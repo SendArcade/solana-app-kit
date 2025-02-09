@@ -5,6 +5,10 @@ import '@ethersproject/shims';
 import {Buffer} from 'buffer';
 global.Buffer = Buffer;
 
+if (typeof Settings === 'undefined') {
+  global.Settings = {};
+}
+
 import {registerRootComponent} from 'expo';
 import App from './App';
 

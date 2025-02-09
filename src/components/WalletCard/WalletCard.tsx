@@ -13,7 +13,7 @@ interface WalletCardProps {
 }
 
 export const WalletCard: React.FC<WalletCardProps> = ({
-    balance,
+    balance, 
     priceChange,
     percentageChange,
     onSwap,
@@ -57,7 +57,7 @@ export const WalletCard: React.FC<WalletCardProps> = ({
                     activeOpacity={0.7}
                 >
                     <View style={styles.buttonIconContainer}>
-                        <Icons.arrow width={24} height={24} />
+                        <Icons.Arrow width={24} height={24} />
                     </View>
                     <Text style={styles.buttonLabel}>Send</Text>
                 </TouchableOpacity>
@@ -68,7 +68,7 @@ export const WalletCard: React.FC<WalletCardProps> = ({
                     activeOpacity={0.7}
                 >
                     <View style={styles.buttonIconContainer}>
-                        <Icons.arrow width={24} height={24} />
+                        <Icons.Arrow width={24} height={24} />
                     </View>
                     <Text style={styles.buttonLabel}>On-Ramp</Text>
                     <Text style={styles.buttonSubLabel}>via mercuryo</Text>

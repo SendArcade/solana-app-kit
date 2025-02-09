@@ -1,7 +1,11 @@
-import { StyleSheet, DimensionValue } from 'react-native';
-import { WALLET_DEFAULT_THEME } from './wallet.theme';
+// components/wallet/wallet.styles.ts
 
-export function getMergedWalletTheme(userTheme?: Partial<typeof WALLET_DEFAULT_THEME>) {
+import {StyleSheet} from 'react-native';
+import {WALLET_DEFAULT_THEME} from './wallet.theme';
+
+export function getMergedWalletTheme(
+  userTheme?: Partial<typeof WALLET_DEFAULT_THEME>,
+) {
   return {
     ...WALLET_DEFAULT_THEME,
     ...(userTheme || {}),
@@ -9,19 +13,19 @@ export function getMergedWalletTheme(userTheme?: Partial<typeof WALLET_DEFAULT_T
 }
 
 /**
- * Create a complete set of wallet styles, merged from:
- *  1) the default wallet theme,
- *  2) optional user provided theme,
+ * Creates a complete set of wallet styles, merged from:
+ *  1) default wallet theme,
+ *  2) optional user-provided theme,
  *  3) base wallet styles,
  *  4) optional userStyleSheet,
  *  5) explicit override styles.
  */
 export function createWalletStyles(
   theme: ReturnType<typeof getMergedWalletTheme>,
-  overrideStyles?: { [key: string]: object },
-  userStyleSheet?: { [key: string]: object },
+  overrideStyles?: {[key: string]: object},
+  userStyleSheet?: {[key: string]: object},
 ) {
-  const baseStyles: { [key: string]: any } = StyleSheet.create({
+  const baseStyles: {[key: string]: any} = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme['--wallet-bg-primary'],
@@ -87,9 +91,10 @@ export function createWalletStyles(
       width: '100%',
     },
     statusText: {
-      marginTop: 10,
+      marginTop: 20,
       fontSize: theme['--wallet-font-size'],
       color: theme['--wallet-text-secondary'],
+      textAlign: 'center',
     },
   });
 
@@ -97,7 +102,10 @@ export function createWalletStyles(
   if (userStyleSheet) {
     Object.keys(userStyleSheet).forEach(key => {
       if (baseStyles[key]) {
-        baseStyles[key] = StyleSheet.flatten([baseStyles[key], userStyleSheet[key]]);
+        baseStyles[key] = StyleSheet.flatten([
+          baseStyles[key],
+          userStyleSheet[key],
+        ]);
       }
     });
   }
@@ -106,10 +114,13 @@ export function createWalletStyles(
   if (overrideStyles) {
     Object.keys(overrideStyles).forEach(key => {
       if (baseStyles[key]) {
-        baseStyles[key] = StyleSheet.flatten([baseStyles[key], overrideStyles[key]]);
+        baseStyles[key] = StyleSheet.flatten([
+          baseStyles[key],
+          overrideStyles[key],
+        ]);
       }
     });
   }
 
   return baseStyles;
-} 
+}

@@ -1,37 +1,46 @@
 import React from 'react';
 import {createStackNavigator} from '@react-navigation/stack';
-import IntroScreen from '../screens/IntroScreen/IntroScreen';
-import MainTabs from './MainTabs';
+import {useSelector} from 'react-redux';
+import {RootState} from '../state/store';
 import LoginScreen from '../screens/LoginScreen/LoginScreen';
+import MainTabs from './MainTabs';
 import CoinDetailPage from '../screens/CoinDetailPage/CoinDetailPage';
+import BlinkScreen from '../screens/BlinkScreen';
 import EmbeddedWalletScreen from '../screens/EmbeddedWalletScreen';
+import IntroScreen from '../screens/IntroScreen/IntroScreen';
 
 export type RootStackParamList = {
-  Intro: undefined;
-  MainTabs: undefined;
   LoginOptions: undefined;
-  CoinDetailPage : undefined;
+  MainTabs: undefined;
+  CoinDetailPage: undefined;
+  Blink: undefined;
   EmbeddedWallet: undefined;
+  IntroScreen: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
+  const isLoggedIn = useSelector((state: RootState) => state.auth.isLoggedIn);
+
   return (
     <Stack.Navigator screenOptions={{headerShown: false}}>
-      <Stack.Screen name="Intro" component={IntroScreen} />
-      <Stack.Screen name="MainTabs" component={MainTabs} />
-      <Stack.Screen
-        name="LoginOptions"
-        component={LoginScreen}
-        options={{headerShown: false}}
-      />
-      <Stack.Screen
-        name="CoinDetailPage"
-        component={CoinDetailPage}
-        options={{headerShown: false}}
-      />
-      <Stack.Screen name="EmbeddedWallet" component={EmbeddedWalletScreen} />
+      {isLoggedIn ? (
+        <>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen name="CoinDetailPage" component={CoinDetailPage} />
+          <Stack.Screen name="Blink" component={BlinkScreen} />
+          <Stack.Screen
+            name="EmbeddedWallet"
+            component={EmbeddedWalletScreen}
+          />
+        </>
+      ) : (
+        <>
+          <Stack.Screen name="IntroScreen" component={IntroScreen} />
+          <Stack.Screen name="LoginOptions" component={LoginScreen} />
+        </>
+      )}
     </Stack.Navigator>
   );
 }

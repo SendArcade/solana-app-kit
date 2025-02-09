@@ -21,6 +21,7 @@ export default function HomeScreen() {
       <TouchableOpacity onPress={() => navigation.navigate('CoinDetailPage')}>
         <Text>Go To Coin Details</Text>
       </TouchableOpacity>
+      
     </SafeAreaView>
   );
 }

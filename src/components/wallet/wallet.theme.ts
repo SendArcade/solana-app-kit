@@ -1,3 +1,5 @@
+// components/wallet/wallet.theme.ts
+
 export const WALLET_DEFAULT_THEME = {
   // Background colors
   '--wallet-bg-primary': '#FFFFFF',
@@ -20,4 +22,4 @@ export const WALLET_DEFAULT_THEME = {
   '--wallet-container-padding': 16,
   '--wallet-button-padding': 12,
   '--wallet-font-size': 14,
-}; 
+};
