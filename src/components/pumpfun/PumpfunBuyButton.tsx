@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import {usePumpfun} from '../../hooks/usePumpfun';
+import {usePumpfun} from '../../hooks/usePumpFun';
 
 /**
  * A reusable component that allows the user to buy a Pumpfun-based token.

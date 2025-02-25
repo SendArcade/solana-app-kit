@@ -24,6 +24,13 @@ app.use('/api/pumpportal', pumpportalRouter);
  */
 const tokenMill = new TokenMillClient();
 
+interface VestingReleaseParams {
+  marketAddress: string;
+  vestingPlanAddress: string;
+  baseTokenMint: string;
+  userPublicKey: string;
+}
+
 /**
  * Create a new TokenMill configuration
  * @route POST /api/config
@@ -239,20 +246,73 @@ app.post(
  * @param {string} req.params.marketAddress - Market address for the vesting schedule
  * @param {Object} req.body - Claim parameters
  */
-app.post(
-  '/api/vesting/:marketAddress/claim',
-  async (req: Request<{marketAddress: string}>, res: Response) => {
-    try {
-      const result = await tokenMill.releaseVesting(req.body);
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({
+app.post('/api/vesting/release', async (req: any, res: any) => {
+  try {
+    const {
+      marketAddress,
+      vestingPlanAddress,
+      baseTokenMint,
+      userPublicKey
+    } = req.body;
+
+    // Build the base64 transaction
+    const result = await tokenMill.buildReleaseVestingTx({
+      marketAddress,
+      vestingPlanAddress,
+      baseTokenMint,
+      userPublicKey
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+    // Return { success, data: base64Tx }
+    return res.json({ success: true, data: result.data });
+  } catch (error: any) {
+    console.error('[POST /api/vesting/release] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Unknown error'
+    });
+  }
+});
+
+app.post("/api/set-curve", async (req: any, res: any) => {
+  try {
+    const { market, userPublicKey, askPrices, bidPrices } = req.body;
+
+    // 1) Validate
+    if (!market || !userPublicKey || !askPrices || !bidPrices) {
+      return res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: "Missing market, userPublicKey, askPrices, or bidPrices",
       });
     }
-  },
-);
+
+    // 2) Call buildSetCurveTx in tokenMill
+    const result = await tokenMill.buildSetCurveTx({
+      market,
+      userPublicKey,
+      askPrices,
+      bidPrices,
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ success: false, error: result.error });
+    }
+
+    // 3) Return the base64 transaction
+    return res.json({ success: true, data: result.data });
+  } catch (error: any) {
+    console.error("[POST /api/set-curve] Error:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Unknown error",
+    });
+  }
+});
+
+
 app.post(
   '/api/quote-swap',
   async (req: Request, res: Response): Promise<any> => {
