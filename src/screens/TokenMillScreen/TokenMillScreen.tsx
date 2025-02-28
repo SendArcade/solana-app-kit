@@ -299,7 +299,7 @@ export default function TokenMillScreen() {
           action: swapType,
           tradeType: 'exactInput',
           amount: parseInt(swapAmount, 10),
-          otherAmountThreshold: 1,
+          otherAmountThreshold: 0,
           userPublicKey: publicKey,
         }),
       });
