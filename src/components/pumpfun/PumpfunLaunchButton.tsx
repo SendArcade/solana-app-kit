@@ -15,7 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import {useAuth} from '../../hooks/useAuth';
 import {createAndBuyTokenViaPumpfun} from '../../services/pumpfun/pumpfunService';
 
-export const PumpportalLaunchButton = () => {
+export const PumpFunLaunchButton = () => {
   const [tokenName, setTokenName] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
   const [description, setDescription] = useState('');
@@ -157,7 +157,7 @@ export const PumpportalLaunchButton = () => {
   );
 };
 
-export default PumpportalLaunchButton;
+export default PumpFunLaunchButton;
 
 const styles = StyleSheet.create({
   container: {padding: 16},

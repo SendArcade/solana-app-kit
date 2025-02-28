@@ -1,12 +1,13 @@
+// File: src/services/pumpfun/pumpfunService.ts
+
 import {
   PublicKey,
-  Connection,
-  VersionedTransaction,
   Transaction,
+  Keypair,
 } from '@solana/web3.js';
 import {calculateWithSlippageBuy, PumpFunSDK} from 'pumpdotfun-sdk';
 import {getAssociatedTokenAddress} from '@solana/spl-token';
-import {HELIUS_API_KEY} from '@env';
+import {PUMPFUN_BACKEND_URL} from '@env';
 
 import {
   checkIfTokenIsOnRaydium,
@@ -28,11 +29,7 @@ import {
   signVersionedTransactionWithPrivy,
 } from './solanaSignUtils';
 
-import {
-  getProvider,
-} from '../../utils/pumpfun/pumpfunUtils';
-import { Keypair } from '@solana/web3.js';
-
+import {getProvider} from '../../utils/pumpfun/pumpfunUtils';
 
 export async function createAndBuyTokenViaPumpfun({
   userPublicKey,
@@ -79,6 +76,9 @@ export async function createAndBuyTokenViaPumpfun({
   });
 
   try {
+    // Use environment variable instead of hard-coded localhost
+    const uploadEndpoint = `${PUMPFUN_BACKEND_URL}/api/pumpfun/uploadMetadata`;
+
     const formData = new FormData();
     formData.append('publicKey', userPublicKey);
     formData.append('tokenName', tokenName);
@@ -95,10 +95,10 @@ export async function createAndBuyTokenViaPumpfun({
       type: 'image/png',
     } as any);
 
-    const uploadResponse = await fetch(
-      'http://localhost:3000/api/pumpfun/uploadMetadata',
-      {method: 'POST', body: formData},
-    );
+    const uploadResponse = await fetch(uploadEndpoint, {
+      method: 'POST',
+      body: formData,
+    });
     if (!uploadResponse.ok) {
       const errMsg = await uploadResponse.text();
       throw new Error(`Metadata upload failed: ${errMsg}`);
