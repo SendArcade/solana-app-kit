@@ -1,0 +1,150 @@
+import {StyleSheet} from 'react-native';
+
+export const PumpfunBuyStyles = StyleSheet.create({
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 12,
+    color: '#333',
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginVertical: 6,
+    color: '#555',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: '#fafafa',
+    marginBottom: 12,
+  },
+  pasteButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  pasteButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  buyButton: {
+    marginTop: 16,
+    backgroundColor: '#28a745',
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+  },
+  buyButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+});
+
+export const PumpfunSellStyles = StyleSheet.create({
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 12,
+    color: '#333',
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 6,
+    color: '#555',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: '#fafafa',
+    marginBottom: 12,
+  },
+  sellButton: {
+    marginTop: 16,
+    backgroundColor: '#dc3545',
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+  },
+  sellButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  maxButton: {
+    backgroundColor: '#ffc107',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  maxButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  feeEstimate: {
+    fontStyle: 'italic',
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 12,
+  },
+});
+
+export const PumpfunLaunchStyles = StyleSheet.create({
+  header: {
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 16,
+    textAlign: 'center',
+    color: '#333',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: '#fafafa',
+    marginBottom: 12,
+  },
+  imageButton: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  imageButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  imagePreview: {
+    width: 120,
+    height: 120,
+    alignSelf: 'center',
+    marginVertical: 10,
+    borderRadius: 8,
+  },
+  launchButton: {
+    backgroundColor: '#28a745',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  launchButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+});

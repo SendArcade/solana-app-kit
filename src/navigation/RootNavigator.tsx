@@ -10,6 +10,7 @@ import IntroScreen from '../screens/IntroScreen/IntroScreen';
 import PumpfunScreen from '../screens/pumpfunScreen/pumpfunScreen';
 import TokenMillScreen from '../screens/TokenMillScreen/TokenMillScreen';
 import NftScreen from '../screens/NftScreen/NftScreen';
+import PlatformSelectionScreen from '../screens/PlatformSelectionScreen';
 
 export type RootStackParamList = {
   LoginOptions: undefined;
@@ -20,6 +21,7 @@ export type RootStackParamList = {
   Pumpfun: undefined;
   TokenMill: undefined;
   NftScreen: undefined;
+  PlatformSelection: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -28,9 +30,13 @@ export default function RootNavigator() {
   const isLoggedIn = useSelector((state: RootState) => state.auth.isLoggedIn);
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{headerShown: false}}>
       {isLoggedIn ? (
         <>
+          <Stack.Screen
+            name="PlatformSelection"
+            component={PlatformSelectionScreen}
+          />
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="CoinDetailPage" component={CoinDetailPage} />
           <Stack.Screen name="Blink" component={BlinkScreen} />
