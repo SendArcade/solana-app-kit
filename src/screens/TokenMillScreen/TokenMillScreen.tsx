@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,23 +10,28 @@ import {
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
+import { styles } from './styles';
 
 import Slider from '@react-native-community/slider';
-import {Picker} from '@react-native-picker/picker';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import { Picker } from '@react-native-picker/picker';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   Transaction,
   Connection,
   PublicKey,
   clusterApiUrl,
+  LAMPORTS_PER_SOL,
+  SystemProgram,
 } from '@solana/web3.js';
-import {Buffer} from 'buffer';
+import * as spl from '@solana/spl-token';
+import { createSyncNativeInstruction } from '@solana/spl-token';
+import { Buffer } from 'buffer';
 global.Buffer = Buffer;
 
-import {useAuth} from '../../hooks/useAuth';
+import { useAuth } from '../../hooks/useAuth';
 
-import {LineChart} from 'react-native-chart-kit';
+import { LineChart } from 'react-native-chart-kit';
 import BondingCurveCustomizer from '../../components/BondingCurveCustomizer';
 
 const SERVER_URL = 'http://localhost:3000'; // or your real server address
@@ -37,12 +42,8 @@ export default function TokenMillScreen() {
   //-------------------------------------------------------------------------------------
   // 1) AUTH CHECK
   //-------------------------------------------------------------------------------------
-  const {solanaWallet} = useAuth();
-  if (
-    !solanaWallet ||
-    !solanaWallet.wallets ||
-    solanaWallet.wallets.length === 0
-  ) {
+  const { solanaWallet } = useAuth();
+  if (!solanaWallet || !solanaWallet.wallets || solanaWallet.wallets.length === 0) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <Text style={styles.errorText}>Wallet not connected</Text>
@@ -56,8 +57,10 @@ export default function TokenMillScreen() {
   const publicKey = solanaWallet.wallets[0].publicKey;
   const connection = new Connection(clusterApiUrl('devnet'));
 
+  // -- Input Fields: Existing Market, Base Token Mint, Vesting Plan Address --
   const [marketAddress, setMarketAddress] = useState('');
   const [baseTokenMint, setBaseTokenMint] = useState('');
+  const [vestingPlanAddress, setVestingPlanAddress] = useState('');
 
   // Market creation form:
   const [tokenName, setTokenName] = useState('MyToken');
@@ -69,9 +72,8 @@ export default function TokenMillScreen() {
 
   // Vesting form:
   const [vestingAmount, setVestingAmount] = useState('200000');
-  const [vestingPlanAddress, setVestingPlanAddress] = useState('');
 
-  // Swap form:
+  // Swap form (Buy/Sell):
   const [swapType, setSwapType] = useState<'buy' | 'sell'>('buy');
   const [swapAmount, setSwapAmount] = useState('1000000');
 
@@ -96,15 +98,13 @@ export default function TokenMillScreen() {
   const [bidPrices, setBidPrices] = useState<number[]>([]);
 
   //-------------------------------------------------------------------------------------
-  // 4) REBUILD ASK PRICES WHENEVER PARAMS CHANGE
+  // 4) REBUILD ASK PRICES WHENEVER PARAMETERS CHANGE
   //-------------------------------------------------------------------------------------
   useEffect(() => {
     const newAsks: number[] = [];
-
     for (let i = 0; i < nPoints; i++) {
       const t = i / (nPoints - 1);
       let val: number;
-
       switch (curveType) {
         case 'linear':
           val = minPrice + (maxPrice - minPrice) * t;
@@ -117,26 +117,18 @@ export default function TokenMillScreen() {
           val = minPrice * Math.pow(ratio, growthRate / 2);
           break;
         }
-        case 'logistic':
+        case 'logistic': {
           const logistic = 1 / (1 + Math.exp(-steepness * (t - midPoint)));
           val = minPrice + (maxPrice - minPrice) * logistic;
           break;
+        }
       }
       newAsks.push(Math.round(val));
     }
     setAskPrices(newAsks);
-  }, [
-    curveType,
-    nPoints,
-    minPrice,
-    maxPrice,
-    exponent,
-    growthRate,
-    midPoint,
-    steepness,
-  ]);
+  }, [curveType, nPoints, minPrice, maxPrice, exponent, growthRate, midPoint, steepness]);
 
-  // Whenever askPrices changes, recalc bid
+  // Whenever askPrices changes, recalc bidPrices as 98% of askPrices
   useEffect(() => {
     setBidPrices(askPrices.map(x => Math.floor(x * 0.98)));
   }, [askPrices]);
@@ -148,8 +140,7 @@ export default function TokenMillScreen() {
     const txBuffer = Buffer.from(base64Tx, 'base64');
     const legacyTx = Transaction.from(txBuffer);
 
-    const provider =
-      solanaWallet.getProvider && (await solanaWallet.getProvider());
+    const provider = solanaWallet.getProvider && (await solanaWallet.getProvider());
     if (!provider || typeof provider.request !== 'function') {
       throw new Error('Wallet provider does not support request().');
     }
@@ -158,7 +149,7 @@ export default function TokenMillScreen() {
 
     const signResult = await provider.request({
       method: 'signMessage',
-      params: {message: base64Message},
+      params: { message: base64Message },
     });
     if (!signResult || !signResult.signature) {
       throw new Error('No signature from wallet');
@@ -166,7 +157,7 @@ export default function TokenMillScreen() {
 
     legacyTx.addSignature(
       new PublicKey(publicKey),
-      Buffer.from(signResult.signature, 'base64'),
+      Buffer.from(signResult.signature, 'base64')
     );
 
     const signedTx = legacyTx.serialize();
@@ -192,7 +183,7 @@ export default function TokenMillScreen() {
       };
       const response = await fetch(`${SERVER_URL}/api/markets`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       const json = await response.json();
@@ -200,10 +191,7 @@ export default function TokenMillScreen() {
         throw new Error(json.error || 'Market creation failed');
       }
       const txSig = await signAndSendLegacyTx(json.transaction);
-      Alert.alert(
-        'Market Created',
-        `Market: ${json.marketAddress}\nTx: ${txSig}`,
-      );
+      Alert.alert('Market Created', `Market: ${json.marketAddress}\nTx: ${txSig}`);
       setMarketAddress(json.marketAddress);
       setBaseTokenMint(json.baseTokenMint);
     } catch (error: any) {
@@ -218,7 +206,7 @@ export default function TokenMillScreen() {
       setLoading(true);
       const response = await fetch(`${SERVER_URL}/api/stake`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           marketAddress,
           amount,
@@ -243,7 +231,7 @@ export default function TokenMillScreen() {
       setLoading(true);
       const resp = await fetch(`${SERVER_URL}/api/vesting`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           marketAddress,
           recipient: publicKey,
@@ -263,7 +251,7 @@ export default function TokenMillScreen() {
       setVestingPlanAddress(data.data.ephemeralVestingPubkey);
       Alert.alert(
         'Vesting Created',
-        `VestingPlan: ${data.data.ephemeralVestingPubkey}\nTx: ${txSig}`,
+        `VestingPlan: ${data.data.ephemeralVestingPubkey}\nTx: ${txSig}`
       );
     } catch (err: any) {
       Alert.alert('Error', err.message);
@@ -282,14 +270,13 @@ export default function TokenMillScreen() {
           marketAddress,
           vestingPlanAddress,
           baseTokenMint,
-          userPublicKey: publicKey, // who pays
+          userPublicKey: publicKey,
         }),
       });
       const data = await response.json();
       if (!data.success) {
         throw new Error(data.error || 'Release vesting failed');
       }
-      // data.data => base64 transaction
       const txSig = await signAndSendLegacyTx(data.data);
       Alert.alert('Vesting Released', `Tx: ${txSig}`);
     } catch (error: any) {
@@ -305,7 +292,7 @@ export default function TokenMillScreen() {
       setLoading(true);
       const response = await fetch(`${SERVER_URL}/api/swap`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           market: marketAddress,
           quoteTokenMint: 'So11111111111111111111111111111111111111112',
@@ -323,11 +310,94 @@ export default function TokenMillScreen() {
       const txSig = await signAndSendLegacyTx(data.transaction);
       Alert.alert('Swap Success', `Signature: ${txSig}`);
     } catch (error: any) {
+      console.log('[handleSwap] Error:', error);
       Alert.alert('Error', error.message);
     } finally {
       setLoading(false);
     }
   };
+
+  //-------------------------------------------------------------------------------------
+  // NEW: FUND MARKET QUOTE TOKEN ACCOUNT (WRAP SOL) FUNCTION
+  //-------------------------------------------------------------------------------------
+  const handleFundMarket = async () => {
+    if (!marketAddress) {
+      Alert.alert('Error', 'Market address is required to fund the quote token account.');
+      return;
+    }
+    try {
+      setLoading(true);
+      console.log("[handleFundMarket] Starting funding process for market:", marketAddress);
+      const marketPubkey = new PublicKey(marketAddress);
+      const quoteTokenMint = new PublicKey("So11111111111111111111111111111111111111112");
+      // Derive the market's quote token associated token account (ATA)
+      const marketQuoteTokenAta = spl.getAssociatedTokenAddressSync(
+        quoteTokenMint,
+        marketPubkey,
+        true
+      );
+      console.log("[handleFundMarket] Derived market quote ATA:", marketQuoteTokenAta.toBase58());
+  
+      // Check if the ATA exists; if not, add an instruction to create it.
+      const ataInfo = await connection.getAccountInfo(marketQuoteTokenAta);
+      const tx = new Transaction();
+      if (!ataInfo) {
+        console.log("[handleFundMarket] Market quote ATA does not exist, creating it...");
+        const createATAIx = spl.createAssociatedTokenAccountInstruction(
+          new PublicKey(publicKey), // payer
+          marketQuoteTokenAta,      // ATA to create
+          marketPubkey,             // owner of the ATA
+          quoteTokenMint
+        );
+        tx.add(createATAIx);
+      } else {
+        console.log("[handleFundMarket] Market quote ATA already exists.");
+      }
+  
+      // Specify amount to deposit (e.g., 0.1 SOL)
+      const lamportsToDeposit = Math.floor(0.1 * LAMPORTS_PER_SOL);
+      console.log("[handleFundMarket] Depositing lamports:", lamportsToDeposit);
+  
+      // Create a transfer instruction from your wallet to the market's wSOL ATA
+      const transferIx = SystemProgram.transfer({
+        fromPubkey: new PublicKey(publicKey),
+        toPubkey: marketQuoteTokenAta,
+        lamports: lamportsToDeposit,
+      });
+      console.log("[handleFundMarket] Created transfer instruction.");
+  
+      // Create a sync instruction so the token program recognizes the new balance
+      const syncIx = createSyncNativeInstruction(marketQuoteTokenAta);
+      console.log("[handleFundMarket] Created sync instruction.");
+  
+      tx.add(transferIx, syncIx);
+      const { blockhash } = await connection.getLatestBlockhash();
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = new PublicKey(publicKey);
+      console.log("[handleFundMarket] Transaction built. Serializing transaction...");
+  
+      const serializedTx = tx.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      });
+      const base64Tx = serializedTx.toString('base64');
+      console.log("[handleFundMarket] Serialized transaction to base64. Sending transaction...");
+  
+      const txSignature = await signAndSendLegacyTx(base64Tx);
+      console.log("[handleFundMarket] Transaction sent successfully. Signature:", txSignature);
+      Alert.alert('Market Funded', `wSOL deposited.\nTx: ${txSignature}`);
+    } catch (error: any) {
+      console.error("[handleFundMarket] Error:", error);
+      // If error is a SendTransactionError, log its details.
+      if (error && typeof error.getLogs === 'function') {
+        console.log("[handleFundMarket] Transaction logs:", error.getLogs());
+      }
+      Alert.alert('Error funding market', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
 
   //-------------------------------------------------------------------------------------
   // 7) handleSetCurve: Calls /api/set-curve with askPrices + bidPrices
@@ -341,20 +411,18 @@ export default function TokenMillScreen() {
       setLoading(true);
       const response = await fetch(`${SERVER_URL}/api/set-curve`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           market: marketAddress,
           userPublicKey: publicKey,
-          askPrices, // from your state
-          bidPrices, // from your state
+          askPrices,
+          bidPrices,
         }),
       });
       const json = await response.json();
       if (!json.success) {
         throw new Error(json.error || 'Failed to build setMarketPrices transaction');
       }
-  
-      // sign & send
       const txSig = await signAndSendLegacyTx(json.data.transaction);
       Alert.alert('Bonding Curve Set', `Tx: ${txSig}`);
     } catch (error: any) {
@@ -363,7 +431,6 @@ export default function TokenMillScreen() {
       setLoading(false);
     }
   };
-  
 
   //-------------------------------------------------------------------------------------
   // 8) Chart Data & Dynamic Scale
@@ -382,7 +449,7 @@ export default function TokenMillScreen() {
     labelSuffix = 'K';
   }
 
-  const chartData = {
+  const chartDataObj = {
     labels: askPrices.map((_, i) => i.toString()),
     datasets: [
       {
@@ -411,14 +478,10 @@ export default function TokenMillScreen() {
         <Text style={styles.subHeader}>Your Pubkey: {publicKey}</Text>
 
         {loading && (
-          <ActivityIndicator
-            size="large"
-            color="#2a2a2a"
-            style={styles.loader}
-          />
+          <ActivityIndicator size="large" color="#2a2a2a" style={styles.loader} />
         )}
 
-        {/* ----------------- Existing Market & Mint ----------------- */}
+        {/* --- 1) Input Fields --- */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Existing Market (Optional)</Text>
           <TextInput
@@ -441,13 +504,13 @@ export default function TokenMillScreen() {
           <Text style={styles.sectionTitle}>Existing Vesting Plan Address (Optional)</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter Base Token Mint"
+            placeholder="Enter Vesting Plan Address"
             value={vestingPlanAddress}
             onChangeText={setVestingPlanAddress}
           />
         </View>
 
-        {/* ----------------- Market Creation ----------------- */}
+        {/* --- 2) Market Creation --- */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Create Market (Token)</Text>
           <TextInput
@@ -495,80 +558,19 @@ export default function TokenMillScreen() {
           )}
         </View>
 
-        {/* ----------------- Stake ----------------- */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Stake</Text>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => handleStake(50000)}>
-            <Text style={styles.buttonText}>Stake 50,000 tokens</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ----------------- Vesting ----------------- */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vesting</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Vesting Amount"
-            value={vestingAmount}
-            onChangeText={setVestingAmount}
-          />
-          <TouchableOpacity style={styles.button} onPress={handleCreateVesting}>
-            <Text style={styles.buttonText}>Create Vesting</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleReleaseVesting}>
-            <Text style={styles.buttonText}>Release Vesting</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ----------------- Swap ----------------- */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Swap</Text>
-          <View style={styles.row}>
-            <TouchableOpacity
-              style={[
-                styles.swapBtn,
-                swapType === 'buy' && styles.swapBtnActive,
-              ]}
-              onPress={() => setSwapType('buy')}>
-              <Text
-                style={[
-                  styles.swapBtnText,
-                  swapType === 'buy' && styles.swapBtnTextActive,
-                ]}>
-                Buy
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.swapBtn,
-                swapType === 'sell' && styles.swapBtnActive,
-              ]}
-              onPress={() => setSwapType('sell')}>
-              <Text
-                style={[
-                  styles.swapBtnText,
-                  swapType === 'sell' && styles.swapBtnTextActive,
-                ]}>
-                Sell
-              </Text>
+        {/* --- NEW: FUND MARKET QUOTE TOKEN ACCOUNT --- */}
+        {marketAddress ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              Fund Market Quote Token Account (Wrap SOL)
+            </Text>
+            <TouchableOpacity style={styles.button} onPress={handleFundMarket}>
+              <Text style={styles.buttonText}>Fund Market (0.1 SOL)</Text>
             </TouchableOpacity>
           </View>
-          <TextInput
-            style={styles.input}
-            placeholder="Swap Amount"
-            value={swapAmount}
-            onChangeText={setSwapAmount}
-          />
-          <TouchableOpacity style={styles.button} onPress={handleSwap}>
-            <Text style={styles.buttonText}>Swap</Text>
-          </TouchableOpacity>
-        </View>
+        ) : null}
 
-        {/* ----------------- Bonding Curve Section Moved to a Separate Component ----------------- */}
+        {/* --- 3) Bonding Curve Customizer --- */}
         <BondingCurveCustomizer
           curveType={curveType}
           setCurveType={setCurveType}
@@ -588,120 +590,68 @@ export default function TokenMillScreen() {
           setSteepness={setSteepness}
           askPrices={askPrices}
           bidPrices={bidPrices}
-          chartData={chartData}
+          chartData={chartDataObj}
           screenWidth={screenWidth}
           handleSetCurve={handleSetCurve}
         />
+
+        {/* --- 4) Buy/Sell (Swap) --- */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Swap (Buy/Sell)</Text>
+          <View style={styles.row}>
+            <TouchableOpacity
+              style={[styles.swapBtn, swapType === 'buy' && styles.swapBtnActive]}
+              onPress={() => setSwapType('buy')}
+            >
+              <Text style={[styles.swapBtnText, swapType === 'buy' && styles.swapBtnTextActive]}>
+                Buy
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.swapBtn, swapType === 'sell' && styles.swapBtnActive]}
+              onPress={() => setSwapType('sell')}
+            >
+              <Text style={[styles.swapBtnText, swapType === 'sell' && styles.swapBtnTextActive]}>
+                Sell
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={styles.input}
+            placeholder="Swap Amount"
+            value={swapAmount}
+            onChangeText={setSwapAmount}
+          />
+          <TouchableOpacity style={styles.button} onPress={handleSwap}>
+            <Text style={styles.buttonText}>Swap</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* --- 5) Staking --- */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Stake</Text>
+          <TouchableOpacity style={styles.button} onPress={() => handleStake(50000)}>
+            <Text style={styles.buttonText}>Stake 50,000 tokens</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* --- 6) Vesting --- */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Vesting</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Vesting Amount"
+            value={vestingAmount}
+            onChangeText={setVestingAmount}
+          />
+          <TouchableOpacity style={styles.button} onPress={handleCreateVesting}>
+            <Text style={styles.buttonText}>Create Vesting</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.button} onPress={handleReleaseVesting}>
+            <Text style={styles.buttonText}>Release Vesting</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#e9e9e9', // Subtle gray background
-  },
-  container: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  header: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#2a2a2a',
-    marginBottom: 4,
-    marginTop: 8,
-  },
-  subHeader: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 16,
-  },
-  loader: {
-    marginVertical: 16,
-  },
-  errorText: {
-    fontSize: 16,
-    color: 'red',
-    textAlign: 'center',
-    marginTop: 20,
-  },
-  section: {
-    width: '100%',
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-
-    // subtle shadow for a nicer card look
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 12,
-    color: '#2a2a2a',
-  },
-  input: {
-    backgroundColor: '#fafafa',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    marginBottom: 12,
-    fontSize: 14,
-  },
-  picker: {
-    width: '100%',
-    backgroundColor: '#fff',
-    marginBottom: 12,
-    borderRadius: 4,
-  },
-  button: {
-    backgroundColor: '#2a2a2a',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  row: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    justifyContent: 'space-between',
-  },
-  swapBtn: {
-    flex: 1,
-    backgroundColor: '#eee',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  swapBtnActive: {
-    backgroundColor: '#2a2a2a',
-  },
-  swapBtnText: {
-    color: '#2a2a2a',
-    fontWeight: '600',
-  },
-  swapBtnTextActive: {
-    color: '#fff',
-  },
-  result: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#2a2a2a',
-    textAlign: 'center',
-  },
-});
