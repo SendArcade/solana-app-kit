@@ -1,5 +1,5 @@
 import React from 'react';
-import {View, Text, TouchableOpacity} from 'react-native';
+import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {useAuth} from '../hooks/useAuth';
 import {useNavigation} from '@react-navigation/native';
 
@@ -51,6 +51,34 @@ export default function SearchScreen() {
       >
         <Text style={{ color: '#fff' }}>Go to Token Mill</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.nftButton}
+        onPress={() => navigation.navigate('NftScreen' as never)} 
+      >
+        <Text style={styles.nftButtonText}>Go to NFT Screen</Text>
+      </TouchableOpacity>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1, 
+    backgroundColor: 'white', 
+    padding: 16,
+  },
+  title: {
+    fontSize: 20, 
+    fontWeight: 'bold',
+  },
+  nftButton: {
+    marginTop: 20,
+    backgroundColor: '#32D4DE',
+    padding: 12,
+    borderRadius: 8,
+  },
+  nftButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+});

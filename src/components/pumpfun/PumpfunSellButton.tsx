@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import {usePumpfun} from '../../hooks/usePumpfun';
+import {usePumpfun} from '../../hooks/usePumpFun';
 
 type SelectedToken = {
   mintPubkey: string;

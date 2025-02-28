@@ -1133,19 +1133,46 @@ export class TokenMillClient {
       const baseTokenMintPubkey = new PublicKey(baseTokenMint);
       const userPubkey = new PublicKey(userPublicKey);
 
-      // 1) Build Anchor instruction
+      // 1) Derive the staking & stakePosition PDAs
+      const stakingPda = PublicKey.findProgramAddressSync(
+        [Buffer.from("market_staking"), marketPubkey.toBuffer()],
+        this.program.programId
+      )[0];
+      const stakePositionPda = PublicKey.findProgramAddressSync(
+        [Buffer.from("stake_position"), marketPubkey.toBuffer(), userPubkey.toBuffer()],
+        this.program.programId
+      )[0];
+
+      // 2) Derive ATAs
+      const marketBaseTokenAta = getAssociatedTokenAddressSync(
+        baseTokenMintPubkey,
+        marketPubkey,
+        true
+      );
+      const userBaseTokenAta = getAssociatedTokenAddressSync(
+        baseTokenMintPubkey,
+        userPubkey,
+        true
+      );
+
+      console.log("[buildReleaseVestingTx] Building release instruction...");
+      // 3) Build the anchor instruction but do NOT call .rpc()
       const anchorTx = await this.program.methods
-        .release() // or whatever your method is
+        .release() // your on-chain method
         .accountsPartial({
           market: marketPubkey,
+          staking: stakingPda,
+          stakePosition: stakePositionPda,
           vestingPlan: vestingPubkey,
+          marketBaseTokenAta,
+          userBaseTokenAta,
           baseTokenMint: baseTokenMintPubkey,
+          baseTokenProgram: TOKEN_PROGRAM_ID,
           user: userPubkey,
-          // plus any other accounts needed (ATA, staking, stakePosition, etc.)
         })
         .transaction();
 
-      // 2) Convert to legacy Tx
+      // 4) Convert anchorTx instructions into a legacy Transaction
       const { blockhash } = await this.connection.getLatestBlockhash();
       const legacyTx = new Transaction({
         feePayer: userPubkey,
@@ -1153,26 +1180,22 @@ export class TokenMillClient {
       });
       legacyTx.add(...anchorTx.instructions);
 
-      // 3) No ephemeral signer needed if vesting is a PDA. If ephemeral, you'd partialSign here.
-      //    For example, if you needed ephemeral key, you do:
-      //    legacyTx.partialSign(ephemeralKeypair);
+      // 5) No ephemeral signers needed (vestingPlan is a PDA, so no local signing).
+      //    If your program required ephemeral, you'd partialSign here.
 
-      // 4) Serialize
+      // 6) Serialize to base64
       const serializedTx = legacyTx.serialize({
         requireAllSignatures: false,
         verifySignatures: false,
       });
-      const base64Tx = serializedTx.toString('base64');
+      const base64Tx = serializedTx.toString("base64");
 
-      return {
-        success: true,
-        data: base64Tx,
-      };
+      return { success: true, data: base64Tx };
     } catch (error: any) {
-      console.error('[buildReleaseVestingTx] Error:', error);
+      console.error("[buildReleaseVestingTx] Error:", error);
       return {
         success: false,
-        error: error.message || 'Unknown error',
+        error: error.message || "Unknown error",
       };
     }
   }
@@ -1768,6 +1791,59 @@ export class TokenMillClient {
     } catch (error) {
       console.log("Error parsing return data:", error);
       return { inputAmount: 0, outputAmount: 0 };
+    }
+  }
+
+
+  async buildSetCurveTx(params: {
+    market: string;
+    userPublicKey: string;
+    askPrices: number[]; 
+    bidPrices: number[];
+  }): Promise<TokenMillResponse<{ transaction: string }>> {
+    try {
+      console.log("[buildSetCurveTx] Received params:", params);
+      const { market, userPublicKey, askPrices, bidPrices } = params;
+      const marketPubkey = new PublicKey(market);
+      const userPubkey = new PublicKey(userPublicKey);
+
+      // 1) Convert askPrices[], bidPrices[] into BN arrays
+      const bnAsk = askPrices.map((n) => new BN(n));
+      const bnBid = bidPrices.map((n) => new BN(n));
+
+      // 2) Build the anchor instruction
+      console.log("[buildSetCurveTx] Building setMarketPrices instruction...");
+      const anchorTx = await this.program.methods
+        .setMarketPrices(bnBid, bnAsk)
+        .accountsPartial({
+          market: marketPubkey,
+          creator: userPubkey, // user must be the "creator" or authorized
+        })
+        .transaction();
+
+      // 3) Convert anchorTx -> legacy Tx
+      const { blockhash } = await this.connection.getLatestBlockhash();
+      const legacyTx = new Transaction({
+        feePayer: userPubkey,
+        recentBlockhash: blockhash,
+      });
+      legacyTx.add(...anchorTx.instructions);
+
+      // 4) No ephemeral signers needed if your program does not require them
+      //    If it does, partialSign them here.
+
+      // 5) Serialize -> base64
+      const serializedTx = legacyTx.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      });
+      const base64Tx = serializedTx.toString("base64");
+      console.log("[buildSetCurveTx] Final base64:", base64Tx);
+
+      return { success: true, data: { transaction: base64Tx } };
+    } catch (error: any) {
+      console.error("[buildSetCurveTx] Error:", error);
+      return { success: false, error: error.message || "Unknown error" };
     }
   }
 
