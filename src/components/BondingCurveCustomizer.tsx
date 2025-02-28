@@ -56,7 +56,7 @@ export default function BondingCurveCustomizer(props: Props) {
   } = props;
 
   // 1) Final clamp for the displayed arrays
-  //    We convert negative or Infinity values => 0.
+  //    We convert negative or Infinity values => 0 (just for display).
   const safeAsks = askPrices.map((val, i) => {
     if (!Number.isFinite(val) || val < 0) {
       console.warn(
@@ -77,11 +77,10 @@ export default function BondingCurveCustomizer(props: Props) {
     return val;
   });
 
-  // 2) If all data points are zero, we’ll skip the chart to avoid any weird “-Infinity” path.
+  // 2) If all data points are zero, we’ll skip the chart to avoid any weird path
   const hasNonZeroData = safeAsks.some((x) => x > 0) || safeBids.some((x) => x > 0);
 
   // 3) Build a final sanitized chart config
-  //    We'll recalculate the scaleFactor logic here, same as in your main screen
   const allValues = [...safeAsks, ...safeBids];
   const globalMax = Math.max(...allValues, 0);
   let scaleFactor = 1;
@@ -94,7 +93,7 @@ export default function BondingCurveCustomizer(props: Props) {
     labelSuffix = 'K';
   }
 
-  // Actually build the chart data
+  // Actually build the chart data for display
   const finalChartData = {
     labels: safeAsks.map((_, i) => i.toString()),
     datasets: [
@@ -141,14 +140,15 @@ export default function BondingCurveCustomizer(props: Props) {
       />
 
       {/* minPrice / maxPrice */}
-      <Text style={curveStyles.smallLabel}>Min Price: {minPrice}</Text>
+      {/* [CHANGED] => allow minPrice to go as low as 0.001, step=0.001 */}
+      <Text style={curveStyles.smallLabel}>Min Price: {minPrice.toFixed(3)}</Text>
       <Slider
         style={curveStyles.slider}
-        minimumValue={1}
-        maximumValue={1000}
-        step={1}
+        minimumValue={0.001}  // was 0 before
+        maximumValue={100}
+        step={0.001}
         value={minPrice}
-        onValueChange={(val) => setMinPrice(Math.round(val))}
+        onValueChange={(val) => setMinPrice(val)}
       />
 
       <Text style={curveStyles.smallLabel}>Max Price: {maxPrice}</Text>
@@ -225,26 +225,30 @@ export default function BondingCurveCustomizer(props: Props) {
         <Text style={{ fontSize: 12, color: '#666' }}>{safeAsks.join(', ')}</Text>
       </View>
 
+      {/* Display final bid array */}
+      <View style={{ marginTop: 12 }}>
+        <Text style={{ fontWeight: '600', marginBottom: 4 }}>Bid Prices (clamped):</Text>
+        <Text style={{ fontSize: 12, color: '#666' }}>{safeBids.join(', ')}</Text>
+      </View>
+
       {/* Chart or fallback */}
       {hasNonZeroData ? (
-        <>
-          <LineChart
-            data={finalChartData}
-            width={screenWidth * 0.9}
-            height={220}
-            chartConfig={{
-              backgroundGradientFrom: '#fff',
-              backgroundGradientTo: '#fff',
-              color: (opacity = 1) => `rgba(0,0,0,${opacity})`,
-              labelColor: (opacity = 1) => `rgba(0,0,0,${opacity})`,
-              style: { borderRadius: 16 },
-              propsForDots: { r: '3', strokeWidth: '2' },
-            }}
-            withShadow
-            withDots
-            style={{ marginTop: 16, borderRadius: 16 }}
-          />
-        </>
+        <LineChart
+          data={finalChartData}
+          width={screenWidth * 0.9}
+          height={220}
+          chartConfig={{
+            backgroundGradientFrom: '#fff',
+            backgroundGradientTo: '#fff',
+            color: (opacity = 1) => `rgba(0,0,0,${opacity})`,
+            labelColor: (opacity = 1) => `rgba(0,0,0,${opacity})`,
+            style: { borderRadius: 16 },
+            propsForDots: { r: '3', strokeWidth: '2' },
+          }}
+          withShadow
+          withDots
+          style={{ marginTop: 16, borderRadius: 16 }}
+        />
       ) : (
         <View style={{ marginTop: 16 }}>
           <Text style={{ color: '#999', fontStyle: 'italic' }}>

@@ -10,11 +10,11 @@ import {
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
-import { styles } from './styles';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { styles } from './styles'; // Your existing global styles
 
 import Slider from '@react-native-community/slider';
 import { Picker } from '@react-native-picker/picker';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   Transaction,
@@ -37,6 +37,18 @@ import BondingCurveCustomizer from '../../components/BondingCurveCustomizer';
 const SERVER_URL = 'http://localhost:3000'; // or your real server address
 
 type CurveType = 'linear' | 'power' | 'exponential' | 'logistic';
+
+// [CHANGED] => Helper to force non-decreasing array
+function ensureMonotonicIncreasing(arr: number[]): number[] {
+  if (arr.length < 2) return arr;
+  const newArr = [...arr];
+  for (let i = 1; i < newArr.length; i++) {
+    if (newArr[i] < newArr[i - 1]) {
+      newArr[i] = newArr[i - 1]; // clamp to previous
+    }
+  }
+  return newArr;
+}
 
 export default function TokenMillScreen() {
   //-------------------------------------------------------------------------------------
@@ -85,12 +97,13 @@ export default function TokenMillScreen() {
   //-------------------------------------------------------------------------------------
   const [curveType, setCurveType] = useState<CurveType>('power');
   const [nPoints, setNPoints] = useState(11);
-  const [minPrice, setMinPrice] = useState(10);
-  const [maxPrice, setMaxPrice] = useState(500000);
 
+  // [CHANGED] => allow minPrice down to 0.001
+  const [minPrice, setMinPrice] = useState(0.001);
+
+  const [maxPrice, setMaxPrice] = useState(500000);
   const [exponent, setExponent] = useState(1.0);
   const [growthRate, setGrowthRate] = useState(1.0);
-
   const [midPoint, setMidPoint] = useState(0.5);
   const [steepness, setSteepness] = useState(5.0);
 
@@ -98,7 +111,7 @@ export default function TokenMillScreen() {
   const [bidPrices, setBidPrices] = useState<number[]>([]);
 
   //-------------------------------------------------------------------------------------
-  // 4) REBUILD ASK PRICES WHENEVER PARAMETERS CHANGE
+  // 4) REBUILD ASK PRICES WHENEVER PARAMETERS CHANGE, THEN FIX TO NON-DECREASING
   //-------------------------------------------------------------------------------------
   useEffect(() => {
     const newAsks: number[] = [];
@@ -113,7 +126,8 @@ export default function TokenMillScreen() {
           val = minPrice + (maxPrice - minPrice) * Math.pow(t, exponent);
           break;
         case 'exponential': {
-          const ratio = Math.pow(maxPrice / Math.max(minPrice, 1), t);
+          // any custom approach; note we clamp minPrice to ensure no negative
+          const ratio = Math.pow(maxPrice / Math.max(minPrice, 0.001), t);
           val = minPrice * Math.pow(ratio, growthRate / 2);
           break;
         }
@@ -123,15 +137,43 @@ export default function TokenMillScreen() {
           break;
         }
       }
-      newAsks.push(Math.round(val));
+
+      // Round to a reasonable integer or float
+      // [CHANGED] => Instead of rounding to int, let's keep some decimals
+      // but your code had `Math.round(...)`. Keep it or remove it as needed.
+      const finalVal = parseFloat(val.toFixed(6)); // keep up to 6 decimals
+      newAsks.push(finalVal);
     }
-    setAskPrices(newAsks);
-  }, [curveType, nPoints, minPrice, maxPrice, exponent, growthRate, midPoint, steepness]);
+
+    // [CHANGED] => Enforce monotonic (non-decreasing) after generation
+    const monotonicAsks = ensureMonotonicIncreasing(newAsks);
+
+    // Only set state if changed (avoid infinite re-renders)
+    if (JSON.stringify(monotonicAsks) !== JSON.stringify(askPrices)) {
+      setAskPrices(monotonicAsks);
+    }
+  }, [
+    curveType,
+    nPoints,
+    minPrice,
+    maxPrice,
+    exponent,
+    growthRate,
+    midPoint,
+    steepness,
+    askPrices, // note: we compare new array to old array
+  ]);
 
   // Whenever askPrices changes, recalc bidPrices as 98% of askPrices
+  // then also enforce monotonic
   useEffect(() => {
-    setBidPrices(askPrices.map(x => Math.floor(x * 0.98)));
-  }, [askPrices]);
+    const newBids = askPrices.map(x => parseFloat((x * 0.98).toFixed(6)));
+    const monotonicBids = ensureMonotonicIncreasing(newBids);
+
+    if (JSON.stringify(monotonicBids) !== JSON.stringify(bidPrices)) {
+      setBidPrices(monotonicBids);
+    }
+  }, [askPrices, bidPrices]);
 
   //-------------------------------------------------------------------------------------
   // 5) signAndSendLegacyTx HELPER
@@ -297,9 +339,9 @@ export default function TokenMillScreen() {
           market: marketAddress,
           quoteTokenMint: 'So11111111111111111111111111111111111111112',
           action: swapType,
-          tradeType: 'exactInput',
-          amount: parseInt(swapAmount, 10),
-          otherAmountThreshold: 0,
+          tradeType: swapType === 'buy' ? 'exactOutput' : 'exactInput',
+          amount: parseInt((parseFloat(swapAmount) * 1_000_000).toString(), 10),
+          otherAmountThreshold: swapType === 'buy'? 1000000000 : 0,
           userPublicKey: publicKey,
         }),
       });
@@ -388,7 +430,6 @@ export default function TokenMillScreen() {
       Alert.alert('Market Funded', `wSOL deposited.\nTx: ${txSignature}`);
     } catch (error: any) {
       console.error("[handleFundMarket] Error:", error);
-      // If error is a SendTransactionError, log its details.
       if (error && typeof error.getLogs === 'function') {
         console.log("[handleFundMarket] Transaction logs:", error.getLogs());
       }
@@ -397,7 +438,6 @@ export default function TokenMillScreen() {
       setLoading(false);
     }
   };
-  
 
   //-------------------------------------------------------------------------------------
   // 7) handleSetCurve: Calls /api/set-curve with askPrices + bidPrices
@@ -433,9 +473,8 @@ export default function TokenMillScreen() {
   };
 
   //-------------------------------------------------------------------------------------
-  // 8) Chart Data & Dynamic Scale (with safety checks)
+  // 8) Chart Data & Dynamic Scale
   //-------------------------------------------------------------------------------------
-  // Ensure all numbers are finite:
   const safeAskPrices = askPrices.map(n => (Number.isFinite(n) ? n : 0));
   const safeBidPrices = bidPrices.map(n => (Number.isFinite(n) ? n : 0));
 
@@ -453,22 +492,21 @@ export default function TokenMillScreen() {
     labelSuffix = 'K';
   }
 
-  // Normalize data by scaleFactor
   const normalizedAskData = safeAskPrices.map(n => n / scaleFactor);
   const normalizedBidData = safeBidPrices.map(n => n / scaleFactor);
 
-  // If all data points are the same, adjust the last point by a tiny amount to avoid zero range
+  // If all data points are the same, artificially bump the last point
   if (
-    normalizedAskData.length > 0 &&
+    normalizedAskData.length > 1 &&
     Math.min(...normalizedAskData) === Math.max(...normalizedAskData)
   ) {
-    normalizedAskData[normalizedAskData.length - 1] += 0.0001;
+    normalizedAskData[normalizedAskData.length - 1] += 0.000001;
   }
   if (
-    normalizedBidData.length > 0 &&
+    normalizedBidData.length > 1 &&
     Math.min(...normalizedBidData) === Math.max(...normalizedBidData)
   ) {
-    normalizedBidData[normalizedBidData.length - 1] += 0.0001;
+    normalizedBidData[normalizedBidData.length - 1] += 0.000001;
   }
 
   const chartDataObj = {
