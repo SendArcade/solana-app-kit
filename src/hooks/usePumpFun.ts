@@ -6,37 +6,26 @@ import {useAuth} from './useAuth';
 import {
   buyTokenViaPumpfun,
   sellTokenViaPumpfun,
+  createAndBuyTokenViaPumpfun,
 } from '../services/pumpfun/pumpfunService';
 
-interface BuyParams {
-  tokenAddress: string;
-  solAmount: number;
-}
-interface SellParams {
-  tokenAddress: string;
-  tokenAmount: number;
-}
-interface LaunchParams {
-  tokenName: string;
-  tokenSymbol: string;
-  description?: string;
-  imageUrl?: string;
-  additionalOptions?: {
-    twitter?: string;
-    telegram?: string;
-    website?: string;
-  };
-}
-
 /**
- * usePumpfun hook: now uses Pinata under the hood for uploading metadata
- * (see launchTokenViaPumpfun in pumpfunService.ts).
+ * usePumpfun hook: centralizes buy, sell, and launch logic for Pumpfun tokens.
  */
 export function usePumpfun() {
   const {solanaWallet} = useAuth();
 
+  /**
+   * BUY
+   */
   const buyToken = useCallback(
-    async ({tokenAddress, solAmount}: BuyParams) => {
+    async ({
+      tokenAddress,
+      solAmount,
+    }: {
+      tokenAddress: string;
+      solAmount: number;
+    }) => {
       if (!solanaWallet) {
         Alert.alert('Error', 'No Solana wallet found. Please connect first.');
         return;
@@ -61,8 +50,17 @@ export function usePumpfun() {
     [solanaWallet],
   );
 
+  /**
+   * SELL
+   */
   const sellToken = useCallback(
-    async ({tokenAddress, tokenAmount}: SellParams) => {
+    async ({
+      tokenAddress,
+      tokenAmount,
+    }: {
+      tokenAddress: string;
+      tokenAmount: number;
+    }) => {
       if (!solanaWallet) {
         Alert.alert('Error', 'No Solana wallet found. Please connect first.');
         return;
@@ -87,8 +85,75 @@ export function usePumpfun() {
     [solanaWallet],
   );
 
+  /**
+   * LAUNCH
+   * (create + buy tokens at launch)
+   */
+  const launchToken = useCallback(
+    async ({
+      tokenName,
+      tokenSymbol,
+      description = '',
+      twitter = '',
+      telegram = '',
+      website = '',
+      imageUri,
+      solAmount,
+    }: {
+      tokenName: string;
+      tokenSymbol: string;
+      description?: string;
+      twitter?: string;
+      telegram?: string;
+      website?: string;
+      imageUri: string;
+      solAmount: number;
+    }) => {
+      if (!solanaWallet) {
+        Alert.alert('Error', 'No Solana wallet found. Please connect first.');
+        return;
+      }
+      const userPublicKey = solanaWallet.wallets?.[0]?.publicKey || '';
+      try {
+        console.log('[usePumpfun.launchToken] Creating + Buying token:', {
+          tokenName,
+          tokenSymbol,
+          description,
+          twitter,
+          telegram,
+          website,
+          imageUri,
+          solAmount,
+        });
+        const result = await createAndBuyTokenViaPumpfun({
+          userPublicKey,
+          tokenName,
+          tokenSymbol,
+          description,
+          twitter,
+          telegram,
+          website,
+          imageUri,
+          solAmount,
+          solanaWallet,
+        });
+        if (result?.success) {
+          Alert.alert(
+            'Success',
+            `Launched token!\nMint: ${result.mintPublicKey}\nTx: ${result.txId}`,
+          );
+        }
+      } catch (error: any) {
+        console.error('[usePumpfun.launchToken] Error:', error);
+        Alert.alert('Error Launching Token', error?.message || String(error));
+      }
+    },
+    [solanaWallet],
+  );
+
   return {
     buyToken,
     sellToken,
+    launchToken,
   };
 }
