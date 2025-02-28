@@ -103,7 +103,7 @@ export default function TokenMillScreen() {
   useEffect(() => {
     const newAsks: number[] = [];
     for (let i = 0; i < nPoints; i++) {
-      const t = i / (nPoints - 1);
+      const t = i / (nPoints - 1); // safe since nPoints >= 5
       let val: number;
       switch (curveType) {
         case 'linear':
@@ -433,10 +433,14 @@ export default function TokenMillScreen() {
   };
 
   //-------------------------------------------------------------------------------------
-  // 8) Chart Data & Dynamic Scale
+  // 8) Chart Data & Dynamic Scale (with safety checks)
   //-------------------------------------------------------------------------------------
-  const maxAsk = Math.max(...askPrices, 0);
-  const maxBid = Math.max(...bidPrices, 0);
+  // Ensure all numbers are finite:
+  const safeAskPrices = askPrices.map(n => (Number.isFinite(n) ? n : 0));
+  const safeBidPrices = bidPrices.map(n => (Number.isFinite(n) ? n : 0));
+
+  const maxAsk = Math.max(...safeAskPrices, 0);
+  const maxBid = Math.max(...safeBidPrices, 0);
   const globalMax = Math.max(maxAsk, maxBid);
 
   let scaleFactor = 1;
@@ -449,16 +453,34 @@ export default function TokenMillScreen() {
     labelSuffix = 'K';
   }
 
+  // Normalize data by scaleFactor
+  const normalizedAskData = safeAskPrices.map(n => n / scaleFactor);
+  const normalizedBidData = safeBidPrices.map(n => n / scaleFactor);
+
+  // If all data points are the same, adjust the last point by a tiny amount to avoid zero range
+  if (
+    normalizedAskData.length > 0 &&
+    Math.min(...normalizedAskData) === Math.max(...normalizedAskData)
+  ) {
+    normalizedAskData[normalizedAskData.length - 1] += 0.0001;
+  }
+  if (
+    normalizedBidData.length > 0 &&
+    Math.min(...normalizedBidData) === Math.max(...normalizedBidData)
+  ) {
+    normalizedBidData[normalizedBidData.length - 1] += 0.0001;
+  }
+
   const chartDataObj = {
     labels: askPrices.map((_, i) => i.toString()),
     datasets: [
       {
-        data: askPrices.map(n => n / scaleFactor),
+        data: normalizedAskData,
         color: () => '#f55',
         strokeWidth: 2,
       },
       {
-        data: bidPrices.map(n => n / scaleFactor),
+        data: normalizedBidData,
         color: () => '#55f',
         strokeWidth: 2,
       },

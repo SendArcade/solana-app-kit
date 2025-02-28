@@ -1,5 +1,4 @@
-// File: server/src/utils/pumpfunConstants.ts
-
+// server/src/utils/pumpfunConstants.ts
 import {PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY} from '@solana/web3.js';
 
 export const GLOBAL = new PublicKey(
@@ -21,12 +20,4 @@ export const MINT_AUTHORITY = new PublicKey(
 );
 export const COMPUTE_BUDGET_PROGRAM_ID = new PublicKey(
   'ComputeBudget111111111111111111111111111111',
-);
-
-/**
- * 8-byte discriminator used by Pump.fun for the "create token" instruction.
- */
-export const PUMP_FUN_LAUNCH_DISCRIMINATOR = Buffer.from(
-  '181ec828051c0777',
-  'hex',
 );

@@ -38,3 +38,7 @@ export function bufferFromString(str: string): Buffer {
   return Buffer.concat([lenBuffer, utf8]);
 }
 
+export async function uriToBlob(uri: string): Promise<Blob> {
+  const response = await fetch(uri);
+  return await response.blob();
+}

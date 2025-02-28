@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
+import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import {Picker} from '@react-native-picker/picker';
 import {LineChart} from 'react-native-chart-kit';
 import Slider from '@react-native-community/slider';
@@ -273,8 +268,6 @@ const curveStyles = StyleSheet.create({
     padding: 16,
     borderRadius: 10,
     marginBottom: 16,
-
-    // Subtle shadow for nicer UI
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,

@@ -34,6 +34,18 @@ export async function buildPumpFunBuyTransaction({
     lamportsToBuy,
     slippageBasis,
   );
+  console.log('[PumpFunBonding] Transaction Instructions:');
+  transaction.instructions.forEach((instruction, index) => {
+    console.log(`[PumpFunBonding] Instruction ${index}:`, {
+      programId: instruction.programId.toString(),
+      keys: instruction.keys.map(k => ({
+        pubkey: k.pubkey.toString(),
+        isSigner: k.isSigner,
+        isWritable: k.isWritable,
+      })),
+      data: instruction.data.toString('hex'),
+    });
+  });
   const {blockhash} = await connection.getLatestBlockhash();
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = payerPubkey;

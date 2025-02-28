@@ -4,7 +4,7 @@ import {
   VersionedTransaction,
   Transaction,
 } from '@solana/web3.js';
-import {PumpFunSDK} from 'pumpdotfun-sdk';
+import {calculateWithSlippageBuy, PumpFunSDK} from 'pumpdotfun-sdk';
 import {getAssociatedTokenAddress} from '@solana/spl-token';
 import {HELIUS_API_KEY} from '@env';
 
@@ -28,10 +28,151 @@ import {
   signVersionedTransactionWithPrivy,
 } from './solanaSignUtils';
 
-// --- NEW: we import uploadPinataMetadata instead of the old “uploadPumpfunMetadata”
 import {
   getProvider,
 } from '../../utils/pumpfun/pumpfunUtils';
+import { Keypair } from '@solana/web3.js';
+
+
+export async function createAndBuyTokenViaPumpfun({
+  userPublicKey,
+  tokenName,
+  tokenSymbol,
+  description,
+  twitter,
+  telegram,
+  website,
+  imageUri,
+  solAmount,
+  slippageBasisPoints = 500n,
+  solanaWallet,
+}: {
+  userPublicKey: string;
+  tokenName: string;
+  tokenSymbol: string;
+  description: string;
+  twitter?: string;
+  telegram?: string;
+  website?: string;
+  imageUri: string;
+  solAmount: number;
+  slippageBasisPoints?: bigint;
+  solanaWallet: any;
+}) {
+  if (!solanaWallet) {
+    throw new Error(
+      'No Solana wallet found. Please connect your wallet first.',
+    );
+  }
+
+  const provider = getProvider();
+  const connection = provider.connection;
+  const sdk = new PumpFunSDK(provider);
+  const creatorPubkey = new PublicKey(userPublicKey);
+
+  console.log('[createAndBuyTokenViaPumpfun] Called with =>', {
+    userPublicKey,
+    tokenName,
+    tokenSymbol,
+    solAmount,
+    imageUri,
+  });
+
+  try {
+    const formData = new FormData();
+    formData.append('publicKey', userPublicKey);
+    formData.append('tokenName', tokenName);
+    formData.append('tokenSymbol', tokenSymbol);
+    formData.append('description', description);
+    formData.append('twitter', twitter || '');
+    formData.append('telegram', telegram || '');
+    formData.append('website', website || '');
+    formData.append('showName', 'true');
+    formData.append('mode', 'local');
+    formData.append('image', {
+      uri: imageUri,
+      name: 'token.png',
+      type: 'image/png',
+    } as any);
+
+    const uploadResponse = await fetch(
+      'http://localhost:3000/api/pumpfun/uploadMetadata',
+      {method: 'POST', body: formData},
+    );
+    if (!uploadResponse.ok) {
+      const errMsg = await uploadResponse.text();
+      throw new Error(`Metadata upload failed: ${errMsg}`);
+    }
+    const uploadJson = await uploadResponse.json();
+    if (!uploadJson.success || !uploadJson.metadataUri) {
+      throw new Error(uploadJson.error || 'No metadataUri returned');
+    }
+    const {metadataUri} = uploadJson;
+    console.log('[createAndBuy] metadataUri =>', metadataUri);
+
+    const mintKeypair = Keypair.generate();
+    console.log('[createAndBuy] New Mint =>', mintKeypair.publicKey.toBase58());
+
+    const createTx = await sdk.getCreateInstructions(
+      creatorPubkey,
+      tokenName,
+      tokenSymbol,
+      metadataUri,
+      mintKeypair,
+    );
+
+    let buyTx: Transaction | null = null;
+    if (solAmount > 0) {
+      const globalAccount = await sdk.getGlobalAccount();
+      const buyAmount = globalAccount.getInitialBuyPrice(
+        BigInt(Math.floor(solAmount * 1e9)),
+      );
+      const buyAmountWithSlippage = calculateWithSlippageBuy(
+        BigInt(Math.floor(solAmount * 1e9)),
+        slippageBasisPoints,
+      );
+
+      buyTx = await sdk.getBuyInstructions(
+        creatorPubkey,
+        mintKeypair.publicKey,
+        globalAccount.feeRecipient,
+        buyAmount,
+        buyAmountWithSlippage,
+      );
+    }
+
+    const combinedTx = new Transaction();
+    createTx.instructions.forEach(ix => combinedTx.add(ix));
+    if (buyTx) {
+      buyTx.instructions.forEach(ix => combinedTx.add(ix));
+    }
+
+    const latest = await connection.getLatestBlockhash();
+    combinedTx.feePayer = creatorPubkey;
+    combinedTx.recentBlockhash = latest.blockhash;
+
+    combinedTx.partialSign(mintKeypair);
+
+    const privyProvider = await solanaWallet.getProvider();
+    const finalSigned = await signLegacyTransactionWithPrivy(
+      combinedTx,
+      creatorPubkey,
+      privyProvider,
+    );
+
+    const txid = await connection.sendRawTransaction(finalSigned.serialize());
+    console.log('[createAndBuy] => Txid:', txid);
+
+    return {
+      success: true,
+      txId: txid,
+      mintPublicKey: mintKeypair.publicKey.toBase58(),
+    };
+  } catch (err: any) {
+    console.error('[createAndBuyTokenViaPumpfun] Error =>', err.message);
+    throw err;
+  }
+}
 
 /* =========================================================================
    1) BUY UTILITY
