@@ -1,7 +1,7 @@
 import React from 'react';
-import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import HomeScreen from '../screens/HomeScreen';
-import SearchScreen from '../screens/SearchScreen';
+import SearchScreen from '../screens/SearchScreen/SearchScreen';
 import FeedScreen from '../screens/FeedScreen/FeedScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen/ProfileScreen';
@@ -13,7 +13,7 @@ const Tab = createBottomTabNavigator();
 
 const iconStyle = {
   shadowColor: '#000',
-  shadowOffset: {width: 0, height: 10},
+  shadowOffset: { width: 0, height: 10 },
   shadowOpacity: 0.3,
   shadowRadius: 8,
   elevation: 6,
@@ -37,7 +37,7 @@ export default function MainTabs() {
         name="Home"
         component={HomeScreen}
         options={{
-          tabBarIcon: ({focused, size}) => (
+          tabBarIcon: ({ focused, size }) => (
             <AnimatedTabIcon
               focused={focused}
               size={size * 1.4}
@@ -62,7 +62,7 @@ export default function MainTabs() {
         name="Search"
         component={SearchScreen}
         options={{
-          tabBarIcon: ({focused, size}) => (
+          tabBarIcon: ({ focused, size }) => (
             <AnimatedTabIcon
               focused={focused}
               size={size * 1.4}
@@ -87,7 +87,7 @@ export default function MainTabs() {
         name="Feed"
         component={FeedScreen}
         options={{
-          tabBarIcon: ({focused, size}) => (
+          tabBarIcon: ({ focused, size }) => (
             <AnimatedTabIcon
               focused={focused}
               size={size * 1.4}
@@ -105,7 +105,7 @@ export default function MainTabs() {
               }
               style={{
                 shadowColor: '#000',
-                shadowOffset: {width: 0, height: 15},
+                shadowOffset: { width: 0, height: 15 },
                 shadowOpacity: 0.6,
                 shadowRadius: 8,
                 elevation: 6,
@@ -119,7 +119,7 @@ export default function MainTabs() {
         name="Notifications"
         component={NotificationsScreen}
         options={{
-          tabBarIcon: ({focused, size}) => (
+          tabBarIcon: ({ focused, size }) => (
             <AnimatedTabIcon
               focused={focused}
               size={size * 1}
@@ -144,7 +144,7 @@ export default function MainTabs() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarIcon: ({focused, size}) => (
+          tabBarIcon: ({ focused, size }) => (
             <AnimatedTabIcon
               focused={focused}
               size={size * 1.8}

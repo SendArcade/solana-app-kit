@@ -23,9 +23,9 @@ interface Props {
   setMidPoint: (v: number) => void;
   steepness: number;
   setSteepness: (v: number) => void;
-  askPrices: number[];
-  bidPrices: number[];
-  chartData: any;
+  askPrices: number[];      // raw ask data
+  bidPrices: number[];      // raw bid data
+  chartData: any;           // pre‑built chartData object
   screenWidth: number;
   handleSetCurve: () => void;
 }
@@ -55,6 +55,63 @@ export default function BondingCurveCustomizer(props: Props) {
     handleSetCurve,
   } = props;
 
+  // 1) Final clamp for the displayed arrays
+  //    We convert negative or Infinity values => 0.
+  const safeAsks = askPrices.map((val, i) => {
+    if (!Number.isFinite(val) || val < 0) {
+      console.warn(
+        `BondingCurveCustomizer: invalid askPrice at index=${i}, val=${val} => using 0`
+      );
+      return 0;
+    }
+    return val;
+  });
+
+  const safeBids = bidPrices.map((val, i) => {
+    if (!Number.isFinite(val) || val < 0) {
+      console.warn(
+        `BondingCurveCustomizer: invalid bidPrice at index=${i}, val=${val} => using 0`
+      );
+      return 0;
+    }
+    return val;
+  });
+
+  // 2) If all data points are zero, we’ll skip the chart to avoid any weird “-Infinity” path.
+  const hasNonZeroData = safeAsks.some((x) => x > 0) || safeBids.some((x) => x > 0);
+
+  // 3) Build a final sanitized chart config
+  //    We'll recalculate the scaleFactor logic here, same as in your main screen
+  const allValues = [...safeAsks, ...safeBids];
+  const globalMax = Math.max(...allValues, 0);
+  let scaleFactor = 1;
+  let labelSuffix = '';
+  if (globalMax >= 1_000_000) {
+    scaleFactor = 1_000_000;
+    labelSuffix = 'M';
+  } else if (globalMax >= 1_000) {
+    scaleFactor = 1_000;
+    labelSuffix = 'K';
+  }
+
+  // Actually build the chart data
+  const finalChartData = {
+    labels: safeAsks.map((_, i) => i.toString()),
+    datasets: [
+      {
+        data: safeAsks.map((n) => n / scaleFactor),
+        color: () => '#f55',
+        strokeWidth: 2,
+      },
+      {
+        data: safeBids.map((n) => n / scaleFactor),
+        color: () => '#55f',
+        strokeWidth: 2,
+      },
+    ],
+    legend: [`Ask (${labelSuffix})`, `Bid (${labelSuffix})`],
+  };
+
   return (
     <View style={curveStyles.section}>
       <Text style={curveStyles.sectionTitle}>Bonding Curve Customization</Text>
@@ -63,8 +120,9 @@ export default function BondingCurveCustomizer(props: Props) {
       <Text style={curveStyles.label}>Curve Type:</Text>
       <Picker
         selectedValue={curveType}
-        onValueChange={itemValue => setCurveType(itemValue as CurveType)}
-        style={curveStyles.picker}>
+        onValueChange={(itemValue) => setCurveType(itemValue as CurveType)}
+        style={curveStyles.picker}
+      >
         <Picker.Item label="Linear" value="linear" />
         <Picker.Item label="Power" value="power" />
         <Picker.Item label="Exponential" value="exponential" />
@@ -79,7 +137,7 @@ export default function BondingCurveCustomizer(props: Props) {
         maximumValue={20}
         step={1}
         value={nPoints}
-        onValueChange={v => setNPoints(Math.round(v))}
+        onValueChange={(v) => setNPoints(Math.round(v))}
       />
 
       {/* minPrice / maxPrice */}
@@ -90,7 +148,7 @@ export default function BondingCurveCustomizer(props: Props) {
         maximumValue={1000}
         step={1}
         value={minPrice}
-        onValueChange={val => setMinPrice(Math.round(val))}
+        onValueChange={(val) => setMinPrice(Math.round(val))}
       />
 
       <Text style={curveStyles.smallLabel}>Max Price: {maxPrice}</Text>
@@ -100,7 +158,7 @@ export default function BondingCurveCustomizer(props: Props) {
         maximumValue={1000000}
         step={1000}
         value={maxPrice}
-        onValueChange={val => setMaxPrice(Math.round(val))}
+        onValueChange={(val) => setMaxPrice(Math.round(val))}
       />
 
       {/* Power-specific */}
@@ -115,7 +173,7 @@ export default function BondingCurveCustomizer(props: Props) {
             maximumValue={3.5}
             step={0.1}
             value={exponent}
-            onValueChange={val => setExponent(val)}
+            onValueChange={(val) => setExponent(val)}
           />
         </>
       )}
@@ -132,7 +190,7 @@ export default function BondingCurveCustomizer(props: Props) {
             maximumValue={3.0}
             step={0.05}
             value={growthRate}
-            onValueChange={val => setGrowthRate(val)}
+            onValueChange={(val) => setGrowthRate(val)}
           />
         </>
       )}
@@ -140,63 +198,62 @@ export default function BondingCurveCustomizer(props: Props) {
       {/* Logistic-specific */}
       {curveType === 'logistic' && (
         <>
-          <Text style={curveStyles.smallLabel}>
-            Mid-Point: {midPoint.toFixed(2)}
-          </Text>
+          <Text style={curveStyles.smallLabel}>Mid-Point: {midPoint.toFixed(2)}</Text>
           <Slider
             style={curveStyles.slider}
             minimumValue={0.0}
             maximumValue={1.0}
             step={0.01}
             value={midPoint}
-            onValueChange={val => setMidPoint(val)}
+            onValueChange={(val) => setMidPoint(val)}
           />
-          <Text style={curveStyles.smallLabel}>
-            Steepness: {steepness.toFixed(2)}
-          </Text>
+          <Text style={curveStyles.smallLabel}>Steepness: {steepness.toFixed(2)}</Text>
           <Slider
             style={curveStyles.slider}
             minimumValue={1}
             maximumValue={10}
             step={0.5}
             value={steepness}
-            onValueChange={val => setSteepness(val)}
+            onValueChange={(val) => setSteepness(val)}
           />
         </>
       )}
 
       {/* Display final ask array */}
-      <View style={{marginTop: 12}}>
-        <Text style={{fontWeight: '600', marginBottom: 4}}>Ask Prices:</Text>
-        <Text style={{fontSize: 12, color: '#666'}}>
-          {askPrices.join(', ')}
-        </Text>
+      <View style={{ marginTop: 12 }}>
+        <Text style={{ fontWeight: '600', marginBottom: 4 }}>Ask Prices (clamped):</Text>
+        <Text style={{ fontSize: 12, color: '#666' }}>{safeAsks.join(', ')}</Text>
       </View>
 
-      {/* Conditionally render the chart only if data is available */}
-      {askPrices.length > 0 ? (
-        <LineChart
-          data={chartData}
-          width={screenWidth * 0.9}
-          height={220}
-          chartConfig={{
-            backgroundGradientFrom: '#fff',
-            backgroundGradientTo: '#fff',
-            color: (opacity = 1) => `rgba(0,0,0,${opacity})`,
-            labelColor: (opacity = 1) => `rgba(0,0,0,${opacity})`,
-            style: {borderRadius: 16},
-            propsForDots: {r: '3', strokeWidth: '2'},
-          }}
-          withShadow
-          withDots
-          style={{marginTop: 16, borderRadius: 16}}
-        />
+      {/* Chart or fallback */}
+      {hasNonZeroData ? (
+        <>
+          <LineChart
+            data={finalChartData}
+            width={screenWidth * 0.9}
+            height={220}
+            chartConfig={{
+              backgroundGradientFrom: '#fff',
+              backgroundGradientTo: '#fff',
+              color: (opacity = 1) => `rgba(0,0,0,${opacity})`,
+              labelColor: (opacity = 1) => `rgba(0,0,0,${opacity})`,
+              style: { borderRadius: 16 },
+              propsForDots: { r: '3', strokeWidth: '2' },
+            }}
+            withShadow
+            withDots
+            style={{ marginTop: 16, borderRadius: 16 }}
+          />
+        </>
       ) : (
-        <Text style={{marginTop: 16, color: '#888'}}>
-          Calculating chart data…
-        </Text>
+        <View style={{ marginTop: 16 }}>
+          <Text style={{ color: '#999', fontStyle: 'italic' }}>
+            No valid data to plot. All values are zero or invalid.
+          </Text>
+        </View>
       )}
 
+      {/* Button to set curve */}
       <TouchableOpacity style={curveStyles.button} onPress={handleSetCurve}>
         <Text style={curveStyles.buttonText}>Set Bonding Curve On-Chain</Text>
       </TouchableOpacity>
@@ -212,7 +269,7 @@ const curveStyles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
