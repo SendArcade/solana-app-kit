@@ -902,21 +902,24 @@ export class TokenMillClient {
         );
       }
 
-      const bnAsk: BN[] = [
-        new BN(28),
-        new BN(29),
-        new BN(32),
-        new BN(47),
-        new BN(110),
-        new BN(380),
-        new BN(1500),
-        new BN(6400),
-        new BN(27000),
-        new BN(120000),
-        new BN(500000),
-      ];
+      const bnAsk: BN[] = askPrices.map(price => new BN(Math.floor(price)));
+      const bnBid: BN[] = bidPrices.map(price => new BN(Math.floor(price)));
 
-      const bnBid: BN[] = bnAsk.map(price => price.muln(99).divn(100));
+      // const bnAsk: BN[] = [
+      //   new BN(28),
+      //   new BN(29),
+      //   new BN(32),
+      //   new BN(47),
+      //   new BN(110),
+      //   new BN(380),
+      //   new BN(1500),
+      //   new BN(6400),
+      //   new BN(27000),
+      //   new BN(120000),
+      //   new BN(500000),
+      // ];
+
+      // const bnBid: BN[] = bnAsk.map(price => price.muln(99).divn(100));
 
       console.log('bnAsk:', bnAsk);
       console.log('bnBid:', bnBid);
