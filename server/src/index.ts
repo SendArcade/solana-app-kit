@@ -1,5 +1,5 @@
 import express, {Request, Response} from 'express';
-import {TokenMillClient} from './utils/tokenMill';
+import {TokenMillClient} from './service/tokenMill';
 import {
   MarketParams,
   StakingParams,
@@ -278,19 +278,18 @@ app.post('/api/vesting/release', async (req: any, res: any) => {
   }
 });
 
-app.post("/api/set-curve", async (req: any, res: any) => {
+app.post('/api/set-curve', async (req: Request, res: Response): Promise<any> => {
   try {
-    const { market, userPublicKey, askPrices, bidPrices } = req.body;
+    const {market, userPublicKey, askPrices, bidPrices} = req.body;
 
-    // 1) Validate
     if (!market || !userPublicKey || !askPrices || !bidPrices) {
       return res.status(400).json({
         success: false,
-        error: "Missing market, userPublicKey, askPrices, or bidPrices",
+        error:
+          'Missing required fields: market, userPublicKey, askPrices, bidPrices',
       });
     }
 
-    // 2) Call buildSetCurveTx in tokenMill
     const result = await tokenMill.buildSetCurveTx({
       market,
       userPublicKey,
@@ -299,16 +298,17 @@ app.post("/api/set-curve", async (req: any, res: any) => {
     });
 
     if (!result.success) {
-      return res.status(500).json({ success: false, error: result.error });
+      return res.status(500).json({success: false, error: result.error});
     }
 
-    // 3) Return the base64 transaction
-    return res.json({ success: true, data: result.data });
+    return res
+      .status(200)
+      .json({success: true, transaction: result.data?.transaction});
   } catch (error: any) {
-    console.error("[POST /api/set-curve] Error:", error);
+    console.error('[POST /api/set-curve] Error:', error);
     return res.status(500).json({
       success: false,
-      error: error.message || "Unknown error",
+      error: error.message || 'Unknown error in set-curve',
     });
   }
 });

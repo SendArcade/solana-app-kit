@@ -8,7 +8,6 @@ import {
 } from '@solana/web3.js';
 import {PumpFunSDK} from 'pumpdotfun-sdk';
 import {getAssociatedTokenAddress} from '@solana/spl-token';
-import {PUMPFUN_BACKEND_URL} from '@env';
 
 import {
   getProvider,
@@ -25,6 +24,7 @@ import {
 } from '../../utils/pumpfun/pumpfunUtils';
 
 import {calculateWithSlippageBuy} from 'pumpdotfun-sdk';
+import { SERVER_URL } from '@env';
 
 /**
  * Create and immediately buy tokens
@@ -74,7 +74,7 @@ export async function createAndBuyTokenViaPumpfun({
   });
 
   try {
-    const uploadEndpoint = `${PUMPFUN_BACKEND_URL}/api/pumpfun/uploadMetadata`;
+    const uploadEndpoint = `${SERVER_URL}/api/pumpfun/uploadMetadata`;
 
     const formData = new FormData();
     formData.append('publicKey', userPublicKey);
