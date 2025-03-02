@@ -1,13 +1,14 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import HomeScreen from '../screens/HomeScreen';
-import SearchScreen from '../screens/SearchScreen/SearchScreen';
-import FeedScreen from '../screens/FeedScreen/FeedScreen';
-import NotificationsScreen from '../screens/NotificationsScreen';
-import ProfileScreen from '../screens/ProfileScreen/ProfileScreen';
+import HomeScreen from '../screens/SampleUI/Threads/HomeScreen';
+import SearchScreen from '../screens/Common/SearchScreen/SearchScreen';
+
 import Icons from '../assets/svgs';
 
 import AnimatedTabIcon from './AnimatedTabIcon';
+import FeedScreen from '../screens/SampleUI/Threads/FeedScreen/FeedScreen';
+import NotificationsScreen from '../screens/SampleUI/Threads/NotificationsScreen';
+import ProfileScreen from '../screens/SampleUI/Threads/ProfileScreen/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 

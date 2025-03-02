@@ -2,15 +2,16 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useSelector } from 'react-redux';
 import { RootState } from '../state/store';
-import LoginScreen from '../screens/LoginScreen/LoginScreen';
 import MainTabs from './MainTabs';
-import CoinDetailPage from '../screens/CoinDetailPage/CoinDetailPage';
-import BlinkScreen from '../screens/BlinkScreen';
-import IntroScreen from '../screens/IntroScreen/IntroScreen';
-import PumpfunScreen from '../screens/pumpfunScreen/pumpfunScreen';
-import TokenMillScreen from '../screens/TokenMillScreen/TokenMillScreen';
-import NftScreen from '../screens/NftScreen/NftScreen';
-import PlatformSelectionScreen from '../screens/PlatformSelectionScreen';
+import TokenMillScreen from '../screens/Common/TokenMillScreen/TokenMillScreen';
+import ChatScreen from '../screens/SampleUI/Chat/ChatScreen/ChatScreen';
+import PlatformSelectionScreen from '../screens/Common/PlatformSelectionScreen';
+import CoinDetailPage from '../screens/SampleUI/Threads/CoinDetailPage/CoinDetailPage';
+import BlinkScreen from '../screens/Common/BlinkScreen';
+import PumpfunScreen from '../screens/Common/pumpfunScreen/pumpfunScreen';
+import NftScreen from '../screens/Common/NftScreen/NftScreen';
+import IntroScreen from '../screens/Common/IntroScreen/IntroScreen';
+import LoginScreen from '../screens/Common/LoginScreen/LoginScreen';
 
 export type RootStackParamList = {
   LoginOptions: undefined;
@@ -22,6 +23,7 @@ export type RootStackParamList = {
   TokenMill: undefined;
   NftScreen: undefined;
   PlatformSelection: undefined;
+  ChatScreen: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -43,6 +45,7 @@ export default function RootNavigator() {
           <Stack.Screen name="Pumpfun" component={PumpfunScreen} />
           <Stack.Screen name="TokenMill" component={TokenMillScreen} />
           <Stack.Screen name="NftScreen" component={NftScreen} />
+          <Stack.Screen name="ChatScreen" component={ChatScreen} />
         </>
       ) : (
         <>
