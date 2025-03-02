@@ -18,5 +18,5 @@ declare module '@env' {
   export const PINATA_SECRET: string;
   export const PINATA_GATEWAY: string;
   export const TENSOR_API_KEY: string;
-  export const PUMPFUN_BACKEND_URL: string;
+  export const SERVER_URL: string;
 }
