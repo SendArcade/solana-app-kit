@@ -66,9 +66,13 @@ export default function PlatformSelectionScreen() {
   }, []);
 
   const handlePlatformSelection = (platformId: string): void => {
-    // Navigate or handle selection logic
-    navigation.navigate('MainTabs', {screen: 'Feed'});
+    if (platformId === 'chats') {
+      navigation.navigate('ChatScreen' as never);
+    } else {
+      navigation.navigate('MainTabs', {screen: 'Feed'});
+    }
   };
+
 
   const handlePressIn = (index: number): void => {
     Animated.spring(scaleAnim[index], {
