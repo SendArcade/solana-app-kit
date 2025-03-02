@@ -1,10 +1,11 @@
-import React, {useEffect, useState} from 'react';
-import {SafeAreaView, StyleSheet} from 'react-native';
+// File: src/screens/Common/FeedScreen.tsx
+import React, { useEffect, useState, useCallback } from 'react';
+import { SafeAreaView, StyleSheet } from 'react-native';
 import { ThreadCTAButton, ThreadPost, ThreadUser } from '../../../../components/thread/thread.types';
-import { useAppSelector } from '../../../../hooks/useReduxHooks';
+import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks';
 import { Thread } from '../../../../components/thread';
 import COLORS from '../../../../assets/colors';
-
+import { fetchAllPosts } from '../../../../state/thread/reducer';
 
 /** Example: Current user is "Alice" */
 const currentUser: ThreadUser = {
@@ -16,14 +17,16 @@ const currentUser: ThreadUser = {
 };
 
 export default function FeedScreen() {
-  const allPosts = useAppSelector(state => state.thread.allPosts);
+  const dispatch = useAppDispatch();
+  const allPosts = useAppSelector((state) => state.thread.allPosts);
   const [rootPosts, setRootPosts] = useState<ThreadPost[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Example CTA buttons
   const ctaButtons: ThreadCTAButton[] = [
     {
       label: 'Mint NFT',
-      onPress: post => console.log('Liked:', post.id),
+      onPress: (post) => console.log('Mint NFT pressed for post:', post.id),
       buttonStyle: {
         backgroundColor: '#2A2A2A',
         width: 130,
@@ -31,11 +34,11 @@ export default function FeedScreen() {
         justifyContent: 'center',
         alignItems: 'center',
       },
-      buttonLabelStyle: {color: '#FFFFFF'},
+      buttonLabelStyle: { color: '#FFFFFF' },
     },
     {
       label: 'Trade',
-      onPress: post => console.log('Shared:', post.id),
+      onPress: (post) => console.log('Trade pressed for post:', post.id),
       buttonStyle: {
         backgroundColor: '#2A2A2A',
         width: 140,
@@ -43,25 +46,28 @@ export default function FeedScreen() {
         justifyContent: 'center',
         alignItems: 'center',
       },
-      buttonLabelStyle: {color: '#FFFFFF'},
+      buttonLabelStyle: { color: '#FFFFFF' },
     },
-    // {
-    //   label: 'Copy Trade',
-    //   onPress: post => console.log('Saved:', post.id),
-    //   buttonStyle: {backgroundColor: '#F6F7F9'},
-    //   buttonLabelStyle: {color: '#000000'},
-    // },
   ];
 
+  // Fetch posts on mount
   useEffect(() => {
-    const roots = allPosts.filter(p => !p.parentId);
+    dispatch(fetchAllPosts());
+  }, [dispatch]);
+
+  // Filter out root posts (posts without a parent) and sort descending by createdAt.
+  useEffect(() => {
+    const roots = allPosts.filter((p) => !p.parentId);
     roots.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
     setRootPosts(roots);
   }, [allPosts]);
 
-  const handleRootPostCreated = () => {
-    // Handle post creation logic here
-  };
+  // Pull-to-refresh callback
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await dispatch(fetchAllPosts());
+    setRefreshing(false);
+  }, [dispatch]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -69,11 +75,13 @@ export default function FeedScreen() {
         rootPosts={rootPosts}
         currentUser={currentUser}
         ctaButtons={ctaButtons}
-        themeOverrides={{'--thread-bg-primary': '#F0F0F0'}}
+        refreshing={refreshing}   // Prop passed to Thread for refresh control
+        onRefresh={onRefresh}      // Callback to re-fetch posts on pull-to-refresh
+        themeOverrides={{ '--thread-bg-primary': '#F0F0F0' }}
         styleOverrides={{
-          container: {padding: 10},
-          button: {borderRadius: 8}, // Global button style override
-          buttonLabel: {fontWeight: 'bold'}, // Global label style override
+          container: { padding: 10 },
+          button: { borderRadius: 8 },
+          buttonLabel: { fontWeight: 'bold' },
         }}
       />
     </SafeAreaView>

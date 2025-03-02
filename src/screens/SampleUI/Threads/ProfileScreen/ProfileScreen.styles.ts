@@ -1,3 +1,8 @@
+/*
+  FILE: src/screens/SampleUI/Threads/ProfileScreen/ProfileScreen.styles.ts
+  TYPE: Modified (entire file)
+*/
+
 import {StyleSheet} from 'react-native';
 import COLORS from '../../../../assets/colors';
 
@@ -7,108 +12,106 @@ export const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
 
+  // Banner
+  bannerContainer: {
+    width: '100%',
+    height: 120,
+    backgroundColor: COLORS.greyLight,
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+
+  // Profile Header
   profileHeaderContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.greyBorder,
     backgroundColor: COLORS.white,
   },
-  profileInnerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  profileAvatarBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+  profileAvatarWrapper: {
+    marginTop: -36, // overlap
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: COLORS.white,
+    width: 80,
+    height: 80,
     overflow: 'hidden',
   },
   profileAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
-  profileNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  profileTextInfo: {
+    marginTop: 12,
   },
   profileUsername: {
     fontSize: 18,
-    fontWeight: '600',
-    lineHeight: 22,
+    fontWeight: '700',
+    color: COLORS.black,
   },
-  handleFollowsRow: {
+  usernameRow: {
     flexDirection: 'row',
-    gap: 12,
     alignItems: 'center',
     marginTop: 2,
   },
   profileHandle: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 14,
     color: COLORS.greyDark,
+    marginRight: 4,
   },
-  profileFollowsYouBadge: {
-    backgroundColor: COLORS.greyLight,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    paddingVertical: 4,
-    fontSize: 12,
-    fontWeight: '500',
-    color: COLORS.greyDark,
+  verifiedIcon: {
+    marginTop: 2,
   },
   profileBio: {
+    marginTop: 8,
     fontSize: 14,
-    fontWeight: '400',
-    marginBottom: 8,
+    color: '#333',
+    lineHeight: 18,
   },
-  profileStatsRow: {
+  actionButtonsRow: {
+    marginTop: 12,
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  profileStat: {
-    flexDirection: 'row',
-    gap: 4,
+    justifyContent: 'flex-end',
     alignItems: 'center',
   },
-  profileStatLocation: {
+  editProfileBtn: {
+    borderWidth: 1,
+    borderColor: COLORS.greyBorderdark,
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    marginLeft: 8,
+  },
+  editProfileBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.black,
+  },
+
+  // Stats
+  statsContainer: {
     flexDirection: 'row',
-    gap: 4,
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  statItem: {
+    marginRight: 16,
+    flexDirection: 'row',
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
+    marginRight: 4,
   },
   statLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: COLORS.greyMid,
-  },
-  btnGrp: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  disabledBtn: {
-    height: 40,
-    flex: 1,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: COLORS.greyBorder,
-    backgroundColor: COLORS.greyLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  disabledBtnText: {
-    color: '#2A2A2A',
     fontSize: 14,
-    fontWeight: '600',
+    color: COLORS.greyDark,
   },
 
+  // Post list
   flatListContent: {
     paddingHorizontal: 16,
     paddingBottom: 32,
@@ -121,17 +124,19 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
   },
+
+  // Post items
   postItemContainer: {
     flexDirection: 'row',
     paddingVertical: 12,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0.5,
     borderBottomColor: COLORS.greyBorder,
   },
   postItemAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 8,
+    marginRight: 12,
   },
   postItemContent: {
     flex: 1,
@@ -139,8 +144,7 @@ export const styles = StyleSheet.create({
   postHeaderRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 10,
-    marginBottom: 2,
+    gap: 8,
   },
   postUsername: {
     fontSize: 14,
@@ -148,7 +152,7 @@ export const styles = StyleSheet.create({
     color: COLORS.black,
   },
   postHandle: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.greyDark,
   },
   postText: {

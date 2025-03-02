@@ -8,7 +8,7 @@ import PostCTA from './PostCTA'; // Import PostCTA
 import ThreadComposer from './ThreadComposer';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
 import {useAppDispatch} from '../../hooks/useReduxHooks';
-import {deletePost} from '../../state/thread/reducer';
+// import {deletePost} from '../../state/thread/reducer';
 import {ThreadCTAButton, ThreadPost, ThreadUser} from './thread.types';
 
 interface ThreadItemProps {
@@ -58,7 +58,7 @@ export default function ThreadItem({
       Alert.alert('Cannot Delete', 'You are not the owner of this post.');
       return;
     }
-    dispatch(deletePost({postId: p.id}));
+    // dispatch(deletePost({postId: p.id}));
   };
 
   const Wrapper = onPressPost ? TouchableOpacity : View;
@@ -94,7 +94,7 @@ export default function ThreadItem({
         {/* Add PostCTA here */}
         <PostCTA
           post={post}
-          buttons={ctaButtons}
+          // buttons={ctaButtons}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
           userStyleSheet={userStyleSheet}

@@ -1,7 +1,7 @@
 import React from 'react';
-import {View, Text, Image, TouchableOpacity, Alert} from 'react-native';
+import { View, Text, Image, TouchableOpacity, Alert } from 'react-native';
 import Icons from '../../assets/svgs';
-import {createThreadStyles, getMergedTheme} from './thread.styles';
+import { createThreadStyles, getMergedTheme } from './thread.styles';
 import { ThreadPost } from './thread.types';
 
 interface PostHeaderProps {
@@ -9,7 +9,7 @@ interface PostHeaderProps {
   onPressMenu?: (p: ThreadPost) => void;
   onDeletePost?: (p: ThreadPost) => void; // NEW
   themeOverrides?: Partial<Record<string, any>>;
-  styleOverrides?: {[key: string]: object};
+  styleOverrides?: { [key: string]: object };
 }
 
 export default function PostHeader({
@@ -19,7 +19,7 @@ export default function PostHeader({
   themeOverrides,
   styleOverrides,
 }: PostHeaderProps) {
-  const {user, createdAt} = post;
+  const { user, createdAt } = post;
   const mergedTheme = getMergedTheme(themeOverrides);
   const styles = createThreadStyles(mergedTheme, styleOverrides);
 
@@ -49,7 +49,7 @@ export default function PostHeader({
             style: 'cancel',
           },
         ],
-        {cancelable: true},
+        { cancelable: true },
       );
     }
   };
@@ -58,12 +58,16 @@ export default function PostHeader({
     <View style={styles.threadItemHeaderRow}>
       {/* Avatar + username */}
       <View style={styles.threadItemHeaderLeft}>
-     <View style={{position:"relative"}}>
-     <Image source={user.avatar} style={styles.threadItemAvatar} />
-     <Icons.addUserIcon style={{position:"absolute",bottom:-4,zIndex:10,right:4,width:16,height:16,borderRadius:8,borderWidth:2,borderColor:"white"}}/>
-     </View>
-        <View style={{marginLeft: 8}}>
-          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+        <View style={{ position: "relative" }}>
+          <Image
+            source={user.avatar ? user.avatar : require("../../assets/images/User.png")}
+            style={styles.threadItemAvatar}
+          />
+
+          <Icons.addUserIcon style={{ position: "absolute", bottom: -4, zIndex: 10, right: 4, width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: "white" }} />
+        </View>
+        <View style={{ marginLeft: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={styles.threadItemUsername}>{user.username}</Text>
             {user.verified && (
               <Icons.BlueCheck
