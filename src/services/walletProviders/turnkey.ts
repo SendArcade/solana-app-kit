@@ -3,7 +3,7 @@ import {
   PasskeyStamper,
 } from '@turnkey/react-native-passkey-stamper';
 import {TurnkeyClient} from '@turnkey/http';
-import { TURNKEY_BASE_URL, TURNKEY_RP_ID, TURNKEY_RP_NAME } from '@env';
+import {TURNKEY_BASE_URL, TURNKEY_RP_ID, TURNKEY_RP_NAME} from '@env';
 
 export async function handleTurnkeyConnect(
   onWalletConnected?: (info: {provider: 'turnkey'; address: string}) => void,

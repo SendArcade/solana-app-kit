@@ -75,3 +75,4 @@ yarn-error.log
 
 .expo
 .bundle
+.env.local

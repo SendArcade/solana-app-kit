@@ -5,16 +5,21 @@ import {
   useEmbeddedSolanaWallet,
   useRecoverEmbeddedWallet,
   isNotCreated,
-  isConnected,
   needsRecovery,
 } from '@privy-io/expo';
-import {useEffect, useCallback} from 'react';
+import {useCallback} from 'react';
+import {useCustomization} from '../../CustomizationProvider';
 
 export function usePrivyWalletLogic() {
   const {login} = useLogin();
   const {user, isReady, logout} = usePrivy();
   const solanaWallet = useEmbeddedSolanaWallet();
   const {recover} = useRecoverEmbeddedWallet();
+
+  // For example, if you needed the config:
+  const {
+    auth: {privy: privyConfig},
+  } = useCustomization();
 
   const handlePrivyLogin = useCallback(
     async ({
@@ -25,21 +30,16 @@ export function usePrivyWalletLogic() {
       setStatusMessage?: (msg: string) => void;
     }) => {
       if (user) {
-        setStatusMessage?.(
-          `You are already logged in as ${user?.id}`,
-        );
+        setStatusMessage?.(`You are already logged in as ${user?.id}`);
         return;
       }
       try {
         setStatusMessage?.(`Connecting with privy via ${loginMethod}...`);
-        console.log("Login Method ///////////////", loginMethod);
+        // The actual login call
         const session = await login({
           loginMethods: [loginMethod],
-          appearance: {
-            logo: '',
-          },
+          appearance: {logo: ''},
         });
-        console.log('Privy Session:', session);
         if (session?.user) {
           setStatusMessage?.(`Connected user: ${session.user.id}`);
         }
@@ -67,9 +67,7 @@ export function usePrivyWalletLogic() {
 
       try {
         if (solanaWallet.getProvider) {
-          const provider = solanaWallet.getProvider
-            ? await solanaWallet.getProvider().catch(() => null)
-            : null;
+          const provider = await solanaWallet.getProvider().catch(() => null);
           if (provider && solanaWallet.wallets) {
             const connectedWallet = solanaWallet.wallets[0];
             setStatusMessage?.(

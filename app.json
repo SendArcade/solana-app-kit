@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "solanasocialstarter",
-    "slug": "solanasocialstarter",
+    "name": "solana-social-kit",
+    "slug": "solana-social-kit",
     "scheme": "solanasocialstarter",
     "version": "0.0.1",
     "orientation": "portrait",
@@ -14,8 +14,16 @@
       }
     },
     "ios": {
-      "bundleIdentifier": "com.bhu1tyagi.solanasocialstarter"
+      "bundleIdentifier": "com.bhu1tyagi.solanasocialstarter",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "We need access to your photos to let you pick images."
+      }
     },
-    "plugins": ["expo-secure-store"]
+    "plugins": ["expo-secure-store", [
+      "expo-image-picker",
+      {
+        "photosPermission": "We need access to your photos to let you pick images."
+      }
+    ]]
   }
 }

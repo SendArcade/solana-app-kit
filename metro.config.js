@@ -1,4 +1,5 @@
-const {getDefaultConfig} = require('expo/metro-config');
+// metro.config.js
+const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
 
 const config = getDefaultConfig(__dirname);
@@ -15,7 +16,7 @@ config.resolver = {
   sourceExts: [...config.resolver.sourceExts, 'svg'],
   extraNodeModules: {
     crypto: require.resolve('expo-crypto'),
-  }
+  },
 };
 
 module.exports = config;

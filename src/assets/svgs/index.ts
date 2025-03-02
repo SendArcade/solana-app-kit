@@ -38,6 +38,9 @@ import AddBtnIcon from './addBtn.svg';
 import MessageIcon from './messages.svg';
 import BellIcon from './bell-icon.svg';
 import BookmarkActive from './bookmark-active.svg'
+import SendIdle from './send-idle.svg';
+import CryptoIcon from './crypto-icon.svg';
+import MagnifyingGlass from './magnifying-glass.svg';
 
 export default {
   SolanaDot,
@@ -79,5 +82,8 @@ export default {
   AddBtnIcon,
   MessageIcon,
   BellIcon,
-  BookmarkActive
+  BookmarkActive,
+  SendIdle,
+  CryptoIcon,
+  MagnifyingGlass,
 };

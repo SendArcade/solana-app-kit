@@ -9,23 +9,22 @@ const AddButton = () => {
       <TouchableOpacity style={styles.btn}>
    
         <Text style={styles.text}>Follow Back</Text>
-        <Icons.AddBtnIcon style={styles.icon}/>
+        {/* <Icons.AddBtnIcon style={styles.icon}/> */}
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.btn}>
         <Text style={styles.text}>Send to Wallet</Text>
-        <Icons.AddBtnIcon style={styles.icon}/>
+        {/* <Icons.AddBtnIcon style={styles.icon}/> */}
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.btn}>
+      {/* <TouchableOpacity style={styles.btn}>
         <Text style={styles.text}>Buy Time</Text>
         <Icons.AddBtnIcon style={styles.icon}/>
       </TouchableOpacity>
 
-      {/* Last button with different styling */}
       <TouchableOpacity style={[styles.btn, styles.lastBtn]}>
         <Text style={styles.lastBtnText}>+</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
     </View>
   );
 };

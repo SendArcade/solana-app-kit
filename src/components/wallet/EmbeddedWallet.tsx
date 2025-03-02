@@ -1,11 +1,11 @@
-import React, {useState, useEffect} from 'react';
-import {View, Text, TouchableOpacity, TextInput} from 'react-native';
+// File: src/components/wallet/EmbeddedWallet.tsx
+import React, {useEffect} from 'react';
+import {View, Text, TouchableOpacity, Alert} from 'react-native';
 import Icons from '../../assets/svgs';
 import {useAuth} from '../../hooks/useAuth';
-import styles from '../../screens/LoginScreen/LoginScreen.styles';
+import styles from '../../screens/Common/LoginScreen/LoginScreen.styles';
 
 export interface EmbeddedWalletAuthProps {
-  provider?: 'privy' | 'dynamic' | 'turnkey';
   onWalletConnected: (info: {
     provider: 'privy' | 'dynamic' | 'turnkey';
     address: string;
@@ -14,18 +14,34 @@ export interface EmbeddedWalletAuthProps {
 }
 
 const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
-  provider = 'privy',
   onWalletConnected,
   authMode = 'login',
 }) => {
-  const {status, loginWithGoogle, loginWithApple, loginWithEmail, user} =
-    useAuth(provider);
+  // Use the updated hook (no provider parameter)
+  const {
+    status,
+    loginWithGoogle,
+    loginWithApple,
+    loginWithEmail,
+    user,
+    solanaWallet,
+  } = useAuth();
 
   useEffect(() => {
-    if (user && user.id && onWalletConnected) {
-      onWalletConnected({ provider, address: user.id });
+    console.log(solanaWallet, 'solanaWallet');
+    if (user && solanaWallet && onWalletConnected) {
+      const walletPublicKey =
+        solanaWallet.wallets && solanaWallet.wallets.length > 0
+          ? solanaWallet.wallets[0].publicKey
+          : null;
+      if (!solanaWallet || !walletPublicKey) {
+        Alert.alert('Wallet Error', 'Wallet not connected');
+        return;
+      }
+      // In this example we assume "privy" as the provider (the default from customization)
+      onWalletConnected({provider: 'privy', address: walletPublicKey});
     }
-  }, [user, onWalletConnected, provider]);
+  }, [user, onWalletConnected, solanaWallet]);
 
   return (
     <View style={styles.bottomButtonsContainer}>
@@ -37,9 +53,7 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
         <Icons.Apple width={24} height={24} />
         <Text style={styles.buttonText}>Continue with Apple</Text>
       </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.loginButton]}
-        onPress={loginWithEmail}>
+      <TouchableOpacity style={[styles.loginButton]} onPress={loginWithEmail}>
         <Icons.Device width={24} height={24} />
         <Text style={[styles.buttonText]}>Continue with Email</Text>
       </TouchableOpacity>

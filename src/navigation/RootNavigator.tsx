@@ -1,21 +1,29 @@
 import React from 'react';
-import {createStackNavigator} from '@react-navigation/stack';
-import {useSelector} from 'react-redux';
-import {RootState} from '../state/store';
-import LoginScreen from '../screens/LoginScreen/LoginScreen';
+import { createStackNavigator } from '@react-navigation/stack';
+import { useSelector } from 'react-redux';
+import { RootState } from '../state/store';
 import MainTabs from './MainTabs';
-import CoinDetailPage from '../screens/CoinDetailPage/CoinDetailPage';
-import BlinkScreen from '../screens/BlinkScreen';
-import EmbeddedWalletScreen from '../screens/EmbeddedWalletScreen';
-import IntroScreen from '../screens/IntroScreen/IntroScreen';
+import TokenMillScreen from '../screens/Common/TokenMillScreen/TokenMillScreen';
+import ChatScreen from '../screens/SampleUI/Chat/ChatScreen/ChatScreen';
+import PlatformSelectionScreen from '../screens/Common/PlatformSelectionScreen';
+import CoinDetailPage from '../screens/SampleUI/Threads/CoinDetailPage/CoinDetailPage';
+import BlinkScreen from '../screens/Common/BlinkScreen';
+import PumpfunScreen from '../screens/Common/pumpfunScreen/pumpfunScreen';
+import NftScreen from '../screens/Common/NftScreen/NftScreen';
+import IntroScreen from '../screens/Common/IntroScreen/IntroScreen';
+import LoginScreen from '../screens/Common/LoginScreen/LoginScreen';
 
 export type RootStackParamList = {
   LoginOptions: undefined;
   MainTabs: undefined;
   CoinDetailPage: undefined;
   Blink: undefined;
-  EmbeddedWallet: undefined;
   IntroScreen: undefined;
+  Pumpfun: undefined;
+  TokenMill: undefined;
+  NftScreen: undefined;
+  PlatformSelection: undefined;
+  ChatScreen: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -27,13 +35,17 @@ export default function RootNavigator() {
     <Stack.Navigator screenOptions={{headerShown: false}}>
       {isLoggedIn ? (
         <>
+          <Stack.Screen
+            name="PlatformSelection"
+            component={PlatformSelectionScreen}
+          />
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="CoinDetailPage" component={CoinDetailPage} />
           <Stack.Screen name="Blink" component={BlinkScreen} />
-          <Stack.Screen
-            name="EmbeddedWallet"
-            component={EmbeddedWalletScreen}
-          />
+          <Stack.Screen name="Pumpfun" component={PumpfunScreen} />
+          <Stack.Screen name="TokenMill" component={TokenMillScreen} />
+          <Stack.Screen name="NftScreen" component={NftScreen} />
+          <Stack.Screen name="ChatScreen" component={ChatScreen} />
         </>
       ) : (
         <>

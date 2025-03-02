@@ -21,7 +21,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
   }
 }
 
-rootProject.name = 'solanasocialstarter'
+rootProject.name = 'solana-social-kit'
 
 dependencyResolutionManagement {
   versionCatalogs {
