@@ -1,20 +1,16 @@
-import React from 'react';
-import { View, Text, Image, Alert, TouchableOpacity } from 'react-native';
-import { createThreadStyles, getMergedTheme } from './thread.styles';
+// FILE: src/components/thread/PostBody.tsx
+import React, {useState, useEffect} from 'react';
+import {View, Text, Image, ActivityIndicator} from 'react-native';
+import {createThreadStyles, getMergedTheme} from './thread.styles';
 import TradeCard from '../TradeCard/TradeCard';
-import { ThreadPost } from './thread.types';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../state/store';
-import { Connection, Transaction, VersionedTransaction } from '@solana/web3.js';
-import { getProvider } from '../../utils/pumpfun/pumpfunUtils';
-import { Buffer } from 'buffer';
-
-const SOL_TO_LAMPORTS = 1_000_000_000;
+import {ThreadPost} from './thread.types';
+import {TENSOR_API_KEY} from '@env';
+import nftListingStyles from './NftListingSection.style'; // NEW import
 
 interface PostBodyProps {
   post: ThreadPost;
   themeOverrides?: Partial<Record<string, any>>;
-  styleOverrides?: { [key: string]: object };
+  styleOverrides?: {[key: string]: object};
 }
 
 export default function PostBody({
@@ -26,12 +22,10 @@ export default function PostBody({
   const styles = createThreadStyles(mergedTheme, styleOverrides);
 
   return (
-    <View style={{ marginTop: 8 }}>
-      {post.sections.map((section) => (
+    <View style={{marginTop: 8}}>
+      {post.sections.map(section => (
         <View key={section.id} style={styles.extraContentContainer}>
-          <View style={{ width: '84%' }}>
-            {renderSection(section, styles)}
-          </View>
+          <View style={{width: '84%'}}>{renderSection(section, styles)}</View>
         </View>
       ))}
     </View>
@@ -49,17 +43,25 @@ function renderSection(
     case 'TEXT_IMAGE':
       return (
         <>
-          {!!section.text && <Text style={styles.threadItemText}>{section.text}</Text>}
-          {section.imageUrl && <Image source={section.imageUrl} style={styles.threadItemImage} />}
+          {!!section.text && (
+            <Text style={styles.threadItemText}>{section.text}</Text>
+          )}
+          {section.imageUrl && (
+            <Image source={section.imageUrl} style={styles.threadItemImage} />
+          )}
         </>
       );
 
     case 'TEXT_VIDEO':
       return (
         <>
-          {!!section.text && <Text style={styles.threadItemText}>{section.text}</Text>}
+          {!!section.text && (
+            <Text style={styles.threadItemText}>{section.text}</Text>
+          )}
           <View style={styles.videoPlaceholder}>
-            <Text style={styles.videoPlaceholderText}>[Video Player Placeholder]</Text>
+            <Text style={styles.videoPlaceholderText}>
+              [Video Player Placeholder]
+            </Text>
           </View>
         </>
       );
@@ -67,7 +69,9 @@ function renderSection(
     case 'TEXT_TRADE':
       return (
         <>
-          {!!section.text && <Text style={styles.threadItemText}>{section.text}</Text>}
+          {!!section.text && (
+            <Text style={styles.threadItemText}>{section.text}</Text>
+          )}
           {section.tradeData && (
             <TradeCard
               token1={{
@@ -93,10 +97,10 @@ function renderSection(
       return (
         <View style={styles.pollContainer}>
           <Text style={styles.pollQuestion}>{section.pollData.question}</Text>
-          {section.pollData?.options.map((option, index) => (
+          {section.pollData.options.map((option, index) => (
             <View key={index} style={styles.pollOption}>
               <Text style={styles.pollOptionText}>
-                {option} • {section.pollData?.votes[index]} votes
+                {option} • {section.pollData?.votes[index] ?? 0} votes
               </Text>
             </View>
           ))}
@@ -105,126 +109,140 @@ function renderSection(
 
     case 'NFT_LISTING':
       if (!section.listingData) {
-        return <Text style={styles.threadItemText}>[Missing listing data]</Text>;
+        return (
+          <Text style={styles.threadItemText}>[Missing listing data]</Text>
+        );
       }
-      return <NFTListingSection section={section} styles={styles} />;
+      return <NftListingSection listing={section.listingData} />;
 
     default:
       return null;
   }
 }
 
-/** A dedicated component to render an NFT listing and initiate a buy. */
-interface NFTListingSectionProps {
-  section: ThreadPost['sections'][number];
-  styles: ReturnType<typeof createThreadStyles>;
-}
+/**
+ * Sub-component: NftListingSection
+ * Moved all styles to NftListingSection.style.ts
+ */
+function NftListingSection({
+  listing,
+}: {
+  listing: {
+    mint: string;
+    owner: string;
+    name?: string;
+    image?: string;
+    priceSol?: number;
+  };
+}) {
+  const [loading, setLoading] = useState(false);
+  const [nftData, setNftData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
-const NFTListingSection: React.FC<NFTListingSectionProps> = ({ section, styles }) => {
-  // Get the current viewer's public key from your auth state
-  const viewerPubkey = useSelector((state: RootState) => state.auth.address);
-
-  // Buy handler that replicates the buy logic from your BuySection code
-  const handleBuyListedNft = async () => {
-    console.log('Buy button clicked for NFT listing');
-    const listingOwner = section.listingData!.owner || '';
-    const listingPriceSol = section.listingData!.priceSol ?? 0;
-    const mint = section.listingData!.mint;
-    if (!viewerPubkey) {
-      Alert.alert('Error', 'Wallet not connected.');
-      return;
-    }
-    try {
-      // Create a connection to Solana mainnet
-      const connection = new Connection('https://api.mainnet-beta.solana.com');
-      // Get a recent blockhash (using getRecentBlockhash as in your BuySection)
-      const { blockhash } = await connection.getRecentBlockhash();
-      console.log('Obtained blockhash:', blockhash);
-      // Build the buy URL using Tensor's API
-      const buyUrl = `https://api.mainnet.tensordev.io/api/v1/tx/buy?buyer=${viewerPubkey}&mint=${mint}&owner=${listingOwner}&maxPrice=${listingPriceSol}&blockhash=${blockhash}`;
-      console.log('Buy URL:', buyUrl);
-      const resp = await fetch(buyUrl, {
-        headers: { 'x-tensor-api-key': 'afe339b5-9c47-4105-a9fa-7fba32a294dc' }
-      });
-      const rawText = await resp.text();
-      console.log('Raw response from Tensor:', rawText);
-      let data: any;
+  useEffect(() => {
+    let cancelled = false;
+    const fetchNftData = async () => {
       try {
-        data = JSON.parse(rawText);
-      } catch (parseErr) {
-        throw new Error('Tensor returned non-JSON response. Check console for details.');
-      }
-      if (!data.txs || data.txs.length === 0) {
-        throw new Error('No transactions returned from Tensor API for buying.');
-      }
-      console.log('Transactions received:', data.txs);
-      for (let i = 0; i < data.txs.length; i++) {
-        const txObj = data.txs[i];
-        let transaction: Transaction | VersionedTransaction;
-        if (txObj.txV0) {
-          const txBuffer = Buffer.from(txObj.txV0.data, 'base64');
-          transaction = VersionedTransaction.deserialize(txBuffer);
-          console.log(`Deserialized versioned transaction #${i + 1}`);
-        } else if (txObj.tx) {
-          const txBuffer = Buffer.from(txObj.tx.data, 'base64');
-          transaction = Transaction.from(txBuffer);
-          console.log(`Deserialized legacy transaction #${i + 1}`);
-        } else {
-          throw new Error(`Transaction #${i + 1} is in an unknown format.`);
-        }
-        // Cast provider to any to bypass type errors
-        const provider: any = await getProvider();
-        const { signature } = await provider.request({
-          method: 'signAndSendTransaction',
-          params: { transaction, connection }
+        setLoading(true);
+        setError(null);
+        // For demonstration: "quick-mint-info"
+        // Documentation: https://docs.tensor.trade/reference/quick_mint_info
+        const url = `https://api.mainnet.tensordev.io/api/v1/mint?mints=${listing.mint}`;
+        const resp = await fetch(url, {
+          headers: {
+            'x-tensor-api-key': TENSOR_API_KEY,
+          },
         });
-        console.log(`Transaction #${i + 1} signature: ${signature}`);
+
+        if (!resp.ok) {
+          throw new Error(`Tensor API error: ${resp.status}`);
+        }
+        const data = await resp.json();
+        if (cancelled) return;
+
+        if (data && data.length > 0) {
+          setNftData(data[0]);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err.message || 'Failed to fetch NFT data');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-      Alert.alert('Success', 'NFT purchased successfully!');
-    } catch (err: any) {
-      console.error('Error during buy transaction:', err);
-      Alert.alert('Error', err.message || 'Failed to buy NFT.');
-    }
+    };
+    fetchNftData();
+    return () => {
+      cancelled = true;
+    };
+  }, [listing.mint]);
+
+  const formatSolPrice = (lamports: string) => {
+    if (!lamports) return null;
+    const solPrice = parseFloat(lamports) / 1_000_000_000;
+    return solPrice.toFixed(2);
   };
 
-  // Fallback values for display
-  const listingOwner = section.listingData!.owner || '';
-  const listingPrice = section.listingData!.priceSol ?? 0;
-  const listingName = section.listingData!.name || 'Unnamed NFT';
-  const listingImage = section.listingData!.image || '';
-
   return (
-    <View style={styles.nftListingContainer}>
-      {section.text && <Text style={styles.threadItemText}>{section.text}</Text>}
-      {/* Vertical NFT card: big image on top, name and price below */}
-      <View style={styles.nftListingCard}>
-        <View style={styles.nftListingImageContainer}>
-          {listingImage ? (
-            <Image source={{ uri: listingImage }} style={styles.nftListingImage} />
-          ) : (
-            <View style={styles.nftListingPlaceholder}>
-              <Text style={styles.nftListingPlaceholderText}>No Image</Text>
+    <View style={nftListingStyles.container}>
+      <View style={nftListingStyles.card}>
+        {loading ? (
+          <ActivityIndicator size="large" color="#1d9bf0" />
+        ) : (
+          <>
+            <View style={nftListingStyles.imageContainer}>
+              {nftData?.imageUri ? (
+                <Image
+                  source={{uri: nftData.imageUri}}
+                  style={nftListingStyles.image}
+                />
+              ) : (
+                <View style={nftListingStyles.placeholder}>
+                  <Text style={nftListingStyles.placeholderText}>No Image</Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
-        <View style={styles.nftListingInfo}>
-          <Text style={styles.nftListingName} numberOfLines={1}>
-            {listingName}
+
+            <View style={nftListingStyles.infoSection}>
+              <Text style={nftListingStyles.nftTitle} numberOfLines={1}>
+                {nftData?.name || listing.name || 'Unnamed NFT'}
+              </Text>
+
+              {nftData?.collName && (
+                <Text style={nftListingStyles.collectionName}>
+                  Collection: {nftData.collName}
+                </Text>
+              )}
+
+              {!!nftData?.listing?.price && (
+                <Text style={nftListingStyles.priceText}>
+                  Listed @ {formatSolPrice(nftData.listing.price)} SOL
+                </Text>
+              )}
+
+              {nftData?.lastSale?.price && (
+                <Text style={nftListingStyles.lastSale}>
+                  Last sale: {formatSolPrice(nftData.lastSale.price)} SOL
+                </Text>
+              )}
+
+              {nftData?.rarityRankTN && (
+                <Text style={nftListingStyles.rarityInfo}>
+                  Rarity Rank: #{nftData.rarityRankTN} of{' '}
+                  {nftData.numMints || '?'}
+                </Text>
+              )}
+            </View>
+          </>
+        )}
+        {error && (
+          <Text style={{color: 'red', marginTop: 8, fontSize: 12}}>
+            {error}
           </Text>
-          <Text style={styles.nftListingPrice}>
-            {listingPrice > 0 ? `Listed @ ${listingPrice.toFixed(2)} SOL` : 'No Price'}
-          </Text>
-        </View>
+        )}
       </View>
-      {viewerPubkey && listingOwner && viewerPubkey !== listingOwner ? (
-        <TouchableOpacity style={styles.buyButtonStyle} onPress={handleBuyListedNft}>
-          <Text style={styles.buyButtonText}>Buy</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity style={[styles.buyButtonStyle, { opacity: 0.5 }]} disabled>
-          <Text style={styles.buyButtonText}>Buy (Disabled)</Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
-};
+}

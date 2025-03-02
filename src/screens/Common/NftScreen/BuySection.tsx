@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,11 @@ import {
   FlatList,
   Alert,
   Modal,
-  Pressable
+  Pressable,
 } from 'react-native';
-import { Connection, Transaction, VersionedTransaction } from '@solana/web3.js';
-import { buyStyles as styles } from './buySection.styles';
-
+import {Connection, Transaction, VersionedTransaction} from '@solana/web3.js';
+import {buyStyles as styles} from './buySection.styles';
+import {HELIUS_RPC_URL, TENSOR_API_KEY} from '@env';
 
 const SOL_TO_LAMPORTS = 1_000_000_000;
 
@@ -34,10 +34,13 @@ interface FloorNFT {
 /** Helper to fix IPFS/Arweave URLs */
 const fixImageUrl = (url: string): string => {
   if (!url) return '';
-  if (url.startsWith('ipfs://')) return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
-  if (url.startsWith('ar://')) return url.replace('ar://', 'https://arweave.net/');
+  if (url.startsWith('ipfs://'))
+    return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
+  if (url.startsWith('ar://'))
+    return url.replace('ar://', 'https://arweave.net/');
   if (url.startsWith('/')) return `https://arweave.net${url}`;
-  if (!url.startsWith('http') && !url.startsWith('data:')) return `https://${url}`;
+  if (!url.startsWith('http') && !url.startsWith('data:'))
+    return `https://${url}`;
   return url;
 };
 
@@ -46,13 +49,14 @@ interface BuySectionProps {
   userWallet: any;
 }
 
-const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) => {
+const BuySection: React.FC<BuySectionProps> = ({userPublicKey, userWallet}) => {
   const [collectionName, setCollectionName] = useState('madlads');
   const [searchResults, setSearchResults] = useState<CollectionResult[]>([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
 
   // Selected collection for modal display.
-  const [selectedCollection, setSelectedCollection] = useState<CollectionResult | null>(null);
+  const [selectedCollection, setSelectedCollection] =
+    useState<CollectionResult | null>(null);
   const [showBuyModal, setShowBuyModal] = useState(false);
 
   // State for the floor NFT details.
@@ -68,14 +72,14 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
     setSearchResults([]);
     try {
       const url = `https://api.mainnet.tensordev.io/api/v1/collections/search_collections?query=${encodeURIComponent(
-        collectionName.trim()
+        collectionName.trim(),
       )}`;
       const options = {
         method: 'GET',
         headers: {
           accept: 'application/json',
-          'x-tensor-api-key': 'afe339b5-9c47-4105-a9fa-7fba32a294dc'
-        }
+          'x-tensor-api-key': TENSOR_API_KEY,
+        },
       };
       const response = await fetch(url, options);
       if (!response.ok) {
@@ -87,7 +91,7 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
           collId: c.collId,
           name: c.name,
           description: c.description || '',
-          imageUri: c.imageUri || ''
+          imageUri: c.imageUri || '',
         }));
         console.log('Search results:', mapped);
         setSearchResults(mapped);
@@ -107,7 +111,9 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
   // GET https://api.mainnet.tensordev.io/api/v1/mint/collection?collId=...&sortBy=ListingPriceAsc&limit=1
   // We take the first mint from the "mints" array.
   // ------------------------------------------------------------------------
-  const fetchFloorNFTForCollection = async (collId: string): Promise<FloorNFT | null> => {
+  const fetchFloorNFTForCollection = async (
+    collId: string,
+  ): Promise<FloorNFT | null> => {
     try {
       console.log(`Fetching floor NFT details for collection ${collId}...`);
       setLoadingFloorNFT(true);
@@ -115,11 +121,11 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
         method: 'GET',
         headers: {
           accept: 'application/json',
-          'x-tensor-api-key': 'afe339b5-9c47-4105-a9fa-7fba32a294dc'
-        }
+          'x-tensor-api-key': TENSOR_API_KEY,
+        },
       };
       const url = `https://api.mainnet.tensordev.io/api/v1/mint/collection?collId=${encodeURIComponent(
-        collId
+        collId,
       )}&sortBy=ListingPriceAsc&limit=1`;
       const resp = await fetch(url, options);
       console.log('Response from floor NFT API:', resp);
@@ -133,9 +139,11 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
         if (floor && floor.mint && floor.listing) {
           const owner = floor.listing.seller;
           const maxPrice = parseFloat(floor.listing.price) / SOL_TO_LAMPORTS;
-          console.log(`Floor NFT: mint=${floor.mint}, owner=${owner}, maxPrice=${maxPrice}`);
-          setFloorNFT({ mint: floor.mint, owner, maxPrice });
-          return { mint: floor.mint, owner, maxPrice };
+          console.log(
+            `Floor NFT: mint=${floor.mint}, owner=${owner}, maxPrice=${maxPrice}`,
+          );
+          setFloorNFT({mint: floor.mint, owner, maxPrice});
+          return {mint: floor.mint, owner, maxPrice};
         }
       }
       Alert.alert('Info', 'No tokens found for the collection floor.');
@@ -157,7 +165,9 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
     if (!coll) return;
     const collId = coll.collId;
     // Use the floorNFT from state if available.
-    const floorDetails = floorNFT ? floorNFT : await fetchFloorNFTForCollection(collId);
+    const floorDetails = floorNFT
+      ? floorNFT
+      : await fetchFloorNFTForCollection(collId);
     if (!floorDetails) {
       console.log('No floor NFT to buy. Aborting.');
       return;
@@ -168,13 +178,14 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
       return;
     }
     try {
-      const connection = new Connection('https://api.mainnet-beta.solana.com');
-      const { blockhash } = await connection.getRecentBlockhash();
+      const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
+      const {blockhash} = await connection.getRecentBlockhash();
+      const maxPriceInLamports = floorDetails.maxPrice * SOL_TO_LAMPORTS;
       console.log('Obtained blockhash:', blockhash);
-      const buyUrl = `https://api.mainnet.tensordev.io/api/v1/tx/buy?buyer=${userPublicKey}&mint=${floorDetails.mint}&owner=${floorDetails.owner}&maxPrice=${floorDetails.maxPrice}&blockhash=${blockhash}`;
+      const buyUrl = `https://api.mainnet.tensordev.io/api/v1/tx/buy?buyer=${userPublicKey}&mint=${floorDetails.mint}&owner=${floorDetails.owner}&maxPrice=${maxPriceInLamports}&blockhash=${blockhash}`;
       console.log('Buy URL:', buyUrl);
       const resp = await fetch(buyUrl, {
-        headers: { 'x-tensor-api-key': 'afe339b5-9c47-4105-a9fa-7fba32a294dc' }
+        headers: {'x-tensor-api-key': TENSOR_API_KEY},
       });
       const rawText = await resp.text();
       console.log('Raw response from buy endpoint:', rawText);
@@ -182,7 +193,9 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
       try {
         data = JSON.parse(rawText);
       } catch (parseErr) {
-        throw new Error('Tensor returned non-JSON response. Check console for details.');
+        throw new Error(
+          'Tensor returned non-JSON response. Check console for details.',
+        );
       }
       if (!data.txs || data.txs.length === 0) {
         throw new Error('No transactions returned from Tensor API for buying.');
@@ -203,9 +216,9 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
           throw new Error(`Transaction #${i + 1} is in an unknown format.`);
         }
         const provider = await userWallet.getProvider();
-        const { signature } = await provider.request({
+        const {signature} = await provider.request({
           method: 'signAndSendTransaction',
-          params: { transaction, connection }
+          params: {transaction, connection},
         });
         console.log(`Transaction #${i + 1} signature: ${signature}`);
       }
@@ -223,13 +236,13 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
   // ------------------------------------------------------------------------
   // 4) Render each collection card
   // ------------------------------------------------------------------------
-  const renderCollectionCard = ({ item }: { item: CollectionResult }) => {
+  const renderCollectionCard = ({item}: {item: CollectionResult}) => {
     return (
       <View style={styles.collectionCard}>
         <View style={styles.imageContainer}>
           {item.imageUri ? (
             <Image
-              source={{ uri: fixImageUrl(item.imageUri) }}
+              source={{uri: fixImageUrl(item.imageUri)}}
               style={styles.collectionImage}
               resizeMode="cover"
             />
@@ -256,8 +269,7 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
               // Immediately fetch floor NFT details and store in state
               await fetchFloorNFTForCollection(item.collId);
               setShowBuyModal(true);
-            }}
-          >
+            }}>
             <Text style={styles.buyButtonText}>Buy Floor</Text>
           </TouchableOpacity>
         </View>
@@ -279,17 +291,17 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
           setShowBuyModal(false);
           setSelectedCollection(null);
           setFloorNFT(null);
-        }}
-      >
+        }}>
         <Pressable
           style={styles.modalOverlay}
           onPress={() => {
             setShowBuyModal(false);
             setSelectedCollection(null);
             setFloorNFT(null);
-          }}
-        >
-          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+          }}>
+          <Pressable
+            style={styles.modalContent}
+            onPress={e => e.stopPropagation()}>
             <Text style={styles.modalTitle}>Confirm Purchase</Text>
             <Text style={styles.modalText}>
               Collection: {selectedCollection.name}
@@ -308,8 +320,7 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
               onPress={() => {
                 console.log('Confirm Buy clicked');
                 handleBuyFloor(selectedCollection);
-              }}
-            >
+              }}>
               <Text style={styles.confirmButtonText}>Confirm Buy</Text>
             </TouchableOpacity>
           </Pressable>
@@ -322,7 +333,7 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
   // Main render
   // ------------------------------------------------------------------------
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{flex: 1}}>
       <Text style={styles.label}>Collection Name</Text>
       <TextInput
         style={styles.input}
@@ -330,17 +341,23 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
         value={collectionName}
         onChangeText={setCollectionName}
       />
-      <TouchableOpacity style={styles.actionButton} onPress={handleSearchCollections}>
+      <TouchableOpacity
+        style={styles.actionButton}
+        onPress={handleSearchCollections}>
         <Text style={styles.actionButtonText}>Search Collection</Text>
       </TouchableOpacity>
       {loadingSearch && (
-        <ActivityIndicator size="large" color="#32D4DE" style={{ marginVertical: 16 }} />
+        <ActivityIndicator
+          size="large"
+          color="#32D4DE"
+          style={{marginVertical: 16}}
+        />
       )}
       <FlatList
         data={searchResults}
-        keyExtractor={(item) => item.collId}
+        keyExtractor={item => item.collId}
         renderItem={renderCollectionCard}
-        contentContainerStyle={{ paddingVertical: 8 }}
+        contentContainerStyle={{paddingVertical: 8}}
         ListEmptyComponent={
           !loadingSearch ? (
             <View style={styles.emptyContainer}>
@@ -355,5 +372,3 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
 };
 
 export default BuySection;
-
-
