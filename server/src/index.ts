@@ -13,13 +13,43 @@ import {
 import {PublicKey} from '@solana/web3.js';
 import { launchRouter } from './routes/pumpfunLaunch';
 import { buildCompressedNftListingTx } from './utils/compressedNftListing';
+import { threadRouter } from './routes/threadRoutes';
+import knex from './db/knex';
 
 /**
  * Express application instance
  */
 const app = express();
 app.use(express.json());
+
+async function testDbConnection() {
+  try {
+    const result = await knex.raw('select 1+1 as result');
+    console.log('Database connection successful:', result.rows ? result.rows[0] : result);
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    process.exit(1); // Exit if DB connection fails
+  }
+}
+
+testDbConnection();
+
+async function runMigrationsAndStartServer() {
+  try {
+    console.log('Running migrations...');
+    const [batchNo, log] = await knex.migrate.latest();
+    console.log(`Migrations ran successfully in batch ${batchNo}`);
+    if (log.length > 0) {
+      console.log('Migrations executed:', log);
+    }
+  } catch (error) {
+    console.error('Migration error:', error);
+    process.exit(1); // Exit if migrations fail
+  }
+}
+
 app.use('/api/pumpfun', launchRouter);
+app.use('/api', threadRouter);
 /**
  * TokenMill client instance for interacting with the Solana program
  */
@@ -374,6 +404,10 @@ app.post('/api/build-compressed-nft-listing-tx', async (req: any, res: any) => {
 /**
  * Start the Express server
  */
-app.listen(3000, () => {
-  console.log('Server is running on port 3000');
+const PORT = process.env.PORT || 3000;
+
+runMigrationsAndStartServer().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
+  });
 });

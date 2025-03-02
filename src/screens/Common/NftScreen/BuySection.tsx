@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Connection, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { buyStyles as styles } from './buySection.styles';
+import { HELIUS_RPC_URL, TENSOR_API_KEY } from '@env';
 
 
 const SOL_TO_LAMPORTS = 1_000_000_000;
@@ -74,7 +75,7 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
         method: 'GET',
         headers: {
           accept: 'application/json',
-          'x-tensor-api-key': 'afe339b5-9c47-4105-a9fa-7fba32a294dc'
+          'x-tensor-api-key': TENSOR_API_KEY
         }
       };
       const response = await fetch(url, options);
@@ -115,7 +116,7 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
         method: 'GET',
         headers: {
           accept: 'application/json',
-          'x-tensor-api-key': 'afe339b5-9c47-4105-a9fa-7fba32a294dc'
+          'x-tensor-api-key': TENSOR_API_KEY
         }
       };
       const url = `https://api.mainnet.tensordev.io/api/v1/mint/collection?collId=${encodeURIComponent(
@@ -168,13 +169,14 @@ const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) =>
       return;
     }
     try {
-      const connection = new Connection('https://api.mainnet-beta.solana.com');
+      const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
       const { blockhash } = await connection.getRecentBlockhash();
+      const maxPriceInLamports = floorDetails.maxPrice * SOL_TO_LAMPORTS;
       console.log('Obtained blockhash:', blockhash);
-      const buyUrl = `https://api.mainnet.tensordev.io/api/v1/tx/buy?buyer=${userPublicKey}&mint=${floorDetails.mint}&owner=${floorDetails.owner}&maxPrice=${floorDetails.maxPrice}&blockhash=${blockhash}`;
+      const buyUrl = `https://api.mainnet.tensordev.io/api/v1/tx/buy?buyer=${userPublicKey}&mint=${floorDetails.mint}&owner=${floorDetails.owner}&maxPrice=${maxPriceInLamports}&blockhash=${blockhash}`;
       console.log('Buy URL:', buyUrl);
       const resp = await fetch(buyUrl, {
-        headers: { 'x-tensor-api-key': 'afe339b5-9c47-4105-a9fa-7fba32a294dc' }
+        headers: { 'x-tensor-api-key': TENSOR_API_KEY }
       });
       const rawText = await resp.text();
       console.log('Raw response from buy endpoint:', rawText);

@@ -1,187 +1,199 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useCallback, useEffect, useRef} from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   FlatList,
+  StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Keyboard,
-  Animated,
-  Easing,
+  SafeAreaView,
+  Image,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {styles} from './ChatScreen.styles';
+import {useSelector} from 'react-redux';
+import {RootState} from '../../../../state/store';
+import {ThreadPost, ThreadUser} from '../../../../components/thread/thread.types';
+import {PostBody, ThreadComposer} from '../../../../components/thread';
+import PostCTA from '../../../../components/thread/PostCTA';
 
-// Types for message data
-type Message = {
-  id: string;
-  text: string;
-  createdAt: number;
-  sender: 'me' | 'other';
-};
+/**
+ * ChatScreen:
+ * A simplified "chat-style" view reusing your existing thread logic,
+ * but with the sender's name vertically centered next to the avatar.
+ * The header is split into two rows: one for the avatar and username,
+ * and one for the message body (PostBody and PostCTA).
+ */
+export default function ChatScreen() {
+  // Pull the entire array of posts from your Redux thread slice:
+  const allPosts = useSelector((state: RootState) => state.thread.allPosts);
 
-const ChatScreen: React.FC = () => {
-  // Local state for messages
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: 'Hey, how are you?',
-      createdAt: Date.now() - 1000 * 60 * 60, // example: 1 hour ago
-      sender: 'other',
-    },
-    {
-      id: '2',
-      text: 'Doing great! You?',
-      createdAt: Date.now() - 1000 * 60 * 58,
-      sender: 'me',
-    },
-    {
-      id: '3',
-      text: "I'm fine too, just exploring new UI designs!",
-      createdAt: Date.now() - 1000 * 60 * 57,
-      sender: 'other',
-    },
-  ]);
-  const [inputText, setInputText] = useState('');
-  const [listHeight, setListHeight] = useState(0);
+  // Replace with your real user from auth if desired:
+  const currentUser = useMockCurrentUser();
 
-  // For a little "typing" bubble animation
-  const typingBubbleScale = useRef(new Animated.Value(0)).current;
-  const [isTyping, setIsTyping] = useState(false);
+  // Sort messages by creation time ascending (oldest first)
+  const sortedPosts = [...allPosts].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
 
-  // Animate "typing" bubble
+  // Reference for FlatList to auto-scroll
+  const flatListRef = useRef<FlatList<any>>(null);
+
   useEffect(() => {
-    if (isTyping) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(typingBubbleScale, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-            easing: Easing.inOut(Easing.ease),
-          }),
-          Animated.timing(typingBubbleScale, {
-            toValue: 0.8,
-            duration: 500,
-            useNativeDriver: true,
-            easing: Easing.inOut(Easing.ease),
-          }),
-        ]),
-      ).start();
-    } else {
-      typingBubbleScale.stopAnimation(() => {
-        typingBubbleScale.setValue(0);
-      });
-    }
-  }, [isTyping, typingBubbleScale]);
+    scrollToEnd();
+  }, [sortedPosts.length]);
 
-  // Simulate "other user" typing after a short delay
-  useEffect(() => {
-    // For demonstration, mark typing state to true
-    const timer = setTimeout(() => {
-      setIsTyping(true);
-    }, 1200);
-
-    // And then turn it off after a while
-    const timer2 = setTimeout(() => {
-      setIsTyping(false);
-    }, 4000);
-
-    return () => {
-      clearTimeout(timer);
-      clearTimeout(timer2);
-    };
+  const scrollToEnd = useCallback(() => {
+    flatListRef.current?.scrollToEnd({animated: true});
   }, []);
 
-  // Handle sending a message
-  const handleSend = () => {
-    if (!inputText.trim()) return;
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: inputText.trim(),
-      createdAt: Date.now(),
-      sender: 'me',
-    };
-    setMessages(prev => [newMessage, ...prev]);
-    setInputText('');
-  };
-
-  // Chat message bubble component
-  const renderMessage = ({item}: {item: Message}) => {
-    const isMyMessage = item.sender === 'me';
+  const renderItem = ({item}: {item: ThreadPost}) => {
     return (
-      <View
-        style={[
-          styles.bubbleContainer,
-          isMyMessage ? styles.bubbleRight : styles.bubbleLeft,
-        ]}>
-        <Text style={styles.bubbleText}>{item.text}</Text>
-        <Text style={styles.bubbleTime}>
-          {new Date(item.createdAt).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </Text>
-      </View>
+      <>
+        <View style={styles.messageContainer}>
+          {/* Header row: avatar and username */}
+          <View style={styles.headerRow}>
+            <Image source={item.user.avatar} style={styles.avatar} />
+            <View style={styles.usernameContainer}>
+              <Text style={styles.senderLabel}>{item.user.username}</Text>
+            </View>
+          </View>
+          {/* Message body row */}
+          <View style={styles.bodyContainer}>
+            <PostBody
+              post={item}
+              themeOverrides={{}}
+              styleOverrides={chatBodyOverrides}
+            />
+            <PostCTA
+              post={item}
+              buttons={[
+                {
+                  label: 'React',
+                  onPress: p => {
+                    console.log('React to post id = ', p.id);
+                  },
+                },
+                {
+                  label: 'Trade',
+                  onPress: p => {
+                    console.log('Trade CTA pressed for post id = ', p.id);
+                  },
+                },
+              ]}
+              styleOverrides={{
+                container: {marginTop: 6},
+              }}
+            />
+          </View>
+        </View>
+        {/* Divider between messages */}
+        <View style={styles.messageDivider} />
+      </>
     );
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Top bar (simulate chat name, status, etc.) */}
-      <View style={styles.chatHeader}>
-        <Text style={styles.chatHeaderTitle}>Chat with Jane</Text>
-        <Text style={styles.chatHeaderSubtitle}>online now</Text>
-      </View>
-
-      {/* Main chat area */}
+    <SafeAreaView style={{flex: 1, backgroundColor: '#FFFFFF'}}>
       <KeyboardAvoidingView
-        style={styles.chatContainer}
+        style={styles.chatScreenContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <FlatList
-          inverted
-          data={messages}
-          renderItem={renderMessage}
+          ref={flatListRef}
+          data={sortedPosts}
           keyExtractor={item => item.id}
-          contentContainerStyle={{paddingBottom: 16}}
-          onLayout={e => {
-            setListHeight(e.nativeEvent.layout.height);
-          }}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
         />
-
-        {/* Possibly show the other user's "typing" indicator at the bottom (if needed) */}
-        {isTyping && (
-          <View style={styles.typingIndicatorContainer}>
-            <Animated.View
-              style={[
-                styles.typingBubble,
-                {transform: [{scale: typingBubbleScale}]},
-              ]}>
-              <Text style={styles.typingBubbleDot}>• • •</Text>
-            </Animated.View>
-            <Text style={styles.typingIndicatorText}>Jane is typing</Text>
-          </View>
-        )}
-
-        {/* Input area */}
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.inputField}
-            placeholder="Type a message..."
-            value={inputText}
-            onChangeText={setInputText}
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
+        {/* Composer pinned at bottom */}
+        <View style={styles.composerContainer}>
+          <ThreadComposer
+            currentUser={currentUser}
+            onPostCreated={scrollToEnd}
+            styleOverrides={{
+              composerContainer: {
+                backgroundColor: '#FAFAFA',
+                paddingVertical: 8,
+              },
+            }}
           />
-          <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-            <Text style={styles.sendButtonText}>Send</Text>
-          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-};
+}
 
-export default ChatScreen;
+/**
+ * Temporary hook to provide a mock current user.
+ * Replace with your real user from auth if needed.
+ */
+function useMockCurrentUser(): ThreadUser {
+  return {
+    id: 'mockUser1',
+    username: 'Me',
+    handle: '@me',
+    avatar: require('../../../../assets/images/User.png'),
+    verified: true,
+  };
+}
+
+/**
+ * Overrides for PostBody to tighten vertical spacing.
+ */
+const chatBodyOverrides = StyleSheet.create({
+  extraContentContainer: {
+    marginVertical: 2,
+  },
+  threadItemText: {
+    fontSize: 14,
+    color: '#232324',
+  },
+});
+
+const styles = StyleSheet.create({
+  chatScreenContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  listContent: {
+    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  messageContainer: {
+    paddingVertical: 4,
+  },
+  // Header row contains the avatar and username
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center', // Ensure vertical centering
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 8,
+  },
+  // Container for the username; using justifyContent to center text vertically within the same height as the avatar.
+  usernameContainer: {
+    height: 36,
+    justifyContent: 'center',
+  },
+  senderLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#232324',
+  },
+  // Body container for the message text and CTA
+  bodyContainer: {
+    marginTop: 4,
+    marginLeft: 14, // indent to align with text (avatar width + marginRight)
+  },
+  messageDivider: {
+    height: 1,
+    backgroundColor: '#EDEFF3',
+    marginTop: 6,
+  },
+  composerContainer: {
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+});

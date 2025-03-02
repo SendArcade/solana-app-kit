@@ -24,7 +24,7 @@ import {
   createAssociatedTokenAccountInstruction,
   getAccount
 } from '@solana/spl-token';
-import { HELIUS_API_KEY, TENSOR_API_KEY } from '@env';
+import { HELIUS_API_KEY, HELIUS_RPC_URL, TENSOR_API_KEY } from '@env';
 import { sellStyles as styles } from './sellSection.styles';
 import { useDispatch } from 'react-redux';
 import { ThreadSection } from '../../../components/thread/thread.types';
@@ -179,7 +179,7 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
     setFetchError(null);
     console.log('[fetchOwnedNfts] for wallet:', userPublicKey);
 
-    const url = `https://api.mainnet.tensordev.io/api/v1/user/portfolio?wallet=${userPublicKey}&includeUnverified=true&includeCompressed=true`;
+    const url = `https://api.mainnet.tensordev.io/api/v1/user/portfolio?wallet=${userPublicKey}&includeUnverified=true&includeCompressed=true&includeFavouriteCount=true`;
     const options = {
       method: 'GET',
       headers: {
@@ -189,6 +189,7 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
     };
     try {
       const response = await fetchWithRetries(url, options);
+      console.log('[fetchOwnedNfts] response:', response);
       if (!response.ok) {
         throw new Error(`Portfolio API request failed with status ${response.status}`);
       }
@@ -196,7 +197,7 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
       const dataArray = Array.isArray(data) ? data : [];
       const mappedNfts: NftItem[] = dataArray
         .map((item: any) => {
-          if (!item.setterMintMe) return null;
+          // if (!item.setterMintMe) return null;
           const mint = item.setterMintMe;
           const name = item.name || 'Unnamed NFT';
           const image = item.imageUri ? fixImageUrl(item.imageUri) : '';
@@ -290,7 +291,7 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
     }
     console.log('[handleSellNftOnTensor] Starting listing, selected NFT:', selectedNft);
     try {
-      const connection = new Connection('https://api.mainnet-beta.solana.com');
+      const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
       const priceLamports = Math.floor(parseFloat(salePrice) * SOL_TO_LAMPORTS);
       let expiryValue: number | undefined;
       if (durationDays && !isNaN(parseFloat(durationDays))) {
