@@ -26,7 +26,11 @@ import {
 } from '@solana/spl-token';
 import { HELIUS_API_KEY, TENSOR_API_KEY } from '@env';
 import { sellStyles as styles } from './sellSection.styles';
+import { useDispatch } from 'react-redux';
+import { ThreadSection } from '../../../components/thread/thread.types';
+import { addRootPost } from '../../../state/thread/reducer';
 import { fetchWithRetries } from '../../../utils/common/fetch';
+
 
 const SOL_TO_LAMPORTS = 1_000_000_000;
 
@@ -149,6 +153,8 @@ async function getRealCompressedNFTData(nft: NftItem, ownerAddress: string) {
 }
 
 const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) => {
+  const dispatch = useDispatch();
+
   const [loadingNfts, setLoadingNfts] = useState(false);
   const [ownedNfts, setOwnedNfts] = useState<NftItem[]>([]);
   const [selectedNft, setSelectedNft] = useState<NftItem | null>(null);
@@ -423,6 +429,42 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
     }
   };
 
+  const handleShareToFeed = (item: NftItem) => {
+    if (!userPublicKey) {
+      Alert.alert('Not logged in', 'Connect your wallet first');
+      return;
+    }
+    
+    // We'll create a new Root Post that includes an NFT_LISTING section
+    const sections: ThreadSection[] = [
+      {
+        id: 'section-' + Math.random().toString(36).substring(2),
+        type: 'NFT_LISTING',
+        text: "I’ve listed this NFT. Anyone interested in buying?",
+        listingData: {
+          mint: item.mint,
+          owner: userPublicKey, // The user who listed
+          priceSol: item.priceSol,
+          name: item.name,
+          image: item.image,
+        },
+      },
+    ];
+  
+    // Dispatch to Redux:
+    dispatch(addRootPost({
+      user: {
+        id: userPublicKey,
+        username: 'Aranav',  // or from your profile data
+        handle: '@' + userPublicKey.slice(0, 5),
+        avatar: require('../../assets/images/User.png'), // or your actual avatar
+      },
+      sections,
+    }));
+  
+    Alert.alert('Shared to Feed', 'A new post was created in the feed!');
+  };
+
   const renderActiveListingCard = ({ item }: { item: NftItem }) => (
     <View style={styles.listedCard}>
       <View style={styles.imageContainer}>
@@ -434,21 +476,20 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
           </View>
         )}
         {item.isCompressed && (
-          <View
-            style={{
-              position: 'absolute',
-              top: 5,
-              left: 5,
-              backgroundColor: '#FF4500',
-              paddingHorizontal: 4,
-              paddingVertical: 2,
-              borderRadius: 4
-            }}
-          >
+          <View style={{
+            position: 'absolute',
+            top: 5,
+            left: 5,
+            backgroundColor: '#FF4500',
+            paddingHorizontal: 4,
+            paddingVertical: 2,
+            borderRadius: 4
+          }}>
             <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>cNFT</Text>
           </View>
         )}
       </View>
+  
       <View style={styles.nftDetails}>
         <Text style={styles.nftName} numberOfLines={1}>
           {item.name}
@@ -465,6 +506,20 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
           <Text style={styles.priceText}>Listed @ {item.priceSol.toFixed(2)} SOL</Text>
         )}
       </View>
+  
+      {/* Add a "Share to Feed" button here */}
+      <TouchableOpacity
+        style={{
+          backgroundColor: '#32D4DE',
+          margin: 8,
+          paddingVertical: 6,
+          borderRadius: 6,
+          alignItems: 'center'
+        }}
+        onPress={() => handleShareToFeed(item)}
+      >
+        <Text style={{ color: '#fff', fontWeight: '600' }}>Share to Feed</Text>
+      </TouchableOpacity>
     </View>
   );
 
