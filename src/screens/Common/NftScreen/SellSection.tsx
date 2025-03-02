@@ -457,7 +457,7 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
         id: userPublicKey,
         username: 'Aranav',  // or from your profile data
         handle: '@' + userPublicKey.slice(0, 5),
-        avatar: require('../../assets/images/User.png'), // or your actual avatar
+        avatar: require('../../../assets/images/User.png'), // or your actual avatar
       },
       sections,
     }));
