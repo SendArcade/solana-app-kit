@@ -5,7 +5,17 @@ export type ThreadSectionType =
   | 'TEXT_IMAGE'
   | 'TEXT_VIDEO'
   | 'TEXT_TRADE'
-  | 'POLL';
+  | 'POLL'
+  | 'NFT_LISTING';
+
+  export interface NftListingData {
+    mint: string;          // The mint address
+    owner: string;         // Owner's public key
+    name?: string;         // NFT name
+    image?: string;        // Image URI
+    priceSol?: number;     // Price in SOL
+    collId?: string;       // If you want to reference the collection (optional)
+  }
 
 export interface TradeData {
   token1Avatar: any;
@@ -31,6 +41,7 @@ export interface ThreadSection {
   videoUrl?: string;
   tradeData?: TradeData;
   pollData?: PollData;
+  listingData?: NftListingData;
 }
 
 export interface ThreadUser {

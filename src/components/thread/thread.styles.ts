@@ -347,6 +347,98 @@ export function createThreadStyles(
       zIndex: 10,
       transform: [{translateX: -15}, {translateY: -15}],
     },
+    nftListingContainer: {
+      marginTop: 8,
+      padding: 8,
+      backgroundColor: '#F9F9F9',
+      borderRadius: 8,
+    },
+    nftListingCard: {
+      flexDirection: 'column', // vertical layout
+      backgroundColor: '#FFFFFF',
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: '#EEE',
+      overflow: 'hidden',
+      alignItems: 'center',
+      padding: 8,
+    },
+    nftListingImageContainer: {
+      width: 150,         // Bigger image container
+      height: 150,
+      backgroundColor: '#f0f0f0',
+    },
+    nftListingImage: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+    nftListingPlaceholder: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    nftListingPlaceholderText: {
+      color: '#999',
+    },
+    nftListingInfo: {
+      marginTop: 8,
+      alignItems: 'center',
+    },
+    nftListingName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#333',
+    },
+    nftListingPrice: {
+      fontSize: 14,
+      color: '#666',
+      marginTop: 4,
+    },
+    buyButtonStyle: {
+      marginTop: 8,
+      backgroundColor: '#32D4DE',
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 6,
+      alignSelf: 'center',
+    },
+    buyButtonText: {
+      color: '#fff',
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    
+    composerTradePreview: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 8,
+      backgroundColor: '#F9F9F9',
+      borderRadius: 8,
+      marginVertical: 8,
+    },
+    composerTradeImage: {
+      width: 50,
+      height: 50,
+      borderRadius: 4,
+      backgroundColor: '#ddd',
+    },
+    composerTradeName: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#333',
+    },
+    composerTradePrice: {
+      fontSize: 12,
+      color: '#666',
+    },
+    composerTradeRemove: {
+      backgroundColor: '#ff3b30',
+      padding: 4,
+      borderRadius: 4,
+    },
+    
+    
   });
 
   // 1. Merge userStyleSheet if provided
