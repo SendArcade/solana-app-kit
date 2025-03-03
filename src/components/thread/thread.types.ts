@@ -54,7 +54,7 @@ export interface ThreadUser {
 
 export interface ThreadPost {
   id: string;
-  parentId?: string;
+  parentId?: string | null;
   user: ThreadUser;
   sections: ThreadSection[];
   createdAt: string;

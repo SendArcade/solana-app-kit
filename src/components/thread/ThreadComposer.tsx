@@ -1,4 +1,3 @@
-// File: src/components/thread/ThreadComposer.tsx
 import React, { useState } from 'react';
 import {
   View,
@@ -17,6 +16,8 @@ import { useAppDispatch } from '../../hooks/useReduxHooks';
 import {
   createRootPostAsync,
   createReplyAsync,
+  addPostLocally,
+  addReplyLocally,
 } from '../../state/thread/reducer';
 import { createThreadStyles, getMergedTheme } from './thread.styles';
 import { ThreadSection, ThreadSectionType, ThreadUser } from './thread.types';
@@ -52,8 +53,6 @@ export default function ThreadComposer({
   const dispatch = useAppDispatch();
   const { solanaWallet } = useAuth();
   const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
-
-  
 
   // Basic composer state
   const [textValue, setTextValue] = useState('');
@@ -112,19 +111,43 @@ export default function ThreadComposer({
       });
     }
 
+    // Construct a fallback post object to use if network fails.
+    const fallbackPost = {
+      id: 'local-' + Math.random().toString(36).substr(2, 9),
+      user: currentUser,
+      sections,
+      createdAt: new Date().toISOString(),
+      parentId: parentId ? parentId : undefined,
+      replies: [],
+      reactionCount: 0,
+      retweetCount: 0,
+      quoteCount: 0,
+    };
+
     try {
       if (parentId) {
         await dispatch(createReplyAsync({ parentId, user: currentUser, sections })).unwrap();
       } else {
         await dispatch(createRootPostAsync({ user: currentUser, sections })).unwrap();
       }
-      // Optionally trigger a refresh in parent screen.
+      // Clear input values and trigger any provided callback.
       setTextValue('');
       setSelectedImage(null);
       setSelectedListingNft(null);
       onPostCreated && onPostCreated();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create post');
+      console.warn('Network request failed, adding post locally:', error.message);
+      // If network fails, add post locally.
+      if (parentId) {
+        dispatch(addReplyLocally({ parentId, reply: fallbackPost }));
+      } else {
+        dispatch(addPostLocally(fallbackPost));
+      }
+      // Clear inputs and trigger callback regardless.
+      setTextValue('');
+      setSelectedImage(null);
+      setSelectedListingNft(null);
+      onPostCreated && onPostCreated();
     }
   };
 
@@ -135,7 +158,7 @@ export default function ThreadComposer({
     const options: ImageLibraryOptions = {
       mediaType: 'photo',
       quality: 1,
-      includeBase64: true, // Ensure base64 is included
+      includeBase64: true, // Include base64 data
     };
     launchImageLibrary(options, (response) => {
       if (response.didCancel) {
@@ -144,7 +167,7 @@ export default function ThreadComposer({
         console.log('ImagePicker Error:', response.errorMessage);
       } else if (response.assets && response.assets.length > 0) {
         const asset = response.assets[0];
-        // If base64 is provided, construct a data URL so it’s directly readable by <Image>
+        // If base64 is provided, build a data URL so the <Image> component can decode it.
         if (asset.base64 && asset.type) {
           setSelectedImage(`data:${asset.type};base64,${asset.base64}`);
         } else if (asset.uri) {
