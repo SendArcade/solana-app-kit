@@ -1,5 +1,3 @@
-// FILE: src/components/thread/PostCTA.tsx
-
 import React, {useState} from 'react';
 import {
   View,
@@ -15,19 +13,33 @@ import {
 } from 'react-native';
 import type {ThreadPost} from './thread.types';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
-import PriorityFeeSelector from '../PriorityFeeSelector';
 import {useSelector} from 'react-redux';
 import {RootState} from '../../state/store';
-import {useTradeTransaction} from '../../hooks/useTradeTransaction';
 import {Connection, Transaction, VersionedTransaction} from '@solana/web3.js';
 import {Buffer} from 'buffer';
 import {TENSOR_API_KEY, HELIUS_RPC_URL} from '@env';
 import {useAuth} from '../../hooks/useAuth';
+import TradeModal from './TradeModal';
 
+/**
+ * Get the post section type.
+ */
 function getPostSectionType(post: ThreadPost) {
   for (const section of post.sections) {
     if (section.type === 'TEXT_TRADE') return 'trade';
     if (section.type === 'NFT_LISTING') return 'nft';
+  }
+  return null;
+}
+
+/**
+ * Get trade data from a post (for TEXT_TRADE sections).
+ */
+function getTradeData(post: ThreadPost) {
+  for (const section of post.sections) {
+    if (section.type === 'TEXT_TRADE' && section.tradeData) {
+      return section.tradeData;
+    }
   }
   return null;
 }
@@ -60,13 +72,10 @@ export default function PostCTA({
   const [nftLoading, setNftLoading] = useState(false);
   const [nftStatusMsg, setNftStatusMsg] = useState('');
 
-  // New state for confirmation after a successful buy
+  // New state for confirmation after a successful NFT buy
   const [nftConfirmationVisible, setNftConfirmationVisible] = useState(false);
   const [nftConfirmationMsg, setNftConfirmationMsg] = useState('');
 
-  const [selectedMode, setSelectedMode] = useState<'priority' | 'jito'>(
-    'priority',
-  );
   const selectedFeeTier = useSelector(
     (state: RootState) => state.transaction.selectedFeeTier,
   );
@@ -75,10 +84,9 @@ export default function PostCTA({
   // For simplicity, using the first connected wallet
   const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
   const userWallet = solanaWallet?.wallets?.[0] || null;
-  const {sendTrade} = useTradeTransaction();
 
   const mergedTheme = getMergedTheme(themeOverrides);
-  const styles = createThreadStyles(
+  const threadStyles = createThreadStyles(
     mergedTheme,
     styleOverrides as {[key: string]: object} | undefined,
     userStyleSheet as {[key: string]: object} | undefined,
@@ -88,32 +96,21 @@ export default function PostCTA({
   const sectionType = getPostSectionType(post);
   if (!sectionType) return null;
 
+  const tradeData = sectionType === 'trade' ? getTradeData(post) : null;
+
   /**
-   * 1) "Copy Trade" CTA (for TEXT_TRADE posts)
+   * "Copy Trade" CTA for TEXT_TRADE posts.
    */
   const handleOpenTradeModal = () => {
+    if (!tradeData) {
+      Alert.alert('Error', 'No trade data available for this post.');
+      return;
+    }
     setShowTradeModal(true);
   };
 
-  const handleSubmitTrade = async () => {
-    try {
-      setTradeLoading(true);
-      await sendTrade(selectedMode);
-    } catch (err: any) {
-      Alert.alert(
-        'Trade Error',
-        err.message || 'Failed to send trade transaction.',
-      );
-    } finally {
-      setShowTradeModal(false);
-      setTradeLoading(false);
-    }
-  };
-
   /**
-   * 2) "Buy NFT" CTA (for NFT_LISTING posts)
-   *    This replicates the approach from BuySection to fetch blockhash,
-   *    call the Tensor buy endpoint, and sign each returned transaction.
+   * "Buy NFT" CTA for NFT_LISTING posts.
    */
   const handleBuyListedNft = async () => {
     const listingData = post.sections.find(
@@ -128,7 +125,6 @@ export default function PostCTA({
       return;
     }
 
-    // Basic fields from the listing data
     const listingPriceSol = listingData.priceSol ?? 0;
     const mint = listingData.mint;
 
@@ -136,7 +132,6 @@ export default function PostCTA({
       setNftLoading(true);
       setNftStatusMsg('Fetching blockhash ...');
 
-      // For mainnet
       const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
       const {blockhash} = await connection.getRecentBlockhash();
       setNftStatusMsg(`Blockhash: ${blockhash} fetched.\nPreparing buy tx ...`);
@@ -192,7 +187,6 @@ export default function PostCTA({
 
         setNftStatusMsg(`TX #${i + 1} signature: ${signature}`);
       }
-      // Instead of Alert.alert, set the confirmation modal
       setNftConfirmationMsg('NFT purchased successfully!');
       setNftConfirmationVisible(true);
     } catch (err: any) {
@@ -204,100 +198,67 @@ export default function PostCTA({
     }
   };
 
-  // CTA label & onPress
+  // Set CTA label and onPress based on section type
   const ctaLabel = sectionType === 'trade' ? 'Copy Trade' : 'Buy NFT';
   const onCtaPress =
     sectionType === 'trade' ? handleOpenTradeModal : handleBuyListedNft;
 
   return (
-    <View style={[styles.threadPostCTAContainer, styleOverrides?.container]}>
-      {/* The main CTA button */}
+    <View
+      style={[threadStyles.threadPostCTAContainer, styleOverrides?.container]}>
       <TouchableOpacity
-        style={[styles.threadPostCTAButton, styleOverrides?.button]}
+        style={[threadStyles.threadPostCTAButton, styleOverrides?.button]}
         onPress={onCtaPress}
         activeOpacity={0.8}>
         <Text
           style={[
-            styles.threadPostCTAButtonLabel,
+            threadStyles.threadPostCTAButtonLabel,
             styleOverrides?.buttonLabel,
           ]}>
           {ctaLabel}
         </Text>
       </TouchableOpacity>
 
-      {/* Trade Modal */}
-      <Modal
-        visible={showTradeModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowTradeModal(false)}>
-        <View style={styles.tradeModalOverlay}>
-          <View style={styles.tradeModalContainer}>
-            <Text style={styles.tradeModalTitle}>Trade Settings</Text>
-            <View style={styles.tradeModeSelectorRow}>
-              <TouchableOpacity
-                style={[
-                  styles.tradeModeButton,
-                  {
-                    backgroundColor:
-                      selectedMode === 'priority' ? '#1d9bf0' : '#f0f0f0',
-                  },
-                ]}
-                onPress={() => setSelectedMode('priority')}>
-                <Text
-                  style={{
-                    color: selectedMode === 'priority' ? '#fff' : '#000',
-                  }}>
-                  Priority Fee
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.tradeModeButton,
-                  {
-                    backgroundColor:
-                      selectedMode === 'jito' ? '#1d9bf0' : '#f0f0f0',
-                  },
-                ]}
-                onPress={() => setSelectedMode('jito')}>
-                <Text
-                  style={{
-                    color: selectedMode === 'jito' ? '#fff' : '#000',
-                  }}>
-                  Jito Bundle
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {selectedMode === 'priority' && (
-              <View style={{width: '100%', marginTop: 10}}>
-                <PriorityFeeSelector />
-              </View>
-            )}
-
-            {tradeLoading ? (
-              <ActivityIndicator
-                size="large"
-                color="#1d9bf0"
-                style={{marginTop: 20}}
-              />
-            ) : (
-              <TouchableOpacity
-                style={[styles.tradeConfirmButton, {marginTop: 20}]}
-                onPress={handleSubmitTrade}>
-                <Text style={{color: '#fff', fontWeight: 'bold'}}>Submit</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={{marginTop: 12}}
-              onPress={() => setShowTradeModal(false)}>
-              <Text style={{color: '#1d9bf0'}}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {/* Render Trade Modal for Copy Trade */}
+      {showTradeModal && tradeData && (
+        <TradeModal
+          visible={showTradeModal}
+          onClose={() => setShowTradeModal(false)}
+          currentUser={{
+            id: 'current-user',
+            username: 'You',
+            handle: '@you',
+            avatar: require('../../assets/images/User.png'),
+          }}
+          disableTabs={true}
+          initialInputToken={{
+            address: tradeData.inputMint,
+            symbol: tradeData.inputSymbol,
+            name:
+              tradeData.inputSymbol === 'SOL'
+                ? 'Solana'
+                : tradeData.inputSymbol,
+            decimals: tradeData.inputSymbol === 'SOL' ? 9 : 6,
+            logoURI:
+              tradeData.inputSymbol === 'SOL'
+                ? 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png'
+                : 'https://example.com/default-token.png',
+          }}
+          initialOutputToken={{
+            address: tradeData.outputMint,
+            symbol: tradeData.outputSymbol,
+            name:
+              tradeData.outputSymbol === 'USDC'
+                ? 'USD Coin'
+                : tradeData.outputSymbol,
+            decimals: tradeData.outputSymbol === 'USDC' ? 6 : 6,
+            logoURI:
+              tradeData.outputSymbol === 'USDC'
+                ? 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png'
+                : 'https://example.com/default-token.png',
+          }}
+        />
+      )}
 
       {/* NFT Buying Progress Overlay */}
       <Modal
@@ -307,7 +268,7 @@ export default function PostCTA({
         onRequestClose={() => {}}>
         <View style={uiStyles.progressOverlay}>
           <View style={uiStyles.progressContainer}>
-            <ActivityIndicator size="large" color="#fff" />
+            <ActivityIndicator size="large" color="#1d9bf0" />
             {!!nftStatusMsg && (
               <Text style={uiStyles.progressText}>{nftStatusMsg}</Text>
             )}
@@ -336,7 +297,6 @@ export default function PostCTA({
   );
 }
 
-/** Additional UI for overlays */
 const uiStyles = StyleSheet.create({
   progressOverlay: {
     flex: 1,

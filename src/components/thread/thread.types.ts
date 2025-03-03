@@ -1,4 +1,10 @@
-import {ImageSourcePropType, StyleProp, TextStyle, ViewStyle} from 'react-native';
+// FILE: src/components/thread/thread.types.ts
+import {
+  ImageSourcePropType,
+  StyleProp,
+  TextStyle,
+  ViewStyle,
+} from 'react-native';
 
 export type ThreadSectionType =
   | 'TEXT_ONLY'
@@ -8,23 +14,29 @@ export type ThreadSectionType =
   | 'POLL'
   | 'NFT_LISTING';
 
-  export interface NftListingData {
-    mint: string;          // The mint address
-    owner: string;         // Owner's public key
-    name?: string;         // NFT name
-    image?: string;        // Image URI
-    priceSol?: number;     // Price in SOL
-    collId?: string;       // If you want to reference the collection (optional)
-  }
+export interface NftListingData {
+  mint: string;
+  owner: string;
+  name?: string;
+  image?: string;
+  priceSol?: number;
+  collId?: string;
+}
 
 export interface TradeData {
-  token1Avatar: any;
-  token1Name: string;
-  token1PriceUsd: string;
-  token2Avatar: any;
-  token2Name: string;
-  token2PriceUsd: string;
-  token2PriceSol: string;
+  // Mints for reference
+  inputMint: string;
+  outputMint: string;
+  aggregator?: string;
+
+  // Final trade details
+  inputSymbol: string; // e.g. "SOL"
+  inputQuantity: string; // e.g. "1.5"
+  inputUsdValue: string; // e.g. "$30.00"
+
+  outputSymbol: string; // e.g. "USDC"
+  outputQuantity: string; // e.g. "120"
+  outputUsdValue: string; // e.g. "$120.00"
 }
 
 export interface PollData {
@@ -62,12 +74,6 @@ export interface ThreadPost {
   reactionCount: number;
   retweetCount: number;
   quoteCount: number;
-}
-
-export interface PollData {
-  question: string;
-  options: string[];
-  votes: number[];
 }
 
 export interface ThreadCTAButton {

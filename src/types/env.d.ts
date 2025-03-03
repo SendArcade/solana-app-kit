@@ -19,4 +19,5 @@ declare module '@env' {
   export const PINATA_GATEWAY: string;
   export const TENSOR_API_KEY: string;
   export const SERVER_URL: string;
+  export const CLUSTER: string;
 }

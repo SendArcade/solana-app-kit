@@ -16,6 +16,7 @@ import { launchRouter } from './routes/pumpfunLaunch';
 import { buildCompressedNftListingTx } from './utils/compressedNftListing';
 import { threadRouter } from './routes/threadRoutes';
 import knex from './db/knex';
+import jupiterSwapRouter from './routes/jupiterSwapRoutes';
 
 const app = express();
 app.use(express.json());
@@ -54,6 +55,7 @@ async function runMigrationsAndStartServer() {
 // Use the pumpfun and thread routes.
 app.use('/api/pumpfun', launchRouter);
 app.use('/api', threadRouter);
+app.use('/api/jupiter', jupiterSwapRouter);
 
 /**
  * TokenMill client instance for interacting with the Solana program.

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Image,
@@ -12,18 +12,24 @@ import {
   Alert,
 } from 'react-native';
 import Icons from '../../assets/svgs';
-import { useAppDispatch } from '../../hooks/useReduxHooks';
+import {useAppDispatch} from '../../hooks/useReduxHooks';
 import {
   createRootPostAsync,
   createReplyAsync,
   addPostLocally,
   addReplyLocally,
 } from '../../state/thread/reducer';
-import { createThreadStyles, getMergedTheme } from './thread.styles';
-import { ThreadSection, ThreadSectionType, ThreadUser } from './thread.types';
-import { ImageLibraryOptions, launchImageLibrary } from 'react-native-image-picker';
-import { TENSOR_API_KEY } from '@env';
-import { useAuth } from '../../hooks/useAuth';
+import {createThreadStyles, getMergedTheme} from './thread.styles';
+import {ThreadSection, ThreadSectionType, ThreadUser} from './thread.types';
+import {
+  ImageLibraryOptions,
+  launchImageLibrary,
+} from 'react-native-image-picker';
+import {TENSOR_API_KEY} from '@env';
+import {useAuth} from '../../hooks/useAuth';
+
+// IMPORT OUR NEW TRADE MODAL
+import TradeModal from './TradeModal';
 
 interface NftItem {
   mint: string;
@@ -38,8 +44,8 @@ interface ThreadComposerProps {
   parentId?: string; // if present, it's a reply
   onPostCreated?: () => void;
   themeOverrides?: Partial<Record<string, any>>;
-  styleOverrides?: { [key: string]: object };
-  userStyleSheet?: { [key: string]: object };
+  styleOverrides?: {[key: string]: object};
+  userStyleSheet?: {[key: string]: object};
 }
 
 export default function ThreadComposer({
@@ -51,27 +57,34 @@ export default function ThreadComposer({
   userStyleSheet,
 }: ThreadComposerProps) {
   const dispatch = useAppDispatch();
-  const { solanaWallet } = useAuth();
+  const {solanaWallet} = useAuth();
   const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
 
   // Basic composer state
   const [textValue, setTextValue] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  // NFT listing states
+  // NFT listing states (unchanged, example from earlier code)
   const [showListingModal, setShowListingModal] = useState(false);
   const [listingItems, setListingItems] = useState<NftItem[]>([]);
   const [loadingListings, setLoadingListings] = useState(false);
-  const [selectedListingNft, setSelectedListingNft] = useState<NftItem | null>(null);
+  const [selectedListingNft, setSelectedListingNft] = useState<NftItem | null>(
+    null,
+  );
 
-  // Additional Trade modal state
+  // Show/hide the new TradeModal
   const [showTradeModal, setShowTradeModal] = useState(false);
 
+  // Merged theme
   const mergedTheme = getMergedTheme(themeOverrides);
-  const styles = createThreadStyles(mergedTheme, styleOverrides, userStyleSheet);
+  const styles = createThreadStyles(
+    mergedTheme,
+    styleOverrides,
+    userStyleSheet,
+  );
 
   /***************************************************
-   * 1) Post creation
+   * Post creation logic
    ***************************************************/
   const handlePost = async () => {
     if (!textValue.trim() && !selectedImage && !selectedListingNft) return;
@@ -87,12 +100,12 @@ export default function ThreadComposer({
       });
     }
 
-    // Image section – send image as a data URL (base64 encoded)
+    // Image section
     if (selectedImage) {
       sections.push({
         id: 'section-' + Math.random().toString(36).substr(2, 9),
         type: 'IMAGE_ONLY' as ThreadSectionType,
-        imageUrl: { uri: selectedImage },
+        imageUrl: {uri: selectedImage},
       });
     }
 
@@ -111,7 +124,7 @@ export default function ThreadComposer({
       });
     }
 
-    // Construct a fallback post object to use if network fails.
+    // Fallback post if network fails
     const fallbackPost = {
       id: 'local-' + Math.random().toString(36).substr(2, 9),
       user: currentUser,
@@ -126,24 +139,29 @@ export default function ThreadComposer({
 
     try {
       if (parentId) {
-        await dispatch(createReplyAsync({ parentId, user: currentUser, sections })).unwrap();
+        await dispatch(
+          createReplyAsync({parentId, user: currentUser, sections}),
+        ).unwrap();
       } else {
-        await dispatch(createRootPostAsync({ user: currentUser, sections })).unwrap();
+        await dispatch(
+          createRootPostAsync({user: currentUser, sections}),
+        ).unwrap();
       }
-      // Clear input values and trigger any provided callback.
+      // Clear input
       setTextValue('');
       setSelectedImage(null);
       setSelectedListingNft(null);
       onPostCreated && onPostCreated();
     } catch (error: any) {
-      console.warn('Network request failed, adding post locally:', error.message);
-      // If network fails, add post locally.
+      console.warn(
+        'Network request failed, adding post locally:',
+        error.message,
+      );
       if (parentId) {
-        dispatch(addReplyLocally({ parentId, reply: fallbackPost }));
+        dispatch(addReplyLocally({parentId, reply: fallbackPost}));
       } else {
         dispatch(addPostLocally(fallbackPost));
       }
-      // Clear inputs and trigger callback regardless.
       setTextValue('');
       setSelectedImage(null);
       setSelectedListingNft(null);
@@ -152,22 +170,21 @@ export default function ThreadComposer({
   };
 
   /***************************************************
-   * 2) Image picking
+   * Image picking
    ***************************************************/
   const handleMediaPress = () => {
     const options: ImageLibraryOptions = {
       mediaType: 'photo',
       quality: 1,
-      includeBase64: true, // Include base64 data
+      includeBase64: true,
     };
-    launchImageLibrary(options, (response) => {
+    launchImageLibrary(options, response => {
       if (response.didCancel) {
         console.log('User cancelled image picker');
       } else if (response.errorCode) {
         console.log('ImagePicker Error:', response.errorMessage);
       } else if (response.assets && response.assets.length > 0) {
         const asset = response.assets[0];
-        // If base64 is provided, build a data URL so the <Image> component can decode it.
         if (asset.base64 && asset.type) {
           setSelectedImage(`data:${asset.type};base64,${asset.base64}`);
         } else if (asset.uri) {
@@ -178,7 +195,7 @@ export default function ThreadComposer({
   };
 
   /***************************************************
-   * 3) NFT Listing Modal
+   * NFT Listing Modal
    ***************************************************/
   const handleNftListingPress = async () => {
     setShowListingModal(true);
@@ -263,37 +280,8 @@ export default function ThreadComposer({
     closeListingModal();
   };
 
-  const renderListingItem = ({ item }: { item: NftItem }) => (
-    <TouchableOpacity
-      style={modalStyles.listingCard}
-      onPress={() => handleSelectListing(item)}>
-      <Image source={{ uri: item.image }} style={modalStyles.listingImage} />
-      <View style={{ flex: 1, marginLeft: 10 }}>
-        <Text style={modalStyles.listingName} numberOfLines={1}>
-          {item.name}
-        </Text>
-        {item.priceSol !== undefined && (
-          <Text style={modalStyles.listingPrice}>
-            {item.priceSol.toFixed(2)} SOL
-          </Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-
   /***************************************************
-   * 4) Additional Trade Modal
-   ***************************************************/
-  const handleTradePress = () => {
-    setShowTradeModal(true);
-  };
-
-  const closeTradeModal = () => {
-    setShowTradeModal(false);
-  };
-
-  /***************************************************
-   * 5) RENDER
+   * RENDER
    ***************************************************/
   return (
     <View>
@@ -313,17 +301,17 @@ export default function ThreadComposer({
           />
           {selectedImage && (
             <Image
-              source={{ uri: selectedImage }}
-              style={{ width: 100, height: 100, marginTop: 10 }}
+              source={{uri: selectedImage}}
+              style={{width: 100, height: 100, marginTop: 10}}
             />
           )}
           {selectedListingNft && (
             <View style={styles.composerTradePreview}>
               <Image
-                source={{ uri: selectedListingNft.image }}
+                source={{uri: selectedListingNft.image}}
                 style={styles.composerTradeImage}
               />
-              <View style={{ marginLeft: 8, flex: 1 }}>
+              <View style={{marginLeft: 8, flex: 1}}>
                 <Text style={styles.composerTradeName} numberOfLines={1}>
                   {selectedListingNft.name}
                 </Text>
@@ -336,7 +324,7 @@ export default function ThreadComposer({
               <TouchableOpacity
                 style={styles.composerTradeRemove}
                 onPress={() => setSelectedListingNft(null)}>
-                <Text style={{ color: '#fff', fontWeight: '600' }}>X</Text>
+                <Text style={{color: '#fff', fontWeight: '600'}}>X</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -345,23 +333,27 @@ export default function ThreadComposer({
               <TouchableOpacity onPress={handleMediaPress}>
                 <Icons.MediaIcon width={18} height={18} />
               </TouchableOpacity>
+
               {/* NFT Listing Modal Trigger */}
               <TouchableOpacity
                 onPress={handleNftListingPress}
-                style={styles.nftListingTrigger}>
-                <Text style={{ fontSize: 12, color: '#666666' }}>
+                style={{marginLeft: 8}}>
+                <Text style={{fontSize: 12, color: '#666666'}}>
                   NFT Listing
                 </Text>
               </TouchableOpacity>
-              {/* Additional Trade Modal Trigger */}
+
+              {/* OPEN our new Trade Modal */}
               <TouchableOpacity
-                onPress={handleTradePress}
-                style={styles.tradeModalTrigger}>
-                <Text style={{ fontSize: 12, color: '#333333' }}>Trade</Text>
+                onPress={() => setShowTradeModal(true)}
+                style={{marginLeft: 8}}>
+                <Text style={{fontSize: 12, color: '#333333'}}>
+                  Trade/Share
+                </Text>
               </TouchableOpacity>
             </View>
             <TouchableOpacity onPress={handlePost}>
-              <Text style={{ color: '#1d9bf0', fontWeight: '600' }}>
+              <Text style={{color: '#1d9bf0', fontWeight: '600'}}>
                 {parentId ? 'Reply' : 'Post'}
               </Text>
             </TouchableOpacity>
@@ -369,7 +361,7 @@ export default function ThreadComposer({
         </View>
       </View>
 
-      {/* NFT Listing Modal */}
+      {/* NFT Listing Modal (unchanged) */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -381,15 +373,34 @@ export default function ThreadComposer({
             {loadingListings ? (
               <ActivityIndicator size="large" color="#1d9bf0" />
             ) : listingItems.length === 0 ? (
-              <Text style={{ marginTop: 16, color: '#666' }}>
+              <Text style={{marginTop: 16, color: '#666'}}>
                 No active listings found.
               </Text>
             ) : (
               <FlatList
                 data={listingItems}
-                keyExtractor={(item) => item.mint}
-                renderItem={renderListingItem}
-                style={{ marginTop: 10, width: '100%' }}
+                keyExtractor={item => item.mint}
+                renderItem={({item}) => (
+                  <TouchableOpacity
+                    style={modalStyles.listingCard}
+                    onPress={() => handleSelectListing(item)}>
+                    <Image
+                      source={{uri: item.image}}
+                      style={modalStyles.listingImage}
+                    />
+                    <View style={{flex: 1, marginLeft: 10}}>
+                      <Text style={modalStyles.listingName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      {item.priceSol !== undefined && (
+                        <Text style={modalStyles.listingPrice}>
+                          {item.priceSol.toFixed(2)} SOL
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )}
+                style={{marginTop: 10, width: '100%'}}
               />
             )}
             <TouchableOpacity
@@ -401,31 +412,18 @@ export default function ThreadComposer({
         </View>
       </Modal>
 
-      {/* Additional Trade Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
+      {/* Our new TradeModal */}
+      <TradeModal
         visible={showTradeModal}
-        onRequestClose={closeTradeModal}>
-        <View style={tradeModalStyles.modalOverlay}>
-          <View style={tradeModalStyles.modalContainer}>
-            <Text style={tradeModalStyles.modalTitle}>Trade Modal</Text>
-            <Text style={tradeModalStyles.modalContent}>
-              Customize your trade in this modal...
-            </Text>
-            <TouchableOpacity
-              onPress={closeTradeModal}
-              style={tradeModalStyles.closeButton}>
-              <Text style={tradeModalStyles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowTradeModal(false)}
+        currentUser={currentUser}
+        onPostCreated={onPostCreated}
+      />
     </View>
   );
 }
 
-/** Minimal styling for modals */
+/** Minimal styling for the NFT listing modal only */
 const modalStyles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
@@ -473,43 +471,6 @@ const modalStyles = StyleSheet.create({
   },
   closeButton: {
     marginTop: 12,
-    backgroundColor: '#1d9bf0',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-  },
-  closeButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-});
-
-const tradeModalStyles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    width: '80%',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  modalContent: {
-    fontSize: 16,
-    color: '#444',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  closeButton: {
     backgroundColor: '#1d9bf0',
     paddingVertical: 10,
     paddingHorizontal: 20,

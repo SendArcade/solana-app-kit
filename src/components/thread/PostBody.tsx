@@ -1,4 +1,4 @@
-// FILE: src/components/thread/PostBody.tsx
+// File: src/components/thread/PostBody.tsx
 import React, {useState, useEffect} from 'react';
 import {View, Text, Image, ActivityIndicator} from 'react-native';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
@@ -72,21 +72,7 @@ function renderSection(
           {!!section.text && (
             <Text style={styles.threadItemText}>{section.text}</Text>
           )}
-          {section.tradeData && (
-            <TradeCard
-              token1={{
-                avatar: section.tradeData.token1Avatar,
-                name: section.tradeData.token1Name,
-                priceUsd: section.tradeData.token1PriceUsd,
-              }}
-              token2={{
-                avatar: section.tradeData.token2Avatar,
-                name: section.tradeData.token2Name,
-                priceUsd: section.tradeData.token2PriceUsd,
-                priceSol: section.tradeData.token2PriceSol,
-              }}
-            />
-          )}
+          {section.tradeData && <TradeCard tradeData={section.tradeData} />}
         </>
       );
 
@@ -145,8 +131,6 @@ function NftListingSection({
       try {
         setLoading(true);
         setError(null);
-        // For demonstration: "quick-mint-info"
-        // Documentation: https://docs.tensor.trade/reference/quick_mint_info
         const url = `https://api.mainnet.tensordev.io/api/v1/mint?mints=${listing.mint}`;
         const resp = await fetch(url, {
           headers: {
