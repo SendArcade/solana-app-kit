@@ -3,6 +3,32 @@ import { Image, Text, TouchableOpacity, View, Animated } from 'react-native';
 import { styles } from './buyCard.style';
 import Icons from '../../assets/svgs/index';
 
+/**
+ * A card component for purchasing creator coins
+ * 
+ * @component
+ * @description
+ * BuyCard is a component that displays information about a creator's coin
+ * and provides purchase functionality. Features include:
+ * - Creator profile image display
+ * - Coin name and description
+ * - Buy button for direct purchase
+ * - Animated expandable arrow for additional information
+ * 
+ * The component includes smooth animations for the arrow rotation and
+ * maintains its own state for the expanded/collapsed view.
+ * 
+ * @example
+ * ```tsx
+ * <BuyCard />
+ * ```
+ * 
+ * Note: Currently uses hardcoded values for the Yash coin.
+ * Future iterations could accept props for:
+ * - Creator information
+ * - Coin details
+ * - Buy action callback
+ */
 const BuyCard = () => {
   const [isArrowRotated, setIsArrowRotated] = useState(false);
   const rotationAnim = useRef(new Animated.Value(0)).current;

@@ -2,6 +2,29 @@ import React from "react";
 import { Text, View } from "react-native";
 import { style } from "./portfolioBalance.style";
 import Icons from  "../../assets/svgs/index";
+
+/**
+ * A component that displays the total portfolio value and quick actions
+ * 
+ * @component
+ * @description
+ * PortfolioBalance displays a user's total portfolio value along with profit/loss
+ * indicators and quick action buttons. The component includes:
+ * - Total portfolio value in USD
+ * - Profit/loss amount and percentage
+ * - Quick action buttons for:
+ *   - Swap: Token swapping functionality
+ *   - Send: Asset transfer functionality
+ *   - On-Ramp: Fiat to crypto conversion via Mercuryo
+ * 
+ * The component uses a clean, modern design with clear typography and
+ * iconography for easy understanding of portfolio performance.
+ * 
+ * @example
+ * ```tsx
+ * <PortfolioBalance />
+ * ```
+ */
 const PortfolioBalance = () => {
   return (
     <>

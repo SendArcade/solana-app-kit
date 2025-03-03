@@ -2,7 +2,7 @@ import React from "react";
 import { Image, View, Text } from "react-native";
 import AddButton from "../addButton/addButton";
 import PerksCard from "../perksCard/perksCard";
-import BuyCard from "../buyCard/buyCrad";
+import BuyCard from "../buyCard/buyCard";
 
 import ProfileIcons from "../../assets/svgs/index";
 import { styles } from "./profileInfo.style";

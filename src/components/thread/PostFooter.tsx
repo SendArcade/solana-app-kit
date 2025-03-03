@@ -4,13 +4,39 @@ import Icons from '../../assets/svgs';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
 import {ThreadPost} from './thread.types';
 
+/**
+ * Props for the PostFooter component
+ * @interface PostFooterProps
+ */
 interface PostFooterProps {
+  /** The post data associated with this footer */
   post: ThreadPost;
+  /** Callback fired when the comment button is pressed */
   onPressComment?: (post: ThreadPost) => void;
+  /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
+  /** Style overrides for specific components */
   styleOverrides?: {[key: string]: object};
 }
 
+/**
+ * A component that renders the footer section of a post
+ * 
+ * @component
+ * @description
+ * PostFooter displays engagement metrics and action buttons below a post.
+ * It shows comment counts, like counts, and other interaction options.
+ * The component supports customizable styling through themes and style overrides.
+ * 
+ * @example
+ * ```tsx
+ * <PostFooter
+ *   post={postData}
+ *   onPressComment={handleCommentPress}
+ *   themeOverrides={customTheme}
+ * />
+ * ```
+ */
 export default function PostFooter({
   post,
   onPressComment,

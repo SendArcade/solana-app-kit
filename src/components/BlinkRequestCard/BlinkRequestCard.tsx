@@ -25,11 +25,24 @@ import { useEmbeddedSolanaWallet } from '@privy-io/expo';
 global.Buffer = Buffer;
 
 /**
- * (A) Utility to transform a "dial.to/v1/blink?apiUrl=..." link
- *     into a "dial.to/?action=solana-action:..." link.
- *
- *     If your link is already "https://dial.to/?action=solana-action:...", 
- *     this function just returns it unchanged.
+ * Transforms a Dialect Blink URL from the old format to the new action-based format.
+ * 
+ * @description
+ * This utility function handles the conversion of Dialect Blink URLs from the legacy format
+ * (dial.to/v1/blink?apiUrl=...) to the new action-based format (dial.to/?action=solana-action:...).
+ * If the URL is already in the new format, it is returned unchanged.
+ * 
+ * @example
+ * ```typescript
+ * // Old format
+ * const oldUrl = "https://api.dial.to/v1/blink?apiUrl=https%3A%2F%2Ftensor.dial.to%2Fbuy-floor%2Fmadlads";
+ * const newUrl = transformBlinkUrl(oldUrl);
+ * // Returns: "https://dial.to/?action=solana-action:..."
+ * ```
+ * 
+ * @param {string} originalUrl - The original Dialect Blink URL to transform
+ * @returns {string} The transformed URL in the new action-based format
+ * @throws {Error} If the URL is malformed or cannot be transformed
  */
 function transformBlinkUrl(originalUrl: string): string {
   try {
@@ -63,7 +76,22 @@ function transformBlinkUrl(originalUrl: string): string {
 }
 
 /**
- * (B) Our Dialect adapter using the Privy embedded wallet.
+ * Creates a wallet adapter for Privy wallet integration with Dialect Blinks.
+ * 
+ * @description
+ * This adapter implements the ActionAdapter interface required by Dialect Blinks,
+ * providing wallet functionality for signing messages and transactions using
+ * the Privy embedded wallet.
+ * 
+ * Features:
+ * - Connects to Privy Solana wallet
+ * - Signs transactions (both versioned and legacy)
+ * - Signs messages
+ * - Confirms transactions
+ * - Supports Solana mainnet
+ * 
+ * @returns {ActionAdapter} A wallet adapter compatible with Dialect Blinks
+ * @throws {Error} If the wallet is not connected or initialized
  */
 function createPrivyWalletAdapter(): ActionAdapter {
   const connection = new Connection(clusterApiUrl('mainnet-beta'), 'confirmed');
@@ -169,10 +197,38 @@ function createPrivyWalletAdapter(): ActionAdapter {
 }
 
 /**
- * (C) BlinkExample: Full Dialect Blink component that loads an action from the provided URL.
- *     We transform the given URL into the correct "action=solana-action:..." format if needed.
+ * Props for the Blink components
+ * @interface BlinkProps
  */
-export const BlinkExample: React.FC<{ url: string }> = ({ url }) => {
+interface BlinkProps {
+  /** The Dialect Blink URL to process (supports both old and new formats) */
+  url: string;
+}
+
+/**
+ * A component that renders a full Dialect Blink interface
+ * 
+ * @component
+ * @description
+ * BlinkExample provides a complete Blink interface for handling Solana transactions
+ * and message signing through Dialect. It includes:
+ * - Full transaction details display
+ * - Confirmation dialogs
+ * - Status updates
+ * - Custom theming
+ * - Integration with Privy wallet
+ * - Support for both old and new Blink URL formats
+ * 
+ * The component automatically handles URL transformation and wallet adapter creation.
+ * 
+ * @example
+ * ```tsx
+ * <BlinkExample 
+ *   url="https://dial.to/v1/blink?apiUrl=https%3A%2F%2Fapi.example.com%2Faction"
+ * />
+ * ```
+ */
+export const BlinkExample: React.FC<BlinkProps> = ({ url }) => {
   console.debug('[BlinkExample] Original URL passed in:', url);
   const transformedUrl = transformBlinkUrl(url);
   console.debug('[BlinkExample] Transformed URL for useAction:', transformedUrl);
@@ -208,10 +264,29 @@ export const BlinkExample: React.FC<{ url: string }> = ({ url }) => {
 };
 
 /**
- * (D) MiniblinkExample: A mini version of Blink that selects a specific "Donate" action, if present.
- *     Also transforms the URL if needed.
+ * A component that renders a minimal Dialect Blink interface
+ * 
+ * @component
+ * @description
+ * MiniblinkExample provides a compact version of the Blink interface, ideal for
+ * embedded use cases where space is limited. It maintains all the core functionality
+ * of the full Blink interface but with a more condensed UI.
+ * 
+ * Features:
+ * - Compact UI design
+ * - Full transaction support
+ * - Message signing capability
+ * - Status indicators
+ * - Privy wallet integration
+ * 
+ * @example
+ * ```tsx
+ * <MiniblinkExample 
+ *   url="https://dial.to/v1/blink?apiUrl=https%3A%2F%2Fapi.example.com%2Faction"
+ * />
+ * ```
  */
-export const MiniblinkExample: React.FC<{ url: string }> = ({ url }) => {
+export const MiniblinkExample: React.FC<BlinkProps> = ({ url }) => {
   console.debug('[MiniblinkExample] Original URL:', url);
   const transformedUrl = transformBlinkUrl(url);
   console.debug('[MiniblinkExample] Transformed URL for useAction:', transformedUrl);

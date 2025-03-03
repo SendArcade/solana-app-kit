@@ -3,6 +3,30 @@ import {Image, Text, TouchableOpacity, View, FlatList} from 'react-native';
 import {styles} from './userListing.style';
 import {dummyData, UserItem} from '../../mocks/users';
 
+/**
+ * A component that displays a scrollable list of users with follow functionality
+ * 
+ * @component
+ * @description
+ * UserListing is a component that renders a list of users with their profile
+ * information and follow/unfollow functionality. Features include:
+ * - User profile image display
+ * - User name and username display
+ * - Interactive follow/unfollow button
+ * - State management for follow status
+ * - Smooth scrolling list implementation
+ * 
+ * The component uses FlatList for efficient rendering of large lists and
+ * maintains follow state for each user independently.
+ * 
+ * @example
+ * ```tsx
+ * <UserListing />
+ * ```
+ * 
+ * Note: The component currently uses dummy data from mocks/users.
+ * In a production environment, this should be replaced with real user data.
+ */
 const UserListing = () => {
   const [userData, setUserData] = useState(dummyData);
 

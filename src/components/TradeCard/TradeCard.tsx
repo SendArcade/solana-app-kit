@@ -3,24 +3,69 @@ import {View, Text, Image, TouchableOpacity} from 'react-native';
 import {createThreadStyles, getMergedTheme} from '../thread/thread.styles';
 import Icon from '../../assets/svgs/index';
 
+/**
+ * Props for the token information displayed in the TradeCard
+ */
+interface TokenInfo {
+  /** Image source for the token's avatar */
+  avatar: any;
+  /** Name of the token */
+  name: string;
+  /** Price of the token in USD */
+  priceUsd: string;
+  /** Price of the token in SOL (only required for token2) */
+  priceSol?: string;
+}
+
+/**
+ * Props for the TradeCard component
+ */
 interface TradeCardProps {
-  token1: {
-    avatar: any;
-    name: string;
-    priceUsd: string;
-  };
-  token2: {
-    avatar: any;
-    name: string;
-    priceUsd: string;
-    priceSol: string;
-  };
+  /** Information about the first token in the trading pair */
+  token1: TokenInfo;
+  /** Information about the second token in the trading pair */
+  token2: TokenInfo & { priceSol: string };
+  /** Optional callback function when trade button is pressed */
   onTrade?: () => void;
+  /** Optional theme overrides for styling */
   themeOverrides?: Partial<Record<string, any>>;
+  /** Optional style overrides for specific elements */
   styleOverrides?: {[key: string]: object};
+  /** Optional user-defined stylesheet */
   userStyleSheet?: {[key: string]: object};
 }
 
+/**
+ * A component that displays a trading card interface for token pairs
+ * 
+ * @component
+ * @description
+ * TradeCard provides a user interface for displaying and comparing two tokens
+ * in a trading pair. It shows token information including avatars, names,
+ * and prices in both USD and SOL. The component features a swap icon between
+ * the tokens and supports customizable styling through various override props.
+ * 
+ * The component is designed to be flexible with customizable themes and styles,
+ * making it adaptable to different design requirements.
+ * 
+ * @example
+ * ```tsx
+ * <TradeCard
+ *   token1={{
+ *     avatar: require('./token1.png'),
+ *     name: 'SOL',
+ *     priceUsd: '$100'
+ *   }}
+ *   token2={{
+ *     avatar: require('./token2.png'),
+ *     name: 'USDC',
+ *     priceUsd: '$1',
+ *     priceSol: '0.01'
+ *   }}
+ *   onTrade={() => console.log('Trade initiated')}
+ * />
+ * ```
+ */
 export default function TradeCard({
   token1,
   token2,
