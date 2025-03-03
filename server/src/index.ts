@@ -1,5 +1,6 @@
-import express, {Request, Response} from 'express';
-import {TokenMillClient} from './service/tokenMill';
+// File: src/index.ts
+import express, { Request, Response } from 'express';
+import { TokenMillClient } from './service/tokenMill';
 import {
   MarketParams,
   StakingParams,
@@ -10,30 +11,32 @@ import {
   TokenMetadata,
   SwapAmounts,
 } from './types/interfaces';
-import {PublicKey} from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import { launchRouter } from './routes/pumpfunLaunch';
 import { buildCompressedNftListingTx } from './utils/compressedNftListing';
 import { threadRouter } from './routes/threadRoutes';
 import knex from './db/knex';
 
-/**
- * Express application instance
- */
 const app = express();
 app.use(express.json());
 
+// Test the database connection.
+// Instead of exiting on error, we log the error and continue.
 async function testDbConnection() {
   try {
     const result = await knex.raw('select 1+1 as result');
-    console.log('Database connection successful:', result.rows ? result.rows[0] : result);
+    console.log(
+      'Database connection successful:',
+      result.rows ? result.rows[0] : result
+    );
   } catch (error) {
     console.error('Database connection failed:', error);
-    process.exit(1); // Exit if DB connection fails
+    console.warn('Proceeding without a successful DB connection.');
   }
 }
 
-testDbConnection();
-
+// Run migrations.
+// If migrations fail, log error and continue instead of exiting.
 async function runMigrationsAndStartServer() {
   try {
     console.log('Running migrations...');
@@ -44,14 +47,16 @@ async function runMigrationsAndStartServer() {
     }
   } catch (error) {
     console.error('Migration error:', error);
-    process.exit(1); // Exit if migrations fail
+    console.warn('Proceeding without running migrations.');
   }
 }
 
+// Use the pumpfun and thread routes.
 app.use('/api/pumpfun', launchRouter);
 app.use('/api', threadRouter);
+
 /**
- * TokenMill client instance for interacting with the Solana program
+ * TokenMill client instance for interacting with the Solana program.
  */
 const tokenMill = new TokenMillClient();
 
@@ -65,11 +70,6 @@ interface VestingReleaseParams {
 /**
  * Create a new TokenMill configuration
  * @route POST /api/config
- * @param {Object} req.body
- * @param {string} req.body.authority - Authority public key
- * @param {string} req.body.protocolFeeRecipient - Protocol fee recipient public key
- * @param {number} req.body.protocolFeeShare - Protocol fee share percentage
- * @param {number} req.body.referralFeeShare - Referral fee share percentage
  */
 app.post('/api/config', async (req: Request, res: Response) => {
   try {
@@ -97,8 +97,6 @@ app.post('/api/config', async (req: Request, res: Response) => {
 /**
  * Get token badge quote
  * @route POST /api/quote-token-badge
- * @param {Object} req.body - Token badge parameters
- * @returns {Promise<TokenMillResponse<any>>} Quote response
  */
 app.post('/api/quote-token-badge', async (req: Request, res: Response) => {
   try {
@@ -115,8 +113,6 @@ app.post('/api/quote-token-badge', async (req: Request, res: Response) => {
 /**
  * Create a new market
  * @route POST /api/markets
- * @param {MarketParams} req.body - Market creation parameters
- * @returns {Promise<TokenMillResponse<Market>>} Created market details
  */
 app.post(
   '/api/markets',
@@ -132,23 +128,20 @@ app.post(
     }
   },
 );
+
 app.post(
   '/api/free-market',
   async (req: express.Request, res: express.Response): Promise<any> => {
     try {
-      const {market} = req.body as FreeMarketParams;
-
-      // Validate required parameter
+      const { market } = req.body as FreeMarketParams;
       if (!market) {
         return res.status(400).json({
           success: false,
           message: 'Market address is required',
         });
       }
-
       const tokenMillClient = new TokenMillClient();
       const result = await tokenMillClient.freeMarket(market);
-
       return res.status(200).json(result);
     } catch (error: any) {
       console.error('Free market error:', error);
@@ -164,8 +157,6 @@ app.post(
 /**
  * Create a new token
  * @route POST /api/tokens
- * @param {TokenParams} req.body - Token creation parameters
- * @returns {Promise<TokenMillResponse<any>>} Created token details
  */
 app.post(
   '/api/tokens',
@@ -179,10 +170,11 @@ app.post(
         error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
-  });
+  },
+);
+
 app.post('/api/swap', async (req: Request, res: Response): Promise<any> => {
   try {
-    // Cast to your extended SwapParams that includes userPublicKey
     const {
       market,
       quoteTokenMint,
@@ -190,10 +182,8 @@ app.post('/api/swap', async (req: Request, res: Response): Promise<any> => {
       tradeType,
       amount,
       otherAmountThreshold,
-      userPublicKey
+      userPublicKey,
     } = req.body;
-
-    // Build a single transaction
     const result = await tokenMill.buildSwapTx({
       market,
       quoteTokenMint,
@@ -203,15 +193,12 @@ app.post('/api/swap', async (req: Request, res: Response): Promise<any> => {
       otherAmountThreshold,
       userPublicKey,
     });
-
     if (!result.success) {
       return res.status(500).json({
         success: false,
         error: result.error || 'Swap failed',
       });
     }
-
-    // Return { success, transaction: base64Tx }
     return res.status(200).json({
       success: true,
       transaction: result.data?.transaction,
@@ -228,12 +215,11 @@ app.post('/api/swap', async (req: Request, res: Response): Promise<any> => {
 /**
  * Create a new staking position
  * @route POST /api/stake
- * @param {StakingParams} req.body - Staking parameters
  */
 app.post(
   '/api/stake',
   async (
-    req: Request<{}, {}, StakingParams & {userPublicKey: string}>,
+    req: Request<{}, {}, StakingParams & { userPublicKey: string }>,
     res: Response,
   ) => {
     try {
@@ -251,7 +237,6 @@ app.post(
 /**
  * Create a new vesting schedule
  * @route POST /api/vesting
- * @param {VestingParams} req.body - Vesting schedule parameters
  */
 app.post(
   '/api/vesting',
@@ -273,9 +258,7 @@ app.post(
 
 /**
  * Claim vested tokens for a specific market
- * @route POST /api/vesting/:marketAddress/claim
- * @param {string} req.params.marketAddress - Market address for the vesting schedule
- * @param {Object} req.body - Claim parameters
+ * @route POST /api/vesting/release
  */
 app.post('/api/vesting/release', async (req: any, res: any) => {
   try {
@@ -283,35 +266,30 @@ app.post('/api/vesting/release', async (req: any, res: any) => {
       marketAddress,
       vestingPlanAddress,
       baseTokenMint,
-      userPublicKey
+      userPublicKey,
     } = req.body;
-
-    // Build the base64 transaction
     const result = await tokenMill.buildReleaseVestingTx({
       marketAddress,
       vestingPlanAddress,
       baseTokenMint,
-      userPublicKey
+      userPublicKey,
     });
-
     if (!result.success) {
       return res.status(500).json({ success: false, error: result.error });
     }
-    // Return { success, data: base64Tx }
     return res.json({ success: true, data: result.data });
   } catch (error: any) {
     console.error('[POST /api/vesting/release] Error:', error);
     return res.status(500).json({
       success: false,
-      error: error.message || 'Unknown error'
+      error: error.message || 'Unknown error',
     });
   }
 });
 
 app.post('/api/set-curve', async (req: Request, res: Response): Promise<any> => {
   try {
-    const {market, userPublicKey, askPrices, bidPrices} = req.body;
-
+    const { market, userPublicKey, askPrices, bidPrices } = req.body;
     if (!market || !userPublicKey || !askPrices || !bidPrices) {
       return res.status(400).json({
         success: false,
@@ -319,21 +297,19 @@ app.post('/api/set-curve', async (req: Request, res: Response): Promise<any> => 
           'Missing required fields: market, userPublicKey, askPrices, bidPrices',
       });
     }
-
     const result = await tokenMill.buildSetCurveTx({
       market,
       userPublicKey,
       askPrices,
       bidPrices,
     });
-
     if (!result.success) {
-      return res.status(500).json({success: false, error: result.error});
+      return res.status(500).json({ success: false, error: result.error });
     }
-
-    return res
-      .status(200)
-      .json({success: true, transaction: result.data?.transaction});
+    return res.status(200).json({
+      success: true,
+      transaction: result.data?.transaction,
+    });
   } catch (error: any) {
     console.error('[POST /api/set-curve] Error:', error);
     return res.status(500).json({
@@ -342,7 +318,6 @@ app.post('/api/set-curve', async (req: Request, res: Response): Promise<any> => 
     });
   }
 });
-
 
 app.post(
   '/api/quote-swap',
@@ -358,23 +333,23 @@ app.post(
     }
   },
 );
+
 app.post(
   '/api/get-asset',
   async (req: Request, res: Response): Promise<any> => {
-    const {assetId} = req.body;
-
+    const { assetId } = req.body;
     if (!assetId) {
-      return res.status(400).json({error: 'Asset ID is required'});
+      return res.status(400).json({ error: 'Asset ID is required' });
     }
-
     try {
       const metadata = await tokenMill.getAssetMetadata(assetId);
       res.json(metadata);
     } catch (error: any) {
-      res.status(500).json({error: error.message});
+      res.status(500).json({ error: error.message });
     }
   },
 );
+
 app.get(
   '/api/graduation',
   async (req: Request, res: Response): Promise<any> => {
@@ -390,7 +365,6 @@ app.get(
   },
 );
 
-
 app.post('/api/build-compressed-nft-listing-tx', async (req: any, res: any) => {
   try {
     const result = await buildCompressedNftListingTx(req.body);
@@ -401,13 +375,16 @@ app.post('/api/build-compressed-nft-listing-tx', async (req: any, res: any) => {
   }
 });
 
-/**
- * Start the Express server
- */
+// Start the Express server.
+// Note: We now try connecting to the database and running migrations,
+// but if these fail we log the error and continue to start the server.
 const PORT = process.env.PORT || 3000;
 
-runMigrationsAndStartServer().then(() => {
+
+(async function startServer() {
+  await testDbConnection();
+  await runMigrationsAndStartServer();
   app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
   });
-});
+})();
