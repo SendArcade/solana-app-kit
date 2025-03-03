@@ -6,7 +6,6 @@ import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks'
 import { Thread } from '../../../../components/thread';
 import COLORS from '../../../../assets/colors';
 import { fetchAllPosts } from '../../../../state/thread/reducer';
-import { allposts as fallbackPosts } from '../../../../mocks/posts';
 
 /** Example: Current user is "Alice" */
 const currentUser: ThreadUser = {
@@ -57,16 +56,10 @@ export default function FeedScreen() {
   }, [dispatch]);
 
   // Filter out root posts (posts without a parent) and sort descending by createdAt.
-  // If no posts are returned from the DB, fall back to the local mock posts.
   useEffect(() => {
-    let postsToUse: ThreadPost[] = [];
-    if (allPosts.length === 0) {
-      postsToUse = fallbackPosts.filter((p) => !p.parentId);
-    } else {
-      postsToUse = allPosts.filter((p) => !p.parentId);
-    }
-    postsToUse.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
-    setRootPosts(postsToUse);
+    const roots = allPosts.filter((p) => !p.parentId);
+    roots.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+    setRootPosts(roots);
   }, [allPosts]);
 
   // Pull-to-refresh callback
@@ -82,7 +75,7 @@ export default function FeedScreen() {
         rootPosts={rootPosts}
         currentUser={currentUser}
         ctaButtons={ctaButtons}
-        refreshing={refreshing}   // Passed to Thread for refresh control
+        refreshing={refreshing}   // Prop passed to Thread for refresh control
         onRefresh={onRefresh}      // Callback to re-fetch posts on pull-to-refresh
         themeOverrides={{ '--thread-bg-primary': '#F0F0F0' }}
         styleOverrides={{

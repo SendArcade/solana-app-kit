@@ -11,14 +11,13 @@ import {
 } from 'react-native';
 import {useAuth} from '../../hooks/useAuth';
 import {useAppDispatch} from '../../hooks/useReduxHooks';
-import {createRootPostAsync} from '../../state/thread/reducer';
+import {addPostLocally, createRootPostAsync} from '../../state/thread/reducer';
 import {Transaction, VersionedTransaction, Connection} from '@solana/web3.js';
 import {TENSOR_API_KEY, HELIUS_RPC_URL} from '@env';
-import {ThreadSection, ThreadUser, TradeData} from './thread.types';
+import {ThreadPost, ThreadSection, ThreadUser, TradeData} from './thread.types';
 import styles from './tradeModal.style';
 import SelectTokenModal, {TokenInfo} from './SelectTokenModal';
 
-// Jupiter swap endpoint in your server
 const JUPITER_SWAP_ENDPOINT = 'http://localhost:3000/api/jupiter/swap';
 
 type TabOption = 'TRADE_AND_SHARE' | 'PICK_TX_SHARE';
@@ -47,12 +46,11 @@ export default function TradeModal({
   const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
   const userWallet = solanaWallet?.wallets?.[0] || null;
 
-  // If disableTabs is true, we force the default tab
   const [selectedTab, setSelectedTab] = useState<TabOption>('TRADE_AND_SHARE');
 
   const [inputToken, setInputToken] = useState<TokenInfo>(
     initialInputToken ?? {
-      address: 'So11111111111111111111111111111111111111112', // SOL
+      address: 'So11111111111111111111111111111111111111112',
       symbol: 'SOL',
       name: 'Solana',
       decimals: 9,
@@ -62,7 +60,7 @@ export default function TradeModal({
   );
   const [outputToken, setOutputToken] = useState<TokenInfo>(
     initialOutputToken ?? {
-      address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
+      address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
       symbol: 'USDC',
       name: 'USD Coin',
       decimals: 6,
@@ -76,23 +74,15 @@ export default function TradeModal({
   >('input');
   const [showSelectTokenModal, setShowSelectTokenModal] = useState(false);
 
-  // The user-input amount for the "from" token
   const [solAmount, setSolAmount] = useState('0.01');
-
   const [loading, setLoading] = useState(false);
   const [resultMsg, setResultMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-
-  // For "Pick Tx & Share"
   const [solscanTxSig, setSolscanTxSig] = useState('');
 
-  /****************************************************
-   * Utility to get decimals + symbol + Coingecko price
-   ****************************************************/
   async function getTokenDetailsAndPrice(
     mint: string,
   ): Promise<{symbol: string; decimals: number; usdPrice: number}> {
-    // 1) Jupiter token API
     const tokenResp = await fetch(`https://api.jup.ag/tokens/v1/token/${mint}`);
     if (!tokenResp.ok) {
       throw new Error(`Failed to load token ${mint}: ${tokenResp.status}`);
@@ -100,11 +90,7 @@ export default function TradeModal({
     const tokenData = await tokenResp.json();
     const symbol = tokenData.symbol || tokenData.name || '???';
     const decimals = tokenData.decimals || 0;
-
-    // default price
     let usdPrice = 0;
-
-    // 2) If CoingeckoID present, fetch from Coingecko
     if (tokenData.extensions && tokenData.extensions.coingeckoId) {
       const cgId = tokenData.extensions.coingeckoId;
       try {
@@ -125,13 +111,9 @@ export default function TradeModal({
         console.warn('Coingecko price fetch failed', err);
       }
     }
-
     return {symbol, decimals, usdPrice};
   }
 
-  /**
-   * Convert user input to lamports
-   */
   function toBaseUnits(amount: string, decimals: number): number {
     const val = parseFloat(amount);
     if (isNaN(val)) return 0;
@@ -146,9 +128,6 @@ export default function TradeModal({
     onClose();
   }, [onClose]);
 
-  /**
-   * Called after a successful swap. We'll compute final amounts & store in post
-   */
   const promptPostSwap = useCallback(
     async ({
       inputLamports,
@@ -157,12 +136,9 @@ export default function TradeModal({
       inputLamports: number;
       outputLamports: number;
     }) => {
-      // If disableTabs is true, skip post creation prompt
-      if (disableTabs) return;
-
       Alert.alert(
-        'Swap Success',
-        'Would you like to create a post about this swap?',
+        'Trade Successful',
+        'Your trade was successful! Would you like to share your trade on your feed?',
         [
           {
             text: 'No',
@@ -172,23 +148,19 @@ export default function TradeModal({
             text: 'Yes',
             onPress: async () => {
               try {
-                // 1) Fetch token details for input & output
                 const [inputInfo, outputInfo] = await Promise.all([
                   getTokenDetailsAndPrice(inputToken.address),
                   getTokenDetailsAndPrice(outputToken.address),
                 ]);
 
-                // 2) Convert lamports => decimal quantity
                 const finalInputQty =
                   inputLamports / Math.pow(10, inputInfo.decimals);
                 const finalOutputQty =
                   outputLamports / Math.pow(10, outputInfo.decimals);
 
-                // 3) Compute total USD at time of trade
                 const totalInputUsd = finalInputQty * inputInfo.usdPrice;
                 const totalOutputUsd = finalOutputQty * outputInfo.usdPrice;
 
-                // Format as strings
                 const finalInputQtyStr = finalInputQty
                   .toFixed(4)
                   .replace(/\.?0+$/, '');
@@ -203,7 +175,6 @@ export default function TradeModal({
                     ? `$${totalOutputUsd.toFixed(2)}`
                     : '$0.00';
 
-                // 4) Build the trade data object
                 const tradeData: TradeData = {
                   inputMint: inputToken.address,
                   outputMint: outputToken.address,
@@ -216,15 +187,30 @@ export default function TradeModal({
                   outputUsdValue: outputUsdValStr,
                 };
 
-                // 5) Build post
                 const postSections: ThreadSection[] = [
                   {
                     id: 'swap-post-' + Math.random().toString(36).substr(2, 9),
                     type: 'TEXT_TRADE',
                     tradeData,
-                    text: `I just swapped ${solAmount} ${inputToken.symbol} for ${outputToken.symbol}!`,
+                    text: `I just executed a trade: ${solAmount} ${inputToken.symbol} for ${outputToken.symbol}!`,
                   },
                 ];
+
+                const newPost: ThreadPost = {
+                  id: 'local-' + Math.random().toString(36).substr(2, 9),
+                  user: currentUser,
+                  sections: postSections,
+                  createdAt: new Date().toISOString(),
+                  parentId: undefined,
+                  replies: [],
+                  reactionCount: 0,
+                  retweetCount: 0,
+                  quoteCount: 0,
+                };
+
+                dispatch(addPostLocally(newPost));
+                setResultMsg('Trade post created successfully!');
+                onPostCreated && onPostCreated();
 
                 await dispatch(
                   createRootPostAsync({
@@ -232,9 +218,6 @@ export default function TradeModal({
                     sections: postSections,
                   }),
                 ).unwrap();
-
-                setResultMsg('Post created for your swap!');
-                onPostCreated && onPostCreated();
               } catch (err: any) {
                 setErrorMsg(err?.message || 'Failed to create post.');
               }
@@ -243,20 +226,9 @@ export default function TradeModal({
         ],
       );
     },
-    [
-      dispatch,
-      onPostCreated,
-      currentUser,
-      solAmount,
-      inputToken,
-      outputToken,
-      disableTabs,
-    ],
+    [dispatch, onPostCreated, currentUser, solAmount, inputToken, outputToken],
   );
 
-  /**
-   * Perform the swap -> sign -> create a post
-   */
   const handleTradeAndShare = useCallback(async () => {
     if (!userPublicKey) {
       Alert.alert('Wallet not connected', 'Please connect your wallet first.');
@@ -273,8 +245,6 @@ export default function TradeModal({
     try {
       const inputLamports = toBaseUnits(solAmount, inputToken.decimals);
 
-      // 1) Jupiter quote
-      // 1) Jupiter quote
       const quoteUrl = `https://api.jup.ag/swap/v1/quote?inputMint=${
         inputToken.address
       }&outputMint=${outputToken.address}&amount=${Math.round(
@@ -285,8 +255,6 @@ export default function TradeModal({
         throw new Error(`Jupiter quote failed: ${quoteResp.status}`);
       }
       const quoteData = await quoteResp.json();
-      console.log('quoteData', quoteData);
-
       let firstRoute;
       if (
         quoteData.data &&
@@ -299,7 +267,6 @@ export default function TradeModal({
         Array.isArray(quoteData.routePlan) &&
         quoteData.routePlan.length > 0
       ) {
-        // If no "data" field exists, use the quoteData itself as the route information.
         firstRoute = quoteData;
       } else {
         throw new Error('No routes returned by Jupiter.');
@@ -307,7 +274,6 @@ export default function TradeModal({
 
       const outLamports = parseFloat(firstRoute.outAmount) || 0;
 
-      // 2) server route to build swap transaction
       const body = {
         quoteResponse: quoteData,
         userPublicKey: userPublicKey.toString(),
@@ -319,14 +285,12 @@ export default function TradeModal({
       });
 
       const swapData = await swapResp.json();
-      console.log('swapData', swapData);
       if (!swapResp.ok || !swapData.swapTransaction) {
         throw new Error(
           swapData.error || 'Failed to get Jupiter swapTransaction.',
         );
       }
 
-      // 3) sign & send
       const {swapTransaction} = swapData;
       const txBuffer = Buffer.from(swapTransaction, 'base64');
       let transaction: Transaction | VersionedTransaction;
@@ -352,9 +316,8 @@ export default function TradeModal({
         throw new Error('No signature returned from signAndSendTransaction');
       }
 
-      setResultMsg(`Swap success! Tx signature: ${signature}`);
+      setResultMsg(`Swap successful! Tx: ${signature}`);
 
-      // 4) Prompt the user to create the post, providing final amounts
       await promptPostSwap({
         inputLamports,
         outputLamports: outLamports,
@@ -374,9 +337,6 @@ export default function TradeModal({
     promptPostSwap,
   ]);
 
-  /*****************************************************
-   * "Pick Tx & Share" tab
-   *****************************************************/
   const handlePickTxAndShare = useCallback(async () => {
     if (!solscanTxSig.trim()) {
       Alert.alert(
@@ -406,7 +366,7 @@ export default function TradeModal({
         }),
       ).unwrap();
 
-      setResultMsg('Post created referencing your chosen transaction!');
+      setResultMsg('Post created referencing your transaction!');
       onPostCreated && onPostCreated();
     } catch (err: any) {
       setErrorMsg(err.message);
@@ -415,9 +375,6 @@ export default function TradeModal({
     }
   }, [dispatch, solscanTxSig, currentUser, onPostCreated]);
 
-  /*****************************************************
-   * Render tab content
-   *****************************************************/
   const renderTabContent = () => {
     if (selectedTab === 'TRADE_AND_SHARE') {
       return (
@@ -438,7 +395,7 @@ export default function TradeModal({
             </View>
 
             <View style={styles.arrowContainer}>
-              <Text style={{fontSize: 22, fontWeight: 'bold'}}>→</Text>
+              <Text style={styles.arrowText}>→</Text>
             </View>
 
             <View style={styles.tokenColumn}>
@@ -468,21 +425,20 @@ export default function TradeModal({
           {loading ? (
             <ActivityIndicator
               size="large"
-              color="#1d9bf0"
+              color="#4A90E2"
               style={{marginTop: 16}}
             />
           ) : (
             <TouchableOpacity
               style={styles.swapButton}
               onPress={handleTradeAndShare}>
-              <Text style={styles.swapButtonText}>Swap &amp; Share</Text>
+              <Text style={styles.swapButtonText}>Swap & Share</Text>
             </TouchableOpacity>
           )}
         </ScrollView>
       );
     }
 
-    // PICK_TX_SHARE tab
     return (
       <View style={{width: '100%'}}>
         <Text style={styles.inputLabel}>Transaction Signature</Text>
@@ -496,7 +452,7 @@ export default function TradeModal({
         {loading ? (
           <ActivityIndicator
             size="large"
-            color="#1d9bf0"
+            color="#4A90E2"
             style={{marginTop: 16}}
           />
         ) : (
@@ -514,7 +470,12 @@ export default function TradeModal({
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.title}>Jupiter-like Swap</Text>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Token Swap</Text>
+            <TouchableOpacity style={styles.headerClose} onPress={handleClose}>
+              <Text style={styles.headerCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
           {!disableTabs && (
             <View style={styles.tabRow}>
               <TouchableOpacity
@@ -529,7 +490,7 @@ export default function TradeModal({
                     selectedTab === 'TRADE_AND_SHARE' &&
                       styles.tabButtonTextActive,
                   ]}>
-                  Swap &amp; Share
+                  Swap & Share
                 </Text>
               </TouchableOpacity>
 
@@ -545,7 +506,7 @@ export default function TradeModal({
                     selectedTab === 'PICK_TX_SHARE' &&
                       styles.tabButtonTextActive,
                   ]}>
-                  Pick Tx &amp; Share
+                  Pick Tx & Share
                 </Text>
               </TouchableOpacity>
             </View>
@@ -555,10 +516,6 @@ export default function TradeModal({
 
           {!!resultMsg && <Text style={styles.resultText}>{resultMsg}</Text>}
           {!!errorMsg && <Text style={styles.errorText}>{errorMsg}</Text>}
-
-          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-            <Text style={styles.closeButtonText}>Close</Text>
-          </TouchableOpacity>
         </View>
         <SelectTokenModal
           visible={showSelectTokenModal}

@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import tokenModalStyles from './tokenModal.style';
 
-// Minimal structure for a token.
 export interface TokenInfo {
   address: string;
   symbol: string;
@@ -37,7 +36,6 @@ export default function SelectTokenModal({
 
   useEffect(() => {
     if (visible) {
-      // Refresh tokens when the modal opens.
       fetchTokens();
     }
   }, [visible]);
@@ -45,21 +43,14 @@ export default function SelectTokenModal({
   const fetchTokens = async () => {
     setLoading(true);
     try {
-      // Use the "tagged/verified" endpoint to get a filtered list of tokens with full details.
       const url = 'https://api.jup.ag/tokens/v1/tagged/verified';
-      const resp = await fetch(url, {
-        headers: {
-          // Uncomment and set your API key if needed:
-          // 'x-api-key': process.env.JUPITER_API_KEY || '',
-        },
-      });
+      const resp = await fetch(url);
       if (!resp.ok) {
         throw new Error(`Failed to load tokens: ${resp.status}`);
       }
       const data = await resp.json();
-      // Expected structure: an array of token objects.
       if (!data || !Array.isArray(data)) {
-        throw new Error('Invalid data structure from Jupiter tokens API');
+        throw new Error('Invalid data structure from tokens API');
       }
       const result: TokenInfo[] = data.map((item: any) => ({
         address: item.address,
@@ -90,7 +81,7 @@ export default function SelectTokenModal({
     <TouchableOpacity
       style={tokenModalStyles.tokenItem}
       onPress={() => onTokenSelected(item)}>
-      <View style={{flexDirection: 'row', alignItems: 'center'}}>
+      <View style={tokenModalStyles.tokenItemContent}>
         {item.logoURI ? (
           <Image
             source={{uri: item.logoURI}}
@@ -101,7 +92,7 @@ export default function SelectTokenModal({
             style={[tokenModalStyles.tokenLogo, {backgroundColor: '#ccc'}]}
           />
         )}
-        <View style={{marginLeft: 8}}>
+        <View style={tokenModalStyles.tokenTextContainer}>
           <Text style={tokenModalStyles.tokenSymbol}>{item.symbol}</Text>
           <Text style={tokenModalStyles.tokenName}>{item.name}</Text>
         </View>
@@ -116,23 +107,24 @@ export default function SelectTokenModal({
           <Text style={tokenModalStyles.modalTitle}>Select a Token</Text>
           <TextInput
             style={tokenModalStyles.searchInput}
-            placeholder="Search by symbol, name, or mint"
+            placeholder="Search by symbol, name, or address"
             value={searchInput}
             onChangeText={setSearchInput}
           />
-
           {loading ? (
-            <ActivityIndicator size="large" color="#1d9bf0" />
+            <ActivityIndicator
+              size="large"
+              color="#4A90E2"
+              style={{marginTop: 20}}
+            />
           ) : (
             <FlatList
               data={filteredTokens}
               keyExtractor={item => item.address}
               renderItem={renderItem}
-              contentContainerStyle={{paddingBottom: 20}}
-              style={{width: '100%', marginTop: 10}}
+              contentContainerStyle={{paddingBottom: 20, marginTop: 10}}
             />
           )}
-
           <TouchableOpacity
             style={tokenModalStyles.closeButton}
             onPress={onClose}>
