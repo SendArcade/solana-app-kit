@@ -448,6 +448,114 @@ export function createThreadStyles(
       padding: 4,
       borderRadius: 4,
     },
+    
+    /* Migrated from ThreadComposer.tsx modalStyles */
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContainer: {
+      width: '85%',
+      maxHeight: '80%',
+      backgroundColor: '#fff',
+      borderRadius: 10,
+      padding: 16,
+      alignItems: 'center',
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      marginBottom: 8,
+    },
+    listingCard: {
+      flexDirection: 'row',
+      padding: 8,
+      borderWidth: 1,
+      borderColor: '#eee',
+      borderRadius: 8,
+      marginBottom: 8,
+      alignItems: 'center',
+    },
+    listingImage: {
+      width: 40,
+      height: 40,
+      borderRadius: 4,
+      backgroundColor: '#f0f0f0',
+    },
+    listingName: {
+      fontWeight: '600',
+      fontSize: 14,
+      color: '#333',
+    },
+    listingPrice: {
+      marginTop: 2,
+      fontSize: 12,
+      color: '#999',
+    },
+    closeButton: {
+      marginTop: 12,
+      backgroundColor: '#1d9bf0',
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 5,
+    },
+    closeButtonText: {
+      color: '#fff',
+      fontWeight: '600',
+    },
+    
+    /* Migrated from PostCTA.tsx uiStyles */
+    progressOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.65)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    progressContainer: {
+      padding: 24,
+      backgroundColor: '#333',
+      borderRadius: 12,
+      width: '80%',
+      alignItems: 'center',
+    },
+    progressText: {
+      marginTop: 10,
+      color: '#fff',
+      fontSize: 14,
+      textAlign: 'center',
+    },
+    confirmOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.65)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    confirmContainer: {
+      padding: 24,
+      backgroundColor: '#333',
+      borderRadius: 12,
+      width: '80%',
+      alignItems: 'center',
+    },
+    confirmText: {
+      marginBottom: 20,
+      color: '#fff',
+      fontSize: 16,
+      textAlign: 'center',
+    },
+    confirmButton: {
+      backgroundColor: '#1d9bf0',
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+    },
+    confirmButtonText: {
+      color: '#fff',
+      fontWeight: 'bold',
+      fontSize: 15,
+    },
   });
 
   // Merge userStyleSheet if provided

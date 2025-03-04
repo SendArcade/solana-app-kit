@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Text,
   Modal,
-  StyleSheet,
   FlatList,
   ActivityIndicator,
   Alert,
@@ -323,183 +322,124 @@ export default function ThreadComposer({
             value={textValue}
             onChangeText={setTextValue}
             multiline
-          />
-          {/* Selected image preview */}
-          {selectedImage && (
-            <Image
-              source={{uri: selectedImage}}
-              style={{width: 100, height: 100, marginTop: 10}}
             />
-          )}
-          {/* NFT listing preview */}
-          {selectedListingNft && (
-            <View style={styles.composerTradePreview}>
+            {/* Selected image preview */}
+            {selectedImage && (
               <Image
-                source={{uri: selectedListingNft.image}}
-                style={styles.composerTradeImage}
-              />
-              <View style={{marginLeft: 8, flex: 1}}>
-                <Text style={styles.composerTradeName} numberOfLines={1}>
-                  {selectedListingNft.name}
-                </Text>
-                {selectedListingNft.priceSol && (
-                  <Text style={styles.composerTradePrice}>
-                    {selectedListingNft.priceSol.toFixed(2)} SOL
-                  </Text>
-                )}
-              </View>
-              <TouchableOpacity
-                style={styles.composerTradeRemove}
-                onPress={() => setSelectedListingNft(null)}>
-                <Text style={{color: '#fff', fontWeight: '600'}}>X</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          {/* Buttons */}
-          <View style={styles.iconsRow}>
-            <View style={styles.leftIcons}>
-              <TouchableOpacity onPress={handleMediaPress}>
-                <Icons.MediaIcon width={18} height={18} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleNftListingPress}
-                style={{marginLeft: 8}}>
-                <Text style={{fontSize: 12, color: '#666666'}}>
-                  NFT Listing
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setShowTradeModal(true)}
-                style={{marginLeft: 8}}>
-                <Text style={{fontSize: 12, color: '#333333'}}>
-                  Trade/Share
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity onPress={handlePost}>
-              <Text style={{color: '#1d9bf0', fontWeight: '600'}}>
-                {parentId ? 'Reply' : 'Post'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showListingModal}
-        onRequestClose={closeListingModal}>
-        <View style={modalStyles.modalOverlay}>
-          <View style={modalStyles.modalContainer}>
-            <Text style={modalStyles.modalTitle}>NFT Listing Modal</Text>
-            {loadingListings ? (
-              <ActivityIndicator size="large" color="#1d9bf0" />
-            ) : listingItems.length === 0 ? (
-              <Text style={{marginTop: 16, color: '#666'}}>
-                No active listings found.
-              </Text>
-            ) : (
-              <FlatList
-                data={listingItems}
-                keyExtractor={item => item.mint}
-                renderItem={({item}) => (
-                  <TouchableOpacity
-                    style={modalStyles.listingCard}
-                    onPress={() => handleSelectListing(item)}>
-                    <Image
-                      source={{uri: item.image}}
-                      style={modalStyles.listingImage}
-                    />
-                    <View style={{flex: 1, marginLeft: 10}}>
-                      <Text style={modalStyles.listingName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      {item.priceSol !== undefined && (
-                        <Text style={modalStyles.listingPrice}>
-                          {item.priceSol.toFixed(2)} SOL
-                        </Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                )}
-                style={{marginTop: 10, width: '100%'}}
+                source={{uri: selectedImage}}
+                style={{width: 100, height: 100, marginTop: 10}}
               />
             )}
-            <TouchableOpacity
-              onPress={closeListingModal}
-              style={modalStyles.closeButton}>
-              <Text style={modalStyles.closeButtonText}>Cancel</Text>
-            </TouchableOpacity>
+            {/* NFT listing preview */}
+            {selectedListingNft && (
+              <View style={styles.composerTradePreview}>
+                <Image
+                  source={{uri: selectedListingNft.image}}
+                  style={styles.composerTradeImage}
+                />
+                <View style={{marginLeft: 8, flex: 1}}>
+                  <Text style={styles.composerTradeName} numberOfLines={1}>
+                    {selectedListingNft.name}
+                  </Text>
+                  {selectedListingNft.priceSol && (
+                    <Text style={styles.composerTradePrice}>
+                      {selectedListingNft.priceSol.toFixed(2)} SOL
+                    </Text>
+                  )}
+                </View>
+                <TouchableOpacity
+                  style={styles.composerTradeRemove}
+                  onPress={() => setSelectedListingNft(null)}>
+                  <Text style={{color: '#fff', fontWeight: '600'}}>X</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {/* Buttons */}
+            <View style={styles.iconsRow}>
+              <View style={styles.leftIcons}>
+                <TouchableOpacity onPress={handleMediaPress}>
+                  <Icons.MediaIcon width={18} height={18} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleNftListingPress}
+                  style={{marginLeft: 8}}>
+                  <Text style={{fontSize: 12, color: '#666666'}}>
+                    NFT Listing
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setShowTradeModal(true)}
+                  style={{marginLeft: 8}}>
+                  <Text style={{fontSize: 12, color: '#333333'}}>
+                    Trade/Share
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity onPress={handlePost}>
+                <Text style={{color: '#1d9bf0', fontWeight: '600'}}>
+                  {parentId ? 'Reply' : 'Post'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </Modal>
-
-      <TradeModal
-        visible={showTradeModal}
-        onClose={() => setShowTradeModal(false)}
-        currentUser={currentUser}
-        onPostCreated={onPostCreated}
-      />
-    </View>
-  );
-}
-
-
-const modalStyles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    width: '85%',
-    maxHeight: '80%',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  listingCard: {
-    flexDirection: 'row',
-    padding: 8,
-    borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 8,
-    marginBottom: 8,
-    alignItems: 'center',
-  },
-  listingImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 4,
-    backgroundColor: '#f0f0f0',
-  },
-  listingName: {
-    fontWeight: '600',
-    fontSize: 14,
-    color: '#333',
-  },
-  listingPrice: {
-    marginTop: 2,
-    fontSize: 12,
-    color: '#999',
-  },
-  closeButton: {
-    marginTop: 12,
-    backgroundColor: '#1d9bf0',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-  },
-  closeButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-});
+  
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={showListingModal}
+          onRequestClose={closeListingModal}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <Text style={styles.modalTitle}>NFT Listing Modal</Text>
+              {loadingListings ? (
+                <ActivityIndicator size="large" color="#1d9bf0" />
+              ) : listingItems.length === 0 ? (
+                <Text style={{marginTop: 16, color: '#666'}}>
+                  No active listings found.
+                </Text>
+              ) : (
+                <FlatList
+                  data={listingItems}
+                  keyExtractor={item => item.mint}
+                  renderItem={({item}) => (
+                    <TouchableOpacity
+                      style={styles.listingCard}
+                      onPress={() => handleSelectListing(item)}>
+                      <Image
+                        source={{uri: item.image}}
+                        style={styles.listingImage}
+                      />
+                      <View style={{flex: 1, marginLeft: 10}}>
+                        <Text style={styles.listingName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        {item.priceSol !== undefined && (
+                          <Text style={styles.listingPrice}>
+                            {item.priceSol.toFixed(2)} SOL
+                          </Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  style={{marginTop: 10, width: '100%'}}
+                />
+              )}
+              <TouchableOpacity
+                onPress={closeListingModal}
+                style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+  
+        <TradeModal
+          visible={showTradeModal}
+          onClose={() => setShowTradeModal(false)}
+          currentUser={currentUser}
+          onPostCreated={onPostCreated}
+        />
+      </View>
+    );
+  }

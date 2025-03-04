@@ -9,7 +9,6 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
-  StyleSheet,
 } from 'react-native';
 import type {ThreadPost} from './thread.types';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
@@ -20,7 +19,7 @@ import {Buffer} from 'buffer';
 import {TENSOR_API_KEY, HELIUS_RPC_URL} from '@env';
 import {useAuth} from '../../hooks/useAuth';
 import TradeModal from './TradeModal';
-import { useAppSelector } from '../../hooks/useReduxHooks';
+import {useAppSelector} from '../../hooks/useReduxHooks';
 
 /**
  * Get the post section type.
@@ -70,7 +69,6 @@ export default function PostCTA({
   const [tradeLoading, setTradeLoading] = useState(false);
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
 
-
   // For NFT buying spinner
   const [nftLoading, setNftLoading] = useState(false);
   const [nftStatusMsg, setNftStatusMsg] = useState('');
@@ -89,7 +87,7 @@ export default function PostCTA({
   const userWallet = solanaWallet?.wallets?.[0] || null;
 
   const mergedTheme = getMergedTheme(themeOverrides);
-  const threadStyles = createThreadStyles(
+  const styles = createThreadStyles(
     mergedTheme,
     styleOverrides as {[key: string]: object} | undefined,
     userStyleSheet as {[key: string]: object} | undefined,
@@ -208,14 +206,14 @@ export default function PostCTA({
 
   return (
     <View
-      style={[threadStyles.threadPostCTAContainer, styleOverrides?.container]}>
+      style={[styles.threadPostCTAContainer, styleOverrides?.container]}>
       <TouchableOpacity
-        style={[threadStyles.threadPostCTAButton, styleOverrides?.button]}
+        style={[styles.threadPostCTAButton, styleOverrides?.button]}
         onPress={onCtaPress}
         activeOpacity={0.8}>
         <Text
           style={[
-            threadStyles.threadPostCTAButtonLabel,
+            styles.threadPostCTAButtonLabel,
             styleOverrides?.buttonLabel,
           ]}>
           {ctaLabel}
@@ -271,11 +269,11 @@ export default function PostCTA({
         transparent
         animationType="fade"
         onRequestClose={() => {}}>
-        <View style={uiStyles.progressOverlay}>
-          <View style={uiStyles.progressContainer}>
+        <View style={styles.progressOverlay}>
+          <View style={styles.progressContainer}>
             <ActivityIndicator size="large" color="#1d9bf0" />
             {!!nftStatusMsg && (
-              <Text style={uiStyles.progressText}>{nftStatusMsg}</Text>
+              <Text style={styles.progressText}>{nftStatusMsg}</Text>
             )}
           </View>
         </View>
@@ -287,13 +285,13 @@ export default function PostCTA({
         transparent
         animationType="fade"
         onRequestClose={() => setNftConfirmationVisible(false)}>
-        <View style={uiStyles.confirmOverlay}>
-          <View style={uiStyles.confirmContainer}>
-            <Text style={uiStyles.confirmText}>{nftConfirmationMsg}</Text>
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmContainer}>
+            <Text style={styles.confirmText}>{nftConfirmationMsg}</Text>
             <TouchableOpacity
-              style={uiStyles.confirmButton}
+              style={styles.confirmButton}
               onPress={() => setNftConfirmationVisible(false)}>
-              <Text style={uiStyles.confirmButtonText}>OK</Text>
+              <Text style={styles.confirmButtonText}>OK</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -301,55 +299,3 @@ export default function PostCTA({
     </View>
   );
 }
-
-const uiStyles = StyleSheet.create({
-  progressOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressContainer: {
-    padding: 24,
-    backgroundColor: '#333',
-    borderRadius: 12,
-    width: '80%',
-    alignItems: 'center',
-  },
-  progressText: {
-    marginTop: 10,
-    color: '#fff',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  confirmOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  confirmContainer: {
-    padding: 24,
-    backgroundColor: '#333',
-    borderRadius: 12,
-    width: '80%',
-    alignItems: 'center',
-  },
-  confirmText: {
-    marginBottom: 20,
-    color: '#fff',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  confirmButton: {
-    backgroundColor: '#1d9bf0',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  confirmButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-});
