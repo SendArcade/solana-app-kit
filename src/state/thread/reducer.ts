@@ -1,3 +1,4 @@
+// File: src/state/thread/reducer.ts
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import type { ThreadPost, ThreadUser, ThreadSection } from '../../components/thread/thread.types';
 import { allposts as fallbackPosts } from '../../mocks/posts';
@@ -23,7 +24,7 @@ export const fetchAllPosts = createAsyncThunk('thread/fetchAllPosts', async (_, 
   }
 });
 
-// Async thunk to create a new root post. It returns a complete post object.
+// Async thunk to create a new root post. It returns a complete post object from the server.
 export const createRootPostAsync = createAsyncThunk(
   'thread/createRootPost',
   async (payload: { user: ThreadUser; sections: ThreadSection[] }) => {
@@ -34,22 +35,12 @@ export const createRootPostAsync = createAsyncThunk(
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to create post');
-    const newPost: ThreadPost = {
-      id: data.id,
-      user: payload.user,
-      sections: payload.sections,
-      createdAt: new Date().toISOString(),
-      parentId: undefined,
-      replies: [],
-      reactionCount: 0,
-      retweetCount: 0,
-      quoteCount: 0,
-    };
-    return newPost;
+    // Return the complete post object from the server which includes the updated avatar.
+    return data.data;
   }
 );
 
-// Async thunk to create a reply post. Returns a complete reply object.
+// Async thunk to create a reply post. Returns a complete reply object from the server.
 export const createReplyAsync = createAsyncThunk(
   'thread/createReply',
   async (payload: { parentId: string; user: ThreadUser; sections: ThreadSection[] }) => {
@@ -60,18 +51,8 @@ export const createReplyAsync = createAsyncThunk(
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to create reply');
-    const newReply: ThreadPost = {
-      id: data.id,
-      user: payload.user,
-      sections: payload.sections,
-      createdAt: new Date().toISOString(),
-      parentId: payload.parentId,
-      replies: [],
-      reactionCount: 0,
-      retweetCount: 0,
-      quoteCount: 0,
-    };
-    return newReply;
+    // Return the complete reply object from the server.
+    return data.data;
   }
 );
 

@@ -1,3 +1,4 @@
+// src/components/thread/PostHeader.tsx
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, Alert } from 'react-native';
 import Icons from '../../assets/svgs';
@@ -7,7 +8,7 @@ import { ThreadPost } from './thread.types';
 interface PostHeaderProps {
   post: ThreadPost;
   onPressMenu?: (p: ThreadPost) => void;
-  onDeletePost?: (p: ThreadPost) => void; // NEW
+  onDeletePost?: (p: ThreadPost) => void;
   themeOverrides?: Partial<Record<string, any>>;
   styleOverrides?: { [key: string]: object };
 }
@@ -39,15 +40,10 @@ export default function PostHeader({
           {
             text: 'Delete',
             onPress: () => {
-              if (onDeletePost) {
-                onDeletePost(post);
-              }
+              if (onDeletePost) onDeletePost(post);
             },
           },
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
+          { text: 'Cancel', style: 'cancel' },
         ],
         { cancelable: true },
       );
@@ -56,25 +52,37 @@ export default function PostHeader({
 
   return (
     <View style={styles.threadItemHeaderRow}>
-      {/* Avatar + username */}
       <View style={styles.threadItemHeaderLeft}>
-        <View style={{ position: "relative" }}>
+        <View style={{ position: 'relative' }}>
+          {/* If user.avatar is a full URL, do { uri: user.avatar }. If null, fallback local image */}
           <Image
-            source={user.avatar ? user.avatar : require("../../assets/images/User.png")}
+            source={
+              user.avatar
+                ? { uri: user.avatar }
+                : require('../../assets/images/User.png')
+            }
             style={styles.threadItemAvatar}
           />
 
-          <Icons.addUserIcon style={{ position: "absolute", bottom: -4, zIndex: 10, right: 4, width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: "white" }} />
+          <Icons.addUserIcon
+            style={{
+              position: 'absolute',
+              bottom: -4,
+              zIndex: 10,
+              right: 4,
+              width: 16,
+              height: 16,
+              borderRadius: 8,
+              borderWidth: 2,
+              borderColor: 'white',
+            }}
+          />
         </View>
         <View style={{ marginLeft: 8 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={styles.threadItemUsername}>{user.username}</Text>
             {user.verified && (
-              <Icons.BlueCheck
-                width={14}
-                height={14}
-                style={styles.verifiedIcon}
-              />
+              <Icons.BlueCheck width={14} height={14} style={styles.verifiedIcon} />
             )}
           </View>
           <Text style={styles.threadItemHandleTime}>
@@ -82,8 +90,6 @@ export default function PostHeader({
           </Text>
         </View>
       </View>
-
-      {/* Dots/menu */}
       <TouchableOpacity onPress={handlePressMenu}>
         <Icons.DotsThree width={20} height={20} />
       </TouchableOpacity>

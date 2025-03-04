@@ -16,7 +16,7 @@ export type ThreadSectionType =
 
 export interface NftListingData {
   mint: string;
-  owner: string;
+  owner: string | null;
   name?: string;
   image?: string;
   priceSol?: number;
@@ -46,7 +46,7 @@ export interface PollData {
 }
 
 export interface ThreadSection {
-  id: string;
+  id: string | null;
   type: ThreadSectionType;
   text?: string;
   imageUrl?: ImageSourcePropType;

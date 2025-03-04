@@ -1,4 +1,4 @@
-// File: src/components/thread/PostBody.tsx
+
 import React, {useState, useEffect} from 'react';
 import {View, Text, Image, ActivityIndicator} from 'react-native';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
@@ -99,7 +99,11 @@ function renderSection(
           <Text style={styles.threadItemText}>[Missing listing data]</Text>
         );
       }
-      return <NftListingSection listing={section.listingData} />;
+      // Fix: Provide a default value for null owner
+      return <NftListingSection listing={{
+        ...section.listingData,
+        owner: section.listingData.owner || 'Unknown' // Add default value for nullable owner
+      }} />;
 
     default:
       return null;

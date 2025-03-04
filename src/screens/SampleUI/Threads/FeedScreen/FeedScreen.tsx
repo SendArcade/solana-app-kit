@@ -1,4 +1,5 @@
-// File: src/screens/Common/FeedScreen.tsx
+
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { SafeAreaView, StyleSheet } from 'react-native';
 import { ThreadCTAButton, ThreadPost, ThreadUser } from '../../../../components/thread/thread.types';
@@ -6,23 +7,66 @@ import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks'
 import { Thread } from '../../../../components/thread';
 import COLORS from '../../../../assets/colors';
 import { fetchAllPosts } from '../../../../state/thread/reducer';
+import { fetchProfilePic } from '../../../../state/auth/reducer';
 
-/** Example: Current user is "Alice" */
-const currentUser: ThreadUser = {
-  id: 'user-1',
-  username: 'Alice',
-  handle: '@aliceSmith',
-  avatar: require('../../../../assets/images/User.png'),
-  verified: true,
-};
 
 export default function FeedScreen() {
   const dispatch = useAppDispatch();
+
+
   const allPosts = useAppSelector((state) => state.thread.allPosts);
+
+
+  const userWallet = useAppSelector((state) => state.auth.address);
+
+
+  const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
+
   const [rootPosts, setRootPosts] = useState<ThreadPost[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Example CTA buttons
+
+  const currentUser: ThreadUser = {
+    id: userWallet || 'anonymous-user',   
+    username: 'Alice',                  
+    handle: '@aliceSmith',             
+    verified: true,
+
+    avatar: storedProfilePic
+      ? { uri: storedProfilePic }
+      : require('../../../../assets/images/User.png'),
+  };
+
+  // On mount, fetch all posts from the server
+  useEffect(() => {
+    dispatch(fetchAllPosts());
+  }, [dispatch]);
+
+  // Once we have userWallet, fetch the DB profile pic so Redux can store it
+  useEffect(() => {
+    if (userWallet) {
+      dispatch(fetchProfilePic(userWallet)).catch(err => {
+        console.error('Failed to fetch profile picture:', err);
+      });
+    }
+  }, [userWallet, dispatch]);
+
+  // Each time allPosts changes, filter out root posts and sort them
+  useEffect(() => {
+    const roots = allPosts.filter((p) => !p.parentId);
+    // Sort descending by createdAt
+    roots.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+    setRootPosts(roots);
+  }, [allPosts]);
+
+  // Pull-to-refresh
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await dispatch(fetchAllPosts());
+    setRefreshing(false);
+  }, [dispatch]);
+
+  // Example CTA buttons if you want to pass them to the <Thread>
   const ctaButtons: ThreadCTAButton[] = [
     {
       label: 'Mint NFT',
@@ -50,33 +94,14 @@ export default function FeedScreen() {
     },
   ];
 
-  // Fetch posts on mount
-  useEffect(() => {
-    dispatch(fetchAllPosts());
-  }, [dispatch]);
-
-  // Filter out root posts (posts without a parent) and sort descending by createdAt.
-  useEffect(() => {
-    const roots = allPosts.filter((p) => !p.parentId);
-    roots.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
-    setRootPosts(roots);
-  }, [allPosts]);
-
-  // Pull-to-refresh callback
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await dispatch(fetchAllPosts());
-    setRefreshing(false);
-  }, [dispatch]);
-
   return (
     <SafeAreaView style={styles.container}>
       <Thread
         rootPosts={rootPosts}
         currentUser={currentUser}
         ctaButtons={ctaButtons}
-        refreshing={refreshing}   // Prop passed to Thread for refresh control
-        onRefresh={onRefresh}      // Callback to re-fetch posts on pull-to-refresh
+        refreshing={refreshing}
+        onRefresh={onRefresh}
         themeOverrides={{ '--thread-bg-primary': '#F0F0F0' }}
         styleOverrides={{
           container: { padding: 10 },
