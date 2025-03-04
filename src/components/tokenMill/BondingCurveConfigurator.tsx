@@ -1,5 +1,13 @@
 import React, {useState, useEffect, useCallback, useRef} from 'react';
-import {View, Text, TouchableOpacity, Alert, Platform} from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Alert,
+  Platform,
+  ActivityIndicator,
+  StyleSheet,
+} from 'react-native';
 import Slider from '@react-native-community/slider';
 import {LineChart} from 'react-native-chart-kit';
 import BN from 'bn.js';
@@ -45,7 +53,6 @@ export default function BondingCurveConfigurator({
   /************************************
    * Refs
    ************************************/
-  // We store the parent callback in a ref to avoid infinite loop
   const onCurveChangeRef = useRef(onCurveChange);
   useEffect(() => {
     onCurveChangeRef.current = onCurveChange;
@@ -54,7 +61,6 @@ export default function BondingCurveConfigurator({
   /************************************
    * State variables
    ************************************/
-  // For iOS, we can start from empty; for Android, initialize with safe BN arrays:
   const [askBn, setAskBn] = useState<BN[]>(
     Platform.OS === 'android' ? initialAskBnAndroid : [],
   );
@@ -62,109 +68,86 @@ export default function BondingCurveConfigurator({
     Platform.OS === 'android' ? initialBidBnAndroid : [],
   );
 
-  // Curve type
   const [curveType, setCurveType] = useState<CurveType>('linear');
 
-  // "Committed" slider values used to compute the final curve.
-  // On iOS, we update them in real-time. On Android, we only commit on release.
+  // Slider values (committed)
   const [points, setPoints] = useState<number>(11);
   const [basePrice, setBasePrice] = useState<number>(10);
   const [topPrice, setTopPrice] = useState<number>(50000);
   const [power, setPower] = useState<number>(2.0);
   const [feePercent, setFeePercent] = useState<number>(2.0);
 
+  // Used on Android to indicate computation in progress.
+  const [isLoading, setIsLoading] = useState(false);
+
   /************************************
-   * "Pending" slider values (Android)
-   * - We store these so the slider can move smoothly without re-render.
+   * Bonding curve computation (with overrides)
    ************************************/
-  const [pendingPoints, setPendingPoints] = useState(points);
-  const [pendingBase, setPendingBase] = useState(basePrice);
-  const [pendingTop, setPendingTop] = useState(topPrice);
-  const [pendingPower, setPendingPower] = useState(power);
-  const [pendingFee, setPendingFee] = useState(feePercent);
+  const computeBondingCurve = useCallback(
+    (overrides?: {
+      points?: number;
+      basePrice?: number;
+      topPrice?: number;
+      power?: number;
+      feePercent?: number;
+    }) => {
+      const localPoints = overrides?.points ?? points;
+      const localBase = overrides?.basePrice ?? basePrice;
+      const localTop = overrides?.topPrice ?? topPrice;
+      const localPower = overrides?.power ?? power;
+      const localFee = overrides?.feePercent ?? feePercent;
+
+      const newAskBn: BN[] = [];
+      const newBidBn: BN[] = [];
+
+      for (let i = 0; i < localPoints; i++) {
+        const t = i / Math.max(localPoints - 1, 1);
+        let price: number;
+        switch (curveType) {
+          case 'linear':
+            price = localBase + t * (localTop - localBase);
+            break;
+          case 'power':
+            price =
+              localBase + (localTop - localBase) * Math.pow(t, localPower);
+            break;
+          case 'exponential': {
+            const safeBase = localBase > 0 ? localBase : 1;
+            price = safeBase * Math.pow(localTop / safeBase, t);
+            break;
+          }
+          case 'logarithmic': {
+            const logInput = 1 + 9 * t;
+            const safeLog = logInput > 0 ? Math.log10(logInput) : 0;
+            price = localBase + (localTop - localBase) * safeLog;
+            break;
+          }
+          default:
+            price = localBase + t * (localTop - localBase);
+        }
+        if (!Number.isFinite(price)) price = localBase;
+        if (price < 0) price = 0;
+        if (price > 1e9) price = 1e9;
+
+        const askVal = new BN(Math.floor(price));
+        let rawBid = price * (1 - localFee / 100);
+        if (!Number.isFinite(rawBid)) rawBid = price;
+        if (rawBid < 0) rawBid = 0;
+        if (rawBid > 1e9) rawBid = 1e9;
+        const bidVal = new BN(Math.floor(rawBid));
+
+        newAskBn.push(askVal);
+        newBidBn.push(bidVal);
+      }
+      setAskBn(newAskBn);
+      setBidBn(newBidBn);
+      onCurveChangeRef.current(newAskBn, newBidBn);
+    },
+    [points, basePrice, topPrice, power, feePercent, curveType],
+  );
 
   /************************************
-   * Bonding curve computation
-   ************************************/
-  const computeBondingCurve = useCallback(() => {
-    const newAskBn: BN[] = [];
-    const newBidBn: BN[] = [];
-
-    // Make local copies
-    const localPoints = points;
-    const localBase = basePrice;
-    const localTop = topPrice;
-    const localPower = power;
-    const localFee = feePercent;
-
-    for (let i = 0; i < localPoints; i++) {
-      const t = i / Math.max(localPoints - 1, 1);
-
-      // Compute float price
-      let price: number;
-      switch (curveType) {
-        case 'linear':
-          price = localBase + t * (localTop - localBase);
-          break;
-        case 'power':
-          price = localBase + (localTop - localBase) * Math.pow(t, localPower);
-          break;
-        case 'exponential': {
-          const safeBase = localBase > 0 ? localBase : 1;
-          price = safeBase * Math.pow(localTop / safeBase, t);
-          break;
-        }
-        case 'logarithmic': {
-          // log10(1 + 9t)
-          const logInput = 1 + 9 * t;
-          const safeLog = logInput > 0 ? Math.log10(logInput) : 0;
-          price = localBase + (localTop - localBase) * safeLog;
-          break;
-        }
-        default:
-          price = localBase + t * (localTop - localBase);
-      }
-
-      if (!Number.isFinite(price)) {
-        price = localBase; // fallback
-      }
-      if (price < 0) {
-        price = 0;
-      }
-      if (price > 1e9) {
-        price = 1e9;
-      }
-
-      const askVal = new BN(Math.floor(price));
-
-      // Fee => bid = ask * (1 - fee/100)
-      let rawBid = price * (1 - localFee / 100);
-      if (!Number.isFinite(rawBid)) {
-        rawBid = price;
-      }
-      if (rawBid < 0) {
-        rawBid = 0;
-      }
-      if (rawBid > 1e9) {
-        rawBid = 1e9;
-      }
-
-      const bidVal = new BN(Math.floor(rawBid));
-      newAskBn.push(askVal);
-      newBidBn.push(bidVal);
-    }
-
-    // Save final BN arrays
-    setAskBn(newAskBn);
-    setBidBn(newBidBn);
-
-    // Notify parent
-    onCurveChangeRef.current(newAskBn, newBidBn);
-  }, [curveType, points, basePrice, topPrice, power, feePercent]);
-
-  /************************************
-   * Real-time updates only on iOS
-   * On Android, we do final compute after user releases slider
+   * iOS: Realtime computation via onValueChange
    ************************************/
   useEffect(() => {
     if (Platform.OS === 'ios') {
@@ -182,123 +165,97 @@ export default function BondingCurveConfigurator({
   ]);
 
   /************************************
-   * Slider Handlers
-   * iOS => immediate state updates
-   * Android => only store pending values, commit on release
+   * Android: Curve Type change handler
    ************************************/
   const handleCurveTypePress = (type: CurveType) => {
-    setCurveType(type);
+    if (type === curveType) return;
     if (Platform.OS === 'android') {
-      // Recompute after user changes curve type on Android
-      // (no "slidingComplete" event for pressing buttons, so do it now)
-      computeBondingCurve();
-    }
-  };
-
-  // Points
-  const onPointsChange = (val: number) => {
-    if (Platform.OS === 'ios') {
-      setPoints(val);
+      setIsLoading(true);
+      setCurveType(type);
+      // Delay compute to allow loader to render.
+      setTimeout(() => {
+        computeBondingCurve(); // uses current state (which will update on next render)
+        setIsLoading(false);
+      }, 0);
     } else {
-      setPendingPoints(val);
-    }
-  };
-  const onPointsComplete = () => {
-    if (Platform.OS === 'android') {
-      setPoints(pendingPoints);
-      computeBondingCurve();
-    }
-  };
-
-  // Base Price
-  const onBaseChange = (val: number) => {
-    if (Platform.OS === 'ios') {
-      setBasePrice(val);
-    } else {
-      setPendingBase(val);
-    }
-  };
-  const onBaseComplete = () => {
-    if (Platform.OS === 'android') {
-      setBasePrice(pendingBase);
-      computeBondingCurve();
-    }
-  };
-
-  // Top Price
-  const onTopChange = (val: number) => {
-    if (Platform.OS === 'ios') {
-      setTopPrice(val);
-    } else {
-      setPendingTop(val);
-    }
-  };
-  const onTopComplete = () => {
-    if (Platform.OS === 'android') {
-      setTopPrice(pendingTop);
-      computeBondingCurve();
-    }
-  };
-
-  // Power
-  const onPowerChange = (val: number) => {
-    if (Platform.OS === 'ios') {
-      setPower(val);
-    } else {
-      setPendingPower(val);
-    }
-  };
-  const onPowerComplete = () => {
-    if (Platform.OS === 'android') {
-      setPower(pendingPower);
-      computeBondingCurve();
-    }
-  };
-
-  // Fee
-  const onFeeChange = (val: number) => {
-    if (Platform.OS === 'ios') {
-      setFeePercent(val);
-    } else {
-      setPendingFee(val);
-    }
-  };
-  const onFeeComplete = () => {
-    if (Platform.OS === 'android') {
-      setFeePercent(pendingFee);
-      computeBondingCurve();
+      setCurveType(type);
     }
   };
 
   /************************************
-   * Convert BN => number for Chart
+   * Android: Slider Callbacks
+   ************************************/
+  // onSlidingStart: show loader when interaction begins.
+  const onSlidingStartAndroid = () => {
+    setIsLoading(true);
+  };
+
+  // onSlidingComplete: update value, compute with new value, and hide loader.
+  const onSlidingCompleteAndroid = (
+    sliderType: 'points' | 'basePrice' | 'topPrice' | 'power' | 'feePercent',
+    val: number,
+  ) => {
+    const overrides: {
+      points?: number;
+      basePrice?: number;
+      topPrice?: number;
+      power?: number;
+      feePercent?: number;
+    } = {};
+    if (sliderType === 'points' && val !== points) {
+      overrides.points = val;
+      setPoints(val);
+    } else if (sliderType === 'basePrice' && val !== basePrice) {
+      overrides.basePrice = val;
+      setBasePrice(val);
+    } else if (sliderType === 'topPrice' && val !== topPrice) {
+      overrides.topPrice = val;
+      setTopPrice(val);
+    } else if (sliderType === 'power' && val !== power) {
+      overrides.power = val;
+      setPower(val);
+    } else if (sliderType === 'feePercent' && val !== feePercent) {
+      overrides.feePercent = val;
+      setFeePercent(val);
+    }
+    // Compute bonding curve with the new value(s)
+    computeBondingCurve(overrides);
+    setIsLoading(false);
+  };
+
+  /************************************
+   * iOS: onValueChange callback
+   ************************************/
+  const onValueChangeIOS = (
+    sliderType: 'points' | 'basePrice' | 'topPrice' | 'power' | 'feePercent',
+    val: number,
+  ) => {
+    if (sliderType === 'points') {
+      setPoints(val);
+    } else if (sliderType === 'basePrice') {
+      setBasePrice(val);
+    } else if (sliderType === 'topPrice') {
+      setTopPrice(val);
+    } else if (sliderType === 'power') {
+      setPower(val);
+    } else if (sliderType === 'feePercent') {
+      setFeePercent(val);
+    }
+  };
+
+  /************************************
+   * Chart data and style merging
    ************************************/
   const askPricesNumber = askBn.map(bn => bn.toNumber());
   const bidPricesNumber = bidBn.map(bn => bn.toNumber());
-
-  /************************************
-   * Chart data
-   ************************************/
   const chartData = {
     labels: askBn.map((_, idx) => String(idx + 1)),
     datasets: [
-      {
-        data: askPricesNumber,
-        color: () => '#FF4F78',
-        strokeWidth: 3,
-      },
-      {
-        data: bidPricesNumber,
-        color: () => '#5078FF',
-        strokeWidth: 3,
-      },
+      {data: askPricesNumber, color: () => '#FF4F78', strokeWidth: 3},
+      {data: bidPricesNumber, color: () => '#5078FF', strokeWidth: 3},
     ],
     legend: ['Ask Curve', 'Bid Curve'],
   };
-
-  /************************************
-   * Merge style overrides
-   ************************************/
   const styles = {...defaultStyles, ...styleOverrides};
 
   /************************************
@@ -331,113 +288,132 @@ export default function BondingCurveConfigurator({
         )}
       </View>
 
-      {/* Number of Points */}
+      {/* Points Slider */}
       <View style={styles.sliderRow}>
         <Text style={styles.label}>Points</Text>
-        <Text style={styles.valueText}>
-          {Platform.OS === 'ios' ? points : pendingPoints}
-        </Text>
+        <Text style={styles.valueText}>{points}</Text>
       </View>
       <Slider
         style={styles.slider}
         minimumValue={5}
         maximumValue={20}
         step={1}
-        value={Platform.OS === 'ios' ? points : pendingPoints}
-        onValueChange={onPointsChange}
-        onSlidingComplete={onPointsComplete}
+        value={points}
+        {...(Platform.OS === 'android'
+          ? {
+              onSlidingStart: onSlidingStartAndroid,
+              onSlidingComplete: (val: number) =>
+                onSlidingCompleteAndroid('points', val),
+            }
+          : {onValueChange: (val: number) => onValueChangeIOS('points', val)})}
         thumbTintColor="#8884FF"
         minimumTrackTintColor="#8884FF"
       />
 
-      {/* Base Price */}
+      {/* Base Price Slider */}
       <View style={styles.sliderRow}>
         <Text style={styles.label}>Base Price</Text>
-        <Text style={styles.valueText}>
-          {Platform.OS === 'ios'
-            ? basePrice.toFixed(0)
-            : pendingBase.toFixed(0)}
-        </Text>
+        <Text style={styles.valueText}>{basePrice.toFixed(0)}</Text>
       </View>
       <Slider
         style={styles.slider}
         minimumValue={10}
         maximumValue={1000}
         step={5}
-        value={Platform.OS === 'ios' ? basePrice : pendingBase}
-        onValueChange={onBaseChange}
-        onSlidingComplete={onBaseComplete}
+        value={basePrice}
+        {...(Platform.OS === 'android'
+          ? {
+              onSlidingStart: onSlidingStartAndroid,
+              onSlidingComplete: (val: number) =>
+                onSlidingCompleteAndroid('basePrice', val),
+            }
+          : {
+              onValueChange: (val: number) =>
+                onValueChangeIOS('basePrice', val),
+            })}
         thumbTintColor="#FF4F78"
         minimumTrackTintColor="#FF4F78"
       />
 
-      {/* Top Price */}
+      {/* Top Price Slider */}
       <View style={styles.sliderRow}>
         <Text style={styles.label}>Top Price</Text>
-        <Text style={styles.valueText}>
-          {Platform.OS === 'ios' ? topPrice.toFixed(0) : pendingTop.toFixed(0)}
-        </Text>
+        <Text style={styles.valueText}>{topPrice.toFixed(0)}</Text>
       </View>
       <Slider
         style={styles.slider}
         minimumValue={50000}
         maximumValue={500000}
         step={10000}
-        value={Platform.OS === 'ios' ? topPrice : pendingTop}
-        onValueChange={onTopChange}
-        onSlidingComplete={onTopComplete}
+        value={topPrice}
+        {...(Platform.OS === 'android'
+          ? {
+              onSlidingStart: onSlidingStartAndroid,
+              onSlidingComplete: (val: number) =>
+                onSlidingCompleteAndroid('topPrice', val),
+            }
+          : {
+              onValueChange: (val: number) => onValueChangeIOS('topPrice', val),
+            })}
         thumbTintColor="#5078FF"
         minimumTrackTintColor="#5078FF"
       />
 
-      {/* Power (only if curveType=power) */}
+      {/* Power Slider (if curveType is 'power') */}
       {curveType === 'power' && (
         <>
           <View style={styles.sliderRow}>
             <Text style={styles.label}>Power</Text>
-            <Text style={styles.valueText}>
-              {Platform.OS === 'ios'
-                ? power.toFixed(1)
-                : pendingPower.toFixed(1)}
-            </Text>
+            <Text style={styles.valueText}>{power.toFixed(1)}</Text>
           </View>
           <Slider
             style={styles.slider}
             minimumValue={0.5}
             maximumValue={3.0}
             step={0.1}
-            value={Platform.OS === 'ios' ? power : pendingPower}
-            onValueChange={onPowerChange}
-            onSlidingComplete={onPowerComplete}
+            value={power}
+            {...(Platform.OS === 'android'
+              ? {
+                  onSlidingStart: onSlidingStartAndroid,
+                  onSlidingComplete: (val: number) =>
+                    onSlidingCompleteAndroid('power', val),
+                }
+              : {
+                  onValueChange: (val: number) =>
+                    onValueChangeIOS('power', val),
+                })}
             thumbTintColor="#FFD700"
             minimumTrackTintColor="#FFD700"
           />
         </>
       )}
 
-      {/* Fee % */}
+      {/* Fee % Slider */}
       <View style={styles.sliderRow}>
         <Text style={styles.label}>Fee %</Text>
-        <Text style={styles.valueText}>
-          {Platform.OS === 'ios'
-            ? feePercent.toFixed(1)
-            : pendingFee.toFixed(1)}
-          %
-        </Text>
+        <Text style={styles.valueText}>{feePercent.toFixed(1)}%</Text>
       </View>
       <Slider
         style={styles.slider}
         minimumValue={0}
         maximumValue={10}
         step={0.1}
-        value={Platform.OS === 'ios' ? feePercent : pendingFee}
-        onValueChange={onFeeChange}
-        onSlidingComplete={onFeeComplete}
+        value={feePercent}
+        {...(Platform.OS === 'android'
+          ? {
+              onSlidingStart: onSlidingStartAndroid,
+              onSlidingComplete: (val: number) =>
+                onSlidingCompleteAndroid('feePercent', val),
+            }
+          : {
+              onValueChange: (val: number) =>
+                onValueChangeIOS('feePercent', val),
+            })}
         thumbTintColor="#4FD1C5"
         minimumTrackTintColor="#4FD1C5"
       />
 
-      {/* Chart */}
+      {/* Chart with Loader Overlay (Android only) */}
       <View style={styles.chartContainer}>
         <LineChart
           data={chartData}
@@ -475,9 +451,14 @@ export default function BondingCurveConfigurator({
             Alert.alert('Data Point', `Price: ${value.toFixed(2)}`);
           }}
         />
+        {Platform.OS === 'android' && isLoading && (
+          <View style={localStyles.chartOverlay}>
+            <ActivityIndicator size="large" color="#0000ff" />
+          </View>
+        )}
       </View>
 
-      {/* Display computed values */}
+      {/* Data Points Display */}
       <View style={styles.readoutContainer}>
         <Text style={styles.readoutTitle}>Data Points</Text>
         <View style={styles.readoutTableHeader}>
@@ -500,3 +481,13 @@ export default function BondingCurveConfigurator({
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  chartOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+  },
+});
