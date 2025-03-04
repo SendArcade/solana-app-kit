@@ -21,7 +21,7 @@ const SERVER_BASE_URL = process.env.SERVER_URL || 'http://localhost:3000/api';
 export const fetchProfilePic = createAsyncThunk(
   'auth/fetchProfilePic',
   async (userId: string, thunkAPI) => {
-    const response = await fetch(`${SERVER_BASE_URL}/profile?userId=${userId}`);
+    const response = await fetch(`${SERVER_BASE_URL}/api/profile?userId=${userId}`);
     const data = await response.json();
     if (data.success && data.url) {
       return data.url;

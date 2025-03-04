@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Alert,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import {useAuth} from '../../hooks/useAuth';
 import {useAppDispatch} from '../../hooks/useReduxHooks';
@@ -468,6 +469,7 @@ export default function TradeModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade">
+      <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
           <View style={styles.header}>
@@ -530,6 +532,7 @@ export default function TradeModal({
           }}
         />
       </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 }

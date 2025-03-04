@@ -1,99 +1,295 @@
-import React, {useState, useEffect} from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Alert,
-} from 'react-native';
-import {LineChart} from 'react-native-chart-kit';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
+import {View, Text, TouchableOpacity, Alert, Platform} from 'react-native';
 import Slider from '@react-native-community/slider';
+import {LineChart} from 'react-native-chart-kit';
+import BN from 'bn.js';
+
+import {
+  CHART_WIDTH,
+  BondingCurveConfiguratorStyles as defaultStyles,
+} from './BondingCurveConfigurator.styles';
 
 type CurveType = 'linear' | 'power' | 'exponential' | 'logarithmic';
 
 interface BondingCurveConfiguratorProps {
-  onCurveChange: (askPrices: number[], bidPrices: number[]) => void;
+  onCurveChange: (askPrices: BN[], bidPrices: BN[]) => void;
+  /**
+   * Optional style overrides to customize the UI
+   */
+  styleOverrides?: Partial<typeof defaultStyles>;
 }
 
-const screenWidth = Dimensions.get('window').width;
+/** Initial default BN arrays for Android to avoid Infinity errors */
+const initialAskBnAndroid = [
+  new BN(28),
+  new BN(29),
+  new BN(32),
+  new BN(47),
+  new BN(110),
+  new BN(380),
+  new BN(1500),
+  new BN(6400),
+  new BN(27000),
+  new BN(120000),
+  new BN(500000),
+];
+const initialBidBnAndroid = initialAskBnAndroid.map(price =>
+  // 99% of ask
+  price.muln(99).divn(100),
+);
 
 export default function BondingCurveConfigurator({
   onCurveChange,
+  styleOverrides = {},
 }: BondingCurveConfiguratorProps) {
+  /************************************
+   * Refs
+   ************************************/
+  // We store the parent callback in a ref to avoid infinite loop
+  const onCurveChangeRef = useRef(onCurveChange);
+  useEffect(() => {
+    onCurveChangeRef.current = onCurveChange;
+  }, [onCurveChange]);
+
   /************************************
    * State variables
    ************************************/
+  // For iOS, we can start from empty; for Android, initialize with safe BN arrays:
+  const [askBn, setAskBn] = useState<BN[]>(
+    Platform.OS === 'android' ? initialAskBnAndroid : [],
+  );
+  const [bidBn, setBidBn] = useState<BN[]>(
+    Platform.OS === 'android' ? initialBidBnAndroid : [],
+  );
+
+  // Curve type
   const [curveType, setCurveType] = useState<CurveType>('linear');
 
-  // NEW: Let users control how many points to sample
-  const [points, setPoints] = useState<number>(11); // range: 5..20
-  const [basePrice, setBasePrice] = useState<number>(1);
-  const [topPrice, setTopPrice] = useState<number>(300000);
+  // "Committed" slider values used to compute the final curve.
+  // On iOS, we update them in real-time. On Android, we only commit on release.
+  const [points, setPoints] = useState<number>(11);
+  const [basePrice, setBasePrice] = useState<number>(10);
+  const [topPrice, setTopPrice] = useState<number>(50000);
   const [power, setPower] = useState<number>(2.0);
   const [feePercent, setFeePercent] = useState<number>(2.0);
 
-  // Computed arrays
-  const [askPrices, setAskPrices] = useState<number[]>([]);
-  const [bidPrices, setBidPrices] = useState<number[]>([]);
+  /************************************
+   * "Pending" slider values (Android)
+   * - We store these so the slider can move smoothly without re-render.
+   ************************************/
+  const [pendingPoints, setPendingPoints] = useState(points);
+  const [pendingBase, setPendingBase] = useState(basePrice);
+  const [pendingTop, setPendingTop] = useState(topPrice);
+  const [pendingPower, setPendingPower] = useState(power);
+  const [pendingFee, setPendingFee] = useState(feePercent);
 
   /************************************
-   * Effects
+   * Bonding curve computation
    ************************************/
-  useEffect(() => {
-    const newAsk: number[] = [];
-    const newBid: number[] = [];
+  const computeBondingCurve = useCallback(() => {
+    const newAskBn: BN[] = [];
+    const newBidBn: BN[] = [];
 
-    for (let i = 0; i < points; i++) {
-      const t = i / (points - 1 || 1); // Avoid divide-by-zero
+    // Make local copies
+    const localPoints = points;
+    const localBase = basePrice;
+    const localTop = topPrice;
+    const localPower = power;
+    const localFee = feePercent;
+
+    for (let i = 0; i < localPoints; i++) {
+      const t = i / Math.max(localPoints - 1, 1);
+
+      // Compute float price
       let price: number;
-
       switch (curveType) {
         case 'linear':
-          price = basePrice + t * (topPrice - basePrice);
+          price = localBase + t * (localTop - localBase);
           break;
         case 'power':
-          // Raise t to the "power" factor
-          price = basePrice + (topPrice - basePrice) * Math.pow(t, power);
+          price = localBase + (localTop - localBase) * Math.pow(t, localPower);
           break;
-        case 'exponential':
-          // Exponential between basePrice and topPrice
-          price = basePrice * Math.pow(topPrice / (basePrice || 1), t);
+        case 'exponential': {
+          const safeBase = localBase > 0 ? localBase : 1;
+          price = safeBase * Math.pow(localTop / safeBase, t);
           break;
-        case 'logarithmic':
-          // Using log10(1 + 9t) to shift curve nicely
-          price = basePrice + (topPrice - basePrice) * Math.log10(1 + 9 * t);
+        }
+        case 'logarithmic': {
+          // log10(1 + 9t)
+          const logInput = 1 + 9 * t;
+          const safeLog = logInput > 0 ? Math.log10(logInput) : 0;
+          price = localBase + (localTop - localBase) * safeLog;
           break;
+        }
         default:
-          price = basePrice + t * (topPrice - basePrice);
+          price = localBase + t * (localTop - localBase);
       }
 
-      const ask = price;
-      const bid = ask * (1 - feePercent / 100);
+      if (!Number.isFinite(price)) {
+        price = localBase; // fallback
+      }
+      if (price < 0) {
+        price = 0;
+      }
+      if (price > 1e9) {
+        price = 1e9;
+      }
 
-      newAsk.push(ask);
-      newBid.push(bid);
+      const askVal = new BN(Math.floor(price));
+
+      // Fee => bid = ask * (1 - fee/100)
+      let rawBid = price * (1 - localFee / 100);
+      if (!Number.isFinite(rawBid)) {
+        rawBid = price;
+      }
+      if (rawBid < 0) {
+        rawBid = 0;
+      }
+      if (rawBid > 1e9) {
+        rawBid = 1e9;
+      }
+
+      const bidVal = new BN(Math.floor(rawBid));
+      newAskBn.push(askVal);
+      newBidBn.push(bidVal);
     }
 
-    setAskPrices(newAsk);
-    setBidPrices(newBid);
-    onCurveChange(newAsk, newBid);
+    // Save final BN arrays
+    setAskBn(newAskBn);
+    setBidBn(newBidBn);
+
+    // Notify parent
+    onCurveChangeRef.current(newAskBn, newBidBn);
   }, [curveType, points, basePrice, topPrice, power, feePercent]);
+
+  /************************************
+   * Real-time updates only on iOS
+   * On Android, we do final compute after user releases slider
+   ************************************/
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      computeBondingCurve();
+    }
+  }, [
+    Platform.OS,
+    curveType,
+    points,
+    basePrice,
+    topPrice,
+    power,
+    feePercent,
+    computeBondingCurve,
+  ]);
+
+  /************************************
+   * Slider Handlers
+   * iOS => immediate state updates
+   * Android => only store pending values, commit on release
+   ************************************/
+  const handleCurveTypePress = (type: CurveType) => {
+    setCurveType(type);
+    if (Platform.OS === 'android') {
+      // Recompute after user changes curve type on Android
+      // (no "slidingComplete" event for pressing buttons, so do it now)
+      computeBondingCurve();
+    }
+  };
+
+  // Points
+  const onPointsChange = (val: number) => {
+    if (Platform.OS === 'ios') {
+      setPoints(val);
+    } else {
+      setPendingPoints(val);
+    }
+  };
+  const onPointsComplete = () => {
+    if (Platform.OS === 'android') {
+      setPoints(pendingPoints);
+      computeBondingCurve();
+    }
+  };
+
+  // Base Price
+  const onBaseChange = (val: number) => {
+    if (Platform.OS === 'ios') {
+      setBasePrice(val);
+    } else {
+      setPendingBase(val);
+    }
+  };
+  const onBaseComplete = () => {
+    if (Platform.OS === 'android') {
+      setBasePrice(pendingBase);
+      computeBondingCurve();
+    }
+  };
+
+  // Top Price
+  const onTopChange = (val: number) => {
+    if (Platform.OS === 'ios') {
+      setTopPrice(val);
+    } else {
+      setPendingTop(val);
+    }
+  };
+  const onTopComplete = () => {
+    if (Platform.OS === 'android') {
+      setTopPrice(pendingTop);
+      computeBondingCurve();
+    }
+  };
+
+  // Power
+  const onPowerChange = (val: number) => {
+    if (Platform.OS === 'ios') {
+      setPower(val);
+    } else {
+      setPendingPower(val);
+    }
+  };
+  const onPowerComplete = () => {
+    if (Platform.OS === 'android') {
+      setPower(pendingPower);
+      computeBondingCurve();
+    }
+  };
+
+  // Fee
+  const onFeeChange = (val: number) => {
+    if (Platform.OS === 'ios') {
+      setFeePercent(val);
+    } else {
+      setPendingFee(val);
+    }
+  };
+  const onFeeComplete = () => {
+    if (Platform.OS === 'android') {
+      setFeePercent(pendingFee);
+      computeBondingCurve();
+    }
+  };
+
+  /************************************
+   * Convert BN => number for Chart
+   ************************************/
+  const askPricesNumber = askBn.map(bn => bn.toNumber());
+  const bidPricesNumber = bidBn.map(bn => bn.toNumber());
 
   /************************************
    * Chart data
    ************************************/
   const chartData = {
-    labels: askPrices.map((_, idx) => String(idx + 1)),
+    labels: askBn.map((_, idx) => String(idx + 1)),
     datasets: [
       {
-        data: askPrices,
-        color: () => '#FF4F78', // bright pink/red
+        data: askPricesNumber,
+        color: () => '#FF4F78',
         strokeWidth: 3,
       },
       {
-        data: bidPrices,
-        color: () => '#5078FF', // bright blue
+        data: bidPricesNumber,
+        color: () => '#5078FF',
         strokeWidth: 3,
       },
     ],
@@ -101,19 +297,18 @@ export default function BondingCurveConfigurator({
   };
 
   /************************************
-   * Handlers
+   * Merge style overrides
    ************************************/
-  const handleCurveTypePress = (type: CurveType) => setCurveType(type);
+  const styles = {...defaultStyles, ...styleOverrides};
 
   /************************************
    * Render
    ************************************/
   return (
     <View style={styles.container}>
-      {/* Title */}
       <Text style={styles.sectionTitle}>Bonding Curve Config</Text>
 
-      {/* Curve Selection */}
+      {/* Curve Type Selection */}
       <View style={styles.curveSelectionContainer}>
         {(['linear', 'power', 'exponential', 'logarithmic'] as CurveType[]).map(
           type => (
@@ -139,15 +334,18 @@ export default function BondingCurveConfigurator({
       {/* Number of Points */}
       <View style={styles.sliderRow}>
         <Text style={styles.label}>Points</Text>
-        <Text style={styles.valueText}>{points}</Text>
+        <Text style={styles.valueText}>
+          {Platform.OS === 'ios' ? points : pendingPoints}
+        </Text>
       </View>
       <Slider
         style={styles.slider}
         minimumValue={5}
         maximumValue={20}
         step={1}
-        value={points}
-        onValueChange={v => setPoints(v)}
+        value={Platform.OS === 'ios' ? points : pendingPoints}
+        onValueChange={onPointsChange}
+        onSlidingComplete={onPointsComplete}
         thumbTintColor="#8884FF"
         minimumTrackTintColor="#8884FF"
       />
@@ -155,15 +353,20 @@ export default function BondingCurveConfigurator({
       {/* Base Price */}
       <View style={styles.sliderRow}>
         <Text style={styles.label}>Base Price</Text>
-        <Text style={styles.valueText}>{basePrice.toFixed(0)}</Text>
+        <Text style={styles.valueText}>
+          {Platform.OS === 'ios'
+            ? basePrice.toFixed(0)
+            : pendingBase.toFixed(0)}
+        </Text>
       </View>
       <Slider
         style={styles.slider}
         minimumValue={10}
         maximumValue={1000}
         step={5}
-        value={basePrice}
-        onValueChange={v => setBasePrice(v)}
+        value={Platform.OS === 'ios' ? basePrice : pendingBase}
+        onValueChange={onBaseChange}
+        onSlidingComplete={onBaseComplete}
         thumbTintColor="#FF4F78"
         minimumTrackTintColor="#FF4F78"
       />
@@ -171,15 +374,18 @@ export default function BondingCurveConfigurator({
       {/* Top Price */}
       <View style={styles.sliderRow}>
         <Text style={styles.label}>Top Price</Text>
-        <Text style={styles.valueText}>{topPrice.toFixed(0)}</Text>
+        <Text style={styles.valueText}>
+          {Platform.OS === 'ios' ? topPrice.toFixed(0) : pendingTop.toFixed(0)}
+        </Text>
       </View>
       <Slider
         style={styles.slider}
         minimumValue={50000}
         maximumValue={500000}
         step={10000}
-        value={topPrice}
-        onValueChange={v => setTopPrice(v)}
+        value={Platform.OS === 'ios' ? topPrice : pendingTop}
+        onValueChange={onTopChange}
+        onSlidingComplete={onTopComplete}
         thumbTintColor="#5078FF"
         minimumTrackTintColor="#5078FF"
       />
@@ -189,15 +395,20 @@ export default function BondingCurveConfigurator({
         <>
           <View style={styles.sliderRow}>
             <Text style={styles.label}>Power</Text>
-            <Text style={styles.valueText}>{power.toFixed(1)}</Text>
+            <Text style={styles.valueText}>
+              {Platform.OS === 'ios'
+                ? power.toFixed(1)
+                : pendingPower.toFixed(1)}
+            </Text>
           </View>
           <Slider
             style={styles.slider}
             minimumValue={0.5}
             maximumValue={3.0}
             step={0.1}
-            value={power}
-            onValueChange={v => setPower(v)}
+            value={Platform.OS === 'ios' ? power : pendingPower}
+            onValueChange={onPowerChange}
+            onSlidingComplete={onPowerComplete}
             thumbTintColor="#FFD700"
             minimumTrackTintColor="#FFD700"
           />
@@ -207,15 +418,21 @@ export default function BondingCurveConfigurator({
       {/* Fee % */}
       <View style={styles.sliderRow}>
         <Text style={styles.label}>Fee %</Text>
-        <Text style={styles.valueText}>{feePercent.toFixed(1)}%</Text>
+        <Text style={styles.valueText}>
+          {Platform.OS === 'ios'
+            ? feePercent.toFixed(1)
+            : pendingFee.toFixed(1)}
+          %
+        </Text>
       </View>
       <Slider
         style={styles.slider}
         minimumValue={0}
         maximumValue={10}
         step={0.1}
-        value={feePercent}
-        onValueChange={v => setFeePercent(v)}
+        value={Platform.OS === 'ios' ? feePercent : pendingFee}
+        onValueChange={onFeeChange}
+        onSlidingComplete={onFeeComplete}
         thumbTintColor="#4FD1C5"
         minimumTrackTintColor="#4FD1C5"
       />
@@ -224,8 +441,7 @@ export default function BondingCurveConfigurator({
       <View style={styles.chartContainer}>
         <LineChart
           data={chartData}
-          // We'll let this fill the parent minus some padding
-          width={Math.min(screenWidth * 0.92, 600)}
+          width={CHART_WIDTH}
           height={260}
           fromZero
           withDots
@@ -245,24 +461,23 @@ export default function BondingCurveConfigurator({
               stroke: '#fff',
             },
           }}
-          // No "bezier" => no spline overshoot
           style={{borderRadius: 10}}
           verticalLabelRotation={0}
           segments={5}
           formatYLabel={yValue => {
             const val = parseFloat(yValue);
+            if (!Number.isFinite(val)) return '0';
             if (val >= 1_000_000) return (val / 1_000_000).toFixed(1) + 'M';
             if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
             return yValue;
           }}
           onDataPointClick={({value}) => {
-            // Provide quick feedback on the tapped data point
             Alert.alert('Data Point', `Price: ${value.toFixed(2)}`);
           }}
         />
       </View>
 
-      {/* Display computed values in a table */}
+      {/* Display computed values */}
       <View style={styles.readoutContainer}>
         <Text style={styles.readoutTitle}>Data Points</Text>
         <View style={styles.readoutTableHeader}>
@@ -274,120 +489,14 @@ export default function BondingCurveConfigurator({
             Bid
           </Text>
         </View>
-        {askPrices.map((ask, idx) => (
+        {askBn.map((askVal, idx) => (
           <View key={idx} style={styles.readoutRow}>
             <Text style={styles.readoutCell}>{idx + 1}</Text>
-            <Text style={styles.readoutCell}>{ask.toFixed(2)}</Text>
-            <Text style={styles.readoutCell}>{bidPrices[idx].toFixed(2)}</Text>
+            <Text style={styles.readoutCell}>{askVal.toString()}</Text>
+            <Text style={styles.readoutCell}>{bidBn[idx].toString()}</Text>
           </View>
         ))}
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: '100%',
-    backgroundColor: '#fafafa',
-    borderRadius: 10,
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 16,
-    textAlign: 'center',
-    color: '#333',
-  },
-  curveSelectionContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  curveTypeButton: {
-    minWidth: 80,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    backgroundColor: '#eee',
-    margin: 4,
-    alignItems: 'center',
-  },
-  curveTypeButtonActive: {
-    backgroundColor: '#333',
-  },
-  curveTypeButtonText: {
-    fontSize: 14,
-    color: '#444',
-    fontWeight: '500',
-  },
-  curveTypeButtonTextActive: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  sliderRow: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 2,
-    marginTop: 8,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#555',
-  },
-  valueText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111',
-  },
-  slider: {
-    width: '100%',
-    marginBottom: 12,
-  },
-  chartContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginVertical: 12,
-  },
-  readoutContainer: {
-    width: '100%',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 8,
-  },
-  readoutTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 6,
-    color: '#333',
-    textAlign: 'center',
-  },
-  readoutTableHeader: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-    marginBottom: 6,
-    paddingBottom: 4,
-  },
-  readoutHeaderText: {
-    fontWeight: '700',
-    color: '#333',
-  },
-  readoutRow: {
-    flexDirection: 'row',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
-    paddingVertical: 4,
-  },
-  readoutCell: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 13,
-    color: '#444',
-  },
-});

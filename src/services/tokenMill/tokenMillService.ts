@@ -1,63 +1,24 @@
-// File: src/services/tokenMillService.ts
+// FILE: src/services/tokenMill/tokenMillService.ts
 
-import {Connection, PublicKey, Transaction} from '@solana/web3.js';
+import {
+  Connection,
+  PublicKey,
+  Transaction,
+  SystemProgram,
+  LAMPORTS_PER_SOL,
+} from '@solana/web3.js';
 import {Buffer} from 'buffer';
 import {SERVER_URL} from '@env';
 import {createSyncNativeInstruction} from '@solana/spl-token';
 import * as spl from '@solana/spl-token';
-import {SystemProgram, LAMPORTS_PER_SOL} from '@solana/web3.js';
+import {
+  signAndSendBase64Tx,
+  signAndSendWithPrivy,
+} from '../../utils/transactions/transactionUtils';
 
-// This service centralizes requests to your backend plus the signature flow.
-
-////////////////////////////////////////////////////////////////
-// signAndSendLegacyTx
-////////////////////////////////////////////////////////////////
-export async function signAndSendLegacyTx({
-  base64Tx,
-  connection,
-  signerPublicKey,
-  provider,
-}: {
-  base64Tx: string;
-  connection: Connection;
-  signerPublicKey: string;
-  provider: any; // e.g. Privy or Dynamic
-}): Promise<string> {
-  // Convert base64 to Transaction
-  const txBuffer = Buffer.from(base64Tx, 'base64');
-  const legacyTx = Transaction.from(txBuffer);
-
-  // Convert the Tx message to base64 for signMessage
-  const serializedMessage = legacyTx.serializeMessage();
-  const base64Message = Buffer.from(serializedMessage).toString('base64');
-
-  // Prompt user to sign the message
-  const signResult = await provider.request({
-    method: 'signMessage',
-    params: {message: base64Message},
-  });
-  if (!signResult || !signResult.signature) {
-    throw new Error('No signature from wallet provider');
-  }
-
-  // Attach signature
-  legacyTx.addSignature(
-    new PublicKey(signerPublicKey),
-    Buffer.from(signResult.signature, 'base64'),
-  );
-
-  // Send
-  const signedTx = legacyTx.serialize();
-  const txSignature = await connection.sendRawTransaction(signedTx);
-
-  // Optionally confirm
-  await connection.confirmTransaction(txSignature);
-  return txSignature;
-}
-
-////////////////////////////////////////////////////////////////
-// fundUserWithWSOL
-////////////////////////////////////////////////////////////////
+/**
+ * fundUserWithWSOL
+ */
 export async function fundUserWithWSOL({
   solAmount,
   connection,
@@ -73,10 +34,8 @@ export async function fundUserWithWSOL({
   const userPubkey = new PublicKey(signerPublicKey);
   const userQuoteAta = spl.getAssociatedTokenAddressSync(wSolMint, userPubkey);
 
-  // Check if user ATA exists
   const ataInfo = await connection.getAccountInfo(userQuoteAta);
   const tx = new Transaction();
-
   if (!ataInfo) {
     const createIx = spl.createAssociatedTokenAccountInstruction(
       userPubkey,
@@ -87,7 +46,6 @@ export async function fundUserWithWSOL({
     tx.add(createIx);
   }
 
-  // Transfer some SOL
   const lamports = Math.floor(solAmount * LAMPORTS_PER_SOL);
   const transferIx = SystemProgram.transfer({
     fromPubkey: userPubkey,
@@ -96,30 +54,22 @@ export async function fundUserWithWSOL({
   });
   tx.add(transferIx);
 
-  // Sync wSOL
   const syncIx = createSyncNativeInstruction(userQuoteAta);
   tx.add(syncIx);
 
-  // Prepare partial sign
   const {blockhash} = await connection.getLatestBlockhash();
   tx.recentBlockhash = blockhash;
   tx.feePayer = userPubkey;
 
-  // Serialize for sign
-  const serializedTx = tx.serialize({requireAllSignatures: false});
-  const base64Tx = serializedTx.toString('base64');
-
-  return signAndSendLegacyTx({
-    base64Tx,
-    connection,
-    signerPublicKey,
-    provider,
-  });
+  // sign & send
+  const signature = await signAndSendWithPrivy(tx, connection, provider);
+  await connection.confirmTransaction(signature);
+  return signature;
 }
 
-////////////////////////////////////////////////////////////////
-// createMarket
-////////////////////////////////////////////////////////////////
+/**
+ * createMarket
+ */
 export async function createMarket({
   tokenName,
   tokenSymbol,
@@ -161,16 +111,16 @@ export async function createMarket({
     body: JSON.stringify(body),
   });
   const json = await resp.json();
-
   if (!json.success) {
     throw new Error(json.error || 'Market creation failed');
   }
-  const txSignature = await signAndSendLegacyTx({
-    base64Tx: json.transaction,
+
+  // Just sign & send the returned transaction (base64)
+  const txSignature = await signAndSendBase64Tx(
+    json.transaction,
     connection,
-    signerPublicKey: userPublicKey,
     provider,
-  });
+  );
 
   return {
     txSignature,
@@ -179,9 +129,9 @@ export async function createMarket({
   };
 }
 
-////////////////////////////////////////////////////////////////
-// stakeTokens
-////////////////////////////////////////////////////////////////
+/**
+ * stakeTokens
+ */
 export async function stakeTokens({
   marketAddress,
   amount,
@@ -208,17 +158,14 @@ export async function stakeTokens({
   if (!json.success) {
     throw new Error(json.error || 'Stake failed');
   }
-  return signAndSendLegacyTx({
-    base64Tx: json.data,
-    connection,
-    signerPublicKey: userPublicKey,
-    provider,
-  });
+
+  // sign + send the returned base64Tx
+  return signAndSendBase64Tx(json.data, connection, provider);
 }
 
-////////////////////////////////////////////////////////////////
-// createVesting
-////////////////////////////////////////////////////////////////
+/**
+ * createVesting
+ */
 export async function createVesting({
   marketAddress,
   baseTokenMint,
@@ -253,12 +200,11 @@ export async function createVesting({
     throw new Error(data.error || 'Vesting creation failed');
   }
 
-  const txSignature = await signAndSendLegacyTx({
-    base64Tx: data.data.transaction,
+  const txSignature = await signAndSendBase64Tx(
+    data.data.transaction,
     connection,
-    signerPublicKey: userPublicKey,
     provider,
-  });
+  );
 
   return {
     txSignature,
@@ -266,9 +212,9 @@ export async function createVesting({
   };
 }
 
-////////////////////////////////////////////////////////////////
-// releaseVesting
-////////////////////////////////////////////////////////////////
+/**
+ * releaseVesting
+ */
 export async function releaseVesting({
   marketAddress,
   vestingPlanAddress,
@@ -298,17 +244,13 @@ export async function releaseVesting({
   if (!data.success) {
     throw new Error(data.error || 'Release vesting failed');
   }
-  return signAndSendLegacyTx({
-    base64Tx: data.data,
-    connection,
-    signerPublicKey: userPublicKey,
-    provider,
-  });
+
+  return signAndSendBase64Tx(data.data, connection, provider);
 }
 
-////////////////////////////////////////////////////////////////
-// swapTokens
-////////////////////////////////////////////////////////////////
+/**
+ * swapTokens
+ */
 export async function swapTokens({
   marketAddress,
   swapType,
@@ -342,17 +284,12 @@ export async function swapTokens({
     throw new Error(data.error || 'Swap failed');
   }
 
-  return signAndSendLegacyTx({
-    base64Tx: data.transaction,
-    connection,
-    signerPublicKey: userPublicKey,
-    provider,
-  });
+  return signAndSendBase64Tx(data.transaction, connection, provider);
 }
 
-////////////////////////////////////////////////////////////////
-// fundMarket
-////////////////////////////////////////////////////////////////
+/**
+ * fundMarket
+ */
 export async function fundMarket({
   marketAddress,
   userPublicKey,
@@ -387,7 +324,7 @@ export async function fundMarket({
     tx.add(createATAIx);
   }
 
-  // Example deposit: 0.1 SOL
+  // deposit 0.1 SOL
   const lamportsToDeposit = Math.floor(0.1 * LAMPORTS_PER_SOL);
   const transferIx = SystemProgram.transfer({
     fromPubkey: new PublicKey(userPublicKey),
@@ -403,20 +340,13 @@ export async function fundMarket({
   tx.recentBlockhash = blockhash;
   tx.feePayer = new PublicKey(userPublicKey);
 
-  const serializedTx = tx.serialize({requireAllSignatures: false});
-  const base64Tx = serializedTx.toString('base64');
-
-  return signAndSendLegacyTx({
-    base64Tx,
-    connection,
-    signerPublicKey: userPublicKey,
-    provider,
-  });
+  const txSignature = await signAndSendWithPrivy(tx, connection, provider);
+  return txSignature;
 }
 
-////////////////////////////////////////////////////////////////
-// setBondingCurve
-////////////////////////////////////////////////////////////////
+/**
+ * setBondingCurve
+ */
 export async function setBondingCurve({
   marketAddress,
   askPrices,
@@ -449,10 +379,5 @@ export async function setBondingCurve({
     throw new Error(json.error || 'Set curve failed');
   }
 
-  return signAndSendLegacyTx({
-    base64Tx: json.transaction,
-    connection,
-    signerPublicKey: userPublicKey,
-    provider,
-  });
+  return signAndSendBase64Tx(json.transaction, connection, provider);
 }

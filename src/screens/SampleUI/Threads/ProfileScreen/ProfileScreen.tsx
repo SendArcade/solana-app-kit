@@ -1,7 +1,4 @@
-/*
-  FILE: src/screens/SampleUI/Threads/ProfileScreen/ProfileScreen.tsx
-*/
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -11,18 +8,26 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
-  StyleSheet,
   ActivityIndicator,
-  Pressable,
 } from 'react-native';
+
 import * as ImagePicker from 'expo-image-picker';
-import { styles } from './ProfileScreen.styles';
-import { useAppSelector, useAppDispatch } from '../../../../hooks/useReduxHooks';
-import { ThreadPost } from '../../../../components/thread/thread.types';
+
+import {
+  styles,
+  modalUI,
+  confirmModalUI,
+  inlineConfirmStyles,
+} from './ProfileScreen.styles';
+import {useAppSelector, useAppDispatch} from '../../../../hooks/useReduxHooks';
+import {ThreadPost} from '../../../../components/thread/thread.types';
 import ProfileIcons from '../../../../assets/svgs';
-import { updateProfilePic, fetchProfilePic } from '../../../../state/auth/reducer';
-import { fetchWithRetries } from '../../../../utils/common/fetch';
-import { TENSOR_API_KEY, HELIUS_API_KEY } from '@env';
+import {
+  updateProfilePic,
+  fetchProfilePic,
+} from '../../../../state/auth/reducer';
+import {fetchWithRetries} from '../../../../utils/common/fetch';
+import {TENSOR_API_KEY} from '@env';
 
 interface NftItem {
   mint: string;
@@ -34,7 +39,7 @@ interface NftItem {
 const SERVER_BASE_URL = process.env.SERVER_URL || 'http://localhost:3000/api';
 
 /**
- * Quick helper to fix IPFS or ar:// URIs, if needed.
+ * Helper to fix IPFS/ar:// URIs if needed.
  */
 function fixImageUrl(url: string): string {
   if (!url) return '';
@@ -58,24 +63,51 @@ export default function ProfileScreen() {
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
   const dispatch = useAppDispatch();
 
-  const { allPosts } = useAppSelector(state => state.thread);
+  const {allPosts} = useAppSelector(state => state.thread);
   const [myPosts, setMyPosts] = useState<ThreadPost[]>([]);
-  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(storedProfilePic);
 
-  // For the two-step flow
-  const [avatarOptionModalVisible, setAvatarOptionModalVisible] = useState(false);
-  const [confirmModalVisible, setConfirmModalVisible] = useState<boolean>(false);
+  // Current profile pic
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
+    storedProfilePic,
+  );
 
-  // The user’s “pending” image, whether from library or NFT
-  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
-  // For NFT flow
+  // Modal for NFT flow (we use inline confirmation for library images)
+  const [avatarOptionModalVisible, setAvatarOptionModalVisible] =
+    useState(false);
+  const [confirmModalVisible, setConfirmModalVisible] =
+    useState<boolean>(false);
+
+  // This state stores the new avatar URI (from library or NFT)
+  const [localFileUri, setLocalFileUri] = useState<string | null>(null);
+  // We use selectedSource to know if the image came from 'library' or 'nft'
+  const [selectedSource, setSelectedSource] = useState<
+    'library' | 'nft' | null
+  >(null);
+
+  // NFT modal states
   const [nftsModalVisible, setNftsModalVisible] = useState(false);
   const [ownedNfts, setOwnedNfts] = useState<NftItem[]>([]);
   const [loadingNfts, setLoadingNfts] = useState(false);
   const [fetchNftsError, setFetchNftsError] = useState<string | null>(null);
 
   /*******************************************************
-   * 1) Load user’s posts
+   * Request media library permissions
+   *******************************************************/
+  useEffect(() => {
+    (async () => {
+      console.log('>>> Requesting media library permissions...');
+      const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'We need your permission to access the library.',
+        );
+      }
+    })();
+  }, []);
+
+  /*******************************************************
+   * Load user’s posts
    *******************************************************/
   useEffect(() => {
     if (!userWallet) {
@@ -83,14 +115,14 @@ export default function ProfileScreen() {
       return;
     }
     const userPosts = allPosts.filter(
-      p => p.user.id.toLowerCase() === userWallet.toLowerCase()
+      p => p.user.id.toLowerCase() === userWallet.toLowerCase(),
     );
     userPosts.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
     setMyPosts(userPosts);
   }, [allPosts, userWallet]);
 
   /*******************************************************
-   * 2) Load user’s Profile Pic from DB
+   * Load user’s Profile Pic from DB
    *******************************************************/
   useEffect(() => {
     if (userWallet) {
@@ -106,27 +138,31 @@ export default function ProfileScreen() {
   }, [userWallet, dispatch]);
 
   /*******************************************************
-   * 3) Image picking from Library
+   * Library Image Picker (minimal approach, inline confirmation)
    *******************************************************/
   const handlePickProfilePicture = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: false,
-    });
-    if (result.canceled) {
-      setAvatarOptionModalVisible(false);
-      return;
+    try {
+      console.log('>>> handlePickProfilePicture (library)');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: false,
+      });
+      console.log('>>> Picker result:', result);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const pickedUri = result.assets[0].uri;
+        console.log('>>> Picked library image URI:', pickedUri);
+        setLocalFileUri(pickedUri);
+        setSelectedSource('library');
+        setAvatarOptionModalVisible(false);
+      }
+    } catch (error: any) {
+      console.log('>>> handlePickProfilePicture error:', error);
+      Alert.alert('Error picking image', error.message);
     }
-    if (!result.assets || result.assets.length === 0) return;
-    const asset = result.assets[0];
-    if (!asset.uri) return;
-    setPendingImageUri(asset.uri);
-    setConfirmModalVisible(true);
-    setAvatarOptionModalVisible(false);
   };
 
   /*******************************************************
-   * 4) NFT flow: show user’s NFT selection
+   * NFT Flow: Show NFT selection modal
    *******************************************************/
   const handleSelectNftOption = () => {
     setAvatarOptionModalVisible(false);
@@ -136,12 +172,11 @@ export default function ProfileScreen() {
 
   const fetchOwnedNfts = useCallback(async () => {
     if (!userWallet) return;
+    console.log('>>> Fetching NFTs for wallet:', userWallet);
     setLoadingNfts(true);
     setOwnedNfts([]);
     setFetchNftsError(null);
-
     try {
-      // This uses the Tensor portfolio API
       const url = `https://api.mainnet.tensordev.io/api/v1/user/portfolio?wallet=${userWallet}&includeUnverified=true&includeCompressed=true&includeFavouriteCount=true`;
       const options = {
         method: 'GET',
@@ -153,7 +188,7 @@ export default function ProfileScreen() {
       const response = await fetchWithRetries(url, options);
       if (!response.ok) {
         throw new Error(
-          `Portfolio API request failed with status ${response.status}`
+          `Portfolio API request failed with status ${response.status}`,
         );
       }
       const data = await response.json();
@@ -165,7 +200,7 @@ export default function ProfileScreen() {
           const name = item.name || 'Unnamed NFT';
           const img = fixImageUrl(item.imageUri || '');
           const collection = item.slugDisplay || '';
-          return { mint, name, image: img, collection };
+          return {mint, name, image: img, collection};
         })
         .filter(Boolean) as NftItem[];
       setOwnedNfts(mappedNfts);
@@ -178,28 +213,39 @@ export default function ProfileScreen() {
   }, [userWallet]);
 
   const handleSelectNftAsAvatar = (nft: NftItem) => {
-    setPendingImageUri(nft.image);
+    console.log('>>> handleSelectNftAsAvatar for:', nft.mint);
+    setLocalFileUri(nft.image);
+    setSelectedSource('nft');
     setNftsModalVisible(false);
+    // Open NFT confirm modal (we use a modal overlay for NFT)
     setConfirmModalVisible(true);
   };
 
   /*******************************************************
-   * 5) Confirm uploading the new avatar
+   * Confirm Upload (common for both flows)
    *******************************************************/
   const handleConfirmUpload = async () => {
-    if (!pendingImageUri || !userWallet) {
+    if (!localFileUri) {
+      Alert.alert('Missing Image', 'No image to upload.');
       setConfirmModalVisible(false);
+      setSelectedSource(null);
+      return;
+    }
+    if (!userWallet) {
+      Alert.alert('Missing Wallet', 'Connect a wallet before uploading.');
+      setConfirmModalVisible(false);
+      setSelectedSource(null);
       return;
     }
     try {
       const formData = new FormData();
       formData.append('userId', userWallet);
       formData.append('profilePic', {
-        uri: pendingImageUri,
+        uri: localFileUri,
         type: 'image/jpeg',
         name: `profile_${Date.now()}.jpg`,
       } as any);
-
+      console.log('>>> Uploading to:', `${SERVER_BASE_URL}/profile/upload`);
       const response = await fetch(`${SERVER_BASE_URL}/profile/upload`, {
         method: 'POST',
         body: formData,
@@ -210,30 +256,35 @@ export default function ProfileScreen() {
       }
       setProfilePicUrl(data.url);
       dispatch(updateProfilePic(data.url));
+      console.log('>>> Updated profile pic to:', data.url);
     } catch (err: any) {
       Alert.alert('Upload Error', err.message);
+      console.log('>>> handleConfirmUpload error:', err);
     } finally {
       setConfirmModalVisible(false);
-      setPendingImageUri(null);
+      setLocalFileUri(null);
+      setSelectedSource(null);
     }
   };
 
   const handleCancelUpload = () => {
+    console.log('>>> Canceling confirm upload');
     setConfirmModalVisible(false);
-    setPendingImageUri(null);
+    setLocalFileUri(null);
+    setSelectedSource(null);
   };
 
   /*******************************************************
-   * 6) Render posts
+   * Render posts
    *******************************************************/
-  const renderPostItem = ({ item }: { item: ThreadPost }) => {
+  const renderPostItem = ({item}: {item: ThreadPost}) => {
     const firstTextSection = item.sections.find(s => !!s.text)?.text;
     return (
       <View style={styles.postItemContainer}>
         <Image
           source={
             item.user.avatar
-              ? { uri: item.user.avatar as string }
+              ? {uri: item.user.avatar}
               : require('../../../../assets/images/User.png')
           }
           style={styles.postItemAvatar}
@@ -255,7 +306,7 @@ export default function ProfileScreen() {
   };
 
   /*******************************************************
-   * 7) Render
+   * Main render
    *******************************************************/
   return (
     <SafeAreaView style={styles.container}>
@@ -271,20 +322,18 @@ export default function ProfileScreen() {
 
       {/* Profile header */}
       <View style={styles.profileHeaderContainer}>
-        {/* Pressing this opens the two-option modal */}
         <TouchableOpacity
           style={styles.profileAvatarWrapper}
           onPress={() => setAvatarOptionModalVisible(true)}>
           <Image
             source={
               profilePicUrl
-                ? { uri: profilePicUrl }
+                ? {uri: profilePicUrl}
                 : require('../../../../assets/images/User.png')
             }
             style={styles.profileAvatar}
           />
         </TouchableOpacity>
-
         <View style={styles.profileTextInfo}>
           <Text style={styles.profileUsername}>My Profile</Text>
           <View style={styles.usernameRow}>
@@ -303,13 +352,11 @@ export default function ProfileScreen() {
             Explorer, builder, and #Solana advocate. Sharing my journey in web3.
           </Text>
         </View>
-
         <View style={styles.actionButtonsRow}>
           <TouchableOpacity style={styles.editProfileBtn}>
             <Text style={styles.editProfileBtnText}>Edit Profile</Text>
           </TouchableOpacity>
         </View>
-
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>42</Text>
@@ -322,6 +369,34 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Inline confirmation for library image */}
+      {selectedSource === 'library' && localFileUri && (
+        <View style={inlineConfirmStyles.container}>
+          <Text style={inlineConfirmStyles.title}>Confirm Profile Picture</Text>
+          <Image
+            source={{uri: localFileUri}}
+            style={inlineConfirmStyles.preview}
+            onError={err => {
+              console.log('Inline confirm image load fail:', err.nativeEvent);
+              Alert.alert('Image Load Error', JSON.stringify(err.nativeEvent));
+            }}
+          />
+          <View style={inlineConfirmStyles.buttonRow}>
+            <TouchableOpacity
+              style={[inlineConfirmStyles.button, {backgroundColor: '#aaa'}]}
+              onPress={handleCancelUpload}>
+              <Text style={inlineConfirmStyles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[inlineConfirmStyles.button, {backgroundColor: '#1d9bf0'}]}
+              onPress={handleConfirmUpload}>
+              <Text style={inlineConfirmStyles.buttonText}>Confirm</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Posts */}
       <FlatList
         data={myPosts}
         keyExtractor={post => post.id}
@@ -333,22 +408,18 @@ export default function ProfileScreen() {
             </Text>
           </View>
         }
-        style={{ flex: 1 }}
+        style={{flex: 1}}
         contentContainerStyle={styles.flatListContent}
       />
 
-      {/* *******************************
-           (A) PICK-AVATAR-OPTION Modal
-         ******************************* */}
+      {/* (A) Avatar Option Modal */}
       <Modal
         animationType="fade"
         transparent
         visible={avatarOptionModalVisible}
         onRequestClose={() => setAvatarOptionModalVisible(false)}>
-        <Pressable
-          style={modalUI.overlay}
-          onPress={() => setAvatarOptionModalVisible(false)}>
-          <Pressable style={modalUI.optionContainer} onPress={e => e.stopPropagation()}>
+        <View style={modalUI.overlay}>
+          <View style={modalUI.optionContainer}>
             <Text style={modalUI.optionTitle}>Choose avatar source</Text>
             <TouchableOpacity
               style={modalUI.optionButton}
@@ -360,13 +431,16 @@ export default function ProfileScreen() {
               onPress={handleSelectNftOption}>
               <Text style={modalUI.optionButtonText}>My NFTs</Text>
             </TouchableOpacity>
-          </Pressable>
-        </Pressable>
+            <TouchableOpacity
+              style={[modalUI.optionButton, {backgroundColor: 'gray'}]}
+              onPress={() => setAvatarOptionModalVisible(false)}>
+              <Text style={modalUI.optionButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
-      {/* *******************************
-           (B) NFT-SELECTION Modal
-         ******************************* */}
+      {/* (B) NFT-Selection Modal */}
       <Modal
         animationType="slide"
         transparent
@@ -376,9 +450,10 @@ export default function ProfileScreen() {
           <View style={modalUI.nftContainer}>
             <Text style={modalUI.nftTitle}>Select an NFT</Text>
             {loadingNfts ? (
-              <View style={{ marginTop: 20 }}>
+              <View style={{marginTop: 20}}>
                 <ActivityIndicator size="large" color="#1d9bf0" />
-                <Text style={{ marginTop: 8, color: '#666', textAlign: 'center' }}>
+                <Text
+                  style={{marginTop: 8, color: '#666', textAlign: 'center'}}>
                   Loading your NFTs...
                 </Text>
               </View>
@@ -388,26 +463,31 @@ export default function ProfileScreen() {
               <FlatList
                 data={ownedNfts}
                 keyExtractor={item => item.mint}
-                style={{ marginVertical: 10 }}
-                renderItem={({ item }) => (
+                style={{marginVertical: 10}}
+                renderItem={({item}) => (
                   <TouchableOpacity
                     style={modalUI.nftItem}
                     onPress={() => handleSelectNftAsAvatar(item)}>
                     <View style={modalUI.nftImageContainer}>
                       {item.image ? (
-                        <Image source={{ uri: item.image }} style={modalUI.nftImage} />
+                        <Image
+                          source={{uri: item.image}}
+                          style={modalUI.nftImage}
+                        />
                       ) : (
                         <View style={modalUI.nftPlaceholder}>
-                          <Text style={{ color: '#666' }}>No Image</Text>
+                          <Text style={{color: '#666'}}>No Image</Text>
                         </View>
                       )}
                     </View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
+                    <View style={{flex: 1, marginLeft: 12}}>
                       <Text style={modalUI.nftName} numberOfLines={1}>
                         {item.name}
                       </Text>
                       {item.collection ? (
-                        <Text style={modalUI.nftCollection}>{item.collection}</Text>
+                        <Text style={modalUI.nftCollection}>
+                          {item.collection}
+                        </Text>
                       ) : null}
                       <Text style={modalUI.nftMint} numberOfLines={1}>
                         {item.mint.slice(0, 8) + '...' + item.mint.slice(-4)}
@@ -423,7 +503,7 @@ export default function ProfileScreen() {
               />
             )}
             <TouchableOpacity
-              style={[modalUI.closeButton, { marginTop: 10 }]}
+              style={[modalUI.closeButton, {marginTop: 10}]}
               onPress={() => setNftsModalVisible(false)}>
               <Text style={modalUI.closeButtonText}>Cancel</Text>
             </TouchableOpacity>
@@ -431,200 +511,60 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* *******************************
-           (C) CONFIRM Modal
-         ******************************* */}
-      <Modal
-        animationType="slide"
-        transparent
-        visible={confirmModalVisible}
-        onRequestClose={handleCancelUpload}>
-        <View style={confirmModalUI.overlay}>
-          <View style={confirmModalUI.container}>
-            <Text style={confirmModalUI.title}>Confirm Profile Picture</Text>
-            {pendingImageUri && (
-              <Image
-                source={{ uri: pendingImageUri }}
-                style={confirmModalUI.preview}
-              />
-            )}
-            <View style={confirmModalUI.buttonRow}>
-              <TouchableOpacity
-                style={[confirmModalUI.modalButton, { backgroundColor: '#ccc' }]}
-                onPress={handleCancelUpload}
-              >
-                <Text style={confirmModalUI.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[confirmModalUI.modalButton, { backgroundColor: '#1d9bf0' }]}
-                onPress={handleConfirmUpload}
-              >
-                <Text style={confirmModalUI.buttonText}>Confirm</Text>
-              </TouchableOpacity>
+      {/* (C) NFT Confirm Modal */}
+      {selectedSource === 'nft' && confirmModalVisible && (
+        <Modal
+          animationType="fade"
+          transparent
+          visible={confirmModalVisible}
+          onRequestClose={handleCancelUpload}>
+          <View style={confirmModalUI.overlay}>
+            <View style={confirmModalUI.container}>
+              <Text style={confirmModalUI.title}>
+                Confirm NFT Profile Picture
+              </Text>
+              {localFileUri ? (
+                <Image
+                  source={{uri: localFileUri}}
+                  style={confirmModalUI.preview}
+                  onError={err => {
+                    console.log(
+                      'NFT confirm modal image load fail:',
+                      err.nativeEvent,
+                    );
+                    Alert.alert(
+                      'Image Load Error',
+                      JSON.stringify(err.nativeEvent),
+                    );
+                  }}
+                />
+              ) : (
+                <Text style={{marginVertical: 20, color: '#666'}}>
+                  No pending image
+                </Text>
+              )}
+              <View style={confirmModalUI.buttonRow}>
+                <TouchableOpacity
+                  style={[
+                    confirmModalUI.modalButton,
+                    {backgroundColor: '#aaa'},
+                  ]}
+                  onPress={handleCancelUpload}>
+                  <Text style={confirmModalUI.buttonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    confirmModalUI.modalButton,
+                    {backgroundColor: '#1d9bf0'},
+                  ]}
+                  onPress={handleConfirmUpload}>
+                  <Text style={confirmModalUI.buttonText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
-
-/**
- * Modal UI styling for the “choose avatar source” and NFT selection modals.
- */
-const modalUI = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  optionContainer: {
-    width: '80%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-  },
-  optionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 14,
-    color: '#333',
-  },
-  optionButton: {
-    width: '100%',
-    padding: 12,
-    marginVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#1d9bf0',
-    alignItems: 'center',
-  },
-  optionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  nftOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  nftContainer: {
-    width: '90%',
-    maxHeight: '80%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-  },
-  nftTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  nftError: {
-    color: '#c00',
-    textAlign: 'center',
-    marginTop: 16,
-  },
-  nftItem: {
-    flexDirection: 'row',
-    backgroundColor: '#f8f8f8',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 10,
-    alignItems: 'center',
-  },
-  nftImageContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 6,
-    backgroundColor: '#eee',
-    overflow: 'hidden',
-    marginRight: 6,
-  },
-  nftImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  nftPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  nftName: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  nftCollection: {
-    fontSize: 12,
-    color: '#777',
-    marginBottom: 2,
-  },
-  nftMint: {
-    fontSize: 10,
-    color: '#999',
-  },
-  closeButton: {
-    backgroundColor: '#aaa',
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-});
-
-/**
- * Styling for the confirm modal (the final “Confirm Profile Picture”).
- */
-const confirmModalUI = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  container: {
-    width: '80%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: '600',
-    marginBottom: 16,
-  },
-  preview: {
-    width: 200,
-    height: 200,
-    borderRadius: 8,
-    marginBottom: 16,
-    resizeMode: 'cover',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    width: '100%',
-    justifyContent: 'space-evenly',
-  },
-  modalButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-});

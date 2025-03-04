@@ -1,19 +1,17 @@
-// File: src/services/pumpfun/pumpfunService.ts
+// FILE: src/services/pumpfun/pumpfunService.ts
 
 import {
   PublicKey,
-  Transaction,
   Keypair,
   LAMPORTS_PER_SOL,
+  Connection,
+  VersionedTransaction,
 } from '@solana/web3.js';
 import {PumpFunSDK} from 'pumpdotfun-sdk';
 import {getAssociatedTokenAddress} from '@solana/spl-token';
 
 import {
   getProvider,
-  signLegacyTransactionWithPrivy,
-  signVersionedTransactionWithPrivy,
-  RAYDIUM_SOL_MINT,
   checkIfTokenIsOnRaydium,
   getSwapFee,
   getSwapQuote,
@@ -21,10 +19,15 @@ import {
   parseRaydiumVersionedTransaction,
   buildPumpFunBuyTransaction,
   buildPumpFunSellTransaction,
+  RAYDIUM_SOL_MINT,
 } from '../../utils/pumpfun/pumpfunUtils';
 
 import {calculateWithSlippageBuy} from 'pumpdotfun-sdk';
-import { SERVER_URL } from '@env';
+import {SERVER_URL} from '@env';
+import {
+  signAndSendWithPrivy,
+  signAndSendBase64Tx,
+} from '../../utils/transactions/transactionUtils';
 
 /**
  * Create and immediately buy tokens
@@ -75,7 +78,6 @@ export async function createAndBuyTokenViaPumpfun({
 
   try {
     const uploadEndpoint = `${SERVER_URL}/api/pumpfun/uploadMetadata`;
-
     const formData = new FormData();
     formData.append('publicKey', userPublicKey);
     formData.append('tokenName', tokenName);
@@ -104,6 +106,7 @@ export async function createAndBuyTokenViaPumpfun({
     if (!uploadJson?.success || !uploadJson.metadataUri) {
       throw new Error(uploadJson?.error || 'No metadataUri returned');
     }
+
     const {metadataUri} = uploadJson;
     console.log('[createAndBuy] metadataUri =>', metadataUri);
 
@@ -120,7 +123,7 @@ export async function createAndBuyTokenViaPumpfun({
     );
 
     // optional "buy" instructions
-    let buyTx: Transaction | null = null;
+    let buyTx = null;
     if (solAmount > 0) {
       const globalAccount = await sdk.getGlobalAccount();
       const buyAmount = globalAccount.getInitialBuyPrice(
@@ -140,32 +143,30 @@ export async function createAndBuyTokenViaPumpfun({
       );
     }
 
-    // combine the two
-    const combinedTx = new Transaction();
-    createTx.instructions.forEach(ix => combinedTx.add(ix));
+    // Combine create + buy instructions
+    const combinedTx = createTx;
     if (buyTx) {
       buyTx.instructions.forEach(ix => combinedTx.add(ix));
     }
 
-    // finalize & sign
-    const latest = await connection.getLatestBlockhash();
+    // partial sign with new mint keypair
+    const {blockhash} = await connection.getLatestBlockhash();
     combinedTx.feePayer = creatorPubkey;
-    combinedTx.recentBlockhash = latest.blockhash;
+    combinedTx.recentBlockhash = blockhash;
     combinedTx.partialSign(mintKeypair);
 
-    const privyProvider = await solanaWallet.getProvider();
-    const finalSigned = await signLegacyTransactionWithPrivy(
+    // Now sign & send via privy
+    const walletProvider = await solanaWallet.getProvider();
+    const txSignature = await signAndSendWithPrivy(
       combinedTx,
-      creatorPubkey,
-      privyProvider,
+      connection,
+      walletProvider,
     );
 
-    const txid = await connection.sendRawTransaction(finalSigned.serialize());
-    console.log('[createAndBuy] => Txid:', txid);
-
+    console.log('[createAndBuy] => TxSignature:', txSignature);
     return {
       success: true,
-      txId: txid,
+      txId: txSignature,
       mintPublicKey: mintKeypair.publicKey.toBase58(),
     };
   } catch (err: any) {
@@ -204,13 +205,14 @@ export async function buyTokenViaPumpfun({
   const connection = provider.connection;
   const buyerPubkey = new PublicKey(buyerPublicKey);
 
-  // check Raydium
   console.log('[buyTokenViaPumpfun] Checking if token is on Raydium...');
   const isRaydium = await checkIfTokenIsOnRaydium(tokenAddress);
 
   let txId: string = '';
+  const walletProvider = await solanaWallet.getProvider();
+
   if (isRaydium) {
-    // Raydium path -> versioned transaction
+    // Raydium path -> we get a base64 from server, then sign+send
     console.log('[buyTokenViaPumpfun] Using Raydium path...');
     const lamportsIn = Math.floor(solAmount * LAMPORTS_PER_SOL);
     const swapResponse = await getSwapQuote(
@@ -231,19 +233,11 @@ export async function buyTokenViaPumpfun({
     if (!base64Tx) {
       throw new Error('[Raydium] No transaction found in swap response');
     }
-    const versionedTx = parseRaydiumVersionedTransaction(base64Tx);
-
-    const privyProvider = await solanaWallet.getProvider();
-    const signedVersionedTx = await signVersionedTransactionWithPrivy(
-      versionedTx,
-      buyerPubkey,
-      privyProvider,
-    );
-
-    txId = await connection.sendRawTransaction(signedVersionedTx.serialize());
-    console.log('[buyTokenViaPumpfun] => success, Raydium txId:', txId);
+    // sign+send using new transactionUtils
+    txId = await signAndSendBase64Tx(base64Tx, connection, walletProvider);
+    console.log('[buyTokenViaPumpfun] => Raydium txId:', txId);
   } else {
-    // Pumpfun bonding curve -> legacy transaction
+    // Pumpfun path -> local building
     console.log('[buyTokenViaPumpfun] Using PumpFun path...');
     const sdk = new PumpFunSDK(provider);
     const tokenMint = new PublicKey(tokenAddress);
@@ -257,15 +251,8 @@ export async function buyTokenViaPumpfun({
       connection,
     });
 
-    const privyProvider = await solanaWallet.getProvider();
-    const signedTx = await signLegacyTransactionWithPrivy(
-      transaction,
-      buyerPubkey,
-      privyProvider,
-    );
-
-    txId = await connection.sendRawTransaction(signedTx.serialize());
-    console.log('[buyTokenViaPumpfun] => success, Pumpfun txId:', txId);
+    txId = await signAndSendWithPrivy(transaction, connection, walletProvider);
+    console.log('[buyTokenViaPumpfun] => Pumpfun txId:', txId);
   }
 
   return {txId, success: true};
@@ -300,26 +287,26 @@ export async function sellTokenViaPumpfun({
   const provider = getProvider();
   const connection = provider.connection;
   const sellerPubkey = new PublicKey(sellerPublicKey);
+  const walletProvider = await solanaWallet.getProvider();
 
-  // check Raydium
   console.log('[sellTokenViaPumpfun] Checking if token is on Raydium...');
   const isRaydium = await checkIfTokenIsOnRaydium(tokenAddress);
 
   let txId: string = '';
+
   if (isRaydium) {
-    // Raydium path -> versioned transaction
+    // Raydium path -> base64 transaction
     console.log('[sellTokenViaPumpfun] Using Raydium path...');
     const supplyResult = await connection.getTokenSupply(
       new PublicKey(tokenAddress),
     );
     const decimals = supplyResult.value.decimals;
-
     const lamportsIn = Math.floor(tokenAmount * 10 ** decimals);
+
     const userTokenATA = await getAssociatedTokenAddress(
       new PublicKey(tokenAddress),
       sellerPubkey,
     );
-
     const swapResponse = await getSwapQuote(
       tokenAddress,
       RAYDIUM_SOL_MINT,
@@ -339,19 +326,11 @@ export async function sellTokenViaPumpfun({
     if (!base64Tx) {
       throw new Error('[Raydium] No transaction found in swap response');
     }
-    const versionedTx = parseRaydiumVersionedTransaction(base64Tx);
 
-    const privyProvider = await solanaWallet.getProvider();
-    const signedVersionedTx = await signVersionedTransactionWithPrivy(
-      versionedTx,
-      sellerPubkey,
-      privyProvider,
-    );
-
-    txId = await connection.sendRawTransaction(signedVersionedTx.serialize());
+    txId = await signAndSendBase64Tx(base64Tx, connection, walletProvider);
     console.log('[sellTokenViaPumpfun] => success, Raydium txId:', txId);
   } else {
-    // Pumpfun bonding curve -> legacy transaction
+    // Pumpfun path
     console.log('[sellTokenViaPumpfun] Using PumpFun path...');
     const sdk = new PumpFunSDK(provider);
     const tokenMint = new PublicKey(tokenAddress);
@@ -367,14 +346,7 @@ export async function sellTokenViaPumpfun({
       connection,
     });
 
-    const privyProvider = await solanaWallet.getProvider();
-    const signedTx = await signLegacyTransactionWithPrivy(
-      transaction,
-      sellerPubkey,
-      privyProvider,
-    );
-
-    txId = await connection.sendRawTransaction(signedTx.serialize());
+    txId = await signAndSendWithPrivy(transaction, connection, walletProvider);
     console.log('[sellTokenViaPumpfun] => success, Pumpfun txId:', txId);
   }
 

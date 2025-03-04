@@ -1,11 +1,17 @@
-
+// FILE: src/components/thread/PostBody.tsx
 import React, {useState, useEffect} from 'react';
-import {View, Text, Image, ActivityIndicator} from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  ActivityIndicator,
+  ImageSourcePropType,
+} from 'react-native';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
 import TradeCard from '../TradeCard/TradeCard';
 import {ThreadPost} from './thread.types';
 import {TENSOR_API_KEY} from '@env';
-import nftListingStyles from './NftListingSection.style'; // NEW import
+import nftListingStyles from './NftListingSection.style';
 
 interface PostBodyProps {
   post: ThreadPost;
@@ -32,6 +38,23 @@ export default function PostBody({
   );
 }
 
+/**
+ * Helper to safely return an ImageSourcePropType
+ */
+function getSafeImageSource(
+  imageSource?: ImageSourcePropType,
+): ImageSourcePropType {
+  if (!imageSource) {
+    // fallback or blank
+    return require('../../assets/images/User.png');
+  }
+  // If it's a numeric require or an object { uri: string }, it's valid as-is
+  return imageSource;
+}
+
+/**
+ * Renders a single post section based on its type
+ */
 function renderSection(
   section: ThreadPost['sections'][number],
   styles: ReturnType<typeof createThreadStyles>,
@@ -47,7 +70,10 @@ function renderSection(
             <Text style={styles.threadItemText}>{section.text}</Text>
           )}
           {section.imageUrl && (
-            <Image source={section.imageUrl} style={styles.threadItemImage} />
+            <Image
+              source={getSafeImageSource(section.imageUrl)}
+              style={styles.threadItemImage}
+            />
           )}
         </>
       );
@@ -99,11 +125,14 @@ function renderSection(
           <Text style={styles.threadItemText}>[Missing listing data]</Text>
         );
       }
-      // Fix: Provide a default value for null owner
-      return <NftListingSection listing={{
-        ...section.listingData,
-        owner: section.listingData.owner || 'Unknown' // Add default value for nullable owner
-      }} />;
+      return (
+        <NftListingSection
+          listing={{
+            ...section.listingData,
+            owner: section.listingData.owner || 'Unknown',
+          }}
+        />
+      );
 
     default:
       return null;
@@ -131,6 +160,7 @@ function NftListingSection({
 
   useEffect(() => {
     let cancelled = false;
+
     const fetchNftData = async () => {
       try {
         setLoading(true);
@@ -161,7 +191,9 @@ function NftListingSection({
         }
       }
     };
+
     fetchNftData();
+
     return () => {
       cancelled = true;
     };
@@ -173,6 +205,16 @@ function NftListingSection({
     return solPrice.toFixed(2);
   };
 
+  /**
+   * Safely get a valid image source for NFT data
+   */
+  function getNftImageSource(uri?: string) {
+    if (!uri || typeof uri !== 'string') {
+      return require('../../assets/images/User.png');
+    }
+    return {uri};
+  }
+
   return (
     <View style={nftListingStyles.container}>
       <View style={nftListingStyles.card}>
@@ -183,7 +225,7 @@ function NftListingSection({
             <View style={nftListingStyles.imageContainer}>
               {nftData?.imageUri ? (
                 <Image
-                  source={{uri: nftData.imageUri}}
+                  source={getNftImageSource(nftData.imageUri)}
                   style={nftListingStyles.image}
                 />
               ) : (

@@ -1,5 +1,4 @@
-// src/components/thread/ThreadComposer.tsx
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Image,
@@ -13,21 +12,21 @@ import {
   Alert,
 } from 'react-native';
 import Icons from '../../assets/svgs';
-import { useAppDispatch, useAppSelector } from '../../hooks/useReduxHooks';
+import {useAppDispatch, useAppSelector} from '../../hooks/useReduxHooks';
 import {
   createRootPostAsync,
   createReplyAsync,
   addPostLocally,
   addReplyLocally,
 } from '../../state/thread/reducer';
-import { createThreadStyles, getMergedTheme } from './thread.styles';
-import { ThreadSection, ThreadSectionType, ThreadUser } from './thread.types';
+import {createThreadStyles, getMergedTheme} from './thread.styles';
+import {ThreadSection, ThreadSectionType, ThreadUser} from './thread.types';
 import {
   ImageLibraryOptions,
   launchImageLibrary,
 } from 'react-native-image-picker';
-import { TENSOR_API_KEY } from '@env';
-import { useAuth } from '../../hooks/useAuth';
+import {TENSOR_API_KEY} from '@env';
+import {useAuth} from '../../hooks/useAuth';
 import TradeModal from './TradeModal';
 
 interface NftItem {
@@ -39,12 +38,12 @@ interface NftItem {
 }
 
 interface ThreadComposerProps {
-  currentUser: ThreadUser;  // must have user.id = wallet address
-  parentId?: string;        // if present, it's a reply
+  currentUser: ThreadUser; // must have user.id = wallet address
+  parentId?: string; // if present, it's a reply
   onPostCreated?: () => void;
   themeOverrides?: Partial<Record<string, any>>;
-  styleOverrides?: { [key: string]: object };
-  userStyleSheet?: { [key: string]: object };
+  styleOverrides?: {[key: string]: object};
+  userStyleSheet?: {[key: string]: object};
 }
 
 export default function ThreadComposer({
@@ -56,9 +55,23 @@ export default function ThreadComposer({
   userStyleSheet,
 }: ThreadComposerProps) {
   const dispatch = useAppDispatch();
-  const storedProfilePic = useAppSelector((state) => state.auth.profilePicUrl);
-  // e.g. currentUser.id = "5Bhb4...someWalletAddress"
-  // e.g. currentUser.avatar can be your fallback or from user’s DB
+  const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
+
+  // Helper function to get a proper image source
+  const getAvatarSource = () => {
+    if (storedProfilePic && typeof storedProfilePic === 'string') {
+      return {uri: storedProfilePic};
+    }
+    if (currentUser.avatar) {
+      if (typeof currentUser.avatar === 'string') {
+        return {uri: currentUser.avatar};
+      } else {
+        // Already a valid image source (e.g. a number from require)
+        return currentUser.avatar;
+      }
+    }
+    return require('../../assets/images/User.png');
+  };
 
   // Basic composer state
   const [textValue, setTextValue] = useState('');
@@ -68,14 +81,20 @@ export default function ThreadComposer({
   const [showListingModal, setShowListingModal] = useState(false);
   const [listingItems, setListingItems] = useState<NftItem[]>([]);
   const [loadingListings, setLoadingListings] = useState(false);
-  const [selectedListingNft, setSelectedListingNft] = useState<NftItem | null>(null);
+  const [selectedListingNft, setSelectedListingNft] = useState<NftItem | null>(
+    null,
+  );
 
   // Show/hide the TradeModal
   const [showTradeModal, setShowTradeModal] = useState(false);
 
   // Merged theme
   const mergedTheme = getMergedTheme(themeOverrides);
-  const styles = createThreadStyles(mergedTheme, styleOverrides, userStyleSheet);
+  const styles = createThreadStyles(
+    mergedTheme,
+    styleOverrides,
+    userStyleSheet,
+  );
 
   /***************************************************
    * Post creation logic
@@ -96,10 +115,11 @@ export default function ThreadComposer({
 
     // Image section
     if (selectedImage) {
+      // If using an image-only section, ensure the type matches the expected one.
       sections.push({
         id: 'section-' + Math.random().toString(36).substr(2, 9),
         type: 'IMAGE_ONLY' as ThreadSectionType,
-        imageUrl: { uri: selectedImage },
+        imageUrl: {uri: selectedImage},
       });
     }
 
@@ -137,7 +157,7 @@ export default function ThreadComposer({
         await dispatch(
           createReplyAsync({
             parentId,
-            user: currentUser,  // user.id = wallet address
+            user: currentUser, // user.id = wallet address
             sections,
           }),
         ).unwrap();
@@ -156,11 +176,13 @@ export default function ThreadComposer({
       setSelectedImage(null);
       setSelectedListingNft(null);
       onPostCreated && onPostCreated();
-
     } catch (error: any) {
-      console.warn('Network request failed, adding post locally:', error.message);
+      console.warn(
+        'Network request failed, adding post locally:',
+        error.message,
+      );
       if (parentId) {
-        dispatch(addReplyLocally({ parentId, reply: fallbackPost }));
+        dispatch(addReplyLocally({parentId, reply: fallbackPost}));
       } else {
         dispatch(addPostLocally(fallbackPost));
       }
@@ -180,7 +202,7 @@ export default function ThreadComposer({
       quality: 1,
       includeBase64: true,
     };
-    launchImageLibrary(options, (response) => {
+    launchImageLibrary(options, response => {
       if (response.didCancel) {
         console.log('User cancelled image picker');
       } else if (response.errorCode) {
@@ -196,8 +218,82 @@ export default function ThreadComposer({
     });
   };
 
-  // NFT listing logic omitted for brevity
-  // ...
+  const fetchActiveListings = async (pubkey: string | null) => {
+    if (!pubkey) {
+      Alert.alert('Not logged in', 'Connect your wallet first');
+      return;
+    }
+    setLoadingListings(true);
+    try {
+      const url = `https://api.mainnet.tensordev.io/api/v1/user/active_listings?wallets=${pubkey}&sortBy=PriceAsc&limit=50`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          'x-tensor-api-key': TENSOR_API_KEY,
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to fetch listings. status=${res.status}`);
+      }
+      const data = await res.json();
+      if (data.listings && Array.isArray(data.listings)) {
+        const mapped: NftItem[] = data.listings.map((item: any) => {
+          const mintObj = item.mint || {};
+          const mintAddress =
+            typeof item.mint === 'object' && item.mint.onchainId
+              ? item.mint.onchainId
+              : item.mint;
+          const nftName = mintObj?.name || 'Unnamed NFT';
+          const nftImage = fixImageUrl(mintObj?.imageUri) || '';
+          const lamports = parseInt(item.grossAmount || '0', 10);
+          const priceSol = lamports / 1_000_000_000;
+          return {
+            mint: mintAddress,
+            name: nftName,
+            image: nftImage,
+            priceSol,
+            collection: mintObj?.collName || '',
+          };
+        });
+        setListingItems(mapped);
+      } else {
+        setListingItems([]);
+      }
+    } catch (err: any) {
+      console.error('fetchActiveListings error:', err);
+      Alert.alert('Error', err.message);
+    } finally {
+      setLoadingListings(false);
+    }
+  };
+
+  const fixImageUrl = (url: string): string => {
+    if (!url) return '';
+    if (url.startsWith('ipfs://')) {
+      return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
+    }
+    if (url.startsWith('ar://')) {
+      return url.replace('ar://', 'https://arweave.net/');
+    }
+    if (url.startsWith('/')) {
+      return `https://arweave.net${url}`;
+    }
+    if (!url.startsWith('http') && !url.startsWith('data:')) {
+      return `https://${url}`;
+    }
+    return url;
+  };
+
+  const closeListingModal = () => {
+    setShowListingModal(false);
+  };
+
+  const handleSelectListing = (item: NftItem) => {
+    setSelectedListingNft(item);
+    closeListingModal();
+  };
+
 
   /***************************************************
    * RENDER
@@ -206,16 +302,7 @@ export default function ThreadComposer({
     <View>
       <View style={styles.composerContainer}>
         <View style={styles.composerAvatarContainer}>
-          <Image
-            source={
-              storedProfilePic
-                ? { uri: storedProfilePic }
-                : currentUser.avatar
-                ? { uri: currentUser.avatar }
-                : require('../../assets/images/User.png')
-            }
-            style={styles.composerAvatar}
-          />
+          <Image source={getAvatarSource()} style={styles.composerAvatar} />
         </View>
         <View style={styles.composerMiddle}>
           <Text style={styles.composerUsername}>{currentUser.username}</Text>
@@ -230,18 +317,18 @@ export default function ThreadComposer({
           {/* Selected image preview */}
           {selectedImage && (
             <Image
-              source={{ uri: selectedImage }}
-              style={{ width: 100, height: 100, marginTop: 10 }}
+              source={{uri: selectedImage}}
+              style={{width: 100, height: 100, marginTop: 10}}
             />
           )}
           {/* NFT listing preview */}
           {selectedListingNft && (
             <View style={styles.composerTradePreview}>
               <Image
-                source={{ uri: selectedListingNft.image }}
+                source={{uri: selectedListingNft.image}}
                 style={styles.composerTradeImage}
               />
-              <View style={{ marginLeft: 8, flex: 1 }}>
+              <View style={{marginLeft: 8, flex: 1}}>
                 <Text style={styles.composerTradeName} numberOfLines={1}>
                   {selectedListingNft.name}
                 </Text>
@@ -254,7 +341,7 @@ export default function ThreadComposer({
               <TouchableOpacity
                 style={styles.composerTradeRemove}
                 onPress={() => setSelectedListingNft(null)}>
-                <Text style={{ color: '#fff', fontWeight: '600' }}>X</Text>
+                <Text style={{color: '#fff', fontWeight: '600'}}>X</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -266,19 +353,21 @@ export default function ThreadComposer({
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setShowListingModal(true)}
-                style={{ marginLeft: 8 }}
-              >
-                <Text style={{ fontSize: 12, color: '#666666' }}>NFT Listing</Text>
+                style={{marginLeft: 8}}>
+                <Text style={{fontSize: 12, color: '#666666'}}>
+                  NFT Listing
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setShowTradeModal(true)}
-                style={{ marginLeft: 8 }}
-              >
-                <Text style={{ fontSize: 12, color: '#333333' }}>Trade/Share</Text>
+                style={{marginLeft: 8}}>
+                <Text style={{fontSize: 12, color: '#333333'}}>
+                  Trade/Share
+                </Text>
               </TouchableOpacity>
             </View>
             <TouchableOpacity onPress={handlePost}>
-              <Text style={{ color: '#1d9bf0', fontWeight: '600' }}>
+              <Text style={{color: '#1d9bf0', fontWeight: '600'}}>
                 {parentId ? 'Reply' : 'Post'}
               </Text>
             </TouchableOpacity>
@@ -286,8 +375,55 @@ export default function ThreadComposer({
         </View>
       </View>
 
-      {/* NFT listing modal etc. */}
-      {/** Omitted for brevity **/}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showListingModal}
+        onRequestClose={closeListingModal}>
+        <View style={modalStyles.modalOverlay}>
+          <View style={modalStyles.modalContainer}>
+            <Text style={modalStyles.modalTitle}>NFT Listing Modal</Text>
+            {loadingListings ? (
+              <ActivityIndicator size="large" color="#1d9bf0" />
+            ) : listingItems.length === 0 ? (
+              <Text style={{marginTop: 16, color: '#666'}}>
+                No active listings found.
+              </Text>
+            ) : (
+              <FlatList
+                data={listingItems}
+                keyExtractor={item => item.mint}
+                renderItem={({item}) => (
+                  <TouchableOpacity
+                    style={modalStyles.listingCard}
+                    onPress={() => handleSelectListing(item)}>
+                    <Image
+                      source={{uri: item.image}}
+                      style={modalStyles.listingImage}
+                    />
+                    <View style={{flex: 1, marginLeft: 10}}>
+                      <Text style={modalStyles.listingName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      {item.priceSol !== undefined && (
+                        <Text style={modalStyles.listingPrice}>
+                          {item.priceSol.toFixed(2)} SOL
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                )}
+                style={{marginTop: 10, width: '100%'}}
+              />
+            )}
+            <TouchableOpacity
+              onPress={closeListingModal}
+              style={modalStyles.closeButton}>
+              <Text style={modalStyles.closeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <TradeModal
         visible={showTradeModal}
@@ -298,3 +434,62 @@ export default function ThreadComposer({
     </View>
   );
 }
+
+
+const modalStyles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '85%',
+    maxHeight: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 16,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  listingCard: {
+    flexDirection: 'row',
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 8,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  listingImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+    backgroundColor: '#f0f0f0',
+  },
+  listingName: {
+    fontWeight: '600',
+    fontSize: 14,
+    color: '#333',
+  },
+  listingPrice: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#999',
+  },
+  closeButton: {
+    marginTop: 12,
+    backgroundColor: '#1d9bf0',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+});

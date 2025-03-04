@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import { BlinkExample } from '../../components/BlinkRequestCard/BlinkRequestCard';
+// import { BlinkExample } from '../../components/BlinkRequestCard/BlinkRequestCard';
 
 
 
@@ -10,7 +10,7 @@ const BlinkScreen: React.FC = () => {
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <BlinkExample url={actionUrl} />
+      {/* <BlinkExample url={actionUrl} /> */}
     </View>
   );
 };

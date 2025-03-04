@@ -1,11 +1,11 @@
-// File: src/screens/TokenMillScreen/TokenMillScreen.tsx
+// File: src/screens/Common/TokenMillScreen/TokenMillScreen.tsx
 import React, {useState} from 'react';
 import {View, Text, ScrollView, ActivityIndicator} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Connection, clusterApiUrl} from '@solana/web3.js';
 
 import {useAuth} from '../../../hooks/useAuth';
-import {styles} from './styles';
+import {tokenMillScreenStyles as styles} from './TokenMillScreen.style';
 import FundUserCard from '../../../components/tokenMill/FundUserCard';
 import ExistingAddressesCard from '../../../components/tokenMill/ExistingAddressCard';
 import MarketCreationCard from '../../../components/tokenMill/MarketCreationCard';
@@ -14,7 +14,6 @@ import BondingCurveCard from '../../../components/tokenMill/BondingCurveCard';
 import SwapCard from '../../../components/tokenMill/SwapCard';
 import StakingCard from '../../../components/tokenMill/StakingCard';
 import VestingCard from '../../../components/tokenMill/VestingCard';
-
 
 export default function TokenMillScreen() {
   // 1) Auth & Connection

@@ -10,8 +10,10 @@ const SERVER_BASE_URL = process.env.SERVER_URL || 'http://localhost:3000/api';
 // In case of failure, we return fallbackPosts so the state isn’t cleared.
 export const fetchAllPosts = createAsyncThunk('thread/fetchAllPosts', async (_, { rejectWithValue }) => {
   try {
-    const res = await fetch(`${SERVER_BASE_URL}/posts`);
+    const res = await fetch(`${SERVER_BASE_URL}/api/posts`);
+
     const data = await res.json();
+    console.log(data);
     if (!data.success) {
       return rejectWithValue(data.error || 'Failed to fetch posts');
     }
