@@ -56,6 +56,8 @@ export default function ThreadComposer({
 }: ThreadComposerProps) {
   const dispatch = useAppDispatch();
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
+  const {solanaWallet} = useAuth();
+  const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
 
   // Helper function to get a proper image source
   const getAvatarSource = () => {
@@ -218,6 +220,13 @@ export default function ThreadComposer({
     });
   };
 
+  const handleNftListingPress = async () => {
+    setShowListingModal(true);
+    if (listingItems.length === 0) {
+      await fetchActiveListings(userPublicKey);
+    }
+  };
+
   const fetchActiveListings = async (pubkey: string | null) => {
     if (!pubkey) {
       Alert.alert('Not logged in', 'Connect your wallet first');
@@ -237,6 +246,7 @@ export default function ThreadComposer({
         throw new Error(`Failed to fetch listings. status=${res.status}`);
       }
       const data = await res.json();
+      console.log('Fetched listings:', data);
       if (data.listings && Array.isArray(data.listings)) {
         const mapped: NftItem[] = data.listings.map((item: any) => {
           const mintObj = item.mint || {};
@@ -352,7 +362,7 @@ export default function ThreadComposer({
                 <Icons.MediaIcon width={18} height={18} />
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => setShowListingModal(true)}
+                onPress={handleNftListingPress}
                 style={{marginLeft: 8}}>
                 <Text style={{fontSize: 12, color: '#666666'}}>
                   NFT Listing

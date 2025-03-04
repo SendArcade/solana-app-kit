@@ -116,6 +116,7 @@ export default StyleSheet.create({
   swapButton: {
     backgroundColor: '#000000',
     paddingVertical: 14,
+    marginBottom : 14,
     borderRadius: 25,
     alignItems: 'center',
     marginTop: 10,

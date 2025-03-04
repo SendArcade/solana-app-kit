@@ -15,7 +15,7 @@ const initialState: AuthState = {
   profilePicUrl: null,
 };
 
-const SERVER_BASE_URL = process.env.SERVER_URL || 'http://localhost:3000/api';
+const SERVER_BASE_URL = process.env.SERVER_URL ;
 
 // Thunk to fetch the user's profile picture from the DB
 export const fetchProfilePic = createAsyncThunk(

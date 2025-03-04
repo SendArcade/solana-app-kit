@@ -4,7 +4,7 @@ import type { ThreadPost, ThreadUser, ThreadSection } from '../../components/thr
 import { allposts as fallbackPosts } from '../../mocks/posts';
 
 // Our server’s base URL
-const SERVER_BASE_URL = process.env.SERVER_URL || 'http://localhost:3000/api';
+const SERVER_BASE_URL = process.env.SERVER_URL || 'http://localhost:3000';
 
 // Async thunk to fetch all posts.
 // In case of failure, we return fallbackPosts so the state isn’t cleared.
@@ -30,7 +30,7 @@ export const fetchAllPosts = createAsyncThunk('thread/fetchAllPosts', async (_, 
 export const createRootPostAsync = createAsyncThunk(
   'thread/createRootPost',
   async (payload: { user: ThreadUser; sections: ThreadSection[] }) => {
-    const res = await fetch(`${SERVER_BASE_URL}/posts`, {
+    const res = await fetch(`${SERVER_BASE_URL}/api/posts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -46,7 +46,7 @@ export const createRootPostAsync = createAsyncThunk(
 export const createReplyAsync = createAsyncThunk(
   'thread/createReply',
   async (payload: { parentId: string; user: ThreadUser; sections: ThreadSection[] }) => {
-    const res = await fetch(`${SERVER_BASE_URL}/posts/reply`, {
+    const res = await fetch(`${SERVER_BASE_URL}/api/posts/reply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -61,7 +61,7 @@ export const createReplyAsync = createAsyncThunk(
 export const deletePostAsync = createAsyncThunk(
   'thread/deletePost',
   async (postId: string) => {
-    const res = await fetch(`${SERVER_BASE_URL}/posts/${postId}`, {
+    const res = await fetch(`${SERVER_BASE_URL}/api/posts/${postId}`, {
       method: 'DELETE',
     });
     const data = await res.json();
