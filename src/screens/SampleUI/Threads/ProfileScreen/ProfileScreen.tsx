@@ -9,6 +9,8 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  Platform,
+  StyleSheet,
 } from 'react-native';
 
 import * as ImagePicker from 'expo-image-picker';
@@ -309,7 +311,10 @@ export default function ProfileScreen() {
    * Main render
    *******************************************************/
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={
+        (styles.container, Platform.OS === 'android' && androidStyles.safeArea)
+      }>
       {/* Banner */}
       <View style={styles.bannerContainer}>
         <Image
@@ -568,3 +573,9 @@ export default function ProfileScreen() {
     </SafeAreaView>
   );
 }
+
+const androidStyles = StyleSheet.create({
+  safeArea: {
+    paddingTop: 30, // Additional padding for Android devices
+  },
+});
