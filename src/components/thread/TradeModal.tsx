@@ -9,6 +9,9 @@ import {
   ScrollView,
   Alert,
   TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
 } from 'react-native';
 import {useAuth} from '../../hooks/useAuth';
 import {useAppDispatch} from '../../hooks/useReduxHooks';
@@ -16,7 +19,7 @@ import {addPostLocally, createRootPostAsync} from '../../state/thread/reducer';
 import {Transaction, VersionedTransaction, Connection} from '@solana/web3.js';
 import {TENSOR_API_KEY, HELIUS_RPC_URL} from '@env';
 import {ThreadPost, ThreadSection, ThreadUser, TradeData} from './thread.types';
-import styles from './tradeModal.style';
+import styles from './tradeModal.style';  // Keep using your existing style definitions for everything else
 import SelectTokenModal, {TokenInfo} from './SelectTokenModal';
 
 const JUPITER_SWAP_ENDPOINT = 'http://localhost:3000/api/jupiter/swap';
@@ -70,9 +73,7 @@ export default function TradeModal({
     },
   );
 
-  const [selectingWhichSide, setSelectingWhichSide] = useState<
-    'input' | 'output'
-  >('input');
+  const [selectingWhichSide, setSelectingWhichSide] = useState<'input' | 'output'>('input');
   const [showSelectTokenModal, setShowSelectTokenModal] = useState(false);
 
   const [solAmount, setSolAmount] = useState('0.01');
@@ -80,6 +81,20 @@ export default function TradeModal({
   const [resultMsg, setResultMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [solscanTxSig, setSolscanTxSig] = useState('');
+
+  const handleClose = useCallback(() => {
+    setSelectedTab('TRADE_AND_SHARE');
+    setResultMsg('');
+    setErrorMsg('');
+    setSolscanTxSig('');
+    onClose();
+  }, [onClose]);
+
+  function toBaseUnits(amount: string, decimals: number): number {
+    const val = parseFloat(amount);
+    if (isNaN(val)) return 0;
+    return val * Math.pow(10, decimals);
+  }
 
   async function getTokenDetailsAndPrice(
     mint: string,
@@ -115,20 +130,6 @@ export default function TradeModal({
     return {symbol, decimals, usdPrice};
   }
 
-  function toBaseUnits(amount: string, decimals: number): number {
-    const val = parseFloat(amount);
-    if (isNaN(val)) return 0;
-    return val * Math.pow(10, decimals);
-  }
-
-  const handleClose = useCallback(() => {
-    setSelectedTab('TRADE_AND_SHARE');
-    setResultMsg('');
-    setErrorMsg('');
-    setSolscanTxSig('');
-    onClose();
-  }, [onClose]);
-
   const promptPostSwap = useCallback(
     async ({
       inputLamports,
@@ -154,27 +155,17 @@ export default function TradeModal({
                   getTokenDetailsAndPrice(outputToken.address),
                 ]);
 
-                const finalInputQty =
-                  inputLamports / Math.pow(10, inputInfo.decimals);
-                const finalOutputQty =
-                  outputLamports / Math.pow(10, outputInfo.decimals);
+                const finalInputQty = inputLamports / Math.pow(10, inputInfo.decimals);
+                const finalOutputQty = outputLamports / Math.pow(10, outputInfo.decimals);
 
                 const totalInputUsd = finalInputQty * inputInfo.usdPrice;
                 const totalOutputUsd = finalOutputQty * outputInfo.usdPrice;
 
-                const finalInputQtyStr = finalInputQty
-                  .toFixed(4)
-                  .replace(/\.?0+$/, '');
-                const finalOutputQtyStr = finalOutputQty
-                  .toFixed(4)
-                  .replace(/\.?0+$/, '');
+                const finalInputQtyStr = finalInputQty.toFixed(4).replace(/\.?0+$/, '');
+                const finalOutputQtyStr = finalOutputQty.toFixed(4).replace(/\.?0+$/, '');
 
-                const inputUsdValStr =
-                  totalInputUsd > 0 ? `$${totalInputUsd.toFixed(2)}` : '$0.00';
-                const outputUsdValStr =
-                  totalOutputUsd > 0
-                    ? `$${totalOutputUsd.toFixed(2)}`
-                    : '$0.00';
+                const inputUsdValStr = totalInputUsd > 0 ? `$${totalInputUsd.toFixed(2)}` : '$0.00';
+                const outputUsdValStr = totalOutputUsd > 0 ? `$${totalOutputUsd.toFixed(2)}` : '$0.00';
 
                 const tradeData: TradeData = {
                   inputMint: inputToken.address,
@@ -244,11 +235,10 @@ export default function TradeModal({
     setErrorMsg('');
 
     try {
-      const inputLamports = toBaseUnits(solAmount, inputToken.decimals);
+      const inputLamports = Number(toBaseUnits(solAmount, inputToken.decimals));
 
-      const quoteUrl = `https://api.jup.ag/swap/v1/quote?inputMint=${
-        inputToken.address
-      }&outputMint=${outputToken.address}&amount=${Math.round(
+      // Get quote
+      const quoteUrl = `https://api.jup.ag/swap/v1/quote?inputMint=${inputToken.address}&outputMint=${outputToken.address}&amount=${Math.round(
         inputLamports,
       )}&slippageBps=50&swapMode=ExactIn`;
       const quoteResp = await fetch(quoteUrl);
@@ -257,17 +247,9 @@ export default function TradeModal({
       }
       const quoteData = await quoteResp.json();
       let firstRoute;
-      if (
-        quoteData.data &&
-        Array.isArray(quoteData.data) &&
-        quoteData.data.length > 0
-      ) {
+      if (quoteData.data && Array.isArray(quoteData.data) && quoteData.data.length > 0) {
         firstRoute = quoteData.data[0];
-      } else if (
-        quoteData.routePlan &&
-        Array.isArray(quoteData.routePlan) &&
-        quoteData.routePlan.length > 0
-      ) {
+      } else if (quoteData.routePlan && Array.isArray(quoteData.routePlan) && quoteData.routePlan.length > 0) {
         firstRoute = quoteData;
       } else {
         throw new Error('No routes returned by Jupiter.');
@@ -275,6 +257,7 @@ export default function TradeModal({
 
       const outLamports = parseFloat(firstRoute.outAmount) || 0;
 
+      // Build swap Tx from server
       const body = {
         quoteResponse: quoteData,
         userPublicKey: userPublicKey.toString(),
@@ -287,9 +270,7 @@ export default function TradeModal({
 
       const swapData = await swapResp.json();
       if (!swapResp.ok || !swapData.swapTransaction) {
-        throw new Error(
-          swapData.error || 'Failed to get Jupiter swapTransaction.',
-        );
+        throw new Error(swapData.error || 'Failed to get Jupiter swapTransaction.');
       }
 
       const {swapTransaction} = swapData;
@@ -308,10 +289,7 @@ export default function TradeModal({
       const provider = await userWallet.getProvider();
       const {signature} = await provider.request({
         method: 'signAndSendTransaction',
-        params: {
-          transaction,
-          connection,
-        },
+        params: {transaction, connection},
       });
       if (!signature) {
         throw new Error('No signature returned from signAndSendTransaction');
@@ -319,31 +297,19 @@ export default function TradeModal({
 
       setResultMsg(`Swap successful! Tx: ${signature}`);
 
-      await promptPostSwap({
-        inputLamports,
-        outputLamports: outLamports,
-      });
+      // Prompt user to create a post about it
+      await promptPostSwap({inputLamports, outputLamports: outLamports});
     } catch (err: any) {
       console.error('Trade error:', err);
       setErrorMsg(err.message);
     } finally {
       setLoading(false);
     }
-  }, [
-    userPublicKey,
-    solAmount,
-    inputToken,
-    outputToken,
-    userWallet,
-    promptPostSwap,
-  ]);
+  }, [userPublicKey, solAmount, inputToken, outputToken, userWallet, promptPostSwap]);
 
   const handlePickTxAndShare = useCallback(async () => {
     if (!solscanTxSig.trim()) {
-      Alert.alert(
-        'No transaction signature',
-        'Please enter a valid signature.',
-      );
+      Alert.alert('No transaction signature', 'Please enter a valid signature.');
       return;
     }
     setLoading(true);
@@ -379,7 +345,7 @@ export default function TradeModal({
   const renderTabContent = () => {
     if (selectedTab === 'TRADE_AND_SHARE') {
       return (
-        <ScrollView style={{width: '100%'}}>
+        <ScrollView style={{width: '100%'}} keyboardShouldPersistTaps="handled">
           <View style={styles.tokenRow}>
             <View style={styles.tokenColumn}>
               <Text style={styles.inputLabel}>From</Text>
@@ -389,9 +355,7 @@ export default function TradeModal({
                   setSelectingWhichSide('input');
                   setShowSelectTokenModal(true);
                 }}>
-                <Text style={styles.tokenSelectorText}>
-                  {inputToken.symbol}
-                </Text>
+                <Text style={styles.tokenSelectorText}>{inputToken.symbol}</Text>
               </TouchableOpacity>
             </View>
 
@@ -407,9 +371,7 @@ export default function TradeModal({
                   setSelectingWhichSide('output');
                   setShowSelectTokenModal(true);
                 }}>
-                <Text style={styles.tokenSelectorText}>
-                  {outputToken.symbol}
-                </Text>
+                <Text style={styles.tokenSelectorText}>{outputToken.symbol}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -424,15 +386,9 @@ export default function TradeModal({
           />
 
           {loading ? (
-            <ActivityIndicator
-              size="large"
-              color="#4A90E2"
-              style={{marginTop: 16}}
-            />
+            <ActivityIndicator size="large" style={{marginTop: 16}} />
           ) : (
-            <TouchableOpacity
-              style={styles.swapButton}
-              onPress={handleTradeAndShare}>
+            <TouchableOpacity style={styles.swapButton} onPress={handleTradeAndShare}>
               <Text style={styles.swapButtonText}>Swap & Share</Text>
             </TouchableOpacity>
           )}
@@ -440,6 +396,7 @@ export default function TradeModal({
       );
     }
 
+    // PICK_TX_SHARE tab
     return (
       <View style={{width: '100%'}}>
         <Text style={styles.inputLabel}>Transaction Signature</Text>
@@ -451,15 +408,9 @@ export default function TradeModal({
           autoCapitalize="none"
         />
         {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#4A90E2"
-            style={{marginTop: 16}}
-          />
+          <ActivityIndicator size="large" style={{marginTop: 16}} />
         ) : (
-          <TouchableOpacity
-            style={styles.swapButton}
-            onPress={handlePickTxAndShare}>
+          <TouchableOpacity style={styles.swapButton} onPress={handlePickTxAndShare}>
             <Text style={styles.swapButtonText}>Share Tx</Text>
           </TouchableOpacity>
         )}
@@ -468,71 +419,109 @@ export default function TradeModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Token Swap</Text>
-            <TouchableOpacity style={styles.headerClose} onPress={handleClose}>
-              <Text style={styles.headerCloseText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          {!disableTabs && (
-            <View style={styles.tabRow}>
-              <TouchableOpacity
-                style={[
-                  styles.tabButton,
-                  selectedTab === 'TRADE_AND_SHARE' && styles.tabButtonActive,
-                ]}
-                onPress={() => setSelectedTab('TRADE_AND_SHARE')}>
-                <Text
-                  style={[
-                    styles.tabButtonText,
-                    selectedTab === 'TRADE_AND_SHARE' &&
-                      styles.tabButtonTextActive,
-                  ]}>
-                  Swap & Share
-                </Text>
-              </TouchableOpacity>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
+      {/* Container for the entire screen (background + modal) */}
+      <View style={{flex: 1}}>
+        {/* Background overlay that closes the modal when tapped */}
+        <TouchableWithoutFeedback onPress={handleClose}>
+          <View
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+            }}
+          />
+        </TouchableWithoutFeedback>
 
-              <TouchableOpacity
-                style={[
-                  styles.tabButton,
-                  selectedTab === 'PICK_TX_SHARE' && styles.tabButtonActive,
-                ]}
-                onPress={() => setSelectedTab('PICK_TX_SHARE')}>
-                <Text
-                  style={[
-                    styles.tabButtonText,
-                    selectedTab === 'PICK_TX_SHARE' &&
-                      styles.tabButtonTextActive,
-                  ]}>
-                  Pick Tx & Share
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {renderTabContent()}
-
-          {!!resultMsg && <Text style={styles.resultText}>{resultMsg}</Text>}
-          {!!errorMsg && <Text style={styles.errorText}>{errorMsg}</Text>}
-        </View>
-        <SelectTokenModal
-          visible={showSelectTokenModal}
-          onClose={() => setShowSelectTokenModal(false)}
-          onTokenSelected={token => {
-            if (selectingWhichSide === 'input') {
-              setInputToken(token);
-            } else {
-              setOutputToken(token);
-            }
-            setShowSelectTokenModal(false);
+        {/* Centered wrapper for the modal content */}
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
           }}
-        />
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            // This view acts like your "modalContainer" but inline:
+            style={{
+              width: '90%',
+              maxHeight: '90%',
+              backgroundColor: '#fff',
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            {/* Shield to prevent tapping inside from closing the modal */}
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View>
+                <View style={styles.header}>
+                  <Text style={styles.headerTitle}>Token Swap</Text>
+                  <TouchableOpacity style={styles.headerClose} onPress={handleClose}>
+                    <Text style={styles.headerCloseText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {!disableTabs && (
+                  <View style={styles.tabRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.tabButton,
+                        selectedTab === 'TRADE_AND_SHARE' && styles.tabButtonActive,
+                      ]}
+                      onPress={() => setSelectedTab('TRADE_AND_SHARE')}
+                    >
+                      <Text
+                        style={[
+                          styles.tabButtonText,
+                          selectedTab === 'TRADE_AND_SHARE' && styles.tabButtonTextActive,
+                        ]}
+                      >
+                        Swap & Share
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.tabButton,
+                        selectedTab === 'PICK_TX_SHARE' && styles.tabButtonActive,
+                      ]}
+                      onPress={() => setSelectedTab('PICK_TX_SHARE')}
+                    >
+                      <Text
+                        style={[
+                          styles.tabButtonText,
+                          selectedTab === 'PICK_TX_SHARE' && styles.tabButtonTextActive,
+                        ]}
+                      >
+                        Pick Tx & Share
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {renderTabContent()}
+
+                {!!resultMsg && <Text style={styles.resultText}>{resultMsg}</Text>}
+                {!!errorMsg && <Text style={styles.errorText}>{errorMsg}</Text>}
+
+                {/* Token selection modal */}
+                <SelectTokenModal
+                  visible={showSelectTokenModal}
+                  onClose={() => setShowSelectTokenModal(false)}
+                  onTokenSelected={(token) => {
+                    if (selectingWhichSide === 'input') {
+                      setInputToken(token);
+                    } else {
+                      setOutputToken(token);
+                    }
+                    setShowSelectTokenModal(false);
+                  }}
+                />
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </View>
       </View>
-      </TouchableWithoutFeedback>
     </Modal>
   );
 }

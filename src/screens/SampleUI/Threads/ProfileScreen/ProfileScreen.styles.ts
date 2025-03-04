@@ -1,7 +1,4 @@
-/*
-  FILE: src/screens/SampleUI/Threads/ProfileScreen/ProfileScreen.styles.ts
-  (All styles are now moved to this file.)
-*/
+
 import {StyleSheet} from 'react-native';
 import COLORS from '../../../../assets/colors';
 
@@ -159,9 +156,7 @@ export const styles = StyleSheet.create({
   },
 });
 
-/*******************************************************
- * Inline Confirmation Styles (for library images)
- *******************************************************/
+
 export const inlineConfirmStyles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
@@ -200,9 +195,7 @@ export const inlineConfirmStyles = StyleSheet.create({
   },
 });
 
-/*******************************************************
- * Modal Styles (for avatar options & NFT list)
- *******************************************************/
+
 export const modalUI = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -314,10 +307,7 @@ export const modalUI = StyleSheet.create({
   },
 });
 
-/*******************************************************
- * Confirm Modal Styles (for NFT flow)
- * Here we add an overlay so the modal doesn’t cover the entire screen.
- *******************************************************/
+
 export const confirmModalUI = StyleSheet.create({
   overlay: {
     flex: 1,

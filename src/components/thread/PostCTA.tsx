@@ -20,6 +20,7 @@ import {Buffer} from 'buffer';
 import {TENSOR_API_KEY, HELIUS_RPC_URL} from '@env';
 import {useAuth} from '../../hooks/useAuth';
 import TradeModal from './TradeModal';
+import { useAppSelector } from '../../hooks/useReduxHooks';
 
 /**
  * Get the post section type.
@@ -67,6 +68,8 @@ export default function PostCTA({
 }: PostCTAProps) {
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [tradeLoading, setTradeLoading] = useState(false);
+  const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
+
 
   // For NFT buying spinner
   const [nftLoading, setNftLoading] = useState(false);
@@ -228,7 +231,9 @@ export default function PostCTA({
             id: 'current-user',
             username: 'You',
             handle: '@you',
-            avatar: require('../../assets/images/User.png'),
+            avatar: storedProfilePic
+            ? { uri: storedProfilePic }
+            : require('../../assets/images/User.png'),
           }}
           disableTabs={true}
           initialInputToken={{

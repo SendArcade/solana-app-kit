@@ -38,7 +38,7 @@ interface NftItem {
   collection?: string;
 }
 
-const SERVER_BASE_URL = process.env.SERVER_URL || 'http://localhost:3000/api';
+const SERVER_BASE_URL = process.env.SERVER_URL;
 
 /**
  * Helper to fix IPFS/ar:// URIs if needed.
@@ -247,8 +247,8 @@ export default function ProfileScreen() {
         type: 'image/jpeg',
         name: `profile_${Date.now()}.jpg`,
       } as any);
-      console.log('>>> Uploading to:', `${SERVER_BASE_URL}/profile/upload`);
-      const response = await fetch(`${SERVER_BASE_URL}/profile/upload`, {
+      // console.log('>>> Uploading to:', `${SERVER_BASE_URL}/profile/upload`);
+      const response = await fetch(`${SERVER_BASE_URL}/api/profile/upload`, {
         method: 'POST',
         body: formData,
       });
