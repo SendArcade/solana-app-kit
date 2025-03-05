@@ -49,6 +49,7 @@ export const updateUsername = createAsyncThunk(
         body: JSON.stringify({ userId, username: newUsername }),
       });
       const data = await response.json();
+      console.log('updateUsername response:', data);
       if (!data.success) {
         return thunkAPI.rejectWithValue(data.error || 'Failed to update username');
       }

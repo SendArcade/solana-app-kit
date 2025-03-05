@@ -110,14 +110,22 @@ profileImageRouter.post('/updateUsername', async (req: any, res: any) => {
 
     const existingUser = await knex('users').where({id: userId}).first();
     if (!existingUser) {
-      return res.status(404).json({success: false, error: 'User not found'});
+      // Create a new user if one doesn't exist
+      await knex('users').insert({
+        id: userId,
+        username: username,
+        handle: '@' + userId.slice(0, 6),
+        profile_picture_url: null, // No profile picture yet
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+    } else {
+      // Update the username field for existing user
+      await knex('users').where({id: userId}).update({
+        username,
+        updated_at: new Date(),
+      });
     }
-
-    // Update the username field
-    await knex('users').where({id: userId}).update({
-      username,
-      updated_at: new Date(),
-    });
 
     return res.json({success: true, username});
   } catch (error: any) {
