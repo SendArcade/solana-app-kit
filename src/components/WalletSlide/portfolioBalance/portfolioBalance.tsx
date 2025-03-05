@@ -1,7 +1,7 @@
 import React from "react";
 import { Text, View } from "react-native";
 import { style } from "./portfolioBalance.style";
-import Icons from  "../../assets/svgs/index";
+import Icons from  "../../../assets/svgs/index";
 const PortfolioBalance = () => {
   return (
     <>
