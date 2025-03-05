@@ -29,7 +29,8 @@ import {
   fetchProfilePic,
 } from '../../../../state/auth/reducer';
 import {fetchWithRetries} from '../../../../utils/common/fetch';
-import {TENSOR_API_KEY} from '@env';
+import {SERVER_URL, TENSOR_API_KEY} from '@env';
+import { DEFAULT_IMAGES } from '../../../../config/constants';
 
 interface NftItem {
   mint: string;
@@ -38,7 +39,7 @@ interface NftItem {
   collection?: string;
 }
 
-const SERVER_BASE_URL = process.env.SERVER_URL;
+const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 
 /**
  * Helper to fix IPFS/ar:// URIs if needed.
@@ -287,7 +288,7 @@ export default function ProfileScreen() {
           source={
             item.user.avatar
               ? {uri: item.user.avatar}
-              : require('../../../../assets/images/User.png')
+              : DEFAULT_IMAGES.user
           }
           style={styles.postItemAvatar}
         />
@@ -334,7 +335,7 @@ export default function ProfileScreen() {
             source={
               profilePicUrl
                 ? {uri: profilePicUrl}
-                : require('../../../../assets/images/User.png')
+                : DEFAULT_IMAGES.user
             }
             style={styles.profileAvatar}
           />

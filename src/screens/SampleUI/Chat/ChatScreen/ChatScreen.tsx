@@ -19,6 +19,7 @@ import {
 import {PostBody, ThreadComposer} from '../../../../components/thread';
 import PostCTA from '../../../../components/thread/PostCTA';
 import {styles, androidStyles, chatBodyOverrides} from './ChatScreen.styles';
+import { DEFAULT_IMAGES } from '../../../../config/constants';
 
 export default function ChatScreen() {
   const dispatch = useAppDispatch();
@@ -37,7 +38,7 @@ export default function ChatScreen() {
     verified: true,
     avatar: storedProfilePic
       ? {uri: storedProfilePic}
-      : require('../../../../assets/images/User.png'),
+      : DEFAULT_IMAGES.user,
   };
 
   // Fetch all posts on mount
@@ -73,7 +74,7 @@ export default function ChatScreen() {
         ? typeof item.user.avatar === 'string'
           ? {uri: item.user.avatar}
           : item.user.avatar
-        : require('../../../../assets/images/User.png');
+        : DEFAULT_IMAGES.user;
 
     return (
       <View

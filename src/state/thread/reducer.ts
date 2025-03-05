@@ -2,9 +2,10 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import type { ThreadPost, ThreadUser, ThreadSection } from '../../components/thread/thread.types';
 import { allposts as fallbackPosts } from '../../mocks/posts';
+import { SERVER_URL } from '@env';
 
 // Our server’s base URL
-const SERVER_BASE_URL = process.env.SERVER_URL || 'http://localhost:3000';
+const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 
 // Async thunk to fetch all posts.
 // In case of failure, we return fallbackPosts so the state isn’t cleared.

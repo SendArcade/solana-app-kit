@@ -12,9 +12,10 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
-import { Connection, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { Cluster, clusterApiUrl, Connection, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { buyStyles as styles } from './buySection.styles';
-import { HELIUS_RPC_URL, TENSOR_API_KEY } from '@env';
+import { CLUSTER, HELIUS_RPC_URL, TENSOR_API_KEY } from '@env';
+import { ENDPOINTS } from '../../../config/constants';
 
 
 
@@ -180,7 +181,8 @@ const BuySection: React.FC<BuySectionProps> = ({userPublicKey, userWallet}) => {
       return;
     }
     try {
-      const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
+      const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
+      const connection = new Connection(rpcUrl, 'confirmed');
       const {blockhash} = await connection.getRecentBlockhash();
       const maxPriceInLamports = floorDetails.maxPrice * SOL_TO_LAMPORTS;
       console.log('Obtained blockhash:', blockhash);

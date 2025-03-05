@@ -16,6 +16,9 @@ import {RootState} from '../state/store';
 import {useCustomization} from '../CustomizationProvider';
 import { VersionedTransaction } from '@solana/web3.js';
 import { Transaction } from '@solana/web3.js';
+import { CLUSTER, HELIUS_RPC_URL, SERVER_URL } from '@env';
+import { Cluster } from '@solana/web3.js';
+import { ENDPOINTS, PUBLIC_KEYS } from '../config/constants';
 
 export function useTradeTransaction() {
   const solanaWallet = useEmbeddedSolanaWallet();
@@ -46,8 +49,8 @@ export function useTradeTransaction() {
         return;
       }
 
-      // Connect to mainnet-beta
-      const connection = new Connection(clusterApiUrl('mainnet-beta'));
+      const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
+      const connection = new Connection(rpcUrl, 'confirmed');
       const senderPubkey = new PublicKey(walletPublicKey);
       console.log('senderPubkey', senderPubkey);
       console.log('walletPublicKey', walletPublicKey);
@@ -67,9 +70,7 @@ export function useTradeTransaction() {
       }
 
       // Define the receiver public key (hard-coded)
-      const receiverPubkey = new PublicKey(
-        '24MDwQXG2TWiST8ty1rjcrKgtaYaMiLdRxFQawYgZh4v',
-      );
+      const receiverPubkey = new PublicKey(PUBLIC_KEYS.defaultReceiver);
 
       let txSignature: string;
 
@@ -160,7 +161,7 @@ export function useTradeTransaction() {
         quoteResponse: quoteData,
         userPublicKey: walletPublicKey.toString(),
       };
-      const swapResp = await fetch('http://localhost:3000/api/jupiter/swap', {
+      const swapResp = await fetch(`${SERVER_URL}/api/jupiter/swap`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(serverBody),
@@ -187,10 +188,8 @@ export function useTradeTransaction() {
       if (!provider) {
         throw new Error('Provider not available');
       }
-      const connection = new Connection(
-        clusterApiUrl('mainnet-beta'),
-        'confirmed',
-      );
+      const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
+      const connection = new Connection(rpcUrl, 'confirmed');
       const {signature} = await provider.request({
         method: 'signAndSendTransaction',
         params: {transaction, connection},

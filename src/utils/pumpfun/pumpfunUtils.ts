@@ -10,6 +10,7 @@ import {AnchorProvider} from '@coral-xyz/anchor';
 import {PumpFunSDK} from 'pumpdotfun-sdk';
 import {Buffer} from 'buffer';
 import {HELIUS_RPC_URL} from '@env';
+import { ENDPOINTS, PUBLIC_KEYS } from '../../config/constants';
 
 /**
  * Setup: a standard AnchorProvider.
@@ -30,10 +31,10 @@ export function getProvider(): AnchorProvider {
 /* ------------------------------------------------------------------
    RAYDIUM UTILS
 --------------------------------------------------------------------- */
-const RAYDIUM_SWAP_API_BASE = 'https://transaction-v1.raydium.io';
-const RAYDIUM_API_V3 = 'https://api-v3.raydium.io';
+const RAYDIUM_SWAP_API_BASE = ENDPOINTS.raydium.swapApi;
+const RAYDIUM_API_V3 = ENDPOINTS.raydium.v3Api;
 
-export const RAYDIUM_SOL_MINT = 'So11111111111111111111111111111111111111112';
+export const RAYDIUM_SOL_MINT = PUBLIC_KEYS.wSolMint;
 
 /**
  * Check if a token is recognized by Raydium.

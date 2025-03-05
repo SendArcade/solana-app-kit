@@ -1,4 +1,5 @@
 // File: src/state/auth/reducer.ts
+import { SERVER_URL } from '@env';
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 
 export interface AuthState {
@@ -15,7 +16,7 @@ const initialState: AuthState = {
   profilePicUrl: null,
 };
 
-const SERVER_BASE_URL = process.env.SERVER_URL ;
+const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 
 // Thunk to fetch the user's profile picture from the DB
 export const fetchProfilePic = createAsyncThunk(

@@ -1,6 +1,6 @@
 // File: src/utils/common/fetch.ts
 
-import {HELIUS_API_KEY} from '@env';
+import {CLUSTER, HELIUS_API_KEY} from '@env';
 
 export async function fetchWithRetries(
   url: string,
@@ -45,7 +45,7 @@ export async function fetchSolBalance(
   userPublicKey: string,
 ): Promise<number | null> {
   try {
-    const url = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+    const url = ENDPOINTS.helius || `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
     const body = {
       jsonrpc: '2.0',
       id: 'get-balance-1',
@@ -161,6 +161,7 @@ export async function fetchTokenAccountBalance(tokenAccount: string) {
 
 // File: src/utils/solanaWithRetries.ts
 import {Connection, PublicKey} from '@solana/web3.js';
+import { ENDPOINTS } from '../../config/constants';
 
 export async function getBalanceWithRetries(
   connection: Connection,

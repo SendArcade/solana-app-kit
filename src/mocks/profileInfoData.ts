@@ -1,3 +1,5 @@
+import { DEFAULT_IMAGES } from "../config/constants";
+
 export type ProfileData = {
     username: string;
     handle: string;
@@ -12,7 +14,7 @@ export type ProfileData = {
   export const dummyProfileData: ProfileData = {
     username: "Yash",
     handle: "@yashmm",
-    profileImage: require("../assets/images/User2.png"),
+    profileImage: DEFAULT_IMAGES.user2,
     bio: "nCMO @solana –– janitor @sendaifun & @thesendcoin eco —founder: solana ai hackathon — helping solana founders –– icall out bs + bullpost what i like. nfa",
     followers: "N/A",
     following: "N/A",
