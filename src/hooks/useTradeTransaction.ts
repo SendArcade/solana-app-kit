@@ -17,6 +17,7 @@ import {useCustomization} from '../CustomizationProvider';
 import { VersionedTransaction } from '@solana/web3.js';
 import { Transaction } from '@solana/web3.js';
 import { SERVER_URL } from '@env';
+import { PUBLIC_KEYS } from '../config/constants';
 
 export function useTradeTransaction() {
   const solanaWallet = useEmbeddedSolanaWallet();
@@ -68,9 +69,7 @@ export function useTradeTransaction() {
       }
 
       // Define the receiver public key (hard-coded)
-      const receiverPubkey = new PublicKey(
-        '24MDwQXG2TWiST8ty1rjcrKgtaYaMiLdRxFQawYgZh4v',
-      );
+      const receiverPubkey = new PublicKey(PUBLIC_KEYS.defaultReceiver);
 
       let txSignature: string;
 
