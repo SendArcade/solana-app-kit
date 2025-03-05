@@ -32,6 +32,8 @@ async function fetchRepliesRecursive(parentId: string): Promise<any[]> {
       reactionCount: row.reaction_count,
       retweetCount: row.retweet_count,
       quoteCount: row.quote_count,
+      // NEW: parse "reactions" from DB
+      reactions: row.reactions || {},
     });
   }
   return results;
@@ -70,6 +72,8 @@ export const getAllPosts = async (req: Request, res: Response): Promise<void> =>
         reactionCount: row.reaction_count,
         retweetCount: row.retweet_count,
         quoteCount: row.quote_count,
+        // parse "reactions" from DB
+        reactions: row.reactions || {},
       });
     }
 
@@ -109,6 +113,8 @@ export const createRootPost = async (req: Request, res: Response): Promise<void>
       reaction_count: 0,
       retweet_count: 0,
       quote_count: 0,
+      // Store an empty object in "reactions" column by default
+      reactions: JSON.stringify({}),
     });
 
     // fetch user again for avatar
@@ -131,6 +137,7 @@ export const createRootPost = async (req: Request, res: Response): Promise<void>
       reactionCount: 0,
       retweetCount: 0,
       quoteCount: 0,
+      reactions: {}, // empty object
     };
 
     res.status(201).json({ success: true, data: newPost });
@@ -175,6 +182,7 @@ export const createReply = async (req: Request, res: Response): Promise<void> =>
       reaction_count: 0,
       retweet_count: 0,
       quote_count: 0,
+      reactions: JSON.stringify({}),
     });
 
     // increment parent's quoteCount
@@ -200,6 +208,7 @@ export const createReply = async (req: Request, res: Response): Promise<void> =>
       reactionCount: 0,
       retweetCount: 0,
       quoteCount: 0,
+      reactions: {},
     };
     res.status(201).json({ success: true, data: newReply });
     return;
@@ -239,3 +248,75 @@ export const deletePost = async (req: Request, res: Response): Promise<void> => 
     return;
   }
 };
+
+/**
+ * PATCH /api/posts/:postId/reaction
+ * body: { reactionEmoji: string }
+ */
+export const addReaction = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { postId } = req.params;
+      const { reactionEmoji } = req.body;
+  
+      if (!postId || !reactionEmoji) {
+        res.status(400).json({
+          success: false,
+          error: 'Missing postId or reactionEmoji',
+        });
+        return; // Just return without the Response object
+      }
+  
+      // fetch the post
+      const post = await knex('posts').where({ id: postId }).first();
+      if (!post) {
+        res.status(404).json({ success: false, error: 'Post not found' });
+        return; // Just return without the Response object
+      }
+  
+      // Because the DB (JSONB) might already return an object:
+      // if it's string-based, you'd do type-checking, but let's assume it's an object:
+      let reactionsObj = post.reactions || {};
+  
+      // If needed, do a safe type check:
+      // if (typeof post.reactions === 'string') {
+      //   reactionsObj = JSON.parse(post.reactions);
+      // } else {
+      //   reactionsObj = post.reactions || {};
+      // }
+  
+      // increment the emoji
+      if (!reactionsObj[reactionEmoji]) {
+        reactionsObj[reactionEmoji] = 1;
+      } else {
+        reactionsObj[reactionEmoji] += 1;
+      }
+  
+      // sum up total
+      let totalReactions = 0;
+      Object.values(reactionsObj).forEach((val: any) => {
+        totalReactions += val;
+      });
+  
+      // Update DB: if you used .jsonb('reactions'), you can store it directly
+      await knex('posts')
+        .where({ id: postId })
+        .update({
+          reactions: reactionsObj, // store the raw object if JSONB
+          reaction_count: totalReactions,
+        //   updated_at: new Date(),
+        });
+  
+      // return updated post
+      const updatedPost = {
+        ...post,
+        reactions: reactionsObj,
+        reaction_count: totalReactions,
+      };
+  
+      res.json({ success: true, data: updatedPost });
+      return; // Add explicit return here
+    } catch (error: any) {
+      console.error('[addReaction] Error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  };

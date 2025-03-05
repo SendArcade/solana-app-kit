@@ -1,9 +1,11 @@
+// server/src/routes/threadRoutes.ts
 import { Router, Request, Response, NextFunction } from 'express';
 import {
   getAllPosts,
   createRootPost,
   createReply,
   deletePost,
+  addReaction, // <-- new import
 } from '../controllers/threadController';
 
 const threadRouter = Router();
@@ -28,5 +30,8 @@ threadRouter.post('/posts/reply', asyncHandler(createReply));
 
 // Delete a post
 threadRouter.delete('/posts/:postId', asyncHandler(deletePost));
+
+// NEW: Add a reaction
+threadRouter.patch('/posts/:postId/reaction', asyncHandler(addReaction));
 
 export { threadRouter };

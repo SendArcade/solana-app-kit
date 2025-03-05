@@ -1,25 +1,20 @@
 // File: src/state/thread/reducer.ts
+
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import type { ThreadPost, ThreadUser, ThreadSection } from '../../components/thread/thread.types';
 import { allposts as fallbackPosts } from '../../mocks/posts';
 import { SERVER_URL } from '@env';
 
-// Our server’s base URL
 const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 
-// Async thunk to fetch all posts.
-// In case of failure, we return fallbackPosts so the state isn’t cleared.
+// fetchAllPosts ...
 export const fetchAllPosts = createAsyncThunk('thread/fetchAllPosts', async (_, { rejectWithValue }) => {
   try {
     const res = await fetch(`${SERVER_BASE_URL}/api/posts`);
-
     const data = await res.json();
-    console.log(data);
     if (!data.success) {
       return rejectWithValue(data.error || 'Failed to fetch posts');
     }
-    // If the API returns posts (even an empty array) we use that;
-    // otherwise, fallback to our mocks.
     return data.data.length > 0 ? data.data : fallbackPosts;
   } catch (error: any) {
     console.error('Fetch posts error, using fallback posts:', error.message);
@@ -27,7 +22,7 @@ export const fetchAllPosts = createAsyncThunk('thread/fetchAllPosts', async (_, 
   }
 });
 
-// Async thunk to create a new root post. It returns a complete post object from the server.
+// createRootPostAsync ...
 export const createRootPostAsync = createAsyncThunk(
   'thread/createRootPost',
   async (payload: { user: ThreadUser; sections: ThreadSection[] }) => {
@@ -38,12 +33,11 @@ export const createRootPostAsync = createAsyncThunk(
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to create post');
-    // Return the complete post object from the server which includes the updated avatar.
     return data.data;
   }
 );
 
-// Async thunk to create a reply post. Returns a complete reply object from the server.
+// createReplyAsync ...
 export const createReplyAsync = createAsyncThunk(
   'thread/createReply',
   async (payload: { parentId: string; user: ThreadUser; sections: ThreadSection[] }) => {
@@ -54,20 +48,32 @@ export const createReplyAsync = createAsyncThunk(
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to create reply');
-    // Return the complete reply object from the server.
     return data.data;
   }
 );
 
-export const deletePostAsync = createAsyncThunk(
-  'thread/deletePost',
-  async (postId: string) => {
-    const res = await fetch(`${SERVER_BASE_URL}/api/posts/${postId}`, {
-      method: 'DELETE',
+// deletePostAsync ...
+export const deletePostAsync = createAsyncThunk('thread/deletePost', async (postId: string) => {
+  const res = await fetch(`${SERVER_BASE_URL}/api/posts/${postId}`, {
+    method: 'DELETE',
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'Failed to delete post');
+  return postId;
+});
+
+// NEW: addReactionAsync
+export const addReactionAsync = createAsyncThunk(
+  'thread/addReaction',
+  async ({ postId, reactionEmoji }: { postId: string; reactionEmoji: string }) => {
+    const res = await fetch(`${SERVER_BASE_URL}/api/posts/${postId}/reaction`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reactionEmoji }),
     });
     const data = await res.json();
-    if (!data.success) throw new Error(data.error || 'Failed to delete post');
-    return postId;
+    if (!data.success) throw new Error(data.error || 'Failed to add reaction');
+    return data.data; // updated post from the server
   }
 );
 
@@ -77,7 +83,6 @@ interface ThreadState {
   error: string | null;
 }
 
-// Initialize with fallback posts so that even if the API call fails, we have data.
 const initialState: ThreadState = {
   allPosts: fallbackPosts,
   loading: false,
@@ -88,11 +93,9 @@ export const threadSlice = createSlice({
   name: 'thread',
   initialState,
   reducers: {
-    // Fallback action for when network call fails – add a new root post locally.
     addPostLocally: (state, action: PayloadAction<ThreadPost>) => {
       state.allPosts.unshift(action.payload);
     },
-    // Fallback action for replies: find the parent post and add the reply.
     addReplyLocally: (state, action: PayloadAction<{ parentId: string; reply: ThreadPost }>) => {
       const { parentId, reply } = action.payload;
       function addReply(posts: ThreadPost[]): boolean {
@@ -124,15 +127,14 @@ export const threadSlice = createSlice({
     builder.addCase(fetchAllPosts.rejected, (state, action) => {
       state.loading = false;
       state.error = action.error.message || 'Failed to fetch posts';
-      // Do not clear state; leave fallback posts in place.
     });
 
-    // createRootPostAsync – prepend new post to state.
+    // createRootPostAsync
     builder.addCase(createRootPostAsync.fulfilled, (state, action) => {
       state.allPosts.unshift(action.payload);
     });
 
-    // createReplyAsync – find parent and insert reply.
+    // createReplyAsync
     builder.addCase(createReplyAsync.fulfilled, (state, action) => {
       const newReply = action.payload;
       const parentId = newReply.parentId;
@@ -143,7 +145,7 @@ export const threadSlice = createSlice({
             post.quoteCount += 1;
             return true;
           }
-          if (post.replies && post.replies.length > 0) {
+          if (post.replies.length > 0) {
             if (addReply(post.replies)) return true;
           }
         }
@@ -152,7 +154,7 @@ export const threadSlice = createSlice({
       addReply(state.allPosts);
     });
 
-    // deletePostAsync – remove post (and nested replies) from state.
+    // deletePostAsync
     builder.addCase(deletePostAsync.fulfilled, (state, action) => {
       const postId = action.payload;
       function removeRecursive(posts: ThreadPost[]): ThreadPost[] {
@@ -164,6 +166,30 @@ export const threadSlice = createSlice({
           }));
       }
       state.allPosts = removeRecursive(state.allPosts);
+    });
+
+    // NEW: addReactionAsync
+    builder.addCase(addReactionAsync.fulfilled, (state, action) => {
+      const updatedPost = action.payload as ThreadPost;
+
+      // Helper to replace the target post in the tree
+      const replacePost = (posts: ThreadPost[]): ThreadPost[] => {
+        return posts.map(p => {
+          if (p.id === updatedPost.id) {
+            return {
+              ...p,
+              reactionCount: updatedPost.reactionCount,
+              reactions: updatedPost.reactions,
+            };
+          }
+          if (p.replies.length > 0) {
+            p.replies = replacePost(p.replies);
+          }
+          return p;
+        });
+      };
+
+      state.allPosts = replacePost(state.allPosts);
     });
   },
 });
