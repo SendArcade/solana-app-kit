@@ -11,6 +11,7 @@ import {
 import Icons from '../../assets/svgs';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
 import {ThreadPost, ThreadUser} from './thread.types';
+import { DEFAULT_IMAGES } from '../../config/constants';
 
 interface PostHeaderProps {
   post: ThreadPost;
@@ -70,7 +71,7 @@ export default function PostHeader({
       return u.avatar;
     }
     // Fallback if nothing is set
-    return require('../../assets/images/User.png');
+    return DEFAULT_IMAGES.user;
   }
 
   return (

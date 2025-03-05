@@ -28,6 +28,7 @@ import {
 import {TENSOR_API_KEY} from '@env';
 import {useAuth} from '../../hooks/useAuth';
 import TradeModal from './TradeModal';
+import { DEFAULT_IMAGES } from '../../config/constants';
 
 interface NftItem {
   mint: string;
@@ -72,7 +73,7 @@ export default function ThreadComposer({
         return currentUser.avatar;
       }
     }
-    return require('../../assets/images/User.png');
+    return DEFAULT_IMAGES.user;
   };
 
   // Basic composer state

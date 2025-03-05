@@ -16,6 +16,7 @@ import {RootState} from '../state/store';
 import {useCustomization} from '../CustomizationProvider';
 import { VersionedTransaction } from '@solana/web3.js';
 import { Transaction } from '@solana/web3.js';
+import { SERVER_URL } from '@env';
 
 export function useTradeTransaction() {
   const solanaWallet = useEmbeddedSolanaWallet();
@@ -160,7 +161,7 @@ export function useTradeTransaction() {
         quoteResponse: quoteData,
         userPublicKey: walletPublicKey.toString(),
       };
-      const swapResp = await fetch('http://localhost:3000/api/jupiter/swap', {
+      const swapResp = await fetch(`${SERVER_URL}/api/jupiter/swap`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(serverBody),

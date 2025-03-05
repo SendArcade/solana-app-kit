@@ -1,7 +1,9 @@
+import { DEFAULT_IMAGES } from "../config/constants";
+
 export  const portfolioData = [
     {
       id: "1",
-      imagePath: require("../assets/images/Smiley.png"),
+      imagePath: DEFAULT_IMAGES.SENDlogo,
       tokenName: "$SEND",
       tokenAmount: "6,969.35",
       usdValue: "$6,969.35",
@@ -9,7 +11,7 @@ export  const portfolioData = [
     },
     {
       id: "2",
-      imagePath: require("../assets/images/Smiley.png"),
+      imagePath: DEFAULT_IMAGES.SENDlogo,
       tokenName: "$BTC",
       tokenAmount: "1.254",
       usdValue: "$51,230.75",
@@ -17,7 +19,7 @@ export  const portfolioData = [
     },
     {
       id: "3",
-      imagePath: require("../assets/images/Smiley.png"),
+      imagePath: DEFAULT_IMAGES.SENDlogo,
       tokenName: "$ETH",
       tokenAmount: "5.89",
       usdValue: "$18,345.50",
@@ -25,7 +27,7 @@ export  const portfolioData = [
     },
     {
       id: "4",
-      imagePath: require("../assets/images/Smiley.png"),
+      imagePath: DEFAULT_IMAGES.SENDlogo,
       tokenName: "$SOL",
       tokenAmount: "120.45",
       usdValue: "$14,520.25",

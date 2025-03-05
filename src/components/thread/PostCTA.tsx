@@ -21,6 +21,7 @@ import {TENSOR_API_KEY, HELIUS_RPC_URL} from '@env';
 import {useAuth} from '../../hooks/useAuth';
 import TradeModal from './TradeModal';
 import { useAppSelector } from '../../hooks/useReduxHooks';
+import { DEFAULT_IMAGES } from '../../config/constants';
 
 /**
  * Get the post section type.
@@ -231,9 +232,7 @@ export default function PostCTA({
             id: 'current-user',
             username: 'You',
             handle: '@you',
-            avatar: storedProfilePic
-            ? { uri: storedProfilePic }
-            : require('../../assets/images/User.png'),
+            avatar: storedProfilePic ? {uri: storedProfilePic} : DEFAULT_IMAGES.user,
           }}
           disableTabs={true}
           initialInputToken={{

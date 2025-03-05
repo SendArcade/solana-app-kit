@@ -12,6 +12,7 @@ import TradeCard from '../TradeCard/TradeCard';
 import {ThreadPost} from './thread.types';
 import {TENSOR_API_KEY} from '@env';
 import nftListingStyles from './NftListingSection.style';
+import { DEFAULT_IMAGES } from '../../config/constants';
 
 interface PostBodyProps {
   post: ThreadPost;
@@ -46,7 +47,7 @@ function getSafeImageSource(
 ): ImageSourcePropType {
   if (!imageSource) {
     // fallback or blank
-    return require('../../assets/images/User.png');
+    return DEFAULT_IMAGES.user;
   }
   // If it's a numeric require or an object { uri: string }, it's valid as-is
   return imageSource;
@@ -210,7 +211,7 @@ function NftListingSection({
    */
   function getNftImageSource(uri?: string) {
     if (!uri || typeof uri !== 'string') {
-      return require('../../assets/images/User.png');
+      return DEFAULT_IMAGES.user;
     }
     return {uri};
   }

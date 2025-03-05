@@ -15,6 +15,7 @@ import {
   signAndSendBase64Tx,
   signAndSendWithPrivy,
 } from '../../utils/transactions/transactionUtils';
+import { PUBLIC_KEYS } from '../../config/constants';
 
 /**
  * fundUserWithWSOL
@@ -30,7 +31,7 @@ export async function fundUserWithWSOL({
   signerPublicKey: string;
   provider: any;
 }): Promise<string> {
-  const wSolMint = new PublicKey('So11111111111111111111111111111111111111112');
+  const wSolMint = new PublicKey(PUBLIC_KEYS.wSolMint);
   const userPubkey = new PublicKey(signerPublicKey);
   const userQuoteAta = spl.getAssociatedTokenAddressSync(wSolMint, userPubkey);
 
@@ -271,7 +272,7 @@ export async function swapTokens({
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
       market: marketAddress,
-      quoteTokenMint: 'So11111111111111111111111111111111111111112', // wSOL
+      quoteTokenMint: PUBLIC_KEYS.wSolMint,
       action: swapType,
       tradeType: swapType === 'buy' ? 'exactOutput' : 'exactInput',
       amount: Math.floor(swapAmount * 1_000_000),
@@ -302,9 +303,7 @@ export async function fundMarket({
   provider: any;
 }): Promise<string> {
   const marketPubkey = new PublicKey(marketAddress);
-  const quoteTokenMint = new PublicKey(
-    'So11111111111111111111111111111111111111112',
-  );
+  const quoteTokenMint = new PublicKey(PUBLIC_KEYS.wSolMint);
   const marketQuoteTokenAta = spl.getAssociatedTokenAddressSync(
     quoteTokenMint,
     marketPubkey,

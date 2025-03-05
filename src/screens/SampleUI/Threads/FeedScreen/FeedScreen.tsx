@@ -10,6 +10,7 @@ import {Thread} from '../../../../components/thread';
 import COLORS from '../../../../assets/colors';
 import {fetchAllPosts} from '../../../../state/thread/reducer';
 import {fetchProfilePic} from '../../../../state/auth/reducer';
+import { DEFAULT_IMAGES } from '../../../../config/constants';
 
 export default function FeedScreen() {
   const dispatch = useAppDispatch();
@@ -31,7 +32,7 @@ export default function FeedScreen() {
 
     avatar: storedProfilePic
       ? {uri: storedProfilePic}
-      : require('../../../../assets/images/User.png'),
+      : DEFAULT_IMAGES.user,
   };
 
   // On mount, fetch all posts from the server
