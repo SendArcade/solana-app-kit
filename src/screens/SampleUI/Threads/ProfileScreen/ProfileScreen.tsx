@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Platform,
   StyleSheet,
+  TextInput,
 } from 'react-native';
 
 import * as ImagePicker from 'expo-image-picker';
@@ -26,7 +27,8 @@ import {ThreadPost} from '../../../../components/thread/thread.types';
 import ProfileIcons from '../../../../assets/svgs';
 import {
   updateProfilePic,
-  fetchProfilePic,
+  fetchUserProfile,
+  updateUsername,
 } from '../../../../state/auth/reducer';
 import {fetchWithRetries} from '../../../../utils/common/fetch';
 import {SERVER_URL, TENSOR_API_KEY} from '@env';
@@ -64,21 +66,25 @@ function fixImageUrl(url: string): string {
 export default function ProfileScreen() {
   const userWallet = useAppSelector(state => state.auth.address);
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
+  const storedUsername = useAppSelector(state => state.auth.username);
   const dispatch = useAppDispatch();
 
   const {allPosts} = useAppSelector(state => state.thread);
   const [myPosts, setMyPosts] = useState<ThreadPost[]>([]);
 
-  // Current profile pic
+  // Current profile pic in local component state
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(
     storedProfilePic,
   );
 
-  // Modal for NFT flow (we use inline confirmation for library images)
+  // Modal for editing user name
+  const [editNameModalVisible, setEditNameModalVisible] = useState(false);
+  const [tempName, setTempName] = useState(storedUsername || '');
+
+  // Modal for avatar picking approach
   const [avatarOptionModalVisible, setAvatarOptionModalVisible] =
     useState(false);
-  const [confirmModalVisible, setConfirmModalVisible] =
-    useState<boolean>(false);
+  const [confirmModalVisible, setConfirmModalVisible] = useState<boolean>(false);
 
   // This state stores the new avatar URI (from library or NFT)
   const [localFileUri, setLocalFileUri] = useState<string | null>(null);
@@ -98,7 +104,6 @@ export default function ProfileScreen() {
    *******************************************************/
   useEffect(() => {
     (async () => {
-      console.log('>>> Requesting media library permissions...');
       const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
@@ -117,49 +122,46 @@ export default function ProfileScreen() {
       setMyPosts([]);
       return;
     }
-    const userPosts = allPosts.filter(
-      p => p.user.id.toLowerCase() === userWallet.toLowerCase(),
-    );
+    const userPosts = allPosts.filter(p => {
+      console.log('Post being checked:', p, userWallet);
+      return p.user.id.toLowerCase() === userWallet.toLowerCase();
+    });
     userPosts.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
     setMyPosts(userPosts);
   }, [allPosts, userWallet]);
 
   /*******************************************************
-   * Load user’s Profile Pic from DB
+   * Load user’s Profile Pic + username from DB
    *******************************************************/
   useEffect(() => {
     if (userWallet) {
-      dispatch(fetchProfilePic(userWallet))
+      dispatch(fetchUserProfile(userWallet))
         .unwrap()
-        .then(url => {
-          setProfilePicUrl(url);
+        .then(value => {
+          setProfilePicUrl(value.profilePicUrl);
         })
         .catch(err => {
-          console.error('Failed to fetch profile picture:', err);
+          console.error('Failed to fetch user profile:', err);
         });
     }
   }, [userWallet, dispatch]);
 
   /*******************************************************
-   * Library Image Picker (minimal approach, inline confirmation)
+   * Library Image Picker (inline confirmation)
    *******************************************************/
   const handlePickProfilePicture = async () => {
     try {
-      console.log('>>> handlePickProfilePicture (library)');
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: false,
       });
-      console.log('>>> Picker result:', result);
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const pickedUri = result.assets[0].uri;
-        console.log('>>> Picked library image URI:', pickedUri);
         setLocalFileUri(pickedUri);
         setSelectedSource('library');
         setAvatarOptionModalVisible(false);
       }
     } catch (error: any) {
-      console.log('>>> handlePickProfilePicture error:', error);
       Alert.alert('Error picking image', error.message);
     }
   };
@@ -175,7 +177,6 @@ export default function ProfileScreen() {
 
   const fetchOwnedNfts = useCallback(async () => {
     if (!userWallet) return;
-    console.log('>>> Fetching NFTs for wallet:', userWallet);
     setLoadingNfts(true);
     setOwnedNfts([]);
     setFetchNftsError(null);
@@ -208,7 +209,6 @@ export default function ProfileScreen() {
         .filter(Boolean) as NftItem[];
       setOwnedNfts(mappedNfts);
     } catch (err: any) {
-      console.error('[fetchOwnedNfts] error:', err);
       setFetchNftsError(err.message);
     } finally {
       setLoadingNfts(false);
@@ -216,16 +216,14 @@ export default function ProfileScreen() {
   }, [userWallet]);
 
   const handleSelectNftAsAvatar = (nft: NftItem) => {
-    console.log('>>> handleSelectNftAsAvatar for:', nft.mint);
     setLocalFileUri(nft.image);
     setSelectedSource('nft');
     setNftsModalVisible(false);
-    // Open NFT confirm modal (we use a modal overlay for NFT)
     setConfirmModalVisible(true);
   };
 
   /*******************************************************
-   * Confirm Upload (common for both flows)
+   * Confirm Upload (common for library or NFT)
    *******************************************************/
   const handleConfirmUpload = async () => {
     if (!localFileUri) {
@@ -248,7 +246,7 @@ export default function ProfileScreen() {
         type: 'image/jpeg',
         name: `profile_${Date.now()}.jpg`,
       } as any);
-      // console.log('>>> Uploading to:', `${SERVER_BASE_URL}/profile/upload`);
+
       const response = await fetch(`${SERVER_BASE_URL}/api/profile/upload`, {
         method: 'POST',
         body: formData,
@@ -259,7 +257,6 @@ export default function ProfileScreen() {
       }
       setProfilePicUrl(data.url);
       dispatch(updateProfilePic(data.url));
-      console.log('>>> Updated profile pic to:', data.url);
     } catch (err: any) {
       Alert.alert('Upload Error', err.message);
       console.log('>>> handleConfirmUpload error:', err);
@@ -271,14 +268,38 @@ export default function ProfileScreen() {
   };
 
   const handleCancelUpload = () => {
-    console.log('>>> Canceling confirm upload');
     setConfirmModalVisible(false);
     setLocalFileUri(null);
     setSelectedSource(null);
   };
 
   /*******************************************************
-   * Render posts
+   * Edit Name Modal Flow
+   *******************************************************/
+  const handleOpenEditModal = () => {
+    setTempName(storedUsername || '');
+    setEditNameModalVisible(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!userWallet) return Alert.alert('No wallet to update name');
+    if (!tempName.trim()) {
+      Alert.alert('Empty Name', 'Please enter a valid name');
+      return;
+    }
+    try {
+      await dispatch(
+        updateUsername({ userId: userWallet, newUsername: tempName.trim() }),
+      ).unwrap();
+    } catch (err: any) {
+      Alert.alert('Update Name Failed', err.message || 'Unknown error');
+    } finally {
+      setEditNameModalVisible(false);
+    }
+  };
+
+  /*******************************************************
+   * Render user’s posts
    *******************************************************/
   const renderPostItem = ({item}: {item: ThreadPost}) => {
     const firstTextSection = item.sections.find(s => !!s.text)?.text;
@@ -308,14 +329,12 @@ export default function ProfileScreen() {
     );
   };
 
-  /*******************************************************
-   * Main render
-   *******************************************************/
   return (
     <SafeAreaView
-      style={
-        (styles.container, Platform.OS === 'android' && androidStyles.safeArea)
-      }>
+      style={[
+        styles.container,
+        Platform.OS === 'android' && androidStyles.safeArea,
+      ]}>
       {/* Banner */}
       <View style={styles.bannerContainer}>
         <Image
@@ -341,7 +360,9 @@ export default function ProfileScreen() {
           />
         </TouchableOpacity>
         <View style={styles.profileTextInfo}>
-          <Text style={styles.profileUsername}>My Profile</Text>
+          <Text style={styles.profileUsername}>
+            {storedUsername || 'My Profile'}
+          </Text>
           <View style={styles.usernameRow}>
             <Text style={styles.profileHandle}>
               {userWallet
@@ -359,7 +380,7 @@ export default function ProfileScreen() {
           </Text>
         </View>
         <View style={styles.actionButtonsRow}>
-          <TouchableOpacity style={styles.editProfileBtn}>
+          <TouchableOpacity style={styles.editProfileBtn} onPress={handleOpenEditModal}>
             <Text style={styles.editProfileBtnText}>Edit Profile</Text>
           </TouchableOpacity>
         </View>
@@ -383,7 +404,6 @@ export default function ProfileScreen() {
             source={{uri: localFileUri}}
             style={inlineConfirmStyles.preview}
             onError={err => {
-              console.log('Inline confirm image load fail:', err.nativeEvent);
               Alert.alert('Image Load Error', JSON.stringify(err.nativeEvent));
             }}
           />
@@ -402,7 +422,7 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {/* Posts */}
+      {/* Posts List */}
       <FlatList
         data={myPosts}
         keyExtractor={post => post.id}
@@ -418,7 +438,7 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.flatListContent}
       />
 
-      {/* (A) Avatar Option Modal */}
+      {/** (A) Modal for choosing avatar approach */}
       <Modal
         animationType="fade"
         transparent
@@ -446,7 +466,7 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* (B) NFT-Selection Modal */}
+      {/** (B) NFT Selection Modal */}
       <Modal
         animationType="slide"
         transparent
@@ -458,8 +478,7 @@ export default function ProfileScreen() {
             {loadingNfts ? (
               <View style={{marginTop: 20}}>
                 <ActivityIndicator size="large" color="#1d9bf0" />
-                <Text
-                  style={{marginTop: 8, color: '#666', textAlign: 'center'}}>
+                <Text style={{marginTop: 8, color: '#666', textAlign: 'center'}}>
                   Loading your NFTs...
                 </Text>
               </View>
@@ -517,7 +536,7 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* (C) NFT Confirm Modal */}
+      {/** (C) Confirm NFT Upload Modal */}
       {selectedSource === 'nft' && confirmModalVisible && (
         <Modal
           animationType="fade"
@@ -534,14 +553,7 @@ export default function ProfileScreen() {
                   source={{uri: localFileUri}}
                   style={confirmModalUI.preview}
                   onError={err => {
-                    console.log(
-                      'NFT confirm modal image load fail:',
-                      err.nativeEvent,
-                    );
-                    Alert.alert(
-                      'Image Load Error',
-                      JSON.stringify(err.nativeEvent),
-                    );
+                    Alert.alert('Image Load Error', JSON.stringify(err.nativeEvent));
                   }}
                 />
               ) : (
@@ -571,12 +583,92 @@ export default function ProfileScreen() {
           </View>
         </Modal>
       )}
+
+      {/** (D) Edit Name Modal */}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={editNameModalVisible}
+        onRequestClose={() => setEditNameModalVisible(false)}>
+        <View style={editModalStyles.overlay}>
+          <View style={editModalStyles.container}>
+            <Text style={editModalStyles.title}>Edit Profile Name</Text>
+            <TextInput
+              style={editModalStyles.input}
+              placeholder="Enter your display name"
+              value={tempName}
+              onChangeText={setTempName}
+            />
+            <View style={editModalStyles.btnRow}>
+              <TouchableOpacity
+                style={[editModalStyles.button, {backgroundColor: 'gray'}]}
+                onPress={() => setEditNameModalVisible(false)}>
+                <Text style={editModalStyles.btnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[editModalStyles.button, {backgroundColor: '#1d9bf0'}]}
+                onPress={handleSaveName}>
+                <Text style={editModalStyles.btnText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const androidStyles = StyleSheet.create({
   safeArea: {
-    paddingTop: 30, // Additional padding for Android devices
+    paddingTop: 30,
+  },
+});
+
+/**
+ * Minimal local styles for the "Edit Name" modal
+ */
+const editModalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  container: {
+    width: '85%',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: '600',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#CCC',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 16,
+    fontSize: 15,
+  },
+  btnRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  button: {
+    minWidth: 80,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 6,
+    marginLeft: 10,
+  },
+  btnText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

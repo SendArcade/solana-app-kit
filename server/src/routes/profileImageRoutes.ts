@@ -7,7 +7,10 @@ import knex from '../db/knex';
 const profileImageRouter = Router();
 const upload = multer({storage: multer.memoryStorage()});
 
-// POST /api/profile/upload
+/**
+ * POST /api/profile/upload
+ * Upload or update the profile picture of the user.
+ */
 profileImageRouter.post(
   '/upload',
   upload.single('profilePic'),
@@ -43,7 +46,7 @@ profileImageRouter.post(
       if (!existingUser) {
         await knex('users').insert({
           id: userId,
-          username: userId,
+          username: userId, // default to userId if no name set
           handle: '@' + userId.slice(0, 6),
           profile_picture_url: publicUrl,
           created_at: new Date(),
@@ -64,7 +67,10 @@ profileImageRouter.post(
   },
 );
 
-// GET /api/profile?userId=xxx
+/**
+ * GET /api/profile?userId=xxx
+ * Returns the user's profile picture URL and username.
+ */
 profileImageRouter.get('/', async (req: any, res: any) => {
   try {
     const userId = req.query.userId;
@@ -77,9 +83,45 @@ profileImageRouter.get('/', async (req: any, res: any) => {
       return res.status(404).json({success: false, error: 'User not found'});
     }
 
-    return res.json({success: true, url: user.profile_picture_url});
+    return res.json({
+      success: true,
+      url: user.profile_picture_url,
+      username: user.username,
+    });
   } catch (error: any) {
     console.error('[Profile fetch error]', error);
+    return res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * POST /api/profile/updateUsername
+ * Updates the user's display name in the "users" table, preserving handle = wallet address.
+ */
+profileImageRouter.post('/updateUsername', async (req: any, res: any) => {
+  try {
+    const {userId, username} = req.body;
+    if (!userId || !username) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId or username in request body',
+      });
+    }
+
+    const existingUser = await knex('users').where({id: userId}).first();
+    if (!existingUser) {
+      return res.status(404).json({success: false, error: 'User not found'});
+    }
+
+    // Update the username field
+    await knex('users').where({id: userId}).update({
+      username,
+      updated_at: new Date(),
+    });
+
+    return res.json({success: true, username});
+  } catch (error: any) {
+    console.error('[updateUsername error]', error);
     return res.status(500).json({success: false, error: error.message});
   }
 });

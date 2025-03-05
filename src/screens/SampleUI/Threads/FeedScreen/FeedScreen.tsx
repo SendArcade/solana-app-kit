@@ -9,30 +9,29 @@ import {useAppDispatch, useAppSelector} from '../../../../hooks/useReduxHooks';
 import {Thread} from '../../../../components/thread';
 import COLORS from '../../../../assets/colors';
 import {fetchAllPosts} from '../../../../state/thread/reducer';
-import {fetchProfilePic} from '../../../../state/auth/reducer';
+import {fetchUserProfile} from '../../../../state/auth/reducer'; // <--- renamed
 import { DEFAULT_IMAGES } from '../../../../config/constants';
 
 export default function FeedScreen() {
   const dispatch = useAppDispatch();
 
   const allPosts = useAppSelector(state => state.thread.allPosts);
-
   const userWallet = useAppSelector(state => state.auth.address);
-
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
+  const userName = useAppSelector(state => state.auth.username);  // <-- store user name from state
 
   const [rootPosts, setRootPosts] = useState<ThreadPost[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Build the current user object from Redux data
   const currentUser: ThreadUser = {
     id: userWallet || 'anonymous-user',
-    username: 'Alice',
-    handle: '@aliceSmith',
+    username: userName || 'Anonymous',             // <-- use the stored username
+    handle: userWallet
+      ? '@' + userWallet.slice(0, 6) + '...' + userWallet.slice(-4)
+      : '@anonymous',
     verified: true,
-
-    avatar: storedProfilePic
-      ? {uri: storedProfilePic}
-      : DEFAULT_IMAGES.user,
+    avatar: storedProfilePic ? {uri: storedProfilePic} : DEFAULT_IMAGES.user,
   };
 
   // On mount, fetch all posts from the server
@@ -40,16 +39,16 @@ export default function FeedScreen() {
     dispatch(fetchAllPosts());
   }, [dispatch]);
 
-  // Once we have userWallet, fetch the DB profile pic so Redux can store it
+  // Once we have userWallet, fetch the DB profile pic + user name
   useEffect(() => {
     if (userWallet) {
-      dispatch(fetchProfilePic(userWallet)).catch(err => {
-        console.error('Failed to fetch profile picture:', err);
+      dispatch(fetchUserProfile(userWallet)).catch(err => {
+        console.error('Failed to fetch user profile:', err);
       });
     }
   }, [userWallet, dispatch]);
 
-  // Each time allPosts changes, filter out root posts and sort them
+  // Filter out root posts (no parentId)
   useEffect(() => {
     const roots = allPosts.filter(p => !p.parentId);
     // Sort descending by createdAt
@@ -64,7 +63,7 @@ export default function FeedScreen() {
     setRefreshing(false);
   }, [dispatch]);
 
-  // Example CTA buttons if you want to pass them to the <Thread>
+  // Example CTA buttons (optional)
   const ctaButtons: ThreadCTAButton[] = [
     {
       label: 'Mint NFT',
