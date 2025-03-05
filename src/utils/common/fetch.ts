@@ -160,7 +160,7 @@ export async function fetchTokenAccountBalance(tokenAccount: string) {
 }
 
 // File: src/utils/solanaWithRetries.ts
-import {clusterApiUrl, Connection, PublicKey} from '@solana/web3.js';
+import {Connection, PublicKey} from '@solana/web3.js';
 import { ENDPOINTS } from '../../config/constants';
 
 export async function getBalanceWithRetries(

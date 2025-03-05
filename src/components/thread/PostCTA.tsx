@@ -15,13 +15,13 @@ import type {ThreadPost} from './thread.types';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
 import {useSelector} from 'react-redux';
 import {RootState} from '../../state/store';
-import {Connection, Transaction, VersionedTransaction} from '@solana/web3.js';
+import {Cluster, clusterApiUrl, Connection, Transaction, VersionedTransaction} from '@solana/web3.js';
 import {Buffer} from 'buffer';
-import {TENSOR_API_KEY, HELIUS_RPC_URL} from '@env';
+import {TENSOR_API_KEY, HELIUS_RPC_URL, CLUSTER} from '@env';
 import {useAuth} from '../../hooks/useAuth';
 import TradeModal from './TradeModal';
 import { useAppSelector } from '../../hooks/useReduxHooks';
-import { DEFAULT_IMAGES } from '../../config/constants';
+import { DEFAULT_IMAGES, ENDPOINTS } from '../../config/constants';
 
 /**
  * Get the post section type.
@@ -136,7 +136,8 @@ export default function PostCTA({
       setNftLoading(true);
       setNftStatusMsg('Fetching blockhash ...');
 
-      const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
+      const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
+      const connection = new Connection(rpcUrl, 'confirmed');
       const {blockhash} = await connection.getRecentBlockhash();
       setNftStatusMsg(`Blockhash: ${blockhash} fetched.\nPreparing buy tx ...`);
 

@@ -2,7 +2,7 @@
 import React, {useState} from 'react';
 import {View, Text, ScrollView, ActivityIndicator} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {Connection, clusterApiUrl} from '@solana/web3.js';
+import {Cluster, Connection, clusterApiUrl} from '@solana/web3.js';
 
 import {useAuth} from '../../../hooks/useAuth';
 import {tokenMillScreenStyles as styles} from './TokenMillScreen.style';
@@ -14,6 +14,8 @@ import BondingCurveCard from '../../../components/tokenMill/BondingCurveCard';
 import SwapCard from '../../../components/tokenMill/SwapCard';
 import StakingCard from '../../../components/tokenMill/StakingCard';
 import VestingCard from '../../../components/tokenMill/VestingCard';
+import { ENDPOINTS } from '../../../config/constants';
+import { CLUSTER } from '@env';
 
 export default function TokenMillScreen() {
   // 1) Auth & Connection
@@ -26,7 +28,8 @@ export default function TokenMillScreen() {
     );
   }
   const publicKey = solanaWallet.wallets[0].publicKey;
-  const connection = new Connection(clusterApiUrl('devnet'));
+  const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
+  const connection = new Connection(rpcUrl, 'confirmed');
 
   // 2) Common states
   const [loading, setLoading] = useState(false);

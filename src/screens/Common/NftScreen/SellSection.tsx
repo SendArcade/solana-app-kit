@@ -18,18 +18,21 @@ import {
   VersionedTransaction,
   PublicKey,
   SendTransactionError,
+  clusterApiUrl,
+  Cluster,
 } from '@solana/web3.js';
 import {
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
   getAccount,
 } from '@solana/spl-token';
-import {HELIUS_API_KEY, HELIUS_RPC_URL, TENSOR_API_KEY} from '@env';
+import {CLUSTER, HELIUS_API_KEY, HELIUS_RPC_URL, TENSOR_API_KEY} from '@env';
 import {sellStyles as styles} from './sellSection.styles';
 import {useDispatch} from 'react-redux';
 import {ThreadSection} from '../../../components/thread/thread.types';
 // import {addRootPost} from '../../../state/thread/reducer';
 import {fetchWithRetries} from '../../../utils/common/fetch';
+import { ENDPOINTS } from '../../../config/constants';
 
 const SOL_TO_LAMPORTS = 1_000_000_000;
 
@@ -318,7 +321,8 @@ const SellSection: React.FC<SellSectionProps> = ({
       selectedNft,
     );
     try {
-      const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
+      const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
+      const connection = new Connection(rpcUrl, 'confirmed');
       const priceLamports = Math.floor(parseFloat(salePrice) * SOL_TO_LAMPORTS);
       let expiryValue: number | undefined;
       if (durationDays && !isNaN(parseFloat(durationDays))) {

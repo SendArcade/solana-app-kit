@@ -16,8 +16,8 @@ import {
 import {useAuth} from '../../hooks/useAuth';
 import {useAppDispatch} from '../../hooks/useReduxHooks';
 import {addPostLocally, createRootPostAsync} from '../../state/thread/reducer';
-import {Transaction, VersionedTransaction, Connection} from '@solana/web3.js';
-import {TENSOR_API_KEY, HELIUS_RPC_URL} from '@env';
+import {Transaction, VersionedTransaction, Connection, clusterApiUrl, Cluster} from '@solana/web3.js';
+import {TENSOR_API_KEY, HELIUS_RPC_URL, CLUSTER} from '@env';
 import {ThreadPost, ThreadSection, ThreadUser, TradeData} from './thread.types';
 import styles from './tradeModal.style';  // Keep using your existing style definitions for everything else
 import SelectTokenModal, {TokenInfo} from './SelectTokenModal';
@@ -288,7 +288,8 @@ export default function TradeModal({
       if (!userWallet) {
         throw new Error('No wallet found to sign transaction.');
       }
-      const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
+      const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
+      const connection = new Connection(rpcUrl, 'confirmed');
       const provider = await userWallet.getProvider();
       const {signature} = await provider.request({
         method: 'signAndSendTransaction',
