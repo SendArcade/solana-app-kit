@@ -6,10 +6,10 @@ import {
   ThreadUser,
 } from '../../../../components/thread/thread.types';
 import {useAppDispatch, useAppSelector} from '../../../../hooks/useReduxHooks';
-import {Thread} from '../../../../components/thread';
+import {Thread} from '../../../../components/thread/Thread';
 import COLORS from '../../../../assets/colors';
 import {fetchAllPosts} from '../../../../state/thread/reducer';
-import {fetchUserProfile} from '../../../../state/auth/reducer'; // <--- renamed
+import {fetchUserProfile} from '../../../../state/auth/reducer';
 import { DEFAULT_IMAGES } from '../../../../config/constants';
 
 export default function FeedScreen() {
