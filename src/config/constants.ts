@@ -1,5 +1,3 @@
-// File: src/config/constants.ts
-
 import {
   HELIUS_RPC_URL,
   HELIUS_API_KEY,
@@ -19,7 +17,7 @@ export const ENDPOINTS = {
     quote: 'https://api.jup.ag/swap/v1/quote',
     swap: SERVER_URL + '/api/jupiter/swap',
   },
-  // Raydium endpoints are fixed for now.
+  // Raydium endpoints
   raydium: {
     swapApi: 'https://transaction-v1.raydium.io',
     v3Api: 'https://api-v3.raydium.io',
@@ -30,10 +28,10 @@ export const ENDPOINTS = {
   },
   // Helius RPC endpoint from env
   helius: HELIUS_RPC_URL,
+  tensorFlowBaseUrl: 'https://api.mainnet.tensordev.io',
 };
 
 export const PUBLIC_KEYS = {
-  // Wrapped SOL mint – default constant (can be overridden by a new env value if desired)
   wSolMint: 'So11111111111111111111111111111111111111112',
   // Default receiver public key for transfers
   defaultReceiver: '24MDwQXG2TWiST8ty1rjcrKgtaYaMiLdRxFQawYgZh4v',

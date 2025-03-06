@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Image, Text, TouchableOpacity, View, Animated } from 'react-native';
 import { styles } from './buyCard.style';
-import Icons from '../../assets/svgs/index';
-import { DEFAULT_IMAGES } from '../../config/constants';
+import Icons from '../../../assets/svgs/index';
+import { DEFAULT_IMAGES } from '../../../config/constants';
 
 const BuyCard = () => {
   const [isArrowRotated, setIsArrowRotated] = useState(false);

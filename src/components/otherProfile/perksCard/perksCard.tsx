@@ -1,7 +1,7 @@
 import React from 'react';
 import {Image, Text, View} from 'react-native';
 import {styles} from './perksCard.style';
-import COLORS from '../../assets/colors';
+import COLORS from '../../../assets/colors';
 const PerksCard = () => {
   return (
     <>
@@ -12,7 +12,7 @@ const PerksCard = () => {
           {/* community image  */}
           <View style={styles.communityImgContainer}>
             <Image
-              source={require('../../assets/images/communityImg.png')}
+              source={require('../../../assets/images/communityImg.png')}
               style={styles.communityImg}
             />
           </View>

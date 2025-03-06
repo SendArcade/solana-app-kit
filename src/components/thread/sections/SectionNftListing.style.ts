@@ -1,5 +1,3 @@
-// FILE: src/components/thread/NftListingSection.style.ts
-
 import {StyleSheet} from 'react-native';
 
 export default StyleSheet.create({

@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -31,37 +31,13 @@ import {
   updateUsername,
 } from '../../../../state/auth/reducer';
 import {fetchWithRetries} from '../../../../utils/common/fetch';
-import {SERVER_URL, TENSOR_API_KEY} from '@env';
-import { DEFAULT_IMAGES } from '../../../../config/constants';
+import {SERVER_URL} from '@env';
+import {DEFAULT_IMAGES} from '../../../../config/constants';
+import { NftItem, useFetchNFTs } from '../../../../hooks/useFetchNFTs';
 
-interface NftItem {
-  mint: string;
-  name: string;
-  image: string;
-  collection?: string;
-}
+// NEW: Import our NFT hook
 
 const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
-
-/**
- * Helper to fix IPFS/ar:// URIs if needed.
- */
-function fixImageUrl(url: string): string {
-  if (!url) return '';
-  if (url.startsWith('ipfs://')) {
-    return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
-  }
-  if (url.startsWith('ar://')) {
-    return url.replace('ar://', 'https://arweave.net/');
-  }
-  if (url.startsWith('/')) {
-    return `https://arweave.net${url}`;
-  }
-  if (!url.startsWith('http') && !url.startsWith('data:')) {
-    return `https://${url}`;
-  }
-  return url;
-}
 
 export default function ProfileScreen() {
   const userWallet = useAppSelector(state => state.auth.address);
@@ -69,6 +45,7 @@ export default function ProfileScreen() {
   const storedUsername = useAppSelector(state => state.auth.username);
   const dispatch = useAppDispatch();
 
+  // All posts from Redux
   const {allPosts} = useAppSelector(state => state.thread);
   const [myPosts, setMyPosts] = useState<ThreadPost[]>([]);
 
@@ -84,24 +61,25 @@ export default function ProfileScreen() {
   // Modal for avatar picking approach
   const [avatarOptionModalVisible, setAvatarOptionModalVisible] =
     useState(false);
-  const [confirmModalVisible, setConfirmModalVisible] = useState<boolean>(false);
+  const [confirmModalVisible, setConfirmModalVisible] =
+    useState<boolean>(false);
 
   // This state stores the new avatar URI (from library or NFT)
   const [localFileUri, setLocalFileUri] = useState<string | null>(null);
-  // We use selectedSource to know if the image came from 'library' or 'nft'
+  // If the image came from 'library' or 'nft'
   const [selectedSource, setSelectedSource] = useState<
     'library' | 'nft' | null
   >(null);
 
-  // NFT modal states
+  // NFT modal states (We now rely on the `useFetchNFTs` hook)
   const [nftsModalVisible, setNftsModalVisible] = useState(false);
-  const [ownedNfts, setOwnedNfts] = useState<NftItem[]>([]);
-  const [loadingNfts, setLoadingNfts] = useState(false);
-  const [fetchNftsError, setFetchNftsError] = useState<string | null>(null);
+  const {
+    nfts: ownedNfts,
+    loading: loadingNfts,
+    error: fetchNftsError,
+  } = useFetchNFTs(userWallet || undefined);
 
-  /*******************************************************
-   * Request media library permissions
-   *******************************************************/
+  // Request media library permissions on mount
   useEffect(() => {
     (async () => {
       const {status} = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -114,25 +92,20 @@ export default function ProfileScreen() {
     })();
   }, []);
 
-  /*******************************************************
-   * Load user’s posts
-   *******************************************************/
+  // Load user’s posts
   useEffect(() => {
     if (!userWallet) {
       setMyPosts([]);
       return;
     }
-    const userPosts = allPosts.filter(p => {
-      console.log('Post being checked:', p, userWallet);
-      return p.user.id.toLowerCase() === userWallet.toLowerCase();
-    });
+    const userPosts = allPosts.filter(
+      p => p.user.id.toLowerCase() === userWallet.toLowerCase(),
+    );
     userPosts.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
     setMyPosts(userPosts);
   }, [allPosts, userWallet]);
 
-  /*******************************************************
-   * Load user’s Profile Pic + username from DB
-   *******************************************************/
+  // Load user’s Profile Pic + username from DB (via Redux)
   useEffect(() => {
     if (userWallet) {
       dispatch(fetchUserProfile(userWallet))
@@ -146,9 +119,9 @@ export default function ProfileScreen() {
     }
   }, [userWallet, dispatch]);
 
-  /*******************************************************
-   * Library Image Picker (inline confirmation)
-   *******************************************************/
+  /**
+   * Library Image Picker (inline confirmation).
+   */
   const handlePickProfilePicture = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -166,55 +139,17 @@ export default function ProfileScreen() {
     }
   };
 
-  /*******************************************************
+  /**
    * NFT Flow: Show NFT selection modal
-   *******************************************************/
+   */
   const handleSelectNftOption = () => {
     setAvatarOptionModalVisible(false);
     setNftsModalVisible(true);
-    fetchOwnedNfts();
   };
 
-  const fetchOwnedNfts = useCallback(async () => {
-    if (!userWallet) return;
-    setLoadingNfts(true);
-    setOwnedNfts([]);
-    setFetchNftsError(null);
-    try {
-      const url = `https://api.mainnet.tensordev.io/api/v1/user/portfolio?wallet=${userWallet}&includeUnverified=true&includeCompressed=true&includeFavouriteCount=true`;
-      const options = {
-        method: 'GET',
-        headers: {
-          accept: 'application/json',
-          'x-tensor-api-key': TENSOR_API_KEY,
-        },
-      };
-      const response = await fetchWithRetries(url, options);
-      if (!response.ok) {
-        throw new Error(
-          `Portfolio API request failed with status ${response.status}`,
-        );
-      }
-      const data = await response.json();
-      const dataArray = Array.isArray(data) ? data : [];
-      const mappedNfts: NftItem[] = dataArray
-        .map((item: any) => {
-          if (!item.setterMintMe) return null;
-          const mint = item.setterMintMe;
-          const name = item.name || 'Unnamed NFT';
-          const img = fixImageUrl(item.imageUri || '');
-          const collection = item.slugDisplay || '';
-          return {mint, name, image: img, collection};
-        })
-        .filter(Boolean) as NftItem[];
-      setOwnedNfts(mappedNfts);
-    } catch (err: any) {
-      setFetchNftsError(err.message);
-    } finally {
-      setLoadingNfts(false);
-    }
-  }, [userWallet]);
-
+  /**
+   * Confirmation after picking an NFT
+   */
   const handleSelectNftAsAvatar = (nft: NftItem) => {
     setLocalFileUri(nft.image);
     setSelectedSource('nft');
@@ -222,9 +157,9 @@ export default function ProfileScreen() {
     setConfirmModalVisible(true);
   };
 
-  /*******************************************************
-   * Confirm Upload (common for library or NFT)
-   *******************************************************/
+  /**
+   * Actually upload the new avatar to the server
+   */
   const handleConfirmUpload = async () => {
     if (!localFileUri) {
       Alert.alert('Missing Image', 'No image to upload.');
@@ -273,23 +208,26 @@ export default function ProfileScreen() {
     setSelectedSource(null);
   };
 
-  /*******************************************************
-   * Edit Name Modal Flow
-   *******************************************************/
+  /**
+   * Edit Name Modal
+   */
   const handleOpenEditModal = () => {
     setTempName(storedUsername || '');
     setEditNameModalVisible(true);
   };
 
   const handleSaveName = async () => {
-    if (!userWallet) return Alert.alert('No wallet to update name');
+    if (!userWallet) {
+      Alert.alert('No wallet to update name');
+      return;
+    }
     if (!tempName.trim()) {
       Alert.alert('Empty Name', 'Please enter a valid name');
       return;
     }
     try {
       await dispatch(
-        updateUsername({ userId: userWallet, newUsername: tempName.trim() }),
+        updateUsername({userId: userWallet, newUsername: tempName.trim()}),
       ).unwrap();
     } catch (err: any) {
       Alert.alert('Update Name Failed', err.message || 'Unknown error');
@@ -298,18 +236,16 @@ export default function ProfileScreen() {
     }
   };
 
-  /*******************************************************
+  /**
    * Render user’s posts
-   *******************************************************/
+   */
   const renderPostItem = ({item}: {item: ThreadPost}) => {
     const firstTextSection = item.sections.find(s => !!s.text)?.text;
     return (
       <View style={styles.postItemContainer}>
         <Image
           source={
-            item.user.avatar
-              ? {uri: item.user.avatar}
-              : DEFAULT_IMAGES.user
+            item.user.avatar ? {uri: item.user.avatar} : DEFAULT_IMAGES.user
           }
           style={styles.postItemAvatar}
         />
@@ -351,14 +287,11 @@ export default function ProfileScreen() {
           style={styles.profileAvatarWrapper}
           onPress={() => setAvatarOptionModalVisible(true)}>
           <Image
-            source={
-              profilePicUrl
-                ? {uri: profilePicUrl}
-                : DEFAULT_IMAGES.user
-            }
+            source={profilePicUrl ? {uri: profilePicUrl} : DEFAULT_IMAGES.user}
             style={styles.profileAvatar}
           />
         </TouchableOpacity>
+
         <View style={styles.profileTextInfo}>
           <Text style={styles.profileUsername}>
             {storedUsername || 'My Profile'}
@@ -379,11 +312,15 @@ export default function ProfileScreen() {
             Explorer, builder, and #Solana advocate. Sharing my journey in web3.
           </Text>
         </View>
+
         <View style={styles.actionButtonsRow}>
-          <TouchableOpacity style={styles.editProfileBtn} onPress={handleOpenEditModal}>
+          <TouchableOpacity
+            style={styles.editProfileBtn}
+            onPress={handleOpenEditModal}>
             <Text style={styles.editProfileBtnText}>Edit Profile</Text>
           </TouchableOpacity>
         </View>
+
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>42</Text>
@@ -430,7 +367,7 @@ export default function ProfileScreen() {
         ListEmptyComponent={
           <View style={styles.noPostContainer}>
             <Text style={styles.noPostText}>
-              You haven&apos;t posted or replied yet!
+              You haven't posted or replied yet!
             </Text>
           </View>
         }
@@ -438,7 +375,7 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.flatListContent}
       />
 
-      {/** (A) Modal for choosing avatar approach */}
+      {/* (A) Modal for choosing avatar approach */}
       <Modal
         animationType="fade"
         transparent
@@ -466,7 +403,7 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/** (B) NFT Selection Modal */}
+      {/* (B) NFT Selection Modal */}
       <Modal
         animationType="slide"
         transparent
@@ -475,10 +412,12 @@ export default function ProfileScreen() {
         <View style={modalUI.nftOverlay}>
           <View style={modalUI.nftContainer}>
             <Text style={modalUI.nftTitle}>Select an NFT</Text>
+
             {loadingNfts ? (
               <View style={{marginTop: 20}}>
                 <ActivityIndicator size="large" color="#1d9bf0" />
-                <Text style={{marginTop: 8, color: '#666', textAlign: 'center'}}>
+                <Text
+                  style={{marginTop: 8, color: '#666', textAlign: 'center'}}>
                   Loading your NFTs...
                 </Text>
               </View>
@@ -527,6 +466,7 @@ export default function ProfileScreen() {
                 }
               />
             )}
+
             <TouchableOpacity
               style={[modalUI.closeButton, {marginTop: 10}]}
               onPress={() => setNftsModalVisible(false)}>
@@ -536,7 +476,7 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/** (C) Confirm NFT Upload Modal */}
+      {/* (C) Confirm NFT Upload Modal */}
       {selectedSource === 'nft' && confirmModalVisible && (
         <Modal
           animationType="fade"
@@ -553,7 +493,10 @@ export default function ProfileScreen() {
                   source={{uri: localFileUri}}
                   style={confirmModalUI.preview}
                   onError={err => {
-                    Alert.alert('Image Load Error', JSON.stringify(err.nativeEvent));
+                    Alert.alert(
+                      'Image Load Error',
+                      JSON.stringify(err.nativeEvent),
+                    );
                   }}
                 />
               ) : (
@@ -561,6 +504,7 @@ export default function ProfileScreen() {
                   No pending image
                 </Text>
               )}
+
               <View style={confirmModalUI.buttonRow}>
                 <TouchableOpacity
                   style={[
@@ -584,7 +528,7 @@ export default function ProfileScreen() {
         </Modal>
       )}
 
-      {/** (D) Edit Name Modal */}
+      {/* (D) Edit Name Modal */}
       <Modal
         animationType="slide"
         transparent
@@ -624,9 +568,6 @@ const androidStyles = StyleSheet.create({
   },
 });
 
-/**
- * Minimal local styles for the "Edit Name" modal
- */
 const editModalStyles = StyleSheet.create({
   overlay: {
     flex: 1,

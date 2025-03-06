@@ -4,11 +4,9 @@ import ThreadAncestors from './ThreadAncestors';
 import PostHeader from './PostHeader';
 import PostBody from './PostBody';
 import PostFooter from './PostFooter';
-import PostCTA from './PostCTA'; // Import PostCTA
+import PostCTA from './PostCTA';
 import ThreadComposer from './ThreadComposer';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
-import {useAppDispatch} from '../../hooks/useReduxHooks';
-// import {deletePost} from '../../state/thread/reducer';
 import {ThreadCTAButton, ThreadPost, ThreadUser} from './thread.types';
 
 interface ThreadItemProps {
@@ -29,13 +27,12 @@ export default function ThreadItem({
   rootPosts,
   depth = 0,
   onPressPost,
-  ctaButtons, // Pass CTA buttons
+  ctaButtons,
   themeOverrides,
   styleOverrides,
   userStyleSheet,
 }: ThreadItemProps) {
   const [showReplyComposer, setShowReplyComposer] = useState(false);
-  const dispatch = useAppDispatch();
 
   const mergedTheme = getMergedTheme(themeOverrides);
   const styles = createThreadStyles(
@@ -58,7 +55,7 @@ export default function ThreadItem({
       Alert.alert('Cannot Delete', 'You are not the owner of this post.');
       return;
     }
-    // dispatch(deletePost({postId: p.id}));
+    // If you have a delete post logic, call it here
   };
 
   const Wrapper = onPressPost ? TouchableOpacity : View;
@@ -91,10 +88,8 @@ export default function ThreadItem({
           styleOverrides={styleOverrides}
         />
 
-        {/* Add PostCTA here */}
         <PostCTA
           post={post}
-          // buttons={ctaButtons}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
           userStyleSheet={userStyleSheet}
@@ -128,7 +123,7 @@ export default function ThreadItem({
           rootPosts={rootPosts}
           depth={depth + 1}
           onPressPost={onPressPost}
-          ctaButtons={ctaButtons} // Pass CTA buttons to replies
+          ctaButtons={ctaButtons}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
           userStyleSheet={userStyleSheet}

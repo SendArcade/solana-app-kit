@@ -9,7 +9,7 @@ import {
   Image,
 } from 'react-native';
 import {useSelector} from 'react-redux';
-import {useAppDispatch} from '../../../../hooks/useReduxHooks';
+import {useAppDispatch, useAppSelector} from '../../../../hooks/useReduxHooks';
 import {fetchAllPosts} from '../../../../state/thread/reducer';
 import {RootState} from '../../../../state/store';
 import {
@@ -19,7 +19,7 @@ import {
 import {PostBody, ThreadComposer} from '../../../../components/thread';
 import PostCTA from '../../../../components/thread/PostCTA';
 import {styles, androidStyles, chatBodyOverrides} from './ChatScreen.styles';
-import { DEFAULT_IMAGES } from '../../../../config/constants';
+import {DEFAULT_IMAGES} from '../../../../config/constants';
 
 export default function ChatScreen() {
   const dispatch = useAppDispatch();
@@ -30,15 +30,16 @@ export default function ChatScreen() {
   const userWallet = useSelector((state: RootState) => state.auth.address);
   const [sortedPosts, setSortedPosts] = useState<ThreadPost[]>([]);
   const flatListRef = useRef<FlatList<any>>(null);
+  const userName = useAppSelector(state => state.auth.username);
 
   const currentUser: ThreadUser = {
     id: userWallet || 'anonymous-user',
-    username: 'Alice',
-    handle: '@aliceSmith',
+    username: userName || 'Anonymous',
+    handle: userWallet
+      ? '@' + userWallet.slice(0, 6) + '...' + userWallet.slice(-4)
+      : '@anonymous',
     verified: true,
-    avatar: storedProfilePic
-      ? {uri: storedProfilePic}
-      : DEFAULT_IMAGES.user,
+    avatar: storedProfilePic ? {uri: storedProfilePic} : DEFAULT_IMAGES.user,
   };
 
   // Fetch all posts on mount
