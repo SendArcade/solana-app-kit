@@ -1,4 +1,4 @@
-// File: src/utils/pumpfun/pumpfunUtils.ts
+// FILE: src/utils/pumpfun/pumpfunUtils.ts
 
 import {
   PublicKey,
@@ -9,18 +9,15 @@ import {
 import {AnchorProvider} from '@coral-xyz/anchor';
 import {PumpFunSDK} from 'pumpdotfun-sdk';
 import {Buffer} from 'buffer';
-import { HELIUS_RPC_URL } from '@env';
+import {HELIUS_RPC_URL} from '@env';
+import { ENDPOINTS, PUBLIC_KEYS } from '../../config/constants';
 
-// ------------------------------------
-// 1) Core Provider
-// ------------------------------------
+/**
+ * Setup: a standard AnchorProvider.
+ */
 export function getProvider(): AnchorProvider {
-  const connection = new Connection(
-    // Use your chain’s endpoint:
-    HELIUS_RPC_URL,
-    'confirmed',
-  );
-  // Just a dummy signer for AnchorProvider:
+  const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
+  // Dummy wallet (no signing needed here).
   const dummyWallet = {
     publicKey: new PublicKey('11111111111111111111111111111111'),
     signTransaction: async (tx: any) => tx,
@@ -31,99 +28,20 @@ export function getProvider(): AnchorProvider {
   });
 }
 
-// ------------------------------------
-// 2) Signing Utilities
-// ------------------------------------
-/**
- * Sign a legacy Transaction using Privy's signMessage
- */
-export async function signLegacyTransactionWithPrivy(
-  transaction: Transaction,
-  signerPubkey: PublicKey,
-  privyProvider: any,
-): Promise<Transaction> {
-  console.log('[signLegacyTransactionWithPrivy] Start signing (legacy).');
+/* ------------------------------------------------------------------
+   RAYDIUM UTILS
+--------------------------------------------------------------------- */
+const RAYDIUM_SWAP_API_BASE = ENDPOINTS.raydium.swapApi;
+const RAYDIUM_API_V3 = ENDPOINTS.raydium.v3Api;
 
-  const serializedMessage = transaction.serializeMessage();
-  const base64Msg = Buffer.from(serializedMessage).toString('base64');
-
-  const signResult = await privyProvider.request({
-    method: 'signMessage',
-    params: {message: base64Msg},
-  });
-  if (!signResult?.signature) {
-    throw new Error(
-      '[signLegacyTransactionWithPrivy] Invalid signature from provider.',
-    );
-  }
-  const signatureBuffer = Buffer.from(signResult.signature, 'base64');
-
-  transaction.addSignature(signerPubkey, signatureBuffer);
-
-  if (!transaction.verifySignatures()) {
-    throw new Error(
-      '[signLegacyTransactionWithPrivy] Signature verification failed.',
-    );
-  }
-  console.log('[signLegacyTransactionWithPrivy] Verified OK.');
-  return transaction;
-}
+export const RAYDIUM_SOL_MINT = PUBLIC_KEYS.wSolMint;
 
 /**
- * Sign a VersionedTransaction using Privy's signMessage
- */
-export async function signVersionedTransactionWithPrivy(
-  versionedTx: VersionedTransaction,
-  signerPubkey: PublicKey,
-  privyProvider: any,
-): Promise<VersionedTransaction> {
-  console.log('[signVersionedTransactionWithPrivy] Start signing (versioned).');
-
-  const serializedMsg = versionedTx.message.serialize();
-  const base64Msg = Buffer.from(serializedMsg).toString('base64');
-
-  const signResult = await privyProvider.request({
-    method: 'signMessage',
-    params: {message: base64Msg},
-  });
-  if (!signResult?.signature) {
-    throw new Error(
-      '[signVersionedTransactionWithPrivy] Invalid signature from provider.',
-    );
-  }
-  const signatureBuffer = Buffer.from(signResult.signature, 'base64');
-  versionedTx.addSignature(signerPubkey, signatureBuffer);
-
-  // Quick re-check
-  const reserialized = versionedTx.serialize();
-  const reCheck = VersionedTransaction.deserialize(reserialized);
-  if (!reCheck) {
-    throw new Error(
-      '[signVersionedTransactionWithPrivy] Re-deserialization failed.',
-    );
-  }
-
-  console.log(
-    '[signVersionedTransactionWithPrivy] Versioned transaction signed OK.',
-  );
-  return versionedTx;
-}
-
-// ------------------------------------
-// 3) Raydium & Bonding Helpers
-// ------------------------------------
-const RAYDIUM_SWAP_API_BASE = 'https://transaction-v1.raydium.io';
-const RAYDIUM_API_V3 = 'https://api-v3.raydium.io';
-export const RAYDIUM_SOL_MINT = 'So11111111111111111111111111111111111111112';
-
-/**
- * Check if a token mint is recognized by Raydium
+ * Check if a token is recognized by Raydium.
  */
 export async function checkIfTokenIsOnRaydium(
   mintAddress: string,
 ): Promise<boolean> {
-  console.log('[Raydium] Checking for mint:', mintAddress);
-
   const url = `${RAYDIUM_API_V3}/mint/ids?mints=${mintAddress}`;
   const response = await fetch(url);
   if (!response.ok) {
@@ -135,12 +53,11 @@ export async function checkIfTokenIsOnRaydium(
 }
 
 /**
- * Attempt to fetch Raydium's "auto-fee" for compute unit price
+ * Attempt to fetch Raydium's "auto-fee" for compute units.
  */
 export async function getSwapFee(): Promise<string> {
   console.log('[Raydium] getSwapFee() called.');
   const url = `${RAYDIUM_API_V3}/main/auto-fee`;
-
   const response = await fetch(url);
   if (!response.ok) {
     console.warn('[Raydium] getSwapFee() failed:', response.statusText);
@@ -163,12 +80,14 @@ export async function getSwapQuote(
   slippageBps = 200,
   txVersion = 'V0',
 ): Promise<any> {
-  const url = `${RAYDIUM_SWAP_API_BASE}/compute/swap-base-in?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountInLamports}&slippageBps=${slippageBps}&txVersion=${txVersion}`;
+  const url =
+    `${RAYDIUM_SWAP_API_BASE}/compute/swap-base-in` +
+    `?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountInLamports}` +
+    `&slippageBps=${slippageBps}&txVersion=${txVersion}`;
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(
-      `[Raydium] getSwapQuote() failed: ${await response.text()}`,
-    );
+    const errorText = await response.text();
+    throw new Error(`[Raydium] getSwapQuote() failed: ${errorText}`);
   }
   return response.json();
 }
@@ -212,9 +131,8 @@ export async function getSwapTransaction(params: {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(
-      `[Raydium] getSwapTransaction() failed: ${await response.text()}`,
-    );
+    const errorText = await response.text();
+    throw new Error(`[Raydium] getSwapTransaction() failed: ${errorText}`);
   }
   return response.json();
 }
@@ -229,9 +147,9 @@ export function parseRaydiumVersionedTransaction(
   return VersionedTransaction.deserialize(rawTx);
 }
 
-// ------------------------------------
-// 4) Pumpfun Bonding Helpers
-// ------------------------------------
+/* ------------------------------------------------------------------
+   PUMPFUN BONDING UTILS
+--------------------------------------------------------------------- */
 export interface PumpFunBuyParams {
   payerPubkey: PublicKey;
   tokenMint: PublicKey;
@@ -242,7 +160,7 @@ export interface PumpFunBuyParams {
 }
 
 /**
- * Build a transaction for a PumpFun "BUY" using their bonding curve
+ * Build a PumpFun "BUY" transaction using their bonding curve
  */
 export async function buildPumpFunBuyTransaction({
   payerPubkey,
@@ -279,7 +197,7 @@ export interface PumpFunSellParams {
 }
 
 /**
- * Build a transaction for a PumpFun "SELL" using their bonding curve
+ * Build a PumpFun "SELL" transaction using their bonding curve
  */
 export async function buildPumpFunSellTransaction({
   sellerPubkey,
@@ -293,7 +211,6 @@ export async function buildPumpFunSellTransaction({
     '[PumpFunBonding] buildPumpFunSellTransaction() =>',
     lamportsToSell.toString(),
   );
-
   const transaction = await sdk.getSellInstructionsByTokenAmount(
     sellerPubkey,
     tokenMint,

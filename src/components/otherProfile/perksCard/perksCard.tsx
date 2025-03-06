@@ -1,31 +1,7 @@
 import React from 'react';
 import {Image, Text, View} from 'react-native';
 import {styles} from './perksCard.style';
-import COLORS from '../../assets/colors';
-
-/**
- * A component that displays community benefits and token holding requirements
- * 
- * @component
- * @description
- * PerksCard is a component that showcases the benefits of joining a specific
- * community and the token holding requirements. The component displays:
- * - A "Perks" header
- * - Community image
- * - Community name and description
- * - Token holding requirement information
- * 
- * The component uses a clean, card-based design with consistent typography
- * and color schemes defined in the project's color palette.
- * 
- * @example
- * ```tsx
- * <PerksCard />
- * ```
- * 
- * Note: Currently uses hardcoded values for the Yash Community.
- * This could be made configurable through props in future iterations.
- */
+import COLORS from '../../../assets/colors';
 const PerksCard = () => {
   return (
     <>
@@ -36,7 +12,7 @@ const PerksCard = () => {
           {/* community image  */}
           <View style={styles.communityImgContainer}>
             <Image
-              source={require('../../assets/images/communityImg.png')}
+              source={require('../../../assets/images/communityImg.png')}
               style={styles.communityImg}
             />
           </View>

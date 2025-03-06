@@ -1,3 +1,5 @@
+import { DEFAULT_IMAGES } from "../config/constants";
+
 export const tweetsData = [
   {
     username: 'SEND',
@@ -7,7 +9,7 @@ export const tweetsData = [
     quoteCount: 297,
     retweetCount: 5600,
     reactionCount: 13600,
-    avatar: require('../assets/images/Smiley.png'),
+    avatar: DEFAULT_IMAGES.SENDlogo,
   },
   {
     username: 'CryptoFan',
@@ -17,7 +19,7 @@ export const tweetsData = [
     quoteCount: 120,
     retweetCount: 2000,
     reactionCount: 5000,
-    avatar: require('../assets/images/Smiley.png'),
+    avatar: DEFAULT_IMAGES.SENDlogo,
   },
   {
     username: 'TechGuru',
@@ -27,6 +29,6 @@ export const tweetsData = [
     quoteCount: 450,
     retweetCount: 9000,
     reactionCount: 23000,
-    avatar: require('../assets/images/Smiley.png'),
+    avatar: DEFAULT_IMAGES.SENDlogo,
   },
 ];

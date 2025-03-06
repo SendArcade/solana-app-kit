@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Image, Text, TouchableOpacity, View, Animated } from 'react-native';
 import { styles } from './buyCard.style';
-import Icons from '../../assets/svgs/index';
+import Icons from '../../../assets/svgs/index';
+import { DEFAULT_IMAGES } from '../../../config/constants';
 
 /**
  * A card component for purchasing creator coins
@@ -56,7 +57,7 @@ const BuyCard = () => {
         {/* Image container */}
         <View style={styles.imgContainer}>
           <Image
-            source={require('../../assets/images/user5.png')}
+            source={DEFAULT_IMAGES.user5}
             style={styles.img}
             resizeMode="cover"
           />

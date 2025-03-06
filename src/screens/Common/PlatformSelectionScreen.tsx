@@ -8,9 +8,10 @@ import {
   Dimensions,
   Animated,
   Image,
+  Platform,
 } from 'react-native';
 import {LinearGradient} from 'expo-linear-gradient';
-import { useAppNavigation } from '../../hooks/useAppNavigation';
+import {useAppNavigation} from '../../hooks/useAppNavigation';
 import COLORS from '../../assets/colors';
 
 const {width} = Dimensions.get('window');
@@ -73,7 +74,6 @@ export default function PlatformSelectionScreen() {
     }
   };
 
-
   const handlePressIn = (index: number): void => {
     Animated.spring(scaleAnim[index], {
       toValue: 0.97,
@@ -97,7 +97,11 @@ export default function PlatformSelectionScreen() {
       style={styles.gradientBackground}>
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
-        <View style={styles.header}>
+        <View
+          style={[
+            styles.header,
+            Platform.OS === 'android' && styles.androidHeader,
+          ]}>
           <Animated.Text style={[styles.title, {opacity: fadeAnim}]}>
             Choose Your Platform
           </Animated.Text>
@@ -165,6 +169,9 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 30,
     paddingHorizontal: 20,
+  },
+  androidHeader: {
+    paddingTop: 70, // Additional padding for Android devices
   },
   title: {
     fontSize: 30,

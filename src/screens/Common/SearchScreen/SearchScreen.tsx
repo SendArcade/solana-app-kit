@@ -6,6 +6,7 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import {useAuth} from '../../../hooks/useAuth';
 import {useNavigation} from '@react-navigation/native';
@@ -54,6 +55,13 @@ const sections = [
   },
 ];
 
+// Define additional Android-specific styles
+const androidStyles = StyleSheet.create({
+  safeArea: {
+    paddingTop: 30,
+  },
+});
+
 export default function SearchScreen() {
   const {logout} = useAuth();
   const navigation = useNavigation();
@@ -65,7 +73,11 @@ export default function SearchScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView
+      style={[
+        styles.safeArea,
+        Platform.OS === 'android' && androidStyles.safeArea,
+      ]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Menu</Text>
         <TouchableOpacity onPress={logout} style={styles.logoutButton}>

@@ -5,6 +5,7 @@ import Icons from '../../../../../../assets/svgs/index'
 import { FlatList } from 'react-native-gesture-handler'
 import { SuggestionsCard, Tweet } from '../../../../../../components'
 import LineGraph from './LineGraph'
+import { DEFAULT_IMAGES } from '../../../../../../config/constants'
 
 const cardData = Array(10).fill({})
 const tweetData = [
@@ -16,7 +17,7 @@ const tweetData = [
     quoteCount: 123,
     retweetCount: 456,
     reactionCount: 789,
-    avatar: require('../../../../../../assets/images/Smiley.png'),
+    avatar: DEFAULT_IMAGES.SENDlogo,
   },
   {
     username: 'SolanaBuilder',
@@ -27,7 +28,7 @@ const tweetData = [
     quoteCount: 245,
     retweetCount: 678,
     reactionCount: 912,
-    avatar: require('../../../../../../assets/images/Smiley.png'),
+    avatar: DEFAULT_IMAGES.SENDlogo,
   },
 ];
 
@@ -63,7 +64,7 @@ export const TopScreen = () => {
             <View style={styles.coin}>
               <View>
                 <Image
-                  source={require('../../../../../../assets/images/Smiley.png')}
+                  source={DEFAULT_IMAGES.SENDlogo}
                   style={styles.avatar}
                 />
               </View>
@@ -169,7 +170,7 @@ export const TopScreen = () => {
                 {/* Left Side */}
                 <View style={styles.modalHeaderLeft}>
                   <Image
-                    source={require('../../../../../../assets/images/Smiley.png')}
+                    source={DEFAULT_IMAGES.SENDlogo}
                     style={styles.modalAvatar}
                   />
                   <View style={styles.modalHeaderTexts}>
@@ -202,7 +203,7 @@ export const TopScreen = () => {
                     <Text style={styles.modalTopButtonText}>Held by</Text>
                     <View style={styles.modalAvatarStack}>
                       <Image
-                        source={require('../../../../../../assets/images/Smiley.png')}
+                        source={DEFAULT_IMAGES.SENDlogo}
                         style={styles.modalStackAvatar1}
                       />
                       <Image

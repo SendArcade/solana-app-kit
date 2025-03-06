@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -10,27 +10,29 @@ import {
   Image,
   Alert,
   ActivityIndicator,
-  StyleSheet
+  StyleSheet,
 } from 'react-native';
 import {
   Connection,
   Transaction,
   VersionedTransaction,
   PublicKey,
-  SendTransactionError
+  SendTransactionError,
+  clusterApiUrl,
+  Cluster,
 } from '@solana/web3.js';
 import {
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
-  getAccount
+  getAccount,
 } from '@solana/spl-token';
-import { HELIUS_API_KEY, TENSOR_API_KEY } from '@env';
-import { sellStyles as styles } from './sellSection.styles';
-import { useDispatch } from 'react-redux';
-import { ThreadSection } from '../../../components/thread/thread.types';
-import { addRootPost } from '../../../state/thread/reducer';
-import { fetchWithRetries } from '../../../utils/common/fetch';
-
+import {CLUSTER, HELIUS_API_KEY, HELIUS_RPC_URL, TENSOR_API_KEY} from '@env';
+import {sellStyles as styles} from './sellSection.styles';
+import {useDispatch} from 'react-redux';
+import {ThreadSection} from '../../../components/thread/thread.types';
+// import {addRootPost} from '../../../state/thread/reducer';
+import {fetchWithRetries} from '../../../utils/common/fetch';
+import { ENDPOINTS } from '../../../config/constants';
 
 const SOL_TO_LAMPORTS = 1_000_000_000;
 
@@ -54,10 +56,13 @@ interface SellSectionProps {
 /** Helper to fix various NFT image URI formats. */
 function fixImageUrl(url: string): string {
   if (!url) return '';
-  if (url.startsWith('ipfs://')) return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
-  if (url.startsWith('ar://')) return url.replace('ar://', 'https://arweave.net/');
+  if (url.startsWith('ipfs://'))
+    return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
+  if (url.startsWith('ar://'))
+    return url.replace('ar://', 'https://arweave.net/');
   if (url.startsWith('/')) return `https://arweave.net${url}`;
-  if (!url.startsWith('http') && !url.startsWith('data:')) return `https://${url}`;
+  if (!url.startsWith('http') && !url.startsWith('data:'))
+    return `https://${url}`;
   return url;
 }
 
@@ -68,7 +73,7 @@ async function ensureAtaIfNeeded(
   connection: Connection,
   mint: string,
   owner: string,
-  userWallet: any
+  userWallet: any,
 ) {
   const mintPubkey = new PublicKey(mint);
   const ownerPubkey = new PublicKey(owner);
@@ -84,18 +89,18 @@ async function ensureAtaIfNeeded(
     ownerPubkey,
     ataAddr,
     ownerPubkey,
-    mintPubkey
+    mintPubkey,
   );
   createTx.add(instruction);
-  const { blockhash } = await connection.getLatestBlockhash();
+  const {blockhash} = await connection.getLatestBlockhash();
   createTx.recentBlockhash = blockhash;
   createTx.feePayer = ownerPubkey;
 
   const provider = await userWallet.getProvider();
   console.log('[ensureAtaIfNeeded] about to sign ATA creation TX...');
-  const { signature } = await provider.request({
+  const {signature} = await provider.request({
     method: 'signAndSendTransaction',
-    params: { transaction: createTx, connection }
+    params: {transaction: createTx, connection},
   });
   console.log('ATA creation signature:', signature);
   return ataAddr;
@@ -108,36 +113,44 @@ async function getRealCompressedNFTData(nft: NftItem, ownerAddress: string) {
   console.log('[getRealCompressedNFTData] Called for NFT:', nft);
   const url = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
   const body = {
-    jsonrpc: "2.0",
-    id: "my-id",
-    method: "getAssetProof",
+    jsonrpc: '2.0',
+    id: 'my-id',
+    method: 'getAssetProof',
     params: {
-      id: nft.mint  // assuming the mint is used as the asset ID
-    }
+      id: nft.mint, // assuming the mint is used as the asset ID
+    },
   };
-  console.log('[getRealCompressedNFTData] Fetching asset proof from Helius with URL:', url);
+  console.log(
+    '[getRealCompressedNFTData] Fetching asset proof from Helius with URL:',
+    url,
+  );
   const resp = await fetch(url, {
     method: 'POST',
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
   });
   if (!resp.ok) {
     throw new Error(`Failed to fetch asset proof from Helius: ${resp.status}`);
   }
   const json = await resp.json();
-  console.log('[getRealCompressedNFTData] Helius getAssetProof response:', json);
+  console.log(
+    '[getRealCompressedNFTData] Helius getAssetProof response:',
+    json,
+  );
   const result = json.result;
   if (!result || !result.tree_id) {
     throw new Error('Helius response missing asset proof data.');
   }
   // If proof is an array of arrays, take the first array.
-  const proof = Array.isArray(result.proof) && Array.isArray(result.proof[0])
-    ? result.proof[0]
-    : result.proof;
+  const proof =
+    Array.isArray(result.proof) && Array.isArray(result.proof[0])
+      ? result.proof[0]
+      : result.proof;
   // Use the returned leaf as the dataHash.
   const dataHash = result.leaf;
   // Use a dummy creatorsHash (adjust if you can fetch the actual value).
-  const creatorsHash = "0000000000000000000000000000000000000000000000000000000000000000";
+  const creatorsHash =
+    '0000000000000000000000000000000000000000000000000000000000000000';
   // Use canopyDepth from the result if provided; otherwise, default to 14.
   const canopyDepth = result.canopyDepth || 14;
   const leafIndex = result.node_index;
@@ -148,11 +161,14 @@ async function getRealCompressedNFTData(nft: NftItem, ownerAddress: string) {
     canopyDepth,
     leafIndex,
     dataHash,
-    creatorsHash
+    creatorsHash,
   };
 }
 
-const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) => {
+const SellSection: React.FC<SellSectionProps> = ({
+  userPublicKey,
+  userWallet,
+}) => {
   const dispatch = useDispatch();
 
   const [loadingNfts, setLoadingNfts] = useState(false);
@@ -179,24 +195,27 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
     setFetchError(null);
     console.log('[fetchOwnedNfts] for wallet:', userPublicKey);
 
-    const url = `https://api.mainnet.tensordev.io/api/v1/user/portfolio?wallet=${userPublicKey}&includeUnverified=true&includeCompressed=true`;
+    const url = `https://api.mainnet.tensordev.io/api/v1/user/portfolio?wallet=${userPublicKey}&includeUnverified=true&includeCompressed=true&includeFavouriteCount=true`;
     const options = {
       method: 'GET',
       headers: {
         accept: 'application/json',
-        'x-tensor-api-key': TENSOR_API_KEY
-      }
+        'x-tensor-api-key': TENSOR_API_KEY,
+      },
     };
     try {
       const response = await fetchWithRetries(url, options);
+      console.log('[fetchOwnedNfts] response:', response);
       if (!response.ok) {
-        throw new Error(`Portfolio API request failed with status ${response.status}`);
+        throw new Error(
+          `Portfolio API request failed with status ${response.status}`,
+        );
       }
       const data = await response.json();
       const dataArray = Array.isArray(data) ? data : [];
       const mappedNfts: NftItem[] = dataArray
         .map((item: any) => {
-          if (!item.setterMintMe) return null;
+          // if (!item.setterMintMe) return null;
           const mint = item.setterMintMe;
           const name = item.name || 'Unnamed NFT';
           const image = item.imageUri ? fixImageUrl(item.imageUri) : '';
@@ -209,7 +228,16 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
             const lamports = parseInt(item.statsV2.buyNowPrice, 10);
             priceSol = lamports / SOL_TO_LAMPORTS;
           }
-          return { mint, name, description, symbol, collection, image, priceSol, isCompressed };
+          return {
+            mint,
+            name,
+            description,
+            symbol,
+            collection,
+            image,
+            priceSol,
+            isCompressed,
+          };
         })
         .filter(Boolean) as NftItem[];
       console.log('[fetchOwnedNfts] Mapped NFTs:', mappedNfts);
@@ -232,8 +260,8 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
         method: 'GET',
         headers: {
           accept: 'application/json',
-          'x-tensor-api-key': TENSOR_API_KEY
-        }
+          'x-tensor-api-key': TENSOR_API_KEY,
+        },
       };
       const res = await fetch(url, options);
       if (!res.ok) {
@@ -258,7 +286,7 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
             collection: nftCollection,
             image: nftImage,
             priceSol,
-            isCompressed: item.compressed || false
+            isCompressed: item.compressed || false,
           } as NftItem;
         });
         console.log('[fetchActiveListings] fetched:', mappedListings);
@@ -288,20 +316,30 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
       Alert.alert('Error', 'Wallet not connected.');
       return;
     }
-    console.log('[handleSellNftOnTensor] Starting listing, selected NFT:', selectedNft);
+    console.log(
+      '[handleSellNftOnTensor] Starting listing, selected NFT:',
+      selectedNft,
+    );
     try {
-      const connection = new Connection('https://api.mainnet-beta.solana.com');
+      const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
+      const connection = new Connection(rpcUrl, 'confirmed');
       const priceLamports = Math.floor(parseFloat(salePrice) * SOL_TO_LAMPORTS);
       let expiryValue: number | undefined;
       if (durationDays && !isNaN(parseFloat(durationDays))) {
         const nowSeconds = Math.floor(Date.now() / 1000);
         const addedSeconds = parseFloat(durationDays) * 24 * 60 * 60;
         expiryValue = nowSeconds + addedSeconds;
-        console.log('[handleSellNftOnTensor] Listing expiry (seconds):', expiryValue);
+        console.log(
+          '[handleSellNftOnTensor] Listing expiry (seconds):',
+          expiryValue,
+        );
       }
       if (selectedNft.isCompressed) {
         // For now, alert the user that selling compressed NFTs is not supported.
-        Alert.alert("Unsupported", "Selling compressed NFTs is not supported as of now.");
+        Alert.alert(
+          'Unsupported',
+          'Selling compressed NFTs is not supported as of now.',
+        );
         return;
         /* 
         // Uncomment this block when you are ready to enable cNFT sales:
@@ -374,8 +412,13 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
         */
       } else {
         console.log('[handleSellNftOnTensor] This NFT is NOT compressed.');
-        await ensureAtaIfNeeded(connection, selectedNft.mint, userPublicKey, userWallet);
-        const { blockhash } = await connection.getLatestBlockhash();
+        await ensureAtaIfNeeded(
+          connection,
+          selectedNft.mint,
+          userPublicKey,
+          userWallet,
+        );
+        const {blockhash} = await connection.getLatestBlockhash();
         const mintAddress = selectedNft.mint;
         const listUrl =
           `https://api.mainnet.tensordev.io/api/v1/tx/list` +
@@ -384,14 +427,17 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
           `&blockhash=${blockhash}`;
         console.log('[handleSellNftOnTensor] calling list endpoint:', listUrl);
         const resp = await fetch(listUrl, {
-          headers: { 'x-tensor-api-key': TENSOR_API_KEY }
+          headers: {'x-tensor-api-key': TENSOR_API_KEY},
         });
         const rawText = await resp.text();
         let data: any;
         try {
           data = JSON.parse(rawText);
         } catch (parseErr) {
-          console.error('[handleSellNftOnTensor] failed to parse JSON from Tensor:', rawText);
+          console.error(
+            '[handleSellNftOnTensor] failed to parse JSON from Tensor:',
+            rawText,
+          );
           throw new Error('Tensor returned non-JSON response. Check the logs.');
         }
         if (!data.txs?.length) {
@@ -410,12 +456,16 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
           } else {
             throw new Error(`Transaction #${i + 1} is in an unknown format.`);
           }
-          console.log(`[handleSellNftOnTensor] signing standard NFT TX #${i + 1}...`);
-          const { signature } = await provider.request({
+          console.log(
+            `[handleSellNftOnTensor] signing standard NFT TX #${i + 1}...`,
+          );
+          const {signature} = await provider.request({
             method: 'signAndSendTransaction',
-            params: { transaction, connection }
+            params: {transaction, connection},
           });
-          console.log(`[handleSellNftOnTensor] TX #${i + 1} confirmed. Sig: ${signature}`);
+          console.log(
+            `[handleSellNftOnTensor] TX #${i + 1} confirmed. Sig: ${signature}`,
+          );
         }
         Alert.alert('Success', `NFT listed at ${salePrice} SOL!`);
       }
@@ -434,13 +484,13 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
       Alert.alert('Not logged in', 'Connect your wallet first');
       return;
     }
-    
+
     // We'll create a new Root Post that includes an NFT_LISTING section
     const sections: ThreadSection[] = [
       {
         id: 'section-' + Math.random().toString(36).substring(2),
         type: 'NFT_LISTING',
-        text: "I’ve listed this NFT. Anyone interested in buying?",
+        text: 'I’ve listed this NFT. Anyone interested in buying?',
         listingData: {
           mint: item.mint,
           owner: userPublicKey, // The user who listed
@@ -450,46 +500,51 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
         },
       },
     ];
-  
+
     // Dispatch to Redux:
-    dispatch(addRootPost({
-      user: {
-        id: userPublicKey,
-        username: 'Aranav',  // or from your profile data
-        handle: '@' + userPublicKey.slice(0, 5),
-        avatar: require('../../../assets/images/User.png'), // or your actual avatar
-      },
-      sections,
-    }));
-  
+    // dispatch(
+    //   addRootPost({
+    //     user: {
+    //       id: userPublicKey,
+    //       username: 'Aranav', // or from your profile data
+    //       handle: '@' + userPublicKey.slice(0, 5),
+    //       avatar: require('../../../assets/images/User.png'), // or your actual avatar
+    //     },
+    //     sections,
+    //   }),
+    // );
+
     Alert.alert('Shared to Feed', 'A new post was created in the feed!');
   };
 
-  const renderActiveListingCard = ({ item }: { item: NftItem }) => (
+  const renderActiveListingCard = ({item}: {item: NftItem}) => (
     <View style={styles.listedCard}>
       <View style={styles.imageContainer}>
         {item.image ? (
-          <Image source={{ uri: item.image }} style={styles.nftImage} />
+          <Image source={{uri: item.image}} style={styles.nftImage} />
         ) : (
           <View style={styles.placeholderImage}>
             <Text style={styles.placeholderText}>No Image</Text>
           </View>
         )}
         {item.isCompressed && (
-          <View style={{
-            position: 'absolute',
-            top: 5,
-            left: 5,
-            backgroundColor: '#FF4500',
-            paddingHorizontal: 4,
-            paddingVertical: 2,
-            borderRadius: 4
-          }}>
-            <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>cNFT</Text>
+          <View
+            style={{
+              position: 'absolute',
+              top: 5,
+              left: 5,
+              backgroundColor: '#FF4500',
+              paddingHorizontal: 4,
+              paddingVertical: 2,
+              borderRadius: 4,
+            }}>
+            <Text style={{color: 'white', fontSize: 10, fontWeight: 'bold'}}>
+              cNFT
+            </Text>
           </View>
         )}
       </View>
-  
+
       <View style={styles.nftDetails}>
         <Text style={styles.nftName} numberOfLines={1}>
           {item.name}
@@ -500,43 +555,48 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
           </Text>
         )}
         <Text style={styles.mintAddress} numberOfLines={1}>
-          {item.mint ? item.mint.slice(0, 8) + '...' + item.mint.slice(-4) : 'No Mint'}
+          {item.mint
+            ? item.mint.slice(0, 8) + '...' + item.mint.slice(-4)
+            : 'No Mint'}
         </Text>
         {item.priceSol !== undefined && (
-          <Text style={styles.priceText}>Listed @ {item.priceSol.toFixed(2)} SOL</Text>
+          <Text style={styles.priceText}>
+            Listed @ {item.priceSol.toFixed(2)} SOL
+          </Text>
         )}
       </View>
-  
+
       {/* Add a "Share to Feed" button here */}
-      <TouchableOpacity
+      {/* <TouchableOpacity
         style={{
           backgroundColor: '#32D4DE',
           margin: 8,
           paddingVertical: 6,
           borderRadius: 6,
-          alignItems: 'center'
+          alignItems: 'center',
         }}
-        onPress={() => handleShareToFeed(item)}
-      >
-        <Text style={{ color: '#fff', fontWeight: '600' }}>Share to Feed</Text>
-      </TouchableOpacity>
+        onPress={() => handleShareToFeed(item)}>
+        <Text style={{color: '#fff', fontWeight: '600'}}>Share to Feed</Text>
+      </TouchableOpacity> */}
     </View>
   );
 
-  const renderNftCard = ({ item }: { item: NftItem }) => {
+  const renderNftCard = ({item}: {item: NftItem}) => {
     const isSelected = selectedNft?.mint === item.mint;
     return (
       <TouchableOpacity
         style={[
           styles.nftCard,
           isSelected && styles.nftCardSelected,
-          item.isCompressed && { borderColor: '#FFD700', backgroundColor: '#FFF8DC' }
+          item.isCompressed && {
+            borderColor: '#FFD700',
+            backgroundColor: '#FFF8DC',
+          },
         ]}
-        onPress={() => setSelectedNft(item)}
-      >
+        onPress={() => setSelectedNft(item)}>
         <View style={styles.imageContainer}>
           {item.image ? (
-            <Image source={{ uri: item.image }} style={styles.nftImage} />
+            <Image source={{uri: item.image}} style={styles.nftImage} />
           ) : (
             <View style={styles.placeholderImage}>
               <Text style={styles.placeholderText}>No Image</Text>
@@ -551,10 +611,11 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
                 backgroundColor: '#FF4500',
                 paddingHorizontal: 4,
                 paddingVertical: 2,
-                borderRadius: 4
-              }}
-            >
-              <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>cNFT</Text>
+                borderRadius: 4,
+              }}>
+              <Text style={{color: 'white', fontSize: 10, fontWeight: 'bold'}}>
+                cNFT
+              </Text>
             </View>
           )}
         </View>
@@ -568,12 +629,16 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
             </Text>
           )}
           {item.description ? (
-            <Text style={{ fontSize: 10, color: '#666', marginVertical: 2 }} numberOfLines={2}>
+            <Text
+              style={{fontSize: 10, color: '#666', marginVertical: 2}}
+              numberOfLines={2}>
               {item.description}
             </Text>
           ) : null}
           <Text style={styles.mintAddress} numberOfLines={1}>
-            {item.mint ? item.mint.slice(0, 8) + '...' + item.mint.slice(-4) : 'No Mint'}
+            {item.mint
+              ? item.mint.slice(0, 8) + '...' + item.mint.slice(-4)
+              : 'No Mint'}
           </Text>
         </View>
         {isSelected && (
@@ -586,25 +651,35 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{flex: 1}}>
       <View style={styles.sellHeader}>
-        <Text style={styles.infoText}>Active Listings ({activeListings.length})</Text>
-        <TouchableOpacity style={styles.reloadButton} onPress={fetchActiveListings}>
+        <Text style={styles.infoText}>
+          Active Listings ({activeListings.length})
+        </Text>
+        <TouchableOpacity
+          style={styles.reloadButton}
+          onPress={fetchActiveListings}>
           <Text style={styles.reloadButtonText}>Reload Active Listings</Text>
         </TouchableOpacity>
       </View>
       {loadingActiveListings ? (
-        <ActivityIndicator size="large" color="#32D4DE" style={{ marginVertical: 16 }} />
+        <ActivityIndicator
+          size="large"
+          color="#32D4DE"
+          style={{marginVertical: 16}}
+        />
       ) : (
         <FlatList
           data={activeListings}
-          keyExtractor={(item) => item.mint}
+          keyExtractor={item => item.mint}
           renderItem={renderActiveListingCard}
           horizontal
-          contentContainerStyle={{ paddingHorizontal: 4 }}
+          contentContainerStyle={{paddingHorizontal: 4}}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyListText}>No active listings found.</Text>
+              <Text style={styles.emptyListText}>
+                No active listings found.
+              </Text>
             </View>
           }
         />
@@ -624,14 +699,16 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
       ) : (
         <FlatList
           data={ownedNfts}
-          keyExtractor={(item) => item.mint}
+          keyExtractor={item => item.mint}
           renderItem={renderNftCard}
           numColumns={2}
           columnWrapperStyle={styles.nftGrid}
           contentContainerStyle={styles.nftList}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyListText}>No items found in this wallet.</Text>
+              <Text style={styles.emptyListText}>
+                No items found in this wallet.
+              </Text>
             </View>
           }
         />
@@ -640,10 +717,11 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
         transparent
         visible={selectedNft !== null}
         animationType="fade"
-        onRequestClose={() => setSelectedNft(null)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setSelectedNft(null)}>
-          <Pressable style={styles.sellForm} onPress={(e) => e.stopPropagation()}>
+        onRequestClose={() => setSelectedNft(null)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setSelectedNft(null)}>
+          <Pressable style={styles.sellForm} onPress={e => e.stopPropagation()}>
             <Text style={styles.formTitle}>List NFT for Sale</Text>
             <View style={styles.selectedNftInfo}>
               <Text style={styles.label}>Selected NFT</Text>
@@ -666,7 +744,9 @@ const SellSection: React.FC<SellSectionProps> = ({ userPublicKey, userWallet }) 
               value={durationDays}
               onChangeText={setDurationDays}
             />
-            <TouchableOpacity style={styles.actionButton} onPress={handleSellNftOnTensor}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleSellNftOnTensor}>
               <Text style={styles.actionButtonText}>List on Tensor</Text>
             </TouchableOpacity>
           </Pressable>
