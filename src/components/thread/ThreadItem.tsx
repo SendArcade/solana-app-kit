@@ -9,19 +9,59 @@ import ThreadComposer from './ThreadComposer';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
 import {ThreadCTAButton, ThreadPost, ThreadUser} from './thread.types';
 
+/**
+ * Props for the ThreadItem component
+ * @interface ThreadItemProps
+ */
 interface ThreadItemProps {
+  /** The post data to display */
   post: ThreadPost;
+  /** Current user information */
   currentUser: ThreadUser;
+  /** Array of root-level posts in the thread */
   rootPosts: ThreadPost[];
+  /** Nesting depth of the current post */
   depth?: number;
+  /** Callback fired when a post is pressed */
   onPressPost?: (post: ThreadPost) => void;
+  /** Array of call-to-action buttons to display */
   ctaButtons?: ThreadCTAButton[];
+  /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
+  /** Style overrides for specific components */
   styleOverrides?: {[key: string]: object};
+  /** User-provided stylesheet overrides */
   userStyleSheet?: {[key: string]: object};
 }
 
-export default function ThreadItem({
+/**
+ * A component that renders an individual post within a thread
+ * 
+ * @component
+ * @description
+ * ThreadItem displays a single post with its replies in a threaded discussion.
+ * It handles post interactions like replying, deleting, and showing nested responses.
+ * The component supports customizable styling and themes.
+ * 
+ * Features:
+ * - Displays post content with author information
+ * - Shows nested replies
+ * - Handles post deletion
+ * - Supports reply composition
+ * - Customizable appearance through themes
+ * 
+ * @example
+ * ```tsx
+ * <ThreadItem
+ *   post={postData}
+ *   currentUser={user}
+ *   rootPosts={allPosts}
+ *   depth={0}
+ *   onPressPost={handlePostPress}
+ * />
+ * ```
+ */
+export const ThreadItem: React.FC<ThreadItemProps> = ({
   post,
   currentUser,
   rootPosts,
@@ -31,7 +71,7 @@ export default function ThreadItem({
   themeOverrides,
   styleOverrides,
   userStyleSheet,
-}: ThreadItemProps) {
+}) => {
   const [showReplyComposer, setShowReplyComposer] = useState(false);
 
   const mergedTheme = getMergedTheme(themeOverrides);

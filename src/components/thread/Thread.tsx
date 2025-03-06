@@ -7,14 +7,26 @@ import { createThreadStyles, getMergedTheme } from './thread.styles';
 import Icons from '../../assets/svgs';
 import { ThreadPost, ThreadUser, ThreadCTAButton } from './thread.types';
 
+/**
+ * Props for the Thread component
+ * @interface ThreadProps
+ */
 interface ThreadProps {
+  /** Array of root-level posts to display in the thread */
   rootPosts: ThreadPost[];
+  /** Current user information */
   currentUser: ThreadUser;
+  /** Whether to show the thread header */
   showHeader?: boolean;
+  /** Callback fired when a new post is created */
   onPostCreated?: () => void;
+  /** Whether to hide the post composer */
   hideComposer?: boolean;
+  /** Callback fired when a post is pressed */
   onPressPost?: (post: ThreadPost) => void;
+  /** Array of call-to-action buttons to display */
   ctaButtons?: ThreadCTAButton[];
+  /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
   styleOverrides?: { [key: string]: object };
   userStyleSheet?: { [key: string]: object };
@@ -22,7 +34,27 @@ interface ThreadProps {
   onRefresh?: () => void;
 }
 
-export default function Thread({
+/**
+ * Thread component that displays a list of posts with nested replies
+ * 
+ * @component
+ * @description
+ * The Thread component is a core component that renders a list of posts in a threaded
+ * discussion format. It supports nested replies, post composition, and customizable
+ * styling through themes and style overrides.
+ * 
+ * @example
+ * ```tsx
+ * <Thread
+ *   rootPosts={posts}
+ *   currentUser={user}
+ *   showHeader={true}
+ *   onPostCreated={() => refetchPosts()}
+ *   onPressPost={(post) => handlePostPress(post)}
+ * />
+ * ```
+ */
+export const Thread: React.FC<ThreadProps> = ({
   rootPosts,
   currentUser,
   showHeader = true,
@@ -101,4 +133,4 @@ export default function Thread({
       />
     </View>
   );
-}
+};

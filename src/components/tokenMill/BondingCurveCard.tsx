@@ -6,15 +6,53 @@ import {setBondingCurve} from '../../services/tokenMill/tokenMillService';
 import {BondingCurveCardStyles as defaultStyles} from './BondingCurveCard.style';
 import BondingCurveConfigurator from './BondingCurveConfigurator';
 
+/**
+ * Props for the BondingCurveCard component
+ * @interface BondingCurveCardProps
+ */
 interface BondingCurveCardProps {
+  /** The address of the market to set the bonding curve for */
   marketAddress: string;
+  /** The Solana connection instance */
   connection: Connection;
+  /** The public key of the user setting the curve */
   publicKey: string;
+  /** The Solana wallet instance for signing transactions */
   solanaWallet: any;
+  /** Callback function to set loading state */
   setLoading: (val: boolean) => void;
+  /** Optional style overrides for the component */
   styleOverrides?: Partial<typeof defaultStyles>;
 }
 
+/**
+ * A component for configuring and setting bonding curves for token markets
+ * 
+ * @component
+ * @description
+ * BondingCurveCard provides an interface for configuring and setting bonding curves
+ * for token markets. It combines a configurator component for setting ask and bid
+ * prices with functionality to commit these settings to the blockchain.
+ * 
+ * Features:
+ * - Bonding curve configuration
+ * - Ask and bid price management
+ * - On-chain curve setting
+ * - Loading state handling
+ * - Error handling
+ * - Customizable styling
+ * 
+ * @example
+ * ```tsx
+ * <BondingCurveCard
+ *   marketAddress="market_address_here"
+ *   connection={solanaConnection}
+ *   publicKey={userPublicKey}
+ *   solanaWallet={wallet}
+ *   setLoading={setIsLoading}
+ * />
+ * ```
+ */
 export default function BondingCurveCard({
   marketAddress,
   connection,
@@ -30,6 +68,10 @@ export default function BondingCurveCard({
   // Merge style overrides
   const styles = {...defaultStyles, ...styleOverrides};
 
+  /**
+   * Handles the process of setting the bonding curve on-chain
+   * @returns {Promise<void>}
+   */
   const onPressSetCurve = async () => {
     if (!marketAddress) {
       Alert.alert('No market', 'Please enter or create a market first!');

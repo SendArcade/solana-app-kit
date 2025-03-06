@@ -2,7 +2,7 @@ import React from 'react';
 import {View, Text, StyleSheet, SafeAreaView, TouchableOpacity} from 'react-native';
 import Tweet from '../../../components/tweet/tweet';
 import UserListing from '../../../components/userListing/userListing';
-import SuggestionsCard from '../../../components/suggestionsCard/sugegstionsCard';
+import SuggestionsCard from '../../../components/suggestionsCard/suggestionsCard';
 import { tweetsData } from '../../../mocks/tweets';
 import {RootStackParamList} from '../../../navigation/RootNavigator';
 import {StackNavigationProp} from '@react-navigation/stack';

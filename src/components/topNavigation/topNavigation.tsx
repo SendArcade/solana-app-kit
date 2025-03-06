@@ -3,11 +3,41 @@ import { View, Text } from 'react-native';
 import { styles } from './topNavigation.style';
 import Icons from '../../assets/svgs/index';
 
+/**
+ * Props for the TopNavigation component
+ */
 interface TopNavigationProps {
+  /** Name of the current section to display in the navigation bar */
   sectionName?: string;
 }
 
-const TopNavigation: React.FC<TopNavigationProps> = ({ sectionName }) => {
+/**
+ * A navigation bar component for the top of the screen
+ * 
+ * @component
+ * @description
+ * TopNavigation provides a consistent navigation bar at the top of the screen.
+ * The component features:
+ * - Section name display with customizable text
+ * - Back arrow navigation
+ * - Contextual icons based on view:
+ *   - Messages icon
+ *   - Notifications bell
+ *   - Menu dots
+ * 
+ * The component adapts its display based on whether a section name is provided,
+ * showing different sets of icons accordingly.
+ * 
+ * @example
+ * ```tsx
+ * // With section name
+ * <TopNavigation sectionName="Profile" />
+ * 
+ * // Without section name (shows all icons)
+ * <TopNavigation />
+ * ```
+ */
+export const TopNavigation: React.FC<TopNavigationProps> = ({ sectionName }) => {
   return (
     <View style={styles.container}>
       <View style={{ alignItems: "center", paddingLeft: 2, display: "flex", flexDirection: "row" }}>
@@ -33,5 +63,3 @@ const TopNavigation: React.FC<TopNavigationProps> = ({ sectionName }) => {
     </View>
   );
 };
-
-export default TopNavigation;

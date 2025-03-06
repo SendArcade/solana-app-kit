@@ -25,18 +25,62 @@ import { ENDPOINTS } from '../../config/constants';
 
 const JUPITER_SWAP_ENDPOINT = ENDPOINTS.jupiter.swap;
 
+/**
+ * Available tab options in the TradeModal
+ * @type {'TRADE_AND_SHARE' | 'PICK_TX_SHARE'}
+ */
 type TabOption = 'TRADE_AND_SHARE' | 'PICK_TX_SHARE';
 
+/**
+ * Props for the TradeModal component
+ * @interface TradeModalProps
+ */
 interface TradeModalProps {
+  /** Whether the modal is visible */
   visible: boolean;
+  /** Callback fired when the modal is closed */
   onClose: () => void;
+  /** Current user information */
   currentUser: ThreadUser;
+  /** Callback fired when a trade post is created */
   onPostCreated?: () => void;
+  /** Initial input token for the trade */
   initialInputToken?: TokenInfo;
+  /** Initial output token for the trade */
   initialOutputToken?: TokenInfo;
+  /** Whether to disable tab switching */
   disableTabs?: boolean;
 }
 
+/**
+ * A modal component for executing token trades and sharing them on the feed
+ * 
+ * @component
+ * @description
+ * TradeModal provides a user interface for executing token swaps using Jupiter aggregator
+ * and sharing the trade details on the social feed. It supports token selection, amount input,
+ * and automatic post creation after successful trades.
+ * 
+ * Features:
+ * - Token selection for input and output
+ * - Real-time price quotes
+ * - Trade execution via Jupiter aggregator
+ * - Automatic trade post creation
+ * - USD value calculation
+ * - Customizable appearance
+ * 
+ * @example
+ * ```tsx
+ * <TradeModal
+ *   visible={showTradeModal}
+ *   onClose={() => setShowTradeModal(false)}
+ *   currentUser={user}
+ *   onPostCreated={() => refetchPosts()}
+ *   initialInputToken={solToken}
+ *   initialOutputToken={usdcToken}
+ * />
+ * ```
+ */
 export default function TradeModal({
   visible,
   onClose,
@@ -91,12 +135,23 @@ export default function TradeModal({
     onClose();
   }, [onClose]);
 
+  /**
+   * Converts a decimal amount to base units (e.g., SOL to lamports)
+   * @param {string} amount - The decimal amount to convert
+   * @param {number} decimals - The number of decimal places for the token
+   * @returns {number} The amount in base units
+   */
   function toBaseUnits(amount: string, decimals: number): number {
     const val = parseFloat(amount);
     if (isNaN(val)) return 0;
     return val * Math.pow(10, decimals);
   }
 
+  /**
+   * Fetches token details and current USD price from Jupiter and CoinGecko
+   * @param {string} mint - The token's mint address
+   * @returns {Promise<{symbol: string; decimals: number; usdPrice: number}>} Token details and price
+   */
   async function getTokenDetailsAndPrice(
     mint: string,
   ): Promise<{symbol: string; decimals: number; usdPrice: number}> {

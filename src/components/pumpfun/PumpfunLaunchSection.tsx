@@ -11,19 +11,55 @@ import {
   TextStyle,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import {usePumpfun} from '../../hooks/usePumpfun';
+import {usePumpfun} from '../../hooks/usePumpFun';
 import {PumpfunLaunchStyles} from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
 
+/**
+ * Props for the PumpfunLaunchSection component
+ * @interface PumpfunLaunchSectionProps
+ */
 export interface PumpfunLaunchSectionProps {
+  /** Optional style override for the container */
   containerStyle?: StyleProp<ViewStyle>;
+  /** Optional style override for the input fields */
   inputStyle?: StyleProp<TextStyle>;
+  /** Optional style override for the launch button */
   buttonStyle?: StyleProp<ViewStyle>;
+  /** Custom label for the launch button (defaults to 'Launch Token') */
   launchButtonLabel?: string;
 }
 
 /**
- * A reusable component that allows the user to create + buy a Pumpfun token at launch.
+ * A component that provides a user interface for launching new tokens through Pump.fun
+ * 
+ * @component
+ * @description
+ * PumpfunLaunchSection is a comprehensive form component that allows users to create
+ * and launch new tokens on the Pump.fun platform. It provides a complete interface
+ * for token creation with image upload support and initial purchase functionality.
+ * 
+ * Features:
+ * - Token name and symbol input
+ * - Description field
+ * - Social media links (Twitter, Telegram)
+ * - Website URL
+ * - Token image upload via device gallery
+ * - Initial purchase amount in SOL
+ * - Loading state handling
+ * - Input validation
+ * - Error handling and user feedback
+ * - Customizable styling
+ * 
+ * @example
+ * ```tsx
+ * <PumpfunLaunchSection
+ *   containerStyle={styles.customContainer}
+ *   inputStyle={styles.customInput}
+ *   buttonStyle={styles.customButton}
+ *   launchButtonLabel="Create Token"
+ * />
+ * ```
  */
 export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
   containerStyle,

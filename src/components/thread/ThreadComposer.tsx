@@ -30,15 +30,52 @@ import TradeModal from './TradeModal';
 import {DEFAULT_IMAGES} from '../../config/constants';
 import { NftItem, useFetchNFTs } from '../../hooks/useFetchNFTs';
 
+/**
+ * Props for the ThreadComposer component
+ * @interface ThreadComposerProps
+ */
 interface ThreadComposerProps {
-  currentUser: ThreadUser; // must have user.id = wallet address
-  parentId?: string; // if present, it's a reply
+  /** Current user information - must have user.id set to wallet address */
+  currentUser: ThreadUser;
+  /** Optional parent post ID - if present, this composer is for a reply */
+  parentId?: string;
+  /** Callback fired when a new post is created */
   onPostCreated?: () => void;
+  /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
+  /** Style overrides for specific components */
   styleOverrides?: {[key: string]: object};
+  /** User-provided stylesheet overrides */
   userStyleSheet?: {[key: string]: object};
 }
 
+/**
+ * A component for composing new posts and replies in a thread
+ * 
+ * @component
+ * @description
+ * ThreadComposer provides a rich text editor for creating new posts and replies in a thread.
+ * It supports text input, image attachments, and NFT listings. The component handles both
+ * root-level posts and nested replies, with appropriate styling and behavior for each case.
+ * 
+ * Features:
+ * - Text input with placeholder text
+ * - Image attachment support
+ * - NFT listing integration
+ * - Reply composition
+ * - Offline fallback support
+ * - Customizable theming
+ * 
+ * @example
+ * ```tsx
+ * <ThreadComposer
+ *   currentUser={user}
+ *   parentId="post-123" // Optional, for replies
+ *   onPostCreated={() => refetchPosts()}
+ *   themeOverrides={{ '--primary-color': '#1D9BF0' }}
+ * />
+ * ```
+ */
 export default function ThreadComposer({
   currentUser,
   parentId,

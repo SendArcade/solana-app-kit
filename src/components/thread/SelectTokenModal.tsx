@@ -11,20 +11,61 @@ import {
 } from 'react-native';
 import tokenModalStyles from './tokenModal.style';
 
+/**
+ * Information about a token
+ * @interface TokenInfo
+ */
 export interface TokenInfo {
+  /** The token's mint address */
   address: string;
+  /** The token's symbol (e.g., 'SOL', 'USDC') */
   symbol: string;
+  /** The token's full name */
   name: string;
+  /** The number of decimal places for the token */
   decimals: number;
+  /** URL to the token's logo image */
   logoURI?: string;
 }
 
+/**
+ * Props for the SelectTokenModal component
+ * @interface SelectTokenModalProps
+ */
 interface SelectTokenModalProps {
+  /** Whether the modal is visible */
   visible: boolean;
+  /** Callback fired when the modal is closed */
   onClose: () => void;
+  /** Callback fired when a token is selected */
   onTokenSelected: (token: TokenInfo) => void;
 }
 
+/**
+ * A modal component for selecting tokens from a list of verified tokens
+ * 
+ * @component
+ * @description
+ * SelectTokenModal provides a searchable interface for selecting tokens from a list
+ * of verified tokens fetched from Jupiter's API. It supports searching by symbol,
+ * name, or address, and displays token logos and details.
+ * 
+ * Features:
+ * - Search functionality
+ * - Token logo display
+ * - Token details (symbol, name)
+ * - Loading state handling
+ * - Responsive layout
+ * 
+ * @example
+ * ```tsx
+ * <SelectTokenModal
+ *   visible={showTokenModal}
+ *   onClose={() => setShowTokenModal(false)}
+ *   onTokenSelected={(token) => setSelectedToken(token)}
+ * />
+ * ```
+ */
 export default function SelectTokenModal({
   visible,
   onClose,
@@ -40,6 +81,10 @@ export default function SelectTokenModal({
     }
   }, [visible]);
 
+  /**
+   * Fetches the list of verified tokens from Jupiter's API
+   * @returns {Promise<void>}
+   */
   const fetchTokens = async () => {
     setLoading(true);
     try {
@@ -77,6 +122,11 @@ export default function SelectTokenModal({
     );
   }, [tokens, searchInput]);
 
+  /**
+   * Renders a single token item in the list
+   * @param {{item: TokenInfo}} props - The token item to render
+   * @returns {JSX.Element} The rendered token item
+   */
   const renderItem = ({item}: {item: TokenInfo}) => (
     <TouchableOpacity
       style={tokenModalStyles.tokenItem}

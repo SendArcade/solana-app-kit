@@ -17,13 +17,20 @@ import {
   BondingCurveConfiguratorStyles as defaultStyles,
 } from './BondingCurveConfigurator.styles';
 
+/**
+ * Available curve types for the bonding curve configuration
+ * @type {'linear' | 'power' | 'exponential' | 'logarithmic'}
+ */
 type CurveType = 'linear' | 'power' | 'exponential' | 'logarithmic';
 
+/**
+ * Props for the BondingCurveConfigurator component
+ * @interface BondingCurveConfiguratorProps
+ */
 interface BondingCurveConfiguratorProps {
+  /** Callback function that receives updated ask and bid prices */
   onCurveChange: (askPrices: BN[], bidPrices: BN[]) => void;
-  /**
-   * Optional style overrides to customize the UI
-   */
+  /** Optional style overrides to customize the UI */
   styleOverrides?: Partial<typeof defaultStyles>;
 }
 
@@ -46,6 +53,37 @@ const initialBidBnAndroid = initialAskBnAndroid.map(price =>
   price.muln(99).divn(100),
 );
 
+/**
+ * A component for configuring bonding curves with visual feedback
+ * 
+ * @component
+ * @description
+ * BondingCurveConfigurator provides an interactive interface for configuring
+ * bonding curves with real-time visual feedback. It supports multiple curve types
+ * and allows users to adjust various parameters through sliders.
+ * 
+ * Features:
+ * - Multiple curve types (linear, power, exponential, logarithmic)
+ * - Real-time curve visualization
+ * - Adjustable parameters:
+ *   - Number of points
+ *   - Base price
+ *   - Top price
+ *   - Power (for power curves)
+ *   - Fee percentage
+ * - Platform-specific optimizations
+ * - Loading states
+ * - Customizable styling
+ * 
+ * @example
+ * ```tsx
+ * <BondingCurveConfigurator
+ *   onCurveChange={(askPrices, bidPrices) => {
+ *     console.log('New curve prices:', {askPrices, bidPrices});
+ *   }}
+ * />
+ * ```
+ */
 export default function BondingCurveConfigurator({
   onCurveChange,
   styleOverrides = {},
@@ -80,9 +118,11 @@ export default function BondingCurveConfigurator({
   // Used on Android to indicate computation in progress.
   const [isLoading, setIsLoading] = useState(false);
 
-  /************************************
-   * Bonding curve computation (with overrides)
-   ************************************/
+  /**
+   * Computes the bonding curve based on current parameters
+   * @param {Object} overrides - Optional parameter overrides for computation
+   * @returns {void}
+   */
   const computeBondingCurve = useCallback(
     (overrides?: {
       points?: number;
@@ -167,6 +207,10 @@ export default function BondingCurveConfigurator({
   /************************************
    * Android: Curve Type change handler
    ************************************/
+  /**
+   * Handles curve type changes with platform-specific behavior
+   * @param {CurveType} type - The new curve type to set
+   */
   const handleCurveTypePress = (type: CurveType) => {
     if (type === curveType) return;
     if (Platform.OS === 'android') {
@@ -185,12 +229,18 @@ export default function BondingCurveConfigurator({
   /************************************
    * Android: Slider Callbacks
    ************************************/
-  // onSlidingStart: show loader when interaction begins.
+  /**
+   * Handles the start of slider interaction on Android
+   */
   const onSlidingStartAndroid = () => {
     setIsLoading(true);
   };
 
-  // onSlidingComplete: update value, compute with new value, and hide loader.
+  /**
+   * Handles the completion of slider interaction on Android
+   * @param {string} sliderType - The type of slider being adjusted
+   * @param {number} val - The new value from the slider
+   */
   const onSlidingCompleteAndroid = (
     sliderType: 'points' | 'basePrice' | 'topPrice' | 'power' | 'feePercent',
     val: number,
@@ -223,9 +273,11 @@ export default function BondingCurveConfigurator({
     setIsLoading(false);
   };
 
-  /************************************
-   * iOS: onValueChange callback
-   ************************************/
+  /**
+   * Handles value changes from sliders on iOS
+   * @param {string} sliderType - The type of slider being adjusted
+   * @param {number} val - The new value from the slider
+   */
   const onValueChangeIOS = (
     sliderType: 'points' | 'basePrice' | 'topPrice' | 'power' | 'feePercent',
     val: number,

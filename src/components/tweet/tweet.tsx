@@ -9,19 +9,35 @@ import {
 import {createTweetStyles} from './tweet.style';
 import Icons from '../../assets/svgs';
 
+/**
+ * Interface representing a single tweet's data structure
+ */
 interface SingleTweet {
+  /** Username of the tweet author */
   username: string;
+  /** Twitter handle of the author */
   handle: string;
+  /** Time when the tweet was posted */
   time: string;
+  /** Main content of the tweet */
   tweetContent: string;
+  /** Number of quote tweets */
   quoteCount: number;
+  /** Number of retweets */
   retweetCount: number;
+  /** Number of reactions/likes */
   reactionCount: number;
+  /** Author's avatar image source */
   avatar: any;
 }
 
+/**
+ * Props for the Tweet component
+ */
 interface TweetProps {
+  /** Array of tweet data to display */
   data: SingleTweet[];
+  /** Optional callback for when the tweet is pressed */
   onPress?: () => void;
 }
 
@@ -43,6 +59,42 @@ const reactionIcons = [
   Icons.BookmarkIdle,
 ];
 
+/**
+ * A component that displays a Twitter-like social media post
+ * 
+ * @component
+ * @description
+ * Tweet is a comprehensive component that displays social media posts in a
+ * Twitter-like format. Each tweet includes:
+ * - Author information (username, handle, avatar)
+ * - Tweet content with special formatting for $SEND mentions
+ * - Engagement metrics (quotes, retweets, reactions)
+ * - Interactive elements (buy button, reaction icons)
+ * - Thread avatars for conversation visualization
+ * 
+ * The component is responsive to screen size and supports custom styling
+ * through style props. It also includes animations for user interactions
+ * and proper formatting for large numbers.
+ * 
+ * @example
+ * ```tsx
+ * const tweetData = [{
+ *   username: "John Doe",
+ *   handle: "@johndoe",
+ *   time: "2h",
+ *   tweetContent: "Check out $SEND token!",
+ *   quoteCount: 5,
+ *   retweetCount: 10,
+ *   reactionCount: 100,
+ *   avatar: require('./avatar.png')
+ * }];
+ * 
+ * <Tweet
+ *   data={tweetData}
+ *   onPress={() => console.log('Tweet pressed')}
+ * />
+ * ```
+ */
 const Tweet: React.FC<TweetProps> = ({data, onPress}) => {
   const {width} = useWindowDimensions();
   const isSmallScreen = width < 400;

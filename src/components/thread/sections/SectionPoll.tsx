@@ -3,10 +3,42 @@ import React from 'react';
 import {View, Text} from 'react-native';
 import type {PollData} from '../thread.types';
 
+/**
+ * Props for the SectionPoll component
+ * @interface SectionPollProps
+ */
 interface SectionPollProps {
+  /** The poll data to display */
   pollData?: PollData;
 }
 
+/**
+ * A component that renders a poll in a post section
+ * 
+ * @component
+ * @description
+ * SectionPoll displays a poll with a question and multiple options in a post.
+ * Each option shows the number of votes it has received, and the entire poll
+ * is displayed in a styled container with a light background.
+ * 
+ * Features:
+ * - Question display
+ * - Multiple options support
+ * - Vote count display
+ * - Consistent styling
+ * - Missing data handling
+ * 
+ * @example
+ * ```tsx
+ * <SectionPoll
+ *   pollData={{
+ *     question: "What's your favorite color?",
+ *     options: ["Red", "Blue", "Green"],
+ *     votes: [10, 15, 8]
+ *   }}
+ * />
+ * ```
+ */
 export default function SectionPoll({pollData}: SectionPollProps) {
   if (!pollData) {
     return <Text style={{color: '#666'}}>[Missing poll data]</Text>;

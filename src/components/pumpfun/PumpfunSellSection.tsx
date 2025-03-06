@@ -8,25 +8,72 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import {usePumpfun} from '../../hooks/usePumpfun';
+import {usePumpfun} from '../../hooks/usePumpFun';
 import {PumpfunSellStyles} from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
 
+/**
+ * Interface representing a token selected for selling
+ * @interface SelectedToken
+ */
 export interface SelectedToken {
+  /** The public key of the token's mint account */
   mintPubkey: string;
+  /** The available token amount in UI format (decimal) */
   uiAmount: number;
 }
 
+/**
+ * Props for the PumpfunSellSection component
+ * @interface PumpfunSellSectionProps
+ */
 export interface PumpfunSellSectionProps {
+  /** Optional pre-selected token to sell */
   selectedToken?: SelectedToken | null;
+  /** Optional style override for the container */
   containerStyle?: StyleProp<ViewStyle>;
+  /** Optional style override for the input fields */
   inputStyle?: StyleProp<TextStyle>;
+  /** Optional style override for the sell button */
   buttonStyle?: StyleProp<ViewStyle>;
+  /** Custom label for the sell button (defaults to 'Sell Token') */
   sellButtonLabel?: string;
 }
 
 /**
- * A reusable component that allows the user to sell a Pumpfun-based token.
+ * A component that provides a user interface for selling tokens through Pump.fun
+ * 
+ * @component
+ * @description
+ * PumpfunSellSection is a form component that allows users to sell tokens
+ * through the Pump.fun platform. It supports both manual token address entry
+ * and pre-selected tokens, with features for amount input and fee estimation.
+ * 
+ * Features:
+ * - Manual token address input or pre-selected token support
+ * - Token amount input with "Max" button for pre-selected tokens
+ * - Network fee estimation
+ * - Input validation
+ * - Error handling and user feedback
+ * - Customizable styling
+ * 
+ * @example
+ * ```tsx
+ * // With manual token input
+ * <PumpfunSellSection
+ *   containerStyle={styles.customContainer}
+ *   sellButtonLabel="Sell Now"
+ * />
+ * 
+ * // With pre-selected token
+ * <PumpfunSellSection
+ *   selectedToken={{
+ *     mintPubkey: "5tMi...",
+ *     uiAmount: 1000
+ *   }}
+ *   sellButtonLabel="Sell Token"
+ * />
+ * ```
  */
 export const PumpfunSellSection: React.FC<PumpfunSellSectionProps> = ({
   selectedToken,

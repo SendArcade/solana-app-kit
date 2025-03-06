@@ -4,6 +4,28 @@ import {useDispatch, useSelector} from 'react-redux';
 import {setSelectedFeeTier} from '../state/transaction/reducer';
 import {RootState} from '../state/store';
 
+/**
+ * Interface for the fee tier options available in the selector
+ */
+type FeeTier = 'low' | 'medium' | 'high' | 'very-high';
+
+/**
+ * A component that allows users to select transaction fee tiers for Solana transactions
+ * 
+ * @component
+ * @description
+ * PriorityFeeSelector provides a user interface for selecting different transaction fee tiers
+ * on the Solana network. It offers four options: low, medium, high, and very-high, with
+ * visual feedback for the selected option.
+ * 
+ * The component integrates with Redux for state management and updates the global
+ * transaction fee preference when a user selects a different tier.
+ * 
+ * @example
+ * ```tsx
+ * <PriorityFeeSelector />
+ * ```
+ */
 const PriorityFeeSelector = () => {
   const dispatch = useDispatch();
   const selectedFeeTier = useSelector(
