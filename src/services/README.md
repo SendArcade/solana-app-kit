@@ -10,16 +10,42 @@ services/
 │   ├── privy.ts          # Privy wallet integration
 │   ├── dynamic.ts       # Dynamic wallet integration
 │   └── turnkey.ts      # Turnkey wallet integration
-└── api/                # API service implementations
+├── pumpfun/             # Pump.fun integration services
+│   ├── buy.ts         # Token purchase functionality
+│   ├── sell.ts       # Token sale functionality
+│   └── launch.ts    # Token launch functionality
+├── tokenMill/         # Token mill services
+│   ├── bondingCurve.ts  # Bonding curve operations
+│   └── tokenOperations.ts # General token operations
+└── api/              # API service implementations
 ```
 
 ## Service Categories
 
 ### Wallet Providers
 Handles different wallet integration methods:
-- **Privy**: Embedded wallet solution
+- **Privy**: Embedded wallet solution with social login
 - **Dynamic**: External wallet connections
 - **Turnkey**: Secure wallet management
+
+### Token Services
+- **Pump.fun Integration**:
+  - Token buying and selling
+  - Token launching
+  - Price tracking
+  - Portfolio management
+
+- **Token Mill**:
+  - Bonding curve configuration
+  - Token creation and management
+  - Price curve calculations
+  - Transaction handling
+
+### API Services
+- External API integrations
+- Data fetching and caching
+- Error handling and retries
+- Rate limiting
 
 ## Best Practices
 
@@ -27,21 +53,36 @@ Handles different wallet integration methods:
    - Use consistent error types
    - Implement proper error logging
    - Return meaningful error messages
+   - Handle network errors gracefully
+   - Implement retry mechanisms
 
 2. **Type Safety**:
    - Define TypeScript interfaces for all service methods
    - Use proper return types
    - Document expected errors
+   - Validate input parameters
+   - Use strict type checking
 
 3. **Configuration**:
    - Use environment variables for configuration
    - Keep sensitive data secure
    - Document required configuration
+   - Support different environments
+   - Implement configuration validation
 
 4. **Testing**:
    - Mock external service calls
    - Test error conditions
    - Validate response handling
+   - Test edge cases
+   - Include integration tests
+
+5. **Performance**:
+   - Implement caching where appropriate
+   - Use batch operations when possible
+   - Optimize network requests
+   - Handle rate limiting
+   - Monitor service health
 
 ## Example Service Structure
 
@@ -62,8 +103,12 @@ export interface ServiceInterface {
  * @implements {ServiceInterface}
  */
 export class Service implements ServiceInterface {
-  constructor(config: Config) {
-    // Initialize service
+  private readonly config: Config;
+  private readonly logger: Logger;
+
+  constructor(config: Config, logger: Logger) {
+    this.config = config;
+    this.logger = logger;
   }
 
   /**
@@ -73,7 +118,13 @@ export class Service implements ServiceInterface {
    * @throws {ServiceError} - Error description
    */
   async method1(param: string): Promise<Result> {
-    // Implementation
+    try {
+      // Implementation
+      return result;
+    } catch (error) {
+      this.logger.error('Method1 failed', { param, error });
+      throw new ServiceError('Failed to execute method1', error);
+    }
   }
 }
 ```
@@ -86,6 +137,10 @@ export class Service implements ServiceInterface {
 4. Add error handling
 5. Write unit tests
 6. Document the service
+7. Add configuration options
+8. Implement logging
+9. Add monitoring
+10. Test in different environments
 
 ## Security Considerations
 
@@ -95,4 +150,20 @@ export class Service implements ServiceInterface {
 - Handle errors securely
 - Use HTTPS for all external calls
 - Validate all inputs
-- Follow security best practices for wallet interactions 
+- Follow security best practices for wallet interactions
+- Implement proper key management
+- Use secure storage for sensitive data
+- Monitor for suspicious activity
+
+## Monitoring and Maintenance
+
+- Implement health checks
+- Add performance monitoring
+- Track error rates
+- Monitor API usage
+- Implement circuit breakers
+- Add service metrics
+- Set up alerts
+- Regular security audits
+- Performance optimization
+- Documentation updates 

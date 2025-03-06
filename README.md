@@ -16,6 +16,13 @@ A modern React Native social application built on the Solana blockchain, providi
 - **Authentication**: Multiple auth options with Privy integration
 - **Cryptocurrency Tracking**: View and track coin details and performance
 - **Modern UI**: Beautiful, responsive interface with tab-based navigation
+- **Token Management**: 
+  - Token creation and launching
+  - Bonding curve configuration
+  - Token trading functionality
+- **NFT Support**: Display and manage NFT collectibles
+- **Portfolio Management**: Track and manage token holdings
+- **Community Features**: User profiles, following system, and social interactions
 
 ## Tech Stack
 
@@ -26,6 +33,10 @@ A modern React Native social application built on the Solana blockchain, providi
 - **Privy**: Authentication and wallet management
 - **Redux**: State management with Redux Toolkit
 - **React Navigation**: Tab and stack-based navigation
+- **TypeScript**: Type-safe development
+- **BN.js**: Big number handling for blockchain operations
+- **React Native Chart Kit**: Data visualization
+- **Expo Image Picker**: Image handling for NFTs and profiles
 
 ## Prerequisites
 
@@ -57,6 +68,7 @@ A modern React Native social application built on the Solana blockchain, providi
    ```
    PRIVY_APP_ID=your_privy_app_id
    PRIVY_CLIENT_ID=your_privy_client_id
+   SOLANA_RPC_URL=your_solana_rpc_url
    ```
 
 ### Running the App
@@ -104,36 +116,55 @@ solana-social-starter/
 ├── src/
 │   ├── assets/         # Images, icons, and other static assets
 │   ├── components/     # Reusable UI components
-│   ├── hooks/          # Custom React hooks
-│   ├── navigation/     # Navigation configuration
-│   ├── screens/        # App screens
-│   ├── services/       # API and service integrations
-│   ├── state/          # Redux store and slices
-│   ├── types/          # TypeScript type definitions
-│   └── utils/          # Utility functions
-├── App.tsx             # Main application component
-├── index.js            # Entry point
-└── package.json        # Dependencies and scripts
+│   │   ├── actions/   # Action-related components
+│   │   ├── wallet/    # Wallet-related components
+│   │   ├── thread/    # Social thread components
+│   │   ├── tokenMill/ # Token management components
+│   │   └── ...        # Other UI components
+│   ├── hooks/         # Custom React hooks
+│   ├── navigation/    # Navigation configuration
+│   ├── screens/       # App screens
+│   ├── services/      # API and service integrations
+│   │   ├── pumpfun/   # Pump.fun integration
+│   │   ├── tokenMill/ # Token mill service
+│   │   └── walletProviders/ # Wallet provider integrations
+│   ├── state/         # Redux store and slices
+│   ├── types/         # TypeScript type definitions
+│   └── utils/         # Utility functions
+├── App.tsx            # Main application component
+├── index.js           # Entry point
+└── package.json       # Dependencies and scripts
 ```
 
-## Key Screens
+## Key Features
 
-- **Intro Screen**: Onboarding for new users
-- **Login Screen**: Authentication options
-- **Home Screen**: Dashboard with key information
-- **Feed Screen**: Social activity feed
-- **Profile Screen**: User profile and settings
-- **Coin Detail**: Cryptocurrency information and charts
-- **Blink Screen**: Messaging via Dialect Blinks
-- **Embedded Wallet**: Wallet management interface
-
-## Wallet Integration
-
-This starter supports multiple wallet connection methods:
-
-- Embedded wallets via Privy
+### Wallet Integration
+- Multiple wallet connection methods
+- Embedded wallet support via Privy
 - External wallet connections
 - Dynamic wallet integration
+- Transaction signing and management
+
+### Token Management
+- Token creation and launching
+- Bonding curve configuration
+- Price curve visualization
+- Token trading functionality
+- Portfolio tracking
+
+### Social Features
+- User profiles and following system
+- Social feed with posts and interactions
+- Messaging via Dialect Blinks
+- Community engagement features
+- NFT display and management
+
+### UI/UX
+- Modern, responsive design
+- Tab-based navigation
+- Interactive charts and visualizations
+- Loading states and error handling
+- Platform-specific optimizations
 
 ## Contributing
 
@@ -145,17 +176,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+For more details, see our [Contributing Guide](CONTRIBUTING.md).
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- [Solana](https://solana.com/)
-- [Dialect](https://dialect.to/)
-- [Privy](https://privy.io/)
-- [React Native](https://reactnative.dev/)
-- [Expo](https://expo.dev/)
 
 ---
 

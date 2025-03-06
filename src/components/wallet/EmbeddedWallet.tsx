@@ -5,14 +5,51 @@ import Icons from '../../assets/svgs';
 import {useAuth} from '../../hooks/useAuth';
 import styles from '../../screens/Common/LoginScreen/LoginScreen.styles';
 
+/**
+ * Props for the EmbeddedWalletAuth component
+ * @interface EmbeddedWalletAuthProps
+ */
 export interface EmbeddedWalletAuthProps {
+  /** Callback function that receives wallet connection information */
   onWalletConnected: (info: {
+    /** The authentication provider used */
     provider: 'privy' | 'dynamic' | 'turnkey';
+    /** The connected wallet's public key */
     address: string;
   }) => void;
+  /** The authentication mode to use (defaults to 'login') */
   authMode?: 'login' | 'signup';
 }
 
+/**
+ * A component that provides embedded wallet authentication functionality
+ * 
+ * @component
+ * @description
+ * EmbeddedWalletAuth is a component that handles wallet authentication through
+ * various providers (Google, Apple, Email) and manages the connection state.
+ * It provides a user interface for authentication and handles wallet connection
+ * callbacks.
+ * 
+ * Features:
+ * - Multiple authentication methods:
+ *   - Google Sign-In
+ *   - Apple Sign-In
+ *   - Email Sign-In
+ * - Automatic wallet connection handling
+ * - Error handling and user feedback
+ * - Provider-specific wallet management
+ * 
+ * @example
+ * ```tsx
+ * <EmbeddedWalletAuth
+ *   onWalletConnected={({provider, address}) => {
+ *     console.log(`Connected with ${provider}: ${address}`);
+ *   }}
+ *   authMode="login"
+ * />
+ * ```
+ */
 const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
   onWalletConnected,
   authMode = 'login',
@@ -27,6 +64,10 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
     solanaWallet,
   } = useAuth();
 
+  /**
+   * Effect hook to handle wallet connection and callback
+   * Triggers when user, wallet, or callback changes
+   */
   useEffect(() => {
     console.log(solanaWallet, 'solanaWallet');
     if (user && solanaWallet && onWalletConnected) {

@@ -23,7 +23,9 @@ import {useAppSelector} from '../../hooks/useReduxHooks';
 import { DEFAULT_IMAGES, ENDPOINTS } from '../../config/constants';
 
 /**
- * Get the post section type.
+ * Determines the type of CTA to display based on the post's sections
+ * @param {ThreadPost} post - The post to analyze
+ * @returns {'trade' | 'nft' | null} The type of CTA to display
  */
 function getPostSectionType(post: ThreadPost) {
   for (const section of post.sections) {
@@ -34,7 +36,9 @@ function getPostSectionType(post: ThreadPost) {
 }
 
 /**
- * Get trade data from a post (for TEXT_TRADE sections).
+ * Extracts trade data from a post's TEXT_TRADE section
+ * @param {ThreadPost} post - The post to extract trade data from
+ * @returns {TradeData | null} The trade data if found, null otherwise
  */
 function getTradeData(post: ThreadPost) {
   for (const section of post.sections) {
@@ -45,21 +49,63 @@ function getTradeData(post: ThreadPost) {
   return null;
 }
 
+/**
+ * Props for the PostCTA component
+ * @interface PostCTAProps
+ */
 interface PostCTAProps {
+  /** The post data to display the CTA for */
   post: ThreadPost;
+  /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
+  /** Style overrides for specific components */
   styleOverrides?: {
+    /** Container style overrides */
     container?: StyleProp<ViewStyle>;
+    /** Button style overrides */
     button?: StyleProp<ViewStyle>;
+    /** Button label style overrides */
     buttonLabel?: StyleProp<TextStyle>;
   };
+  /** User-provided stylesheet overrides */
   userStyleSheet?: {
+    /** Container style overrides */
     container?: StyleProp<ViewStyle>;
+    /** Button style overrides */
     button?: StyleProp<ViewStyle>;
+    /** Button label style overrides */
     buttonLabel?: StyleProp<TextStyle>;
   };
 }
 
+/**
+ * A component that displays call-to-action buttons for posts with trade or NFT content
+ * 
+ * @component
+ * @description
+ * PostCTA renders appropriate call-to-action buttons based on the post's content type.
+ * For trade posts, it shows a "Copy Trade" button that opens a trade modal. For NFT
+ * listing posts, it shows a "Buy NFT" button that initiates the NFT purchase process.
+ * 
+ * Features:
+ * - Dynamic CTA based on post content
+ * - Trade copying functionality
+ * - NFT purchasing integration
+ * - Loading states and error handling
+ * - Customizable styling
+ * 
+ * @example
+ * ```tsx
+ * <PostCTA
+ *   post={postData}
+ *   themeOverrides={{ '--primary-color': '#1D9BF0' }}
+ *   styleOverrides={{
+ *     button: { backgroundColor: '#1D9BF0' },
+ *     buttonLabel: { color: 'white' }
+ *   }}
+ * />
+ * ```
+ */
 export default function PostCTA({
   post,
   themeOverrides,
@@ -101,7 +147,8 @@ export default function PostCTA({
   const tradeData = sectionType === 'trade' ? getTradeData(post) : null;
 
   /**
-   * "Copy Trade" CTA for TEXT_TRADE posts.
+   * Opens the trade modal for copying a trade
+   * @returns {void}
    */
   const handleOpenTradeModal = () => {
     if (!tradeData) {
@@ -112,7 +159,8 @@ export default function PostCTA({
   };
 
   /**
-   * "Buy NFT" CTA for NFT_LISTING posts.
+   * Handles the NFT purchase process
+   * @returns {Promise<void>}
    */
   const handleBuyListedNft = async () => {
     const listingData = post.sections.find(
