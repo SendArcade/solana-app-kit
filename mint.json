@@ -33,7 +33,7 @@
       {
         "group": "Structure",
         "pages": [
-          "docs/structure/overview",
+          "docs/structure/repo",
           "docs/structure/assets",
           "docs/structure/components",
           "docs/structure/config",
