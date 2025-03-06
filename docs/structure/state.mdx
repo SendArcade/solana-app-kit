@@ -1,0 +1,29 @@
+# src/state (Redux)
+
+Implements Redux state management for the application.
+
+## Redux Slices
+
+### 🔐 auth/reducer.ts
+Authentication state:
+- Stores provider (privy, dynamic, or turnkey)
+- User's wallet address
+- User name
+- Profile picture
+
+### 💬 thread/reducer.ts
+Content management:
+- Contains async thunks (`fetchAllPosts`, `createRootPostAsync`, etc.)
+- Manages local state additions
+- Controls the "post feed" or "thread" state
+
+### 💱 transaction/reducer.ts
+Transaction configuration:
+- Simple slice for "transactionMode" (priority vs. jito)
+- Selected fee tier (like 'low', 'medium', 'high')
+
+### 🔄 store.ts
+Store configuration:
+- Exports the main Redux store setup
+- Combines reducers
+- Configures middleware

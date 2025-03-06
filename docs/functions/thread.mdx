@@ -1,0 +1,36 @@
+# Thread-based Social Feed
+
+## Overview
+A Twitter-like or Reddit-like post & reply system created by combining components from `src/components/thread` and `src/state/thread`.
+
+## Key Features
+
+### 📱 Content Types
+Users can post various content:
+- Text posts
+- Images and media
+- Interactive polls
+- Trade information
+- NFT listings
+
+### 🧩 Component Structure
+Built from modular components:
+- `Thread.tsx` - Container for multiple posts
+- `ThreadItem.tsx` - Individual post rendering
+- Post section components:
+  - `PostHeader`
+  - `PostBody`
+  - `PostFooter`
+  - `PostCTA`
+
+### 🔄 State Management
+Utilizes Redux for state handling:
+- Async thunks for data fetching
+- Post creation operations
+- Reply management
+- Content updates
+
+### 🎨 Customization
+- Theme customization via `thread.theme.ts`
+- Styling utilities in `thread.styles.ts`
+- Type definitions in `thread.types.ts`

@@ -1,0 +1,26 @@
+# Pump.fun Integration
+
+## Overview
+Handles the creation and management of tokens on Pump.fun's bonding curve system, along with buy/sell functionality.
+
+## Key Components
+
+### 📁 Directory Structure
+- `src/components/pumpfun/` - UI components
+- `src/services/pumpfun/pumpfunService.ts` - Core functionality
+- `src/utils/pumpfun/pumpfunUtils.ts` - Helper utilities
+
+### 🚀 Core Functions
+- `createAndBuyTokenViaPumpfun` - Token creation and initial purchase
+- `buyTokenViaPumpfun` - Purchase existing tokens
+- `sellTokenViaPumpfun` - Liquidate token holdings
+
+### 🔄 Integration Features
+- Metadata uploading to decentralized storage
+- Connection to PumpFunSDK
+- Bridging to Raydium for tokens not available on Pump.fun
+
+### 💻 UI Components
+- `PumpfunBuySection` - Interface for purchasing tokens
+- `PumpfunSellSection` - Interface for selling tokens
+- `PumpfunLaunchSection` - Interface for launching new tokens

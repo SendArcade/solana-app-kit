@@ -1,0 +1,72 @@
+{
+    "$schema": "https://mintlify.com/schema.json",
+    "name": "Solana App Kit",
+    "logo": {
+      "light": "/public/logo/light.svg",
+      "dark": "/public/logo/dark.svg"
+    },
+    "layout": "sidenav",
+    "favicon": "/favicon.svg",
+    "sidebar": {
+      "items": "border"
+    },
+    "colors": {
+      "primary": "#9945FF",
+      "light": "#14F195",
+      "dark": "#9945FF"
+    },
+    "background": {
+      "style": "windows"
+    },
+    "codeBlock": {
+      "mode": "auto"
+    },
+    "feedback": {
+      "thumbsRating": true,
+      "suggestEdit": true
+    },
+    "navigation": [
+      {
+        "group": "Getting Started",
+        "pages": ["docs/introduction", "docs/setup"]
+      },
+      {
+        "group": "Structure",
+        "pages": [
+          "docs/structure/overview",
+          "docs/structure/assets",
+          "docs/structure/components",
+          "docs/structure/config",
+          "docs/structure/hooks",
+          "docs/structure/mocks",
+          "docs/structure/navigation",
+          "docs/structure/screens",
+          "docs/structure/services",
+          "docs/structure/state",
+          "docs/structure/utils",
+          "docs/structure/roots"
+        ]
+      },
+      {
+        "group": "Functions",
+        "icon": "function",
+        "pages": [
+          "docs/functions/thread",
+          "docs/functions/pump",
+          "docs/functions/trade",
+          "docs/functions/tokenmill",
+          "docs/functions/wallet"
+        ]
+      },
+      {
+        "group": "Usage",
+        "icon": "cube",
+        "pages": ["docs/use"]
+      }
+    ],
+    "footer": {
+      "socials": {
+        "github": "https://github.com/SendArcade/solana-social-starter"
+      }
+    }
+  }
