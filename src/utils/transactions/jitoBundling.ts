@@ -1,6 +1,7 @@
 // File: src/utils/jitoBundling.ts
 import { VersionedTransaction } from '@solana/web3.js';
 import { Buffer } from 'buffer';
+import { ENDPOINTS } from '../../config/constants';
 
 export interface JitoBundleResponse {
   jsonrpc: string;
@@ -9,8 +10,7 @@ export interface JitoBundleResponse {
 }
 
 // Use the mainnet bundling endpoint.
-const JITO_MAINNET_URL =
-  'https://mainnet.block-engine.jito.wtf:443/api/v1/bundles';
+const JITO_MAINNET_URL = ENDPOINTS.jito.blockEngine;
 
 /**
  * Sends a bundle of signed transactions to Jito's block engine.

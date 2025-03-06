@@ -1,25 +1,18 @@
-/**************************************
- * File: BondingCurveCard.tsx
- *
- * Updated to use the improved
- * BondingCurveConfigurator without scroll,
- * includes an additional slider for number
- * of points, and a more intuitive layout.
- **************************************/
-
 import React, {useState} from 'react';
-import {View, Text, TouchableOpacity, StyleSheet, Alert} from 'react-native';
+import {View, Text, TouchableOpacity, Alert} from 'react-native';
 import {Connection} from '@solana/web3.js';
-// ^ Update this path if needed
+import BN from 'bn.js';
+import {setBondingCurve} from '../../services/tokenMill/tokenMillService';
+import {BondingCurveCardStyles as defaultStyles} from './BondingCurveCard.style';
 import BondingCurveConfigurator from './BondingCurveConfigurator';
-import { setBondingCurve } from '../../services/tokenMill/tokenMillService';
 
-interface Props {
+interface BondingCurveCardProps {
   marketAddress: string;
   connection: Connection;
   publicKey: string;
   solanaWallet: any;
   setLoading: (val: boolean) => void;
+  styleOverrides?: Partial<typeof defaultStyles>;
 }
 
 export default function BondingCurveCard({
@@ -28,9 +21,14 @@ export default function BondingCurveCard({
   publicKey,
   solanaWallet,
   setLoading,
-}: Props) {
-  const [askPrices, setAskPrices] = useState<number[]>([]);
-  const [bidPrices, setBidPrices] = useState<number[]>([]);
+  styleOverrides = {},
+}: BondingCurveCardProps) {
+  // Local states for BN arrays from configurator
+  const [askPrices, setAskPrices] = useState<BN[]>([]);
+  const [bidPrices, setBidPrices] = useState<BN[]>([]);
+
+  // Merge style overrides
+  const styles = {...defaultStyles, ...styleOverrides};
 
   const onPressSetCurve = async () => {
     if (!marketAddress) {
@@ -40,10 +38,15 @@ export default function BondingCurveCard({
     try {
       setLoading(true);
       const provider = await solanaWallet.getProvider();
+
+      // Convert BN => number before passing
+      const askNumbers = askPrices.map(p => p.toNumber());
+      const bidNumbers = bidPrices.map(p => p.toNumber());
+
       const txSig = await setBondingCurve({
         marketAddress,
-        askPrices,
-        bidPrices,
+        askPrices: askNumbers,
+        bidPrices: bidNumbers,
         userPublicKey: publicKey,
         connection,
         provider,
@@ -60,7 +63,6 @@ export default function BondingCurveCard({
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Bonding Curve</Text>
 
-      {/* The improved Configurator */}
       <BondingCurveConfigurator
         onCurveChange={(newAsk, newBid) => {
           setAskPrices(newAsk);
@@ -74,33 +76,3 @@ export default function BondingCurveCard({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  section: {
-    width: '100%',
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-    // We assume parent container is scrollable or has enough space
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 12,
-    color: '#2a2a2a',
-    textAlign: 'center',
-  },
-  button: {
-    backgroundColor: '#2a2a2a',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-});

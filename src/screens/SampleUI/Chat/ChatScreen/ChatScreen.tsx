@@ -1,187 +1,142 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  Keyboard,
-  Animated,
-  Easing,
+  SafeAreaView,
+  Image,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {styles} from './ChatScreen.styles';
+import {useSelector} from 'react-redux';
+import {useAppDispatch, useAppSelector} from '../../../../hooks/useReduxHooks';
+import {fetchAllPosts} from '../../../../state/thread/reducer';
+import {RootState} from '../../../../state/store';
+import {
+  ThreadPost,
+  ThreadUser,
+} from '../../../../components/thread/thread.types';
+import {PostBody, ThreadComposer} from '../../../../components/thread';
+import PostCTA from '../../../../components/thread/PostCTA';
+import {styles, androidStyles, chatBodyOverrides} from './ChatScreen.styles';
+import {DEFAULT_IMAGES} from '../../../../config/constants';
 
-// Types for message data
-type Message = {
-  id: string;
-  text: string;
-  createdAt: number;
-  sender: 'me' | 'other';
-};
+export default function ChatScreen() {
+  const dispatch = useAppDispatch();
+  const allPosts = useSelector((state: RootState) => state.thread.allPosts);
+  const storedProfilePic = useSelector(
+    (state: RootState) => state.auth.profilePicUrl,
+  );
+  const userWallet = useSelector((state: RootState) => state.auth.address);
+  const [sortedPosts, setSortedPosts] = useState<ThreadPost[]>([]);
+  const flatListRef = useRef<FlatList<any>>(null);
+  const userName = useAppSelector(state => state.auth.username);
 
-const ChatScreen: React.FC = () => {
-  // Local state for messages
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: 'Hey, how are you?',
-      createdAt: Date.now() - 1000 * 60 * 60, // example: 1 hour ago
-      sender: 'other',
-    },
-    {
-      id: '2',
-      text: 'Doing great! You?',
-      createdAt: Date.now() - 1000 * 60 * 58,
-      sender: 'me',
-    },
-    {
-      id: '3',
-      text: "I'm fine too, just exploring new UI designs!",
-      createdAt: Date.now() - 1000 * 60 * 57,
-      sender: 'other',
-    },
-  ]);
-  const [inputText, setInputText] = useState('');
-  const [listHeight, setListHeight] = useState(0);
-
-  // For a little "typing" bubble animation
-  const typingBubbleScale = useRef(new Animated.Value(0)).current;
-  const [isTyping, setIsTyping] = useState(false);
-
-  // Animate "typing" bubble
-  useEffect(() => {
-    if (isTyping) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(typingBubbleScale, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-            easing: Easing.inOut(Easing.ease),
-          }),
-          Animated.timing(typingBubbleScale, {
-            toValue: 0.8,
-            duration: 500,
-            useNativeDriver: true,
-            easing: Easing.inOut(Easing.ease),
-          }),
-        ]),
-      ).start();
-    } else {
-      typingBubbleScale.stopAnimation(() => {
-        typingBubbleScale.setValue(0);
-      });
-    }
-  }, [isTyping, typingBubbleScale]);
-
-  // Simulate "other user" typing after a short delay
-  useEffect(() => {
-    // For demonstration, mark typing state to true
-    const timer = setTimeout(() => {
-      setIsTyping(true);
-    }, 1200);
-
-    // And then turn it off after a while
-    const timer2 = setTimeout(() => {
-      setIsTyping(false);
-    }, 4000);
-
-    return () => {
-      clearTimeout(timer);
-      clearTimeout(timer2);
-    };
-  }, []);
-
-  // Handle sending a message
-  const handleSend = () => {
-    if (!inputText.trim()) return;
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: inputText.trim(),
-      createdAt: Date.now(),
-      sender: 'me',
-    };
-    setMessages(prev => [newMessage, ...prev]);
-    setInputText('');
+  const currentUser: ThreadUser = {
+    id: userWallet || 'anonymous-user',
+    username: userName || 'Anonymous',
+    handle: userWallet
+      ? '@' + userWallet.slice(0, 6) + '...' + userWallet.slice(-4)
+      : '@anonymous',
+    verified: true,
+    avatar: storedProfilePic ? {uri: storedProfilePic} : DEFAULT_IMAGES.user,
   };
 
-  // Chat message bubble component
-  const renderMessage = ({item}: {item: Message}) => {
-    const isMyMessage = item.sender === 'me';
+  // Fetch all posts on mount
+  useEffect(() => {
+    dispatch(fetchAllPosts());
+  }, [dispatch]);
+
+  useEffect(() => {
+    const roots = allPosts.filter(p => !p.parentId);
+    roots.sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    setSortedPosts(roots);
+  }, [allPosts]);
+
+  const scrollToEnd = useCallback(() => {
+    flatListRef.current?.scrollToEnd({animated: true});
+  }, []);
+
+  useEffect(() => {
+    scrollToEnd();
+  }, [sortedPosts.length, scrollToEnd]);
+
+  const renderItem = ({item}: {item: ThreadPost}) => {
+    const isSentByCurrentUser =
+      userWallet && item.user.id.toLowerCase() === userWallet.toLowerCase();
+
+    const avatarSource =
+      isSentByCurrentUser && storedProfilePic
+        ? {uri: storedProfilePic}
+        : item.user.avatar
+        ? typeof item.user.avatar === 'string'
+          ? {uri: item.user.avatar}
+          : item.user.avatar
+        : DEFAULT_IMAGES.user;
+
     return (
       <View
         style={[
-          styles.bubbleContainer,
-          isMyMessage ? styles.bubbleRight : styles.bubbleLeft,
+          styles.messageWrapper,
+          isSentByCurrentUser ? styles.sentWrapper : styles.receivedWrapper,
         ]}>
-        <Text style={styles.bubbleText}>{item.text}</Text>
-        <Text style={styles.bubbleTime}>
-          {new Date(item.createdAt).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </Text>
+        <View style={styles.headerRow}>
+          <Image source={avatarSource} style={styles.avatar} />
+          <View style={styles.usernameContainer}>
+            <Text style={styles.senderLabel}>{item.user.username}</Text>
+          </View>
+        </View>
+
+        <View
+          style={[
+            styles.bubbleContainer,
+            isSentByCurrentUser ? styles.sentBubble : styles.receivedBubble,
+          ]}>
+          <PostBody
+            post={item}
+            themeOverrides={{}}
+            styleOverrides={chatBodyOverrides}
+          />
+          <PostCTA post={item} />
+
+          <Text style={styles.timeStampText}>
+            {new Date(item.createdAt).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </Text>
+        </View>
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Top bar (simulate chat name, status, etc.) */}
-      <View style={styles.chatHeader}>
-        <Text style={styles.chatHeaderTitle}>Chat with Jane</Text>
-        <Text style={styles.chatHeaderSubtitle}>online now</Text>
-      </View>
-
-      {/* Main chat area */}
+    <SafeAreaView
+      style={[
+        {flex: 1, backgroundColor: '#FFFFFF'},
+        Platform.OS === 'android' && androidStyles.safeArea,
+      ]}>
       <KeyboardAvoidingView
-        style={styles.chatContainer}
+        style={styles.chatScreenContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <FlatList
-          inverted
-          data={messages}
-          renderItem={renderMessage}
+          ref={flatListRef}
+          data={sortedPosts}
           keyExtractor={item => item.id}
-          contentContainerStyle={{paddingBottom: 16}}
-          onLayout={e => {
-            setListHeight(e.nativeEvent.layout.height);
-          }}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
         />
 
-        {/* Possibly show the other user's "typing" indicator at the bottom (if needed) */}
-        {isTyping && (
-          <View style={styles.typingIndicatorContainer}>
-            <Animated.View
-              style={[
-                styles.typingBubble,
-                {transform: [{scale: typingBubbleScale}]},
-              ]}>
-              <Text style={styles.typingBubbleDot}>• • •</Text>
-            </Animated.View>
-            <Text style={styles.typingIndicatorText}>Jane is typing</Text>
-          </View>
-        )}
-
-        {/* Input area */}
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.inputField}
-            placeholder="Type a message..."
-            value={inputText}
-            onChangeText={setInputText}
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
+        <View style={styles.composerContainer}>
+          <ThreadComposer
+            currentUser={currentUser}
+            onPostCreated={scrollToEnd}
           />
-          <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-            <Text style={styles.sendButtonText}>Send</Text>
-          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-};
-
-export default ChatScreen;
+}

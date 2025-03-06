@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, TextInput, TouchableOpacity } from "react-native";
 import { style } from "./searchBar.style";
-import Icons from "../../assets/svgs/index"; 
+import Icons from "../../../assets/svgs/index"; 
 
 const SearchBar = () => {
   const [searchText, setSearchText] = useState("");

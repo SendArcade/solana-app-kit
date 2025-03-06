@@ -1,0 +1,141 @@
+import {StyleSheet, Platform} from 'react-native';
+
+export default StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalContainer: {
+    width: '100%',
+    maxHeight: '90%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#333',
+  },
+  headerClose: {
+    padding: 4,
+  },
+  headerCloseText: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#999',
+  },
+  tabRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  tabButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    backgroundColor: '#F2F2F2',
+    marginHorizontal: 5,
+  },
+  tabButtonActive: {
+    backgroundColor: '#4A90E2',
+  },
+  tabButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  tabButtonTextActive: {
+    color: '#FFF',
+  },
+  tokenRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  tokenColumn: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  tokenSelector: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#FAFAFA',
+  },
+  tokenSelectorText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  arrowContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 10,
+  },
+  arrowText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#4A90E2',
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#555',
+    marginBottom: 6,
+  },
+  textInput: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 16,
+    backgroundColor: '#F9F9F9',
+  },
+  swapButton: {
+    backgroundColor: '#000000',
+    paddingVertical: 14,
+    marginBottom : 14,
+    borderRadius: 25,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  swapButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  resultText: {
+    marginTop: 20,
+    fontSize: 16,
+    color: 'green',
+    textAlign: 'center',
+  },
+  errorText: {
+    marginTop: 20,
+    fontSize: 16,
+    color: 'red',
+    textAlign: 'center',
+  },
+});

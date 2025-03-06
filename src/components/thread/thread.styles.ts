@@ -1,3 +1,4 @@
+// FILE: src/components/thread/thread.styles.ts
 import {DimensionValue, StyleSheet} from 'react-native';
 import {THREAD_DEFAULT_THEME} from './thread.theme';
 
@@ -10,14 +11,6 @@ export function getMergedTheme(
   };
 }
 
-/**
- * Complete set of thread-related styles, merged from:
- *   1) the default theme
- *   2) optional user-provided theme
- *   3) the base styles below
- *   4) optional userStyleSheet
- *   5) optional override styles
- */
 export function createThreadStyles(
   theme: ReturnType<typeof getMergedTheme>,
   overrideStyles?: {[key: string]: object},
@@ -113,22 +106,18 @@ export function createThreadStyles(
       borderBottomWidth: 1,
       borderBottomColor: theme['--thread-post-border-color'],
     },
-
-    // a visual thread line for replies
     threadItemReplyLine: {
       borderLeftWidth: 1,
       borderLeftColor: theme['--thread-reply-line-color'],
       marginLeft: 12,
       paddingLeft: 12,
     },
-
     threadItemAvatar: {
       width: theme['--thread-avatar-size'],
       height: theme['--thread-avatar-size'],
       borderRadius: theme['--thread-avatar-size'] / 2,
       marginRight: 8,
     },
-
     replyingContainer: {
       backgroundColor: theme['--thread-replying-bg'],
       padding: theme['--thread-replying-padding'],
@@ -143,8 +132,7 @@ export function createThreadStyles(
       color: theme['--thread-link-color'],
       fontWeight: '600',
     },
-
-    /* Post header (username, handle) */
+    /* Post Header (username, handle) */
     threadItemHeaderRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -169,7 +157,7 @@ export function createThreadStyles(
       marginLeft: 4,
     },
 
-    /* Body / content area */
+    /* Body/content area */
     extraContentContainer: {
       marginVertical: theme['--thread-section-spacing'],
       width: '100%',
@@ -227,7 +215,6 @@ export function createThreadStyles(
     footerContainer: {
       marginTop: 6,
       width: '100%',
-
       alignItems: 'flex-end',
     },
     itemIconsRow: {
@@ -254,31 +241,66 @@ export function createThreadStyles(
       marginLeft: -2,
     },
 
-    /* ======================
-       CTA (PostCTA)
-       ====================== */
+    /* CTA (PostCTA) */
     threadPostCTAContainer: {
-      width: theme['--thread-cta-container-width'] as DimensionValue, // Explicitly cast to DimensionValue
+      width: theme['--thread-cta-container-width'] as DimensionValue,
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 8,
       marginTop: 8,
       alignSelf: 'flex-end',
+      justifyContent: 'flex-end',
     },
     threadPostCTAButton: {
-      backgroundColor: '#2A2A2A',
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderRadius: 8,
+      backgroundColor: '#1A1A1A',
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 20,
     },
     threadPostCTAButtonLabel: {
       color: '#FFFFFF',
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '600',
     },
-    /* ======================
-       TradeCard
-       ====================== */
+
+    /* Additional styles for the trade modal */
+    tradeModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    tradeModalContainer: {
+      width: '80%',
+      backgroundColor: '#fff',
+      borderRadius: 10,
+      padding: 20,
+      alignItems: 'center',
+    },
+    tradeModalTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      marginBottom: 12,
+    },
+    tradeModeSelectorRow: {
+      flexDirection: 'row',
+      marginTop: 8,
+    },
+    tradeModeButton: {
+      flex: 1,
+      marginHorizontal: 2,
+      padding: 10,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    tradeConfirmButton: {
+      backgroundColor: '#1d9bf0',
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 8,
+    },
+
+    /* TradeCard */
     tradeCardContainer: {
       width: '100%',
       gap: 10,
@@ -287,7 +309,6 @@ export function createThreadStyles(
       flex: 1,
     },
     tradeCardCombinedSides: {
-      display: 'flex',
       flexDirection: 'row',
       justifyContent: 'space-between',
       backgroundColor: theme['--thread-bg-secondary'],
@@ -347,6 +368,8 @@ export function createThreadStyles(
       zIndex: 10,
       transform: [{translateX: -15}, {translateY: -15}],
     },
+
+    /* NFT Listing styles */
     nftListingContainer: {
       marginTop: 8,
       padding: 8,
@@ -354,7 +377,7 @@ export function createThreadStyles(
       borderRadius: 8,
     },
     nftListingCard: {
-      flexDirection: 'column', // vertical layout
+      flexDirection: 'column',
       backgroundColor: '#FFFFFF',
       borderRadius: 8,
       borderWidth: 1,
@@ -364,7 +387,7 @@ export function createThreadStyles(
       padding: 8,
     },
     nftListingImageContainer: {
-      width: 150,         // Bigger image container
+      width: 150,
       height: 150,
       backgroundColor: '#f0f0f0',
     },
@@ -395,20 +418,8 @@ export function createThreadStyles(
       color: '#666',
       marginTop: 4,
     },
-    buyButtonStyle: {
-      marginTop: 8,
-      backgroundColor: '#32D4DE',
-      paddingVertical: 10,
-      paddingHorizontal: 20,
-      borderRadius: 6,
-      alignSelf: 'center',
-    },
-    buyButtonText: {
-      color: '#fff',
-      fontWeight: '600',
-      fontSize: 14,
-    },
-    
+
+    /* Composer trade preview */
     composerTradePreview: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -438,10 +449,116 @@ export function createThreadStyles(
       borderRadius: 4,
     },
     
+    /* Migrated from ThreadComposer.tsx modalStyles */
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContainer: {
+      width: '85%',
+      maxHeight: '80%',
+      backgroundColor: '#fff',
+      borderRadius: 10,
+      padding: 16,
+      alignItems: 'center',
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      marginBottom: 8,
+    },
+    listingCard: {
+      flexDirection: 'row',
+      padding: 8,
+      borderWidth: 1,
+      borderColor: '#eee',
+      borderRadius: 8,
+      marginBottom: 8,
+      alignItems: 'center',
+    },
+    listingImage: {
+      width: 40,
+      height: 40,
+      borderRadius: 4,
+      backgroundColor: '#f0f0f0',
+    },
+    listingName: {
+      fontWeight: '600',
+      fontSize: 14,
+      color: '#333',
+    },
+    listingPrice: {
+      marginTop: 2,
+      fontSize: 12,
+      color: '#999',
+    },
+    closeButton: {
+      marginTop: 12,
+      backgroundColor: '#1d9bf0',
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 5,
+    },
+    closeButtonText: {
+      color: '#fff',
+      fontWeight: '600',
+    },
     
+    /* Migrated from PostCTA.tsx uiStyles */
+    progressOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.65)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    progressContainer: {
+      padding: 24,
+      backgroundColor: '#333',
+      borderRadius: 12,
+      width: '80%',
+      alignItems: 'center',
+    },
+    progressText: {
+      marginTop: 10,
+      color: '#fff',
+      fontSize: 14,
+      textAlign: 'center',
+    },
+    confirmOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.65)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    confirmContainer: {
+      padding: 24,
+      backgroundColor: '#333',
+      borderRadius: 12,
+      width: '80%',
+      alignItems: 'center',
+    },
+    confirmText: {
+      marginBottom: 20,
+      color: '#fff',
+      fontSize: 16,
+      textAlign: 'center',
+    },
+    confirmButton: {
+      backgroundColor: '#1d9bf0',
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+    },
+    confirmButtonText: {
+      color: '#fff',
+      fontWeight: 'bold',
+      fontSize: 15,
+    },
   });
 
-  // 1. Merge userStyleSheet if provided
+  // Merge userStyleSheet if provided
   if (userStyleSheet) {
     Object.keys(userStyleSheet).forEach(key => {
       if (baseStyles[key]) {
@@ -453,7 +570,7 @@ export function createThreadStyles(
     });
   }
 
-  // 2. Merge explicit overrideStyles last
+  // Merge explicit overrideStyles last
   if (overrideStyles) {
     Object.keys(overrideStyles).forEach(key => {
       if (baseStyles[key]) {

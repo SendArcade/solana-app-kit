@@ -1,7 +1,7 @@
 import React from "react";
 import { Image, Text, View } from "react-native";
 import { style } from "./portfolioItem.style";
-import Icons from "../../assets/svgs/index";
+import Icons from "../../../assets/svgs/index";
 
 interface PortfolioItemProps {
   imagePath: any; // Image source
