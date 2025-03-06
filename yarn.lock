@@ -1359,9 +1359,9 @@
     markdown-to-jsx "^7.5.0"
 
 "@dialectlabs/sdk@^1.9.4":
-  version "1.9.4"
-  resolved "https://registry.yarnpkg.com/@dialectlabs/sdk/-/sdk-1.9.4.tgz#dcbbdcf4b47f1469b0da4c736293844c2a661594"
-  integrity sha512-ov/e0ZQG0bGyEZmJ8i5evNA98xPH4QP/V0CI5/TzHtsW6XWr3xiDqj0TqqRLEOcaKK5C/rK+PRNcPowckZ7Aww==
+  version "1.9.5"
+  resolved "https://registry.yarnpkg.com/@dialectlabs/sdk/-/sdk-1.9.5.tgz#62665841f034bdb7edcafa219a6d74b6d5a8df08"
+  integrity sha512-5aNpqA40cfzgoY1JrOmqq/ogDnDt3gk+pbhb/SAfw4glEoFNqmrwTlinyo+cRQxcdAzYl32Fb9EkCvh/J2HAYA==
   dependencies:
     "@stablelib/base64" "^1.0.1"
     axios "^0.27.2"
@@ -5884,9 +5884,9 @@
     buffer "^6.0.3"
 
 "@solana/spl-token@^0.4.0", "@solana/spl-token@^0.4.12", "@solana/spl-token@^0.4.6":
-  version "0.4.12"
-  resolved "https://registry.yarnpkg.com/@solana/spl-token/-/spl-token-0.4.12.tgz#09361f9c8116f277b177dbcae7e3a273a19cd48a"
-  integrity sha512-K6CxzSoO1vC+WBys25zlSDaW0w4UFZO/IvEZquEI35A/PjqXNQHeVigmDCZYEJfESvYarKwsr8tYr/29lPtvaw==
+  version "0.4.13"
+  resolved "https://registry.yarnpkg.com/@solana/spl-token/-/spl-token-0.4.13.tgz#8f65c3c2b315e1a00a91b8d0f60922c6eb71de62"
+  integrity sha512-cite/pYWQZZVvLbg5lsodSovbetK/eA24gaR0eeUeMuBAMNrT8XFCwaygKy0N2WSg3gSyjjNpIeAGBAKZaY/1w==
   dependencies:
     "@solana/buffer-layout" "^4.0.0"
     "@solana/buffer-layout-utils" "^0.2.0"
@@ -7161,10 +7161,10 @@
     "@turnkey/webauthn-stamper" "0.5.0"
     cross-fetch "^3.1.5"
 
-"@turnkey/http@2.19.0", "@turnkey/http@^2.17.3":
-  version "2.19.0"
-  resolved "https://registry.yarnpkg.com/@turnkey/http/-/http-2.19.0.tgz#b8ebb4a3e995d2c8bc929612580c47cba72b1214"
-  integrity sha512-UeR84hGy+IWBNCvospsqmn8iF8w2rci4YCduahyB15daHa0zUz/uzsd2PZ6LB4k4wDwfO8Ebxt+vJFJldbrqIA==
+"@turnkey/http@2.20.0", "@turnkey/http@^2.17.3":
+  version "2.20.0"
+  resolved "https://registry.yarnpkg.com/@turnkey/http/-/http-2.20.0.tgz#19bc4f53e75cc99267fb3798580c27763554d075"
+  integrity sha512-j8/1lcw88qImiQKMIp65AQ0MaQH53ixPHuKgiI1UxR9NUsGJPmn2lpjxT1HN4tsDhDlafsIQHRrFu6aZ4DB7Ig==
   dependencies:
     "@turnkey/api-key-stamper" "0.4.4"
     "@turnkey/encoding" "0.4.0"
@@ -7183,12 +7183,12 @@
     sha256-uint8array "^0.10.7"
 
 "@turnkey/react-native-passkey-stamper@^1.0.4":
-  version "1.0.6"
-  resolved "https://registry.yarnpkg.com/@turnkey/react-native-passkey-stamper/-/react-native-passkey-stamper-1.0.6.tgz#0a5000fbd9138f0ff65f2702f1c49b49163abefb"
-  integrity sha512-PerrZRufdST54mj2bRFGr/ZKXIq3R950izwAeGmd/j+bUC8T8mXl00jkQvBMf1qfXmoLWwiptjued5TpH4GApw==
+  version "1.0.7"
+  resolved "https://registry.yarnpkg.com/@turnkey/react-native-passkey-stamper/-/react-native-passkey-stamper-1.0.7.tgz#d97adbf08b5dfbc737766ec5b4f57d6683485644"
+  integrity sha512-0AUCXIFfiHBwRYJ/HdIJSUD/DDwKvaTclZSKEVPP8vtQmX3Am/sTI8WF24U1G786OQZSN6Zapk9qpEta8xe7QA==
   dependencies:
     "@turnkey/encoding" "0.4.0"
-    "@turnkey/http" "2.19.0"
+    "@turnkey/http" "2.20.0"
     buffer "^6.0.3"
     react-native-passkey "^3.0.0"
     sha256-uint8array "^0.10.7"
@@ -7468,9 +7468,9 @@
     "@types/node" "*"
 
 "@types/ws@^8.2.2":
-  version "8.5.14"
-  resolved "https://registry.yarnpkg.com/@types/ws/-/ws-8.5.14.tgz#93d44b268c9127d96026cf44353725dd9b6c3c21"
-  integrity sha512-bd/YFLW+URhBzMXurx7lWByOu+xzU9+kb3RboOteXYDfW+tr+JZa99OyNmPINEGB/ahzKrEuc8rcv4gnpJmxTw==
+  version "8.18.0"
+  resolved "https://registry.yarnpkg.com/@types/ws/-/ws-8.18.0.tgz#8a2ec491d6f0685ceaab9a9b7ff44146236993b5"
+  integrity sha512-8svvI3hMyvN0kKCJMvTJP/x6Y/EoQbepff882wL+Sn5QsXb3etnamgrJq4isrBxSJj5L2AuXcI0+bgkoAXGUJw==
   dependencies:
     "@types/node" "*"
 
@@ -8007,9 +8007,9 @@ acorn-jsx@^5.3.2:
   integrity sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==
 
 acorn@^8.8.2, acorn@^8.9.0:
-  version "8.14.0"
-  resolved "https://registry.yarnpkg.com/acorn/-/acorn-8.14.0.tgz#063e2c70cac5fb4f6467f0b11152e04c682795b0"
-  integrity sha512-cl669nCJTZBsL97OF4kUQm5g5hC2uihk0NxY3WENAC0TYdILVkAyHymAntgxGkl7K+t0cXIrH5siy5S4XkFycA==
+  version "8.14.1"
+  resolved "https://registry.yarnpkg.com/acorn/-/acorn-8.14.1.tgz#721d5dc10f7d5b5609a891773d47731796935dfb"
+  integrity sha512-OvQ/2pUDKmgfCg++xsTX1wGxfTaszcHVcTctW4UJB4hibJx2HXxxO5UmVgyjMa+ZDsiaf5wWLXYpRWMmBI0QHg==
 
 aes-js@3.0.0:
   version "3.0.0"
@@ -11247,9 +11247,9 @@ flow-enums-runtime@^0.0.6:
   integrity sha512-3PYnM29RFXwvAN6Pc/scUfkI7RwhQ/xqyLUyPNlXUp9S40zI8nup9tUSrTLSVnWGBN38FNiGWbwZOB6uR4OGdw==
 
 flow-parser@0.*:
-  version "0.262.0"
-  resolved "https://registry.yarnpkg.com/flow-parser/-/flow-parser-0.262.0.tgz#3af48ee0c0d8f56729ae18a748d1fb0953db1c33"
-  integrity sha512-K3asSw4s2/sRoUC4xD2OfGi04gdYCCFRgkcwEXi5JyfFhS0HrFWLcDPp55ttv95OY5970WKl4T+7hWrnuOAUMQ==
+  version "0.263.0"
+  resolved "https://registry.yarnpkg.com/flow-parser/-/flow-parser-0.263.0.tgz#97740b1401297a0fae0deef9c213865264435007"
+  integrity sha512-F0Tr7SUvZ4BQYglFOkr8rCTO5FPjCwMhm/6i57h40F80Oz/hzzkqte4lGO0vGJ7THQonuXcTyYqCdKkAwt5d2w==
 
 follow-redirects@^1.14.9, follow-redirects@^1.15.0, follow-redirects@^1.15.6:
   version "1.15.9"
@@ -13082,9 +13082,9 @@ levn@^0.4.1:
     type-check "~0.4.0"
 
 libphonenumber-js@^1.10.31, libphonenumber-js@^1.10.44:
-  version "1.12.4"
-  resolved "https://registry.yarnpkg.com/libphonenumber-js/-/libphonenumber-js-1.12.4.tgz#15062e61ac29d381305f0a37b0c2aad6ae432931"
-  integrity sha512-vLmhg7Gan7idyAKfc6pvCtNzvar4/eIzrVVk3hjNFH5+fGqyjD0gQRovdTrDl20wsmZhBtmZpcsR0tOfquwb8g==
+  version "1.12.5"
+  resolved "https://registry.yarnpkg.com/libphonenumber-js/-/libphonenumber-js-1.12.5.tgz#8e6043a67112d4beedb8627b359a613f04d88fba"
+  integrity sha512-DOjiaVjjSmap12ztyb4QgoFmUe/GbgnEXHu+R7iowk0lzDIjScvPAm8cK9RYTEobbRb0OPlwlZUGTTJPJg13Kw==
 
 lighthouse-logger@^1.0.0:
   version "1.4.2"
