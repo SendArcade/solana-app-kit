@@ -61,7 +61,7 @@ interface ThreadItemProps {
  * />
  * ```
  */
-export const ThreadItem: React.FC<ThreadItemProps> = ({
+export default function ThreadItem ({
   post,
   currentUser,
   rootPosts,
@@ -71,7 +71,7 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
   themeOverrides,
   styleOverrides,
   userStyleSheet,
-}) => {
+}: ThreadItemProps) {
   const [showReplyComposer, setShowReplyComposer] = useState(false);
 
   const mergedTheme = getMergedTheme(themeOverrides);

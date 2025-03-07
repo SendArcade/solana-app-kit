@@ -1,0 +1,69 @@
+[**solana-social-kit**](../../../../README.md)
+
+***
+
+[solana-social-kit](../../../../README.md) / [components/tweet/tweet](../README.md) / default
+
+# Function: default()
+
+> **default**(`props`, `deprecatedLegacyContext`?): `ReactNode`
+
+Defined in: [src/components/tweet/tweet.tsx:98](https://github.com/SendArcade/solana-social-starter/blob/98f94bb63d3814df24512365f6ae706d273e698f/src/components/tweet/tweet.tsx#L98)
+
+A component that displays a Twitter-like social media post
+
+## Parameters
+
+### props
+
+`TweetProps`
+
+### deprecatedLegacyContext?
+
+`any`
+
+**Deprecated**
+
+**See**
+
+[React Docs](https://legacy.reactjs.org/docs/legacy-context.html#referencing-context-in-lifecycle-methods)
+
+## Returns
+
+`ReactNode`
+
+## Component
+
+## Description
+
+Tweet is a comprehensive component that displays social media posts in a
+Twitter-like format. Each tweet includes:
+- Author information (username, handle, avatar)
+- Tweet content with special formatting for $SEND mentions
+- Engagement metrics (quotes, retweets, reactions)
+- Interactive elements (buy button, reaction icons)
+- Thread avatars for conversation visualization
+
+The component is responsive to screen size and supports custom styling
+through style props. It also includes animations for user interactions
+and proper formatting for large numbers.
+
+## Example
+
+```tsx
+const tweetData = [{
+  username: "John Doe",
+  handle: "@johndoe",
+  time: "2h",
+  tweetContent: "Check out $SEND token!",
+  quoteCount: 5,
+  retweetCount: 10,
+  reactionCount: 100,
+  avatar: require('./avatar.png')
+}];
+
+<Tweet
+  data={tweetData}
+  onPress={() => console.log('Tweet pressed')}
+/>
+```

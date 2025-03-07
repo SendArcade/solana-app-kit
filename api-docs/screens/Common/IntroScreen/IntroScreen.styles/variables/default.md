@@ -1,0 +1,129 @@
+[**solana-social-kit**](../../../../../README.md)
+
+***
+
+[solana-social-kit](../../../../../README.md) / [screens/Common/IntroScreen/IntroScreen.styles](../README.md) / default
+
+# Variable: default
+
+> `const` **default**: `object`
+
+Defined in: [src/screens/Common/IntroScreen/IntroScreen.styles.ts:6](https://github.com/SendArcade/solana-social-starter/blob/98f94bb63d3814df24512365f6ae706d273e698f/src/screens/Common/IntroScreen/IntroScreen.styles.ts#L6)
+
+## Type declaration
+
+### bottomRectContainer
+
+> **bottomRectContainer**: `object`
+
+#### bottomRectContainer.bottom
+
+> **bottom**: `number` = `0`
+
+#### bottomRectContainer.position
+
+> **position**: `"absolute"` = `'absolute'`
+
+#### bottomRectContainer.right
+
+> **right**: `number` = `0`
+
+### container
+
+> **container**: `object`
+
+#### container.alignItems
+
+> **alignItems**: `"center"` = `'center'`
+
+#### container.backgroundColor
+
+> **backgroundColor**: `string` = `COLORS.white`
+
+#### container.flex
+
+> **flex**: `number` = `1`
+
+#### container.justifyContent
+
+> **justifyContent**: `"center"` = `'center'`
+
+### smileFaceContainer
+
+> **smileFaceContainer**: `object`
+
+#### smileFaceContainer.elevation
+
+> **elevation**: `number` = `1`
+
+#### smileFaceContainer.left
+
+> **left**: `number`
+
+#### smileFaceContainer.paddingHorizontal
+
+> **paddingHorizontal**: `number` = `30`
+
+#### smileFaceContainer.paddingVertical
+
+> **paddingVertical**: `number` = `10`
+
+#### smileFaceContainer.position
+
+> **position**: `"absolute"` = `'absolute'`
+
+#### smileFaceContainer.shadowColor
+
+> **shadowColor**: `string` = `COLORS.black`
+
+#### smileFaceContainer.shadowOffset
+
+> **shadowOffset**: `object`
+
+#### smileFaceContainer.shadowOffset.height
+
+> **height**: `number` = `10`
+
+#### smileFaceContainer.shadowOffset.width
+
+> **width**: `number` = `0`
+
+#### smileFaceContainer.shadowOpacity
+
+> **shadowOpacity**: `number` = `0.2`
+
+#### smileFaceContainer.shadowRadius
+
+> **shadowRadius**: `number` = `10`
+
+#### smileFaceContainer.top
+
+> **top**: `number`
+
+### splashTextContainer
+
+> **splashTextContainer**: `object`
+
+#### splashTextContainer.alignItems
+
+> **alignItems**: `"center"` = `'center'`
+
+#### splashTextContainer.justifyContent
+
+> **justifyContent**: `"center"` = `'center'`
+
+#### splashTextContainer.position
+
+> **position**: `"absolute"` = `'absolute'`
+
+### svgContainer
+
+> **svgContainer**: `object`
+
+#### svgContainer.alignItems
+
+> **alignItems**: `"center"` = `'center'`
+
+#### svgContainer.justifyContent
+
+> **justifyContent**: `"center"` = `'center'`

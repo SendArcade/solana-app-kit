@@ -6,7 +6,7 @@ import {
   ThreadUser,
 } from '../../../../components/thread/thread.types';
 import {useAppDispatch, useAppSelector} from '../../../../hooks/useReduxHooks';
-import {Thread} from '../../../../components/thread/Thread';
+import Thread from '../../../../components/thread/Thread';
 import COLORS from '../../../../assets/colors';
 import {fetchAllPosts} from '../../../../state/thread/reducer';
 import {fetchUserProfile} from '../../../../state/auth/reducer';

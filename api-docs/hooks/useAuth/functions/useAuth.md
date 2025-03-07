@@ -1,0 +1,21 @@
+[**solana-social-kit**](../../../README.md)
+
+***
+
+[solana-social-kit](../../../README.md) / [hooks/useAuth](../README.md) / useAuth
+
+# Function: useAuth()
+
+> **useAuth**(): \{ `loginWithApple`: () => `Promise`\<`void`\>; `loginWithEmail`: () => `Promise`\<`void`\>; `loginWithGoogle`: () => `Promise`\<`void`\>; `loginWithSMS`: `undefined`; `logout`: () => `Promise`\<`void`\>; `solanaWallet`: `EmbeddedSolanaWalletState`; `status`: `string`; `user`: `null` \| `PrivyUser`; \} \| \{ `loginWithApple`: `undefined`; `loginWithEmail`: () => `Promise`\<`void`\>; `loginWithGoogle`: () => `Promise`\<`void`\>; `loginWithSMS`: () => `Promise`\<`void`\>; `logout`: () => `Promise`\<`void`\>; `solanaWallet`: `undefined`; `status`: `string`; `user`: `any`; \} \| \{ `loginWithApple`: `undefined`; `loginWithEmail`: () => `Promise`\<`void`\>; `loginWithGoogle`: `undefined`; `loginWithSMS`: `undefined`; `logout`: () => `Promise`\<`void`\>; `solanaWallet`: `undefined`; `status`: `string`; `user`: `null`; \} \| \{ `loginWithApple`: `undefined`; `loginWithEmail`: `undefined`; `loginWithGoogle`: `undefined`; `loginWithSMS`: `undefined`; `logout`: () => `Promise`\<`void`\>; `solanaWallet`: `undefined`; `status`: `string`; `user`: `undefined`; \}
+
+Defined in: [src/hooks/useAuth.ts:16](https://github.com/SendArcade/solana-social-starter/blob/98f94bb63d3814df24512365f6ae706d273e698f/src/hooks/useAuth.ts#L16)
+
+Summarized usage:
+ 1) Read which provider is set from config.
+ 2) If 'privy', we handle via `usePrivyWalletLogic`.
+ 3) If 'dynamic', we handle via `useDynamicWalletLogic`.
+ 4) If 'turnkey', we do not have a full usage example, but we show how you might do it.
+
+## Returns
+
+\{ `loginWithApple`: () => `Promise`\<`void`\>; `loginWithEmail`: () => `Promise`\<`void`\>; `loginWithGoogle`: () => `Promise`\<`void`\>; `loginWithSMS`: `undefined`; `logout`: () => `Promise`\<`void`\>; `solanaWallet`: `EmbeddedSolanaWalletState`; `status`: `string`; `user`: `null` \| `PrivyUser`; \} \| \{ `loginWithApple`: `undefined`; `loginWithEmail`: () => `Promise`\<`void`\>; `loginWithGoogle`: () => `Promise`\<`void`\>; `loginWithSMS`: () => `Promise`\<`void`\>; `logout`: () => `Promise`\<`void`\>; `solanaWallet`: `undefined`; `status`: `string`; `user`: `any`; \} \| \{ `loginWithApple`: `undefined`; `loginWithEmail`: () => `Promise`\<`void`\>; `loginWithGoogle`: `undefined`; `loginWithSMS`: `undefined`; `logout`: () => `Promise`\<`void`\>; `solanaWallet`: `undefined`; `status`: `string`; `user`: `null`; \} \| \{ `loginWithApple`: `undefined`; `loginWithEmail`: `undefined`; `loginWithGoogle`: `undefined`; `loginWithSMS`: `undefined`; `logout`: () => `Promise`\<`void`\>; `solanaWallet`: `undefined`; `status`: `string`; `user`: `undefined`; \}
