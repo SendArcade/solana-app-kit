@@ -4,7 +4,6 @@
 
 A modern React Native social application built on the Solana blockchain, providing a complete starter kit for building decentralized social experiences.
 
-![Solana App Kit V6 (Light)](https://github.com/user-attachments/assets/41166f47-3b99-4946-8034-30741d4f2efd)
 
 </div>
 
