@@ -11,12 +11,8 @@ import {
 import Icons from '../../assets/svgs';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
 import {ThreadPost, ThreadUser} from './thread.types';
-import { DEFAULT_IMAGES } from '../../config/constants';
+import {DEFAULT_IMAGES} from '../../config/constants';
 
-/**
- * Props for the PostHeader component
- * @interface PostHeaderProps
- */
 interface PostHeaderProps {
   /** The post data to display in the header */
   post: ThreadPost;
@@ -28,41 +24,21 @@ interface PostHeaderProps {
   themeOverrides?: Partial<Record<string, any>>;
   /** Style overrides for specific components */
   styleOverrides?: {[key: string]: object};
+
+  /**
+   * NEW: callback if user taps on the user’s avatar/username
+   */
+  onPressUser?: (user: ThreadUser) => void;
 }
 
-/**
- * A component that displays the header of a post in a thread
- * 
- * @component
- * @description
- * PostHeader shows the user information and metadata for a post, including
- * the user's avatar, username, handle, verification status, and post timestamp.
- * It also provides menu functionality for post actions like deletion.
- * 
- * Features:
- * - User avatar display with fallback
- * - Username and handle display
- * - Verification badge
- * - Post timestamp
- * - Menu actions
- * - Customizable styling
- * 
- * @example
- * ```tsx
- * <PostHeader
- *   post={postData}
- *   onPressMenu={(post) => handleMenuPress(post)}
- *   onDeletePost={(post) => handleDelete(post)}
- *   themeOverrides={{ '--primary-color': '#1D9BF0' }}
- * />
- * ```
- */
 export default function PostHeader({
   post,
   onPressMenu,
   onDeletePost,
   themeOverrides,
   styleOverrides,
+
+  onPressUser,
 }: PostHeaderProps) {
   const {user, createdAt} = post;
   const mergedTheme = getMergedTheme(themeOverrides);
@@ -97,31 +73,34 @@ export default function PostHeader({
 
   /**
    * Safely returns the image source for a user's avatar
-   * @param {ThreadUser} u - The user object to get the avatar for
-   * @returns {ImageSourcePropType} The image source for the avatar
    */
   function getUserAvatarSource(u: ThreadUser): ImageSourcePropType {
     if (u.avatar) {
       if (typeof u.avatar === 'string') {
         return {uri: u.avatar};
       }
-      // If it's already a number or object, assume it's a valid require
       return u.avatar;
     }
-    // Fallback if nothing is set
     return DEFAULT_IMAGES.user;
   }
+
+  const handleUserPress = () => {
+    if (onPressUser) {
+      onPressUser(user);
+    }
+  };
 
   return (
     <View style={styles.threadItemHeaderRow}>
       <View style={styles.threadItemHeaderLeft}>
-        <View style={{position: 'relative'}}>
+        {/* Wrap the avatar in a Touchable to press user */}
+        <TouchableOpacity
+          onPress={handleUserPress}
+          style={{position: 'relative'}}>
           <Image
             source={getUserAvatarSource(user)}
             style={styles.threadItemAvatar}
           />
-
-          {/* "Add User" icon in the corner */}
           <Icons.addUserIcon
             style={{
               position: 'absolute',
@@ -135,9 +114,13 @@ export default function PostHeader({
               borderColor: 'white',
             }}
           />
-        </View>
+        </TouchableOpacity>
+
         <View style={{marginLeft: 8}}>
-          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          {/* Also wrap the username in a Touchable */}
+          <TouchableOpacity
+            onPress={handleUserPress}
+            style={{flexDirection: 'row', alignItems: 'center'}}>
             <Text style={styles.threadItemUsername}>{user.username}</Text>
             {user.verified && (
               <Icons.BlueCheck
@@ -146,12 +129,13 @@ export default function PostHeader({
                 style={styles.verifiedIcon}
               />
             )}
-          </View>
+          </TouchableOpacity>
           <Text style={styles.threadItemHandleTime}>
             {user.handle} • {timeString}
           </Text>
         </View>
       </View>
+
       <TouchableOpacity onPress={handlePressMenu}>
         <Icons.DotsThree width={20} height={20} />
       </TouchableOpacity>

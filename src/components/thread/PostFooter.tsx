@@ -199,7 +199,7 @@ export default function PostFooter({
 
         {/* Right side icons */}
         <View style={styles.itemRightIcons}>
-          <Icons.GridIcon width={20} height={20} />
+          {/* <Icons.GridIcon width={20} height={20} /> */}
           <TouchableOpacity onPress={toggleBookmark}>
             {isBookmarked ? (
               <Icons.BookmarkActive width={20} height={20} />

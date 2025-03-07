@@ -9,10 +9,6 @@ import ThreadComposer from './ThreadComposer';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
 import {ThreadCTAButton, ThreadPost, ThreadUser} from './thread.types';
 
-/**
- * Props for the ThreadItem component
- * @interface ThreadItemProps
- */
 interface ThreadItemProps {
   /** The post data to display */
   post: ThreadPost;
@@ -32,35 +28,13 @@ interface ThreadItemProps {
   styleOverrides?: {[key: string]: object};
   /** User-provided stylesheet overrides */
   userStyleSheet?: {[key: string]: object};
+
+  /**
+   * NEW: Callback if user taps avatar/username
+   */
+  onPressUser?: (user: ThreadUser) => void;
 }
 
-/**
- * A component that renders an individual post within a thread
- * 
- * @component
- * @description
- * ThreadItem displays a single post with its replies in a threaded discussion.
- * It handles post interactions like replying, deleting, and showing nested responses.
- * The component supports customizable styling and themes.
- * 
- * Features:
- * - Displays post content with author information
- * - Shows nested replies
- * - Handles post deletion
- * - Supports reply composition
- * - Customizable appearance through themes
- * 
- * @example
- * ```tsx
- * <ThreadItem
- *   post={postData}
- *   currentUser={user}
- *   rootPosts={allPosts}
- *   depth={0}
- *   onPressPost={handlePostPress}
- * />
- * ```
- */
 export const ThreadItem: React.FC<ThreadItemProps> = ({
   post,
   currentUser,
@@ -71,6 +45,8 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
   themeOverrides,
   styleOverrides,
   userStyleSheet,
+
+  onPressUser,
 }) => {
   const [showReplyComposer, setShowReplyComposer] = useState(false);
 
@@ -120,6 +96,8 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
           onDeletePost={handleDeletePost}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
+          // Pass the new user press callback
+          onPressUser={onPressUser}
         />
 
         <PostBody
@@ -167,8 +145,9 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
           userStyleSheet={userStyleSheet}
+          onPressUser={onPressUser} // pass down
         />
       ))}
     </View>
   );
-}
+};
