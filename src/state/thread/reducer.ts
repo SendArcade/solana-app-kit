@@ -52,6 +52,20 @@ export const createReplyAsync = createAsyncThunk(
   }
 );
 
+export const createRetweetAsync = createAsyncThunk(
+  'thread/createRetweet',
+  async (payload: { retweetOf: string; user: ThreadUser; sections?: ThreadSection[] }) => {
+    const res = await fetch(`${SERVER_BASE_URL}/api/posts/retweet`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Failed to retweet');
+    return data.data as ThreadPost;
+  }
+);
+
 // deletePostAsync ...
 export const deletePostAsync = createAsyncThunk('thread/deletePost', async (postId: string) => {
   const res = await fetch(`${SERVER_BASE_URL}/api/posts/${postId}`, {
@@ -113,6 +127,27 @@ export const threadSlice = createSlice({
       }
       addReply(state.allPosts);
     },
+    addRetweetLocally: (state, action: PayloadAction<ThreadPost>) => {
+      state.allPosts.unshift(action.payload);
+
+      // Also increment retweetCount on the original
+      if (action.payload.retweetOf) {
+        const originalId = action.payload.retweetOf.id;
+        const updateRetweetCount = (posts: ThreadPost[]) => {
+          for (const p of posts) {
+            if (p.id === originalId) {
+              p.retweetCount += 1;
+              return true;
+            }
+            if (p.replies.length) {
+              if (updateRetweetCount(p.replies)) return true;
+            }
+          }
+          return false;
+        };
+        updateRetweetCount(state.allPosts);
+      }
+    },
   },
   extraReducers: (builder) => {
     // fetchAllPosts
@@ -152,6 +187,32 @@ export const threadSlice = createSlice({
         return false;
       }
       addReply(state.allPosts);
+    });
+    builder.addCase(createRetweetAsync.fulfilled, (state, action) => {
+      const newRetweet = action.payload;
+      // Insert at top
+      state.allPosts.unshift(newRetweet);
+
+      // increment retweetCount on original
+      if (newRetweet.retweetOf) {
+        const originalId = newRetweet.retweetOf.id;
+        const updateRetweetCount = (posts: ThreadPost[]) => {
+          for (const p of posts) {
+            if (p.id === originalId) {
+              p.retweetCount += 1;
+              return true;
+            }
+            if (p.replies.length) {
+              if (updateRetweetCount(p.replies)) return true;
+            }
+          }
+          return false;
+        };
+        updateRetweetCount(state.allPosts);
+      }
+    });
+    builder.addCase(createRetweetAsync.rejected, (state, action) => {
+      state.error = action.error.message || 'Failed to retweet.';
     });
 
     // deletePostAsync
@@ -194,5 +255,5 @@ export const threadSlice = createSlice({
   },
 });
 
-export const { addPostLocally, addReplyLocally } = threadSlice.actions;
+export const { addPostLocally, addReplyLocally, addRetweetLocally } = threadSlice.actions;
 export default threadSlice.reducer;

@@ -1,8 +1,11 @@
-// server/src/controllers/threadController.ts
+// FILE: server/src/controllers/threadController.ts
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import knex from '../db/knex';
 
+/**
+ * Recursively fetch replies for a post
+ */
 async function fetchRepliesRecursive(parentId: string): Promise<any[]> {
   const rows = await knex('posts')
     .where({ parent_id: parentId })
@@ -14,7 +17,14 @@ async function fetchRepliesRecursive(parentId: string): Promise<any[]> {
     const dbUser = await knex('users').where({ id: row.user_id }).first();
     const avatar = dbUser ? dbUser.profile_picture_url : null;
 
+    // recursively fetch sub-replies
     const replies = await fetchRepliesRecursive(row.id);
+
+    // if retweet_of is set, fetch that post data too
+    let retweetData: any = null;
+    if (row.retweet_of) {
+      retweetData = await fetchSinglePost(row.retweet_of);
+    }
 
     results.push({
       id: row.id,
@@ -32,11 +42,50 @@ async function fetchRepliesRecursive(parentId: string): Promise<any[]> {
       reactionCount: row.reaction_count,
       retweetCount: row.retweet_count,
       quoteCount: row.quote_count,
-      // NEW: parse "reactions" from DB
       reactions: row.reactions || {},
+      // new retweetOf field
+      retweetOf: retweetData,
     });
   }
   return results;
+}
+
+/**
+ * Helper: fetch a single post by id, including user + retweetOf if present,
+ * but NOT its replies. (Used to hydrate retweetOf field.)
+ */
+async function fetchSinglePost(postId: string): Promise<any | null> {
+  const row = await knex('posts').where({ id: postId }).first();
+  if (!row) return null;
+
+  const dbUser = await knex('users').where({ id: row.user_id }).first();
+  const avatar = dbUser ? dbUser.profile_picture_url : null;
+
+  // If retweet_of is set, fetch that recursively
+  let retweetData: any = null;
+  if (row.retweet_of) {
+    retweetData = await fetchSinglePost(row.retweet_of);
+  }
+
+  return {
+    id: row.id,
+    parentId: row.parent_id,
+    user: {
+      id: row.user_id,
+      username: row.username,
+      handle: row.user_handle,
+      verified: row.user_verified,
+      avatar,
+    },
+    sections: row.sections,
+    createdAt: row.created_at,
+    replies: [], // not returned in single fetch
+    reactionCount: row.reaction_count,
+    retweetCount: row.retweet_count,
+    quoteCount: row.quote_count,
+    reactions: row.reactions || {},
+    retweetOf: retweetData,
+  };
 }
 
 /**
@@ -54,7 +103,14 @@ export const getAllPosts = async (req: Request, res: Response): Promise<void> =>
       const dbUser = await knex('users').where({ id: row.user_id }).first();
       const avatar = dbUser ? dbUser.profile_picture_url : null;
 
+      // get replies
       const replies = await fetchRepliesRecursive(row.id);
+
+      // if retweet_of is set, fetch that post
+      let retweetData: any = null;
+      if (row.retweet_of) {
+        retweetData = await fetchSinglePost(row.retweet_of);
+      }
 
       result.push({
         id: row.id,
@@ -72,8 +128,9 @@ export const getAllPosts = async (req: Request, res: Response): Promise<void> =>
         reactionCount: row.reaction_count,
         retweetCount: row.retweet_count,
         quoteCount: row.quote_count,
-        // parse "reactions" from DB
         reactions: row.reactions || {},
+        // new retweetOf
+        retweetOf: retweetData,
       });
     }
 
@@ -113,8 +170,8 @@ export const createRootPost = async (req: Request, res: Response): Promise<void>
       reaction_count: 0,
       retweet_count: 0,
       quote_count: 0,
-      // Store an empty object in "reactions" column by default
       reactions: JSON.stringify({}),
+      retweet_of: null,
     });
 
     // fetch user again for avatar
@@ -137,7 +194,8 @@ export const createRootPost = async (req: Request, res: Response): Promise<void>
       reactionCount: 0,
       retweetCount: 0,
       quoteCount: 0,
-      reactions: {}, // empty object
+      reactions: {},
+      retweetOf: null,
     };
 
     res.status(201).json({ success: true, data: newPost });
@@ -183,6 +241,7 @@ export const createReply = async (req: Request, res: Response): Promise<void> =>
       retweet_count: 0,
       quote_count: 0,
       reactions: JSON.stringify({}),
+      retweet_of: null,
     });
 
     // increment parent's quoteCount
@@ -209,6 +268,7 @@ export const createReply = async (req: Request, res: Response): Promise<void> =>
       retweetCount: 0,
       quoteCount: 0,
       reactions: {},
+      retweetOf: null,
     };
     res.status(201).json({ success: true, data: newReply });
     return;
@@ -254,69 +314,137 @@ export const deletePost = async (req: Request, res: Response): Promise<void> => 
  * body: { reactionEmoji: string }
  */
 export const addReaction = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { postId } = req.params;
-      const { reactionEmoji } = req.body;
-  
-      if (!postId || !reactionEmoji) {
-        res.status(400).json({
-          success: false,
-          error: 'Missing postId or reactionEmoji',
-        });
-        return; // Just return without the Response object
-      }
-  
-      // fetch the post
-      const post = await knex('posts').where({ id: postId }).first();
-      if (!post) {
-        res.status(404).json({ success: false, error: 'Post not found' });
-        return; // Just return without the Response object
-      }
-  
-      // Because the DB (JSONB) might already return an object:
-      // if it's string-based, you'd do type-checking, but let's assume it's an object:
-      let reactionsObj = post.reactions || {};
-  
-      // If needed, do a safe type check:
-      // if (typeof post.reactions === 'string') {
-      //   reactionsObj = JSON.parse(post.reactions);
-      // } else {
-      //   reactionsObj = post.reactions || {};
-      // }
-  
-      // increment the emoji
-      if (!reactionsObj[reactionEmoji]) {
-        reactionsObj[reactionEmoji] = 1;
-      } else {
-        reactionsObj[reactionEmoji] += 1;
-      }
-  
-      // sum up total
-      let totalReactions = 0;
-      Object.values(reactionsObj).forEach((val: any) => {
-        totalReactions += val;
+  try {
+    const { postId } = req.params;
+    const { reactionEmoji } = req.body;
+
+    if (!postId || !reactionEmoji) {
+      res.status(400).json({
+        success: false,
+        error: 'Missing postId or reactionEmoji',
       });
-  
-      // Update DB: if you used .jsonb('reactions'), you can store it directly
-      await knex('posts')
-        .where({ id: postId })
-        .update({
-          reactions: reactionsObj, // store the raw object if JSONB
-          reaction_count: totalReactions,
-        //   updated_at: new Date(),
-        });
-  
-      // return updated post
-      const updatedPost = {
-        ...post,
+      return;
+    }
+
+    // fetch the post
+    const post = await knex('posts').where({ id: postId }).first();
+    if (!post) {
+      res.status(404).json({ success: false, error: 'Post not found' });
+      return;
+    }
+
+    let reactionsObj = post.reactions || {};
+    // increment the emoji
+    if (!reactionsObj[reactionEmoji]) {
+      reactionsObj[reactionEmoji] = 1;
+    } else {
+      reactionsObj[reactionEmoji] += 1;
+    }
+
+    // sum up total
+    let totalReactions = 0;
+    Object.values(reactionsObj).forEach((val: any) => {
+      totalReactions += val;
+    });
+
+    await knex('posts')
+      .where({ id: postId })
+      .update({
         reactions: reactionsObj,
         reaction_count: totalReactions,
-      };
-  
-      res.json({ success: true, data: updatedPost });
-      return; // Add explicit return here
-    } catch (error: any) {
-      console.error('[addReaction] Error:', error);
-      res.status(500).json({ success: false, error: error.message });
+      });
+
+    const updatedPost = {
+      ...post,
+      reactions: reactionsObj,
+      reaction_count: totalReactions,
+    };
+
+    res.json({ success: true, data: updatedPost });
+  } catch (error: any) {
+    console.error('[addReaction] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * POST /api/posts/retweet
+ * Creates a new root post that references retweetOf.
+ * Increments retweet_count on the original post.
+ */
+export const createRetweet = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { retweetOf, user, sections } = req.body;
+    if (!retweetOf || !user) {
+      res
+        .status(400)
+        .json({ success: false, error: 'retweetOf and user are required' });
+        return;
     }
-  };
+
+    // check existence of the retweeted post
+    const originalPost = await knex('posts').where({ id: retweetOf }).first();
+    if (!originalPost) {
+      res
+        .status(404)
+        .json({ success: false, error: 'Post to retweet not found' });
+        return;
+    }
+
+    const newId = uuidv4();
+
+    // Insert a new root post with retweet_of set
+    await knex('posts').insert({
+      id: newId,
+      parent_id: null,
+      user_id: user.id,
+      username: user.username,
+      user_handle: user.handle,
+      user_verified: !!user.verified,
+      sections: JSON.stringify(sections || []),
+      reaction_count: 0,
+      retweet_count: 0,
+      quote_count: 0,
+      reactions: JSON.stringify({}),
+      retweet_of: retweetOf,
+    });
+
+    // increment retweet_count on the original post
+    await knex('posts')
+      .where({ id: retweetOf })
+      .increment('retweet_count', 1);
+
+    // fetch user again for avatar
+    const dbUser = await knex('users').where({ id: user.id }).first();
+    const avatar = dbUser ? dbUser.profile_picture_url : null;
+
+    // to return retweetOf hydrated data
+    const retweetOfData = await fetchSinglePost(retweetOf);
+
+    const newRetweetPost = {
+      id: newId,
+      parentId: null,
+      user: {
+        id: user.id,
+        username: user.username,
+        handle: user.handle,
+        verified: !!user.verified,
+        avatar,
+      },
+      sections: sections || [],
+      createdAt: new Date().toISOString(),
+      replies: [],
+      reactionCount: 0,
+      retweetCount: 0,
+      quoteCount: 0,
+      reactions: {},
+      retweetOf: retweetOfData,
+    };
+
+    res.status(201).json({ success: true, data: newRetweetPost });
+    return;
+  } catch (error: any) {
+    console.error('[createRetweet] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};

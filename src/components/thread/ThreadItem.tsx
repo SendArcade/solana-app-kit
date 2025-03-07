@@ -1,13 +1,14 @@
-import React, {useState} from 'react';
-import {View, Alert, TouchableOpacity} from 'react-native';
+import React, { useState } from 'react';
+import { View, Alert, TouchableOpacity } from 'react-native';
 import ThreadAncestors from './ThreadAncestors';
 import PostHeader from './PostHeader';
 import PostBody from './PostBody';
 import PostFooter from './PostFooter';
 import PostCTA from './PostCTA';
 import ThreadComposer from './ThreadComposer';
-import {createThreadStyles, getMergedTheme} from './thread.styles';
-import {ThreadCTAButton, ThreadPost, ThreadUser} from './thread.types';
+import { createThreadStyles, getMergedTheme } from './thread.styles';
+import { ThreadCTAButton, ThreadPost, ThreadUser } from './thread.types';
+import RetweetPreview from './RetweetPreview';
 
 /**
  * Props for the ThreadItem component
@@ -29,9 +30,9 @@ interface ThreadItemProps {
   /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
   /** Style overrides for specific components */
-  styleOverrides?: {[key: string]: object};
+  styleOverrides?: { [key: string]: object };
   /** User-provided stylesheet overrides */
-  userStyleSheet?: {[key: string]: object};
+  userStyleSheet?: { [key: string]: object };
 }
 
 /**
@@ -113,10 +114,21 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
       <Wrapper
         activeOpacity={0.8}
         onPress={() => onPressPost && onPressPost(post)}
-        style={{flex: 1}}>
+        style={{ flex: 1 }}
+      >
+        {/* If it's a retweet, display "Retweeted Post" inline (plus the user’s optional quote) */}
+        {post.retweetOf && (
+          <View style={{ marginBottom: 6 }}>
+            <RetweetPreview
+              retweetOf={post.retweetOf}
+              onPress={onPressPost}
+            />
+          </View>
+        )}
+
         <PostHeader
           post={post}
-          onPressMenu={() => {}}
+          onPressMenu={() => { }}
           onDeletePost={handleDeletePost}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
@@ -144,7 +156,7 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
       </Wrapper>
 
       {showReplyComposer && (
-        <View style={{marginTop: 8}}>
+        <View style={{ marginTop: 8 }}>
           <ThreadComposer
             currentUser={currentUser}
             parentId={post.id}
