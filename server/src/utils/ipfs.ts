@@ -45,7 +45,7 @@ export async function uploadToIpfs(
   const metadataResponseJSON = await metadataResponse.json() as { metadataUri: string };
   const metadataUri = metadataResponseJSON.metadataUri;
 
-  console.log('Pump Fun metadata URI:', metadataUri);
+  console.log('Metadata URI:', metadataUri);
   return metadataUri;
 }
 

@@ -14,14 +14,6 @@ import {styles} from './SearchScreen.styles';
 
 const sections = [
   {
-    key: 'blink',
-    title: 'Blink Screen',
-    description:
-      'Experience dynamic blink animations and interactive UI components.',
-    backgroundColor: '#BBDEFB', // light blue
-    navigateTo: 'Blink',
-  },
-  {
     key: 'pumpfun',
     title: 'Pump Fun Screen',
     description:
@@ -44,14 +36,6 @@ const sections = [
       'Browse, buy, and sell NFTs with integrated wallet support and listing functionality.',
     backgroundColor: '#E1BEE7', // light purple
     navigateTo: 'NftScreen',
-  },
-  {
-    key: 'chat',
-    title: 'Chat Screen',
-    description:
-      'Real-time messaging with animated typing indicators and message bubbles.',
-    backgroundColor: '#FFCCBC', // light coral
-    navigateTo: 'ChatScreen',
   },
 ];
 
