@@ -10,15 +10,18 @@ import {Thread} from '../../../../components/thread/Thread';
 import COLORS from '../../../../assets/colors';
 import {fetchAllPosts} from '../../../../state/thread/reducer';
 import {fetchUserProfile} from '../../../../state/auth/reducer';
-import { DEFAULT_IMAGES } from '../../../../config/constants';
+import {DEFAULT_IMAGES} from '../../../../config/constants';
+import {NavigationProp, useNavigation} from '@react-navigation/native';
+import { RootStackParamList } from '../../../../navigation/RootNavigator';
 
 export default function FeedScreen() {
   const dispatch = useAppDispatch();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
   const allPosts = useAppSelector(state => state.thread.allPosts);
   const userWallet = useAppSelector(state => state.auth.address);
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
-  const userName = useAppSelector(state => state.auth.username);  // <-- store user name from state
+  const userName = useAppSelector(state => state.auth.username);
 
   const [rootPosts, setRootPosts] = useState<ThreadPost[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -26,7 +29,7 @@ export default function FeedScreen() {
   // Build the current user object from Redux data
   const currentUser: ThreadUser = {
     id: userWallet || 'anonymous-user',
-    username: userName || 'Anonymous',             // <-- use the stored username
+    username: userName || 'Anonymous',
     handle: userWallet
       ? '@' + userWallet.slice(0, 6) + '...' + userWallet.slice(-4)
       : '@anonymous',
@@ -39,7 +42,7 @@ export default function FeedScreen() {
     dispatch(fetchAllPosts());
   }, [dispatch]);
 
-  // Once we have userWallet, fetch the DB profile pic + user name
+  // Once we have userWallet, fetch DB profile pic + user name
   useEffect(() => {
     if (userWallet) {
       dispatch(fetchUserProfile(userWallet)).catch(err => {
@@ -91,6 +94,14 @@ export default function FeedScreen() {
     },
   ];
 
+  /**
+   * Handle pressing a user's avatar/username on any post => navigate to OtherProfile
+   */
+  const handlePressUser = (user: ThreadUser) => {
+    // user.id is the wallet address stored in the post
+    navigation.navigate('OtherProfile', { userId: user.id } as never);
+  };
+
   return (
     <SafeAreaView
       style={[
@@ -103,6 +114,8 @@ export default function FeedScreen() {
         ctaButtons={ctaButtons}
         refreshing={refreshing}
         onRefresh={onRefresh}
+        // NEW: pass user-press callback
+        onPressUser={handlePressUser}
         themeOverrides={{'--thread-bg-primary': '#F0F0F0'}}
         styleOverrides={{
           container: {padding: 10},
