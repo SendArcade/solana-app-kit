@@ -117,14 +117,6 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
         style={{ flex: 1 }}
       >
         {/* If it's a retweet, display "Retweeted Post" inline (plus the user’s optional quote) */}
-        {post.retweetOf && (
-          <View style={{ marginBottom: 6 }}>
-            <RetweetPreview
-              retweetOf={post.retweetOf}
-              onPress={onPressPost}
-            />
-          </View>
-        )}
 
         <PostHeader
           post={post}
@@ -139,6 +131,15 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
         />
+
+        {post.retweetOf && (
+          <View style={{ marginBottom: 6 }}>
+            <RetweetPreview
+              retweetOf={post.retweetOf}
+              onPress={onPressPost}
+            />
+          </View>
+        )}
 
         <PostCTA
           post={post}
