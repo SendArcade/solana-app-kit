@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import {useAuth} from '../../../hooks/useAuth';
 import {useNavigation} from '@react-navigation/native';
-import {styles} from './SearchScreen.styles';
+import {styles} from './Modules.styles';
 
 const sections = [
   {
@@ -46,7 +46,7 @@ const androidStyles = StyleSheet.create({
   },
 });
 
-export default function SearchScreen() {
+export default function ModuleScreen() {
   const {logout} = useAuth();
   const navigation = useNavigation();
 

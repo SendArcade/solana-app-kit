@@ -15,6 +15,7 @@ import LoginScreen from '../screens/Common/LoginScreen/LoginScreen';
 
 // NEW IMPORT
 import OtherProfileScreen from '../screens/SampleUI/Threads/OtherProfileScreen/OtherProfileScreen';
+import PostThreadScreen from '../screens/SampleUI/Threads/PostThreadScreen/PostthreadScreen';
 
 export type RootStackParamList = {
   LoginOptions: undefined;
@@ -29,6 +30,7 @@ export type RootStackParamList = {
   ChatScreen: undefined;
   // NEW ROUTE
   OtherProfile: {userId: string};
+  PostThread: {postId: string};
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -54,6 +56,7 @@ export default function RootNavigator() {
 
           {/* NEW SCREEN for viewing other user's profile */}
           <Stack.Screen name="OtherProfile" component={OtherProfileScreen} />
+          <Stack.Screen name="PostThread" component={PostThreadScreen} />
         </>
       ) : (
         <>

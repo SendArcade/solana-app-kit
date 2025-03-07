@@ -1,6 +1,13 @@
+// FILE: src/components/thread/thread.utils.ts
 import {ThreadPost} from './thread.types';
 
-export function gatherAncestorChain(postId: string, allRootPosts: ThreadPost[]): ThreadPost[] {
+/**
+ * Gathers the ancestor chain for a given post
+ */
+export function gatherAncestorChain(
+  postId: string,
+  allRootPosts: ThreadPost[],
+): ThreadPost[] {
   const chain: ThreadPost[] = [];
   let currentId = postId;
 
@@ -20,7 +27,10 @@ export function gatherAncestorChain(postId: string, allRootPosts: ThreadPost[]):
     return undefined;
   }
 
-  function deepFind(current: ThreadPost, targetId: string): ThreadPost | undefined {
+  function deepFind(
+    current: ThreadPost,
+    targetId: string,
+  ): ThreadPost | undefined {
     if (current.id === targetId) return current;
     for (const reply of current.replies) {
       const found = deepFind(reply, targetId);
@@ -39,11 +49,20 @@ export function gatherAncestorChain(postId: string, allRootPosts: ThreadPost[]):
   return chain;
 }
 
+/**
+ * Generates a random ID with a given prefix
+ */
 export function generateId(prefix: string) {
   return prefix + '-' + Math.random().toString(36).substr(2, 9);
 }
 
-export function findPostById(posts: ThreadPost[], id: string): ThreadPost | undefined {
+/**
+ * Finds a post by its ID within a nested post structure
+ */
+export function findPostById(
+  posts: ThreadPost[],
+  id: string,
+): ThreadPost | undefined {
   for (const post of posts) {
     if (post.id === id) return post;
     if (post.replies.length > 0) {
@@ -54,6 +73,9 @@ export function findPostById(posts: ThreadPost[], id: string): ThreadPost | unde
   return undefined;
 }
 
+/**
+ * Removes a post (and its replies) recursively from an array
+ */
 export function removePostRecursive(
   posts: ThreadPost[],
   postId: string,
@@ -67,4 +89,22 @@ export function removePostRecursive(
       }
       return p;
     });
+}
+
+/**
+ * **New utility**: Flattens all posts (including replies) into a single array.
+ * This helps us treat replies as distinct items that also belong to the original author.
+ */
+export function flattenPosts(posts: ThreadPost[]): ThreadPost[] {
+  const flatList: ThreadPost[] = [];
+
+  function recurse(current: ThreadPost) {
+    flatList.push(current);
+    if (current.replies && current.replies.length > 0) {
+      current.replies.forEach(recurse);
+    }
+  }
+
+  posts.forEach(recurse);
+  return flatList;
 }

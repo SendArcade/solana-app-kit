@@ -28,13 +28,27 @@ interface CollectiblesProps {
    * Whether the list is loading
    */
   loading?: boolean;
+  /**
+   * Callback for refresh action
+   */
+  onRefresh?: () => void;
+  /**
+   * Whether the data is currently refreshing
+   */
+  refreshing?: boolean;
 }
 
 /**
  * Renders a grid of NFT collectibles. If empty, shows fallback text.
  * For a large number of NFTs, you can convert to a FlatList with numColumns.
  */
-const Collectibles: React.FC<CollectiblesProps> = ({nfts, error, loading}) => {
+const Collectibles: React.FC<CollectiblesProps> = ({
+  nfts,
+  error,
+  loading,
+  onRefresh,
+  refreshing,
+}) => {
   if (loading) {
     return (
       <View style={styles.container}>
@@ -65,6 +79,8 @@ const Collectibles: React.FC<CollectiblesProps> = ({nfts, error, loading}) => {
       keyExtractor={item => item.mint}
       columnWrapperStyle={{justifyContent: 'space-between'}}
       contentContainerStyle={{padding: 12}}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
       renderItem={({item}) => {
         return (
           <View style={styles.nftItem}>
