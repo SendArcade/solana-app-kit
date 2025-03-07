@@ -157,7 +157,7 @@ export default function ChatScreen() {
   return (
     <SafeAreaView
       style={[
-        { flex: 1, backgroundColor: '#FFFFFF' },
+        {flex: 1, backgroundColor: '#FFFFFF'},
         Platform.OS === 'android' && androidStyles.safeArea,
       ]}>
       <KeyboardAvoidingView
@@ -172,7 +172,10 @@ export default function ChatScreen() {
         />
 
         <View style={styles.composerContainer}>
-          <ThreadComposer currentUser={currentUser} onPostCreated={scrollToEnd} />
+          <ThreadComposer
+            currentUser={currentUser}
+            onPostCreated={scrollToEnd}
+          />
         </View>
       </KeyboardAvoidingView>
 
@@ -187,6 +190,9 @@ export default function ChatScreen() {
           }}
           retweetOf={quoteReplyPostId}
           currentUser={currentUser}
+          headerText="Reply"
+          placeholderText="Add a reply to this message"
+          buttonText="Reply"
         />
       )}
     </SafeAreaView>

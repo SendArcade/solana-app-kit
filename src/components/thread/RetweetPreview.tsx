@@ -74,7 +74,10 @@ export default function RetweetPreview({
   styleOverrides,
 }: RetweetPreviewProps) {
   // State for toggling between collapsed and expanded
-  const [expanded, setExpanded] = useState(false);
+  const hasTradeSection = retweetOf.sections.some(
+    section => section.type === 'TEXT_TRADE',
+  );
+  const [expanded, setExpanded] = useState(hasTradeSection || false);
 
   // Merge your theme if needed
   const mergedTheme = getMergedTheme(themeOverrides);

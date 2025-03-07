@@ -221,6 +221,10 @@ export default function PostFooter({
         onClose={() => setShowRetweetModal(false)}
         retweetOf={post.id}
         currentUser={retweeterUser}
+        headerText="Retweet"
+        placeholderText="Add a comment (optional)"
+        buttonText="Retweet"
+        buttonTextWithContent="Quote Retweet"
       />
     </View>
   );

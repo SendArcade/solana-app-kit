@@ -1,3 +1,4 @@
+// FILE: src/components/Profile/profile.tsx
 import React, {useEffect, useState} from 'react';
 import {
   View,
@@ -14,7 +15,6 @@ import {
   TextInput,
 } from 'react-native';
 
-// ======= ADDITIONS for EXACT same approach as older ProfileScreen =======
 import * as ImagePicker from 'expo-image-picker';
 import {useAppSelector, useAppDispatch} from '../../hooks/useReduxHooks';
 import {
@@ -26,7 +26,6 @@ import {fetchAllPosts} from '../../state/thread/reducer';
 import {SERVER_URL} from '@env';
 import {ThreadPost} from '../thread/thread.types';
 import {NftItem, useFetchNFTs} from '../../hooks/useFetchNFTs';
-// ========================================================================
 
 import ProfileInfo from './ProfileInfo/profileInfo';
 import SwipeTabs from './slider/slider';
@@ -37,56 +36,26 @@ import {
   inlineConfirmStyles,
   editNameModalStyles,
 } from './profile.style';
-import {DEFAULT_IMAGES} from '../../config/constants';
+import {flattenPosts} from '../thread/thread.utils';
 import {setStatusBarStyle} from 'expo-status-bar';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 
-/**
- * Define the shape of the data needed by this container (unchanged).
- * If you're using Redux, this can be synced with your store.
- */
 export interface UserProfileData {
-  address: string; // wallet address
-  profilePicUrl: string; // stored in DB or server
+  address: string;
+  profilePicUrl: string;
   username: string;
 }
 
 export interface ProfileProps {
-  /**
-   * If true, this is the user’s own profile (allows editing).
-   */
   isOwnProfile?: boolean;
-
-  /**
-   * The user object, containing wallet address, profilePicUrl, etc.
-   */
   user: UserProfileData;
-
-  /**
-   * List of posts belonging to the user.
-   * (If you want to supply them from outside, not using Redux.)
-   * Otherwise, we will fetch from Redux or filter from global allPosts.
-   */
   posts?: ThreadPost[];
-
-  /**
-   * A list of NFTs owned by the user (if you want to supply them).
-   * Otherwise, we’ll fetch them inside with `useFetchNFTs`.
-   */
   nfts?: NftItem[];
   loadingNfts?: boolean;
   fetchNftsError?: string | null;
-
-  /**
-   * Additional styling or container overrides (optional).
-   */
   containerStyle?: object;
 }
 
-/**
- * Profile: A unified profile component that
- * can show user info, a tabbed view of posts & collectibles,
- * and implement EXACT same avatar-change logic as older screens.
- */
 export default function Profile({
   isOwnProfile = false,
   user,
@@ -97,20 +66,17 @@ export default function Profile({
   containerStyle,
 }: ProfileProps) {
   const dispatch = useAppDispatch();
+  const allReduxPosts = useAppSelector(state => state.thread.allPosts);
+  const navigation = useAppNavigation();
 
-  // Because user might come from props or from Redux:
   const userWallet = user?.address || null;
   const [profilePicUrl, setProfilePicUrl] = useState<string>(
     user?.profilePicUrl,
   );
   const [localUsername, setLocalUsername] = useState<string>(user?.username);
-
-  // We also keep “myPosts” in local state if we want to show them in the tab
-  const allReduxPosts = useAppSelector(state => state.thread.allPosts);
   const [myPosts, setMyPosts] = useState<ThreadPost[]>(posts);
 
-  // ============= EXACT NFT-FETCH LOGIC or use provided props =============
-  // If parent did not supply `nfts`, we fetch inside. Otherwise we use them:
+  // For NFT fetch if not provided
   const {
     nfts: fetchedNfts,
     loading,
@@ -120,7 +86,7 @@ export default function Profile({
   const resolvedLoadingNfts = loadingNfts || loading;
   const resolvedNftError = fetchNftsError || error;
 
-  // ============ Manage states for modals and new image picking ============
+  // Modals for picking avatar & editing name
   const [avatarOptionModalVisible, setAvatarOptionModalVisible] =
     useState(false);
   const [nftsModalVisible, setNftsModalVisible] = useState(false);
@@ -129,25 +95,22 @@ export default function Profile({
     'library' | 'nft' | null
   >(null);
 
-  // For inline confirm (library)
   const [localFileUri, setLocalFileUri] = useState<string | null>(null);
-
-  // Name Edit Modal
   const [editNameModalVisible, setEditNameModalVisible] = useState(false);
   const [tempName, setTempName] = useState(localUsername || '');
 
-  // For turning status bar dark
   useEffect(() => {
     setStatusBarStyle('dark');
   }, []);
 
-  // ========== Fetch user profile from server (like the older screen) =========
+  /**
+   * Fetch user profile from server to get updated picture & name
+   */
   useEffect(() => {
     if (userWallet) {
       dispatch(fetchUserProfile(userWallet))
         .unwrap()
         .then(value => {
-          // value will have { profilePicUrl, username } if success
           if (value.profilePicUrl) {
             setProfilePicUrl(value.profilePicUrl);
           }
@@ -161,40 +124,44 @@ export default function Profile({
     }
   }, [userWallet, dispatch]);
 
-  // ========== Optionally fetch all posts from Redux if parent not providing  =========
+  /**
+   * Optionally fetch all posts from Redux if parent not providing
+   */
   useEffect(() => {
     if (!posts || posts.length === 0) {
-      // Ensure allPosts are fetched from server
       dispatch(fetchAllPosts())
         .unwrap()
         .catch(err => console.error('Failed to fetch all posts:', err));
     }
   }, [posts, dispatch]);
 
-  // ========== Filter posts belonging to current userWallet ===============
+  /**
+   * Flatten all posts so replies also appear, then filter by user ID
+   */
   useEffect(() => {
     if (!userWallet) {
       setMyPosts([]);
       return;
     }
-    // If parent provided `posts`, we use that. Else use `allReduxPosts`.
+    // Flatten the base posts
     const basePosts = posts && posts.length > 0 ? posts : allReduxPosts;
-    const userPosts = basePosts.filter(
+    const flattened = flattenPosts(basePosts);
+    const userPosts = flattened.filter(
       p => p.user.id.toLowerCase() === userWallet.toLowerCase(),
     );
-    // sort by createdAt desc
     userPosts.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
     setMyPosts(userPosts);
   }, [allReduxPosts, userWallet, posts]);
 
-  // ============= EXACT LIBRARY PICK & NFT PICK LOGIC FROM OLDER CODE =========
-
   /**
-   * Called when the user taps on the profile avatar
+   * Example callback if we want to handle tapping on a post in the user's profile
    */
-  function handleAvatarPress() {
-    if (!isOwnProfile) return;
-    setAvatarOptionModalVisible(true);
+  function handleProfilePostPress(post: ThreadPost) {
+    console.log('[Profile] Pressed a post from user profile:', post.id);
+    // For example, you could navigate to a PostDetail screen, or feed screen:
+    // navigation.navigate('Feed', { screen: 'PostDetail', params: { postId: post.id } });
+    // Or do a direct navigation to a dedicated route, etc.
+    navigation.navigate('PostThread', {postId: post.id});
   }
 
   /**
@@ -226,7 +193,7 @@ export default function Profile({
   };
 
   /**
-   * User chose an NFT from the list
+   * User picks an NFT to use as avatar
    */
   const handleSelectNftAsAvatar = (nft: NftItem) => {
     setLocalFileUri(nft.image);
@@ -236,8 +203,7 @@ export default function Profile({
   };
 
   /**
-   * Confirm uploading new avatar (both library & NFT).
-   * EXACT approach: do a direct FormData POST to server, then set Redux.
+   * Confirm uploading new avatar
    */
   const handleConfirmUpload = async () => {
     if (!userWallet) {
@@ -273,7 +239,6 @@ export default function Profile({
       if (!data.success) {
         throw new Error(data.error || 'Upload failed');
       }
-      // Update local state + Redux
       setProfilePicUrl(data.url);
       dispatch(updateProfilePic(data.url));
     } catch (err: any) {
@@ -287,7 +252,7 @@ export default function Profile({
   };
 
   /**
-   * Cancel upload
+   * Cancel the avatar upload
    */
   const handleCancelUpload = () => {
     setConfirmModalVisible(false);
@@ -295,13 +260,18 @@ export default function Profile({
     setSelectedSource(null);
   };
 
-  // ================== NAME EDIT LOGIC (EXACT same) ==================
+  /**
+   * Open name edit modal
+   */
   const handleOpenEditModal = () => {
     if (!isOwnProfile) return;
     setTempName(localUsername || '');
     setEditNameModalVisible(true);
   };
 
+  /**
+   * Save the updated username
+   */
   const handleSaveName = async () => {
     if (!userWallet) {
       Alert.alert('No wallet to update name');
@@ -323,7 +293,14 @@ export default function Profile({
     }
   };
 
-  // =================== RENDER ===================
+  /**
+   * If the user taps the profile image
+   */
+  function handleAvatarPress() {
+    if (!isOwnProfile) return;
+    setAvatarOptionModalVisible(true);
+  }
+
   return (
     <SafeAreaView
       style={[
@@ -331,9 +308,6 @@ export default function Profile({
         containerStyle,
         Platform.OS === 'android' && androidStyles.safeArea,
       ]}>
-      {/* We pass the relevant info to ProfileInfo. 
-          Tapping avatar opens the modal for library or NFT. 
-          Tapping “Edit Profile” triggers name edit. */}
       <ProfileInfo
         profilePicUrl={profilePicUrl || ''}
         username={localUsername || 'Unknown'}
@@ -343,17 +317,19 @@ export default function Profile({
         onEditProfile={handleOpenEditModal}
       />
 
-      {/* The tabbed view: myPosts and myNFTs */}
+      {/* Tabbed view for posts & collectibles */}
       <View style={{flex: 1}}>
         <SwipeTabs
           myPosts={myPosts}
           myNFTs={resolvedNfts}
           loadingNfts={resolvedLoadingNfts}
           fetchNftsError={resolvedNftError}
+          // Add a callback for post press if you want to navigate
+          onPressPost={handleProfilePostPress}
         />
       </View>
 
-      {/* ==================== (A) Modal: Choose avatar source ===================== */}
+      {/* (A) Avatar Option Modal */}
       <Modal
         animationType="fade"
         transparent
@@ -381,7 +357,7 @@ export default function Profile({
         </View>
       </Modal>
 
-      {/* ==================== (B) NFT Selection Modal ===================== */}
+      {/* (B) NFT Selection Modal */}
       <Modal
         animationType="slide"
         transparent
@@ -452,7 +428,7 @@ export default function Profile({
         </View>
       </Modal>
 
-      {/* ==================== (C) Confirm NFT or Library Upload Modal ===================== */}
+      {/* (C) Confirm NFT or Library Upload */}
       {selectedSource === 'nft' && confirmModalVisible && (
         <Modal
           animationType="fade"
@@ -504,7 +480,7 @@ export default function Profile({
         </Modal>
       )}
 
-      {/* Inline Confirmation if selectedSource === 'library' */}
+      {/* Inline confirmation if selectedSource === 'library' */}
       {selectedSource === 'library' && localFileUri && (
         <View style={inlineConfirmStyles.container}>
           <Text style={inlineConfirmStyles.title}>Confirm Profile Picture</Text>
@@ -530,7 +506,7 @@ export default function Profile({
         </View>
       )}
 
-      {/* ==================== (D) Edit Name Modal ===================== */}
+      {/* (D) Edit Name Modal */}
       <Modal
         animationType="slide"
         transparent

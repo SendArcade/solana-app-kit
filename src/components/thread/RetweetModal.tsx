@@ -32,6 +32,11 @@ interface RetweetModalProps {
   onClose: () => void;
   retweetOf: string; // postId of the post we retweet
   currentUser: ThreadUser;
+  // New customizable text props
+  headerText?: string;
+  placeholderText?: string;
+  buttonText?: string;
+  buttonTextWithContent?: string;
   styleOverrides?: {
     container?: StyleProp<ViewStyle>;
     input?: StyleProp<TextStyle>;
@@ -48,6 +53,11 @@ export default function RetweetModal({
   onClose,
   retweetOf,
   currentUser,
+  // Default values for the text props
+  headerText = 'Retweet',
+  placeholderText = 'Add a comment (optional)',
+  buttonText = 'Retweet',
+  buttonTextWithContent = 'Quote Retweet',
   styleOverrides,
 }: RetweetModalProps) {
   const dispatch = useAppDispatch();
@@ -154,10 +164,10 @@ export default function RetweetModal({
               retweetModalStyles.modalContainer,
               styleOverrides?.container,
             ]}>
-            <Text style={retweetModalStyles.modalTitle}>Retweet</Text>
+            <Text style={retweetModalStyles.modalTitle}>{headerText}</Text>
             <TextInput
               style={[retweetModalStyles.textInput, styleOverrides?.input]}
-              placeholder="Add a comment (optional)"
+              placeholder={placeholderText}
               multiline
               value={retweetText}
               onChangeText={setRetweetText}
@@ -176,7 +186,7 @@ export default function RetweetModal({
                     retweetModalStyles.retweetButtonText,
                     styleOverrides?.buttonText,
                   ]}>
-                  {retweetText.trim() ? 'Quote Retweet' : 'Retweet'}
+                  {retweetText.trim() ? buttonTextWithContent : buttonText}
                 </Text>
               </TouchableOpacity>
             )}
