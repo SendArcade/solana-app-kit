@@ -1,0 +1,51 @@
+[**solana-social-kit**](../../README.md)
+
+***
+
+[solana-social-kit](../../README.md) / [config](../README.md) / TransactionProviderConfig
+
+# Interface: TransactionProviderConfig
+
+Defined in: [src/config/index.ts:45](https://github.com/SendArcade/solana-social-starter/blob/03568260ca96ed63f77049843c721de1cb011893/src/config/index.ts#L45)
+
+Transaction config (unchanged)
+
+## Properties
+
+### defaultMode
+
+> **defaultMode**: `"jito"` \| `"priority"`
+
+Defined in: [src/config/index.ts:46](https://github.com/SendArcade/solana-social-starter/blob/03568260ca96ed63f77049843c721de1cb011893/src/config/index.ts#L46)
+
+***
+
+### feeTiers
+
+> **feeTiers**: `object`
+
+Defined in: [src/config/index.ts:47](https://github.com/SendArcade/solana-social-starter/blob/03568260ca96ed63f77049843c721de1cb011893/src/config/index.ts#L47)
+
+#### high
+
+> **high**: `number`
+
+#### low
+
+> **low**: `number`
+
+#### medium
+
+> **medium**: `number`
+
+#### very-high
+
+> **very-high**: `number`
+
+***
+
+### network
+
+> **network**: `"mainnet-beta"` \| `"devnet"` \| `"testnet"`
+
+Defined in: [src/config/index.ts:53](https://github.com/SendArcade/solana-social-starter/blob/03568260ca96ed63f77049843c721de1cb011893/src/config/index.ts#L53)

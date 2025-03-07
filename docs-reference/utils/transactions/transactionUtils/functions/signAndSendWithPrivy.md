@@ -1,0 +1,32 @@
+[**solana-social-kit**](../../../../README.md)
+
+***
+
+[solana-social-kit](../../../../README.md) / [utils/transactions/transactionUtils](../README.md) / signAndSendWithPrivy
+
+# Function: signAndSendWithPrivy()
+
+> **signAndSendWithPrivy**(`transaction`, `connection`, `provider`): `Promise`\<`string`\>
+
+Defined in: [src/utils/transactions/transactionUtils.ts:15](https://github.com/SendArcade/solana-social-starter/blob/03568260ca96ed63f77049843c721de1cb011893/src/utils/transactions/transactionUtils.ts#L15)
+
+Signs and sends an in-memory transaction (legacy or versioned) via the
+Privy provider's `signAndSendTransaction` method. Returns the tx signature.
+
+## Parameters
+
+### transaction
+
+`Transaction` | `VersionedTransaction`
+
+### connection
+
+`Connection`
+
+### provider
+
+`any`
+
+## Returns
+
+`Promise`\<`string`\>

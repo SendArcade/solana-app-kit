@@ -1,0 +1,57 @@
+[**solana-social-kit**](../../../../README.md)
+
+***
+
+[solana-social-kit](../../../../README.md) / [components/collectibles/collectibles.style](../README.md) / styles
+
+# Variable: styles
+
+> `const` **styles**: `object`
+
+Defined in: [src/components/collectibles/collectibles.style.ts:3](https://github.com/SendArcade/solana-social-starter/blob/03568260ca96ed63f77049843c721de1cb011893/src/components/collectibles/collectibles.style.ts#L3)
+
+## Type declaration
+
+### container
+
+> **container**: `object`
+
+#### container.flexDirection
+
+> **flexDirection**: `"row"` = `"row"`
+
+#### container.flexWrap
+
+> **flexWrap**: `"wrap"` = `"wrap"`
+
+#### container.gap
+
+> **gap**: `number` = `14`
+
+#### container.justifyContent
+
+> **justifyContent**: `"space-between"` = `"space-between"`
+
+#### container.paddingHorizontal
+
+> **paddingHorizontal**: `number` = `16`
+
+#### container.paddingVertical
+
+> **paddingVertical**: `number` = `6`
+
+### image
+
+> **image**: `object`
+
+#### image.aspectRatio
+
+> **aspectRatio**: `number` = `1`
+
+#### image.borderRadius
+
+> **borderRadius**: `number` = `8`
+
+#### image.width
+
+> **width**: `"48%"` = `"48%"`

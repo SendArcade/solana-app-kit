@@ -8,7 +8,8 @@
     "ios": "expo run:ios",
     "lint": "eslint .",
     "start": "npx expo start",
-    "docs:generate": "typedoc --options typedoc.json"
+    "docs:generate": "typedoc --options typedoc.json",
+    "docs:convert": "node scripts/convert-to-mintlify.js"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",

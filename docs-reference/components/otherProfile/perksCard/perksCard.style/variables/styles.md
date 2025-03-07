@@ -1,0 +1,129 @@
+[**solana-social-kit**](../../../../../README.md)
+
+***
+
+[solana-social-kit](../../../../../README.md) / [components/otherProfile/perksCard/perksCard.style](../README.md) / styles
+
+# Variable: styles
+
+> `const` **styles**: `object`
+
+Defined in: [src/components/otherProfile/perksCard/perksCard.style.ts:4](https://github.com/SendArcade/solana-social-starter/blob/03568260ca96ed63f77049843c721de1cb011893/src/components/otherProfile/perksCard/perksCard.style.ts#L4)
+
+## Type declaration
+
+### communityImg
+
+> **communityImg**: `object`
+
+#### communityImg.height
+
+> **height**: `"100%"` = `"100%"`
+
+#### communityImg.width
+
+> **width**: `"100%"` = `"100%"`
+
+### communityImgContainer
+
+> **communityImgContainer**: `object`
+
+#### communityImgContainer.borderRadius
+
+> **borderRadius**: `number` = `19`
+
+#### communityImgContainer.height
+
+> **height**: `number` = `38`
+
+#### communityImgContainer.overflow
+
+> **overflow**: `"hidden"` = `"hidden"`
+
+#### communityImgContainer.width
+
+> **width**: `number` = `38`
+
+### container
+
+> **container**: `object`
+
+#### container.borderColor
+
+> **borderColor**: `string` = `COLORS.greyBorderdark`
+
+#### container.borderRadius
+
+> **borderRadius**: `number` = `12`
+
+#### container.borderWidth
+
+> **borderWidth**: `number` = `2`
+
+#### container.display
+
+> **display**: `"flex"` = `"flex"`
+
+#### container.flexDirection
+
+> **flexDirection**: `"column"` = `"column"`
+
+#### container.gap
+
+> **gap**: `number` = `6`
+
+#### container.height
+
+> **height**: `"auto"` = `"auto"`
+
+#### container.paddingHorizontal
+
+> **paddingHorizontal**: `number` = `12`
+
+#### container.paddingVertical
+
+> **paddingVertical**: `number` = `10`
+
+#### container.width
+
+> **width**: `"100%"` = `"100%"`
+
+### perkContainer
+
+> **perkContainer**: `object`
+
+#### perkContainer.alignItems
+
+> **alignItems**: `"center"` = `"center"`
+
+#### perkContainer.borderColor
+
+> **borderColor**: `string` = `COLORS.greyBorderdark`
+
+#### perkContainer.borderRadius
+
+> **borderRadius**: `number` = `12`
+
+#### perkContainer.borderWidth
+
+> **borderWidth**: `number` = `2`
+
+#### perkContainer.display
+
+> **display**: `"flex"` = `"flex"`
+
+#### perkContainer.flexDirection
+
+> **flexDirection**: `"row"` = `"row"`
+
+#### perkContainer.gap
+
+> **gap**: `number` = `8`
+
+#### perkContainer.paddingHorizontal
+
+> **paddingHorizontal**: `number` = `12`
+
+#### perkContainer.paddingVertical
+
+> **paddingVertical**: `number` = `10`
