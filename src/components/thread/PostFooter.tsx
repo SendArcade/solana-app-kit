@@ -1,68 +1,70 @@
+// FILE: src/components/thread/PostFooter.tsx
+
 import React, {useState, useRef, useEffect} from 'react';
 import {
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
   Animated,
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
+  Alert,
 } from 'react-native';
 import Icons from '../../assets/svgs';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
-import {ThreadPost} from './thread.types';
-import {useAppDispatch} from '../../hooks/useReduxHooks';
+import {ThreadPost, ThreadUser} from './thread.types';
+import {useAppDispatch, useAppSelector} from '../../hooks/useReduxHooks';
 import {addReactionAsync} from '../../state/thread/reducer';
+import RetweetModal from './RetweetModal';
 
-/**
- * Props for the PostFooter component
- * @interface PostFooterProps
- */
 interface PostFooterProps {
-  /** The post data associated with this footer */
   post: ThreadPost;
-  /** Callback fired when the comment button is pressed */
   onPressComment?: (post: ThreadPost) => void;
-  /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
-  /** Style overrides for specific components */
   styleOverrides?: {[key: string]: object};
 }
 
-/**
- * A component that renders the footer section of a post
- * 
- * @component
- * @description
- * PostFooter displays engagement metrics and action buttons below a post.
- * It shows comment counts, like counts, and other interaction options.
- * The component supports customizable styling through themes and style overrides.
- * 
- * @example
- * ```tsx
- * <PostFooter
- *   post={postData}
- *   onPressComment={handleCommentPress}
- *   themeOverrides={customTheme}
- * />
- * ```
- */
 export default function PostFooter({
   post,
   onPressComment,
   themeOverrides,
   styleOverrides,
 }: PostFooterProps) {
+  // Local states for bookmark, reactions, and retweet modal.
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
-  // Animation value for the reaction bubble
   const scaleAnim = useRef(new Animated.Value(0)).current;
+  const [showRetweetModal, setShowRetweetModal] = useState(false);
+
+  // Grab user info from Redux
+  const address = useAppSelector(state => state.auth.address);
+  const username = useAppSelector(state => state.auth.username);
+  const profilePicUrl = useAppSelector(state => state.auth.profilePicUrl);
+
+  // Build a proper ThreadUser object for retweet
+  const retweeterUser: ThreadUser = {
+    id: address || 'anonymous-wallet',
+    username: username || 'Anonymous',
+    handle: address
+      ? '@' + address.slice(0, 6) + '...' + address.slice(-4)
+      : '@unknown',
+    verified: false,
+    avatar: profilePicUrl
+      ? {uri: profilePicUrl}
+      : require('../../assets/images/User.png'),
+  };
 
   const dispatch = useAppDispatch();
+
+  // Instead of relying solely on the passed prop, subscribe to the updated post from Redux.
+  const updatedPost =
+    useAppSelector(state =>
+      state.thread.allPosts.find(p => p.id === post.id),
+    ) || post;
 
   const mergedTheme = getMergedTheme(themeOverrides);
   const styles = createThreadStyles(mergedTheme, styleOverrides);
 
-  // Close the reaction bubble
   const closeReactionBubble = () => {
     Animated.timing(scaleAnim, {
       toValue: 0,
@@ -73,38 +75,34 @@ export default function PostFooter({
     });
   };
 
-  // Handle clicks outside the reaction bubble
   useEffect(() => {
     if (!showReactions) return;
-    
-    // Add event listener for any touches outside the bubble
-    const handleOutsideClick = () => {
-      closeReactionBubble();
-    };
-    
-    return () => {
-      // Cleanup
-    };
+    // Additional outside-click logic can go here if needed
+    return () => {};
   }, [showReactions]);
 
   const toggleBookmark = () => {
     setIsBookmarked(prev => !prev);
   };
 
-  // Triggered when user selects an emoji
   const handleSelectReaction = (emoji: string) => {
-    // Animate out
+    if (post.id.startsWith('local-')) {
+      Alert.alert(
+        'Action not allowed',
+        'You cannot add reactions to unsaved posts.',
+      );
+      return;
+    }
     Animated.timing(scaleAnim, {
       toValue: 0,
       duration: 150,
       useNativeDriver: true,
     }).start(() => {
       setShowReactions(false);
-      dispatch(addReactionAsync({ postId: post.id, reactionEmoji: emoji }));
+      dispatch(addReactionAsync({postId: post.id, reactionEmoji: emoji}));
     });
   };
 
-  // Show the reaction bubble
   const handleShowReactions = () => {
     setShowReactions(true);
     // Animate in
@@ -115,15 +113,21 @@ export default function PostFooter({
     }).start();
   };
 
+  const handleOpenRetweetModal = () => {
+    setShowRetweetModal(true);
+  };
+
   // Render existing reactions
   const renderExistingReactions = () => {
-    if (!post.reactions || Object.keys(post.reactions).length === 0) {
+    if (
+      !updatedPost.reactions ||
+      Object.keys(updatedPost.reactions).length === 0
+    ) {
       return null;
     }
-    
     return (
       <View style={reactionStyles.existingReactionsContainer}>
-        {Object.entries(post.reactions).map(([emoji, count]) => (
+        {Object.entries(updatedPost.reactions).map(([emoji, count]) => (
           <View key={emoji} style={reactionStyles.reactionBadge}>
             <Text style={reactionStyles.reactionEmoji}>{emoji}</Text>
             <Text style={reactionStyles.reactionCount}>{count}</Text>
@@ -135,16 +139,16 @@ export default function PostFooter({
 
   return (
     <View style={styles.footerContainer}>
-      {/* Overlay to detect outside clicks */}
+      {/* Overlay to detect outside clicks on the reaction bubble */}
       {showReactions && (
         <TouchableWithoutFeedback onPress={closeReactionBubble}>
           <View style={reactionStyles.clickOutsideOverlay} />
         </TouchableWithoutFeedback>
       )}
-      
+
       {/* Display existing reactions */}
       {renderExistingReactions()}
-      
+
       <View style={styles.itemIconsRow}>
         <View style={{flexDirection: 'row', gap: 16}}>
           {/* Comment icon */}
@@ -152,37 +156,38 @@ export default function PostFooter({
             style={styles.itemLeftIcons}
             onPress={() => onPressComment && onPressComment(post)}>
             <Icons.CommentIdle width={20} height={20} />
-            <Text style={styles.iconText}>{post.quoteCount || 0}</Text>
+            <Text style={styles.iconText}>{updatedPost.quoteCount || 0}</Text>
           </TouchableOpacity>
 
           {/* Retweet */}
           <View style={styles.itemLeftIcons}>
-            <Icons.RetweetIdle width={20} height={20} />
-            <Text style={styles.iconText}>{post.retweetCount || 0}</Text>
+            <TouchableOpacity onPress={handleOpenRetweetModal}>
+              <Icons.RetweetIdle width={20} height={20} />
+            </TouchableOpacity>
+            <Text style={styles.iconText}>{updatedPost.retweetCount || 0}</Text>
           </View>
 
           {/* Reaction icon */}
           <View style={styles.itemLeftIcons}>
-            <TouchableOpacity
-              onPress={handleShowReactions}>
+            <TouchableOpacity onPress={handleShowReactions}>
               <Icons.ReactionIdle width={20} height={20} />
             </TouchableOpacity>
             <Text style={styles.iconText}>
-              {post.reactionCount || 0}
+              {updatedPost.reactionCount || 0}
             </Text>
-            
-            {/* Smaller, light grey WhatsApp-style reaction bubble */}
+
+            {/* Reaction bubble */}
             {showReactions && (
-              <Animated.View 
+              <Animated.View
                 style={[
                   reactionStyles.bubbleContainer,
                   {
-                    transform: [{ scale: scaleAnim }],
-                    opacity: scaleAnim
-                  }
+                    transform: [{scale: scaleAnim}],
+                    opacity: scaleAnim,
+                  },
                 ]}>
                 <View style={reactionStyles.emojiRow}>
-                  {['👍','🚀','❤️','😂',].map((emoji) => (
+                  {['👍', '🚀', '❤️', '😂'].map(emoji => (
                     <TouchableOpacity
                       key={emoji}
                       style={reactionStyles.emojiButton}
@@ -209,12 +214,19 @@ export default function PostFooter({
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Retweet Modal */}
+      <RetweetModal
+        visible={showRetweetModal}
+        onClose={() => setShowRetweetModal(false)}
+        retweetOf={post.id}
+        currentUser={retweeterUser}
+      />
     </View>
   );
 }
 
 const reactionStyles = StyleSheet.create({
-  // Overlay for detecting clicks outside the bubble
   clickOutsideOverlay: {
     position: 'absolute',
     top: 0,
@@ -223,36 +235,35 @@ const reactionStyles = StyleSheet.create({
     bottom: 0,
     zIndex: 90,
   },
-  // Smaller, light grey WhatsApp-style bubble for reactions
   bubbleContainer: {
     position: 'absolute',
-    bottom: 25, // Position above the icons
-    left: -40, // Center over the reaction icon
-    backgroundColor: '#f0f0f0', // Light grey background
+    bottom: 25,
+    left: -40,
+    backgroundColor: '#f0f0f0',
     borderRadius: 20,
-    padding: 6, // Smaller padding
+    padding: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 5,
     zIndex: 100,
-    maxWidth: 160, // Limit the width
+    maxWidth: 160,
   },
   bubbleArrow: {
     position: 'absolute',
-    bottom: -6, // Smaller arrow
+    bottom: -6,
     left: '30%',
     width: 0,
     height: 0,
     backgroundColor: 'transparent',
     borderStyle: 'solid',
-    borderLeftWidth: 6, // Smaller arrow
-    borderRightWidth: 6, // Smaller arrow
-    borderTopWidth: 6, // Smaller arrow
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 6,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: '#f0f0f0', // Match the bubble color
+    borderTopColor: '#f0f0f0',
   },
   emojiRow: {
     flexDirection: 'row',
@@ -260,13 +271,12 @@ const reactionStyles = StyleSheet.create({
     alignItems: 'center',
   },
   emojiButton: {
-    paddingHorizontal: 6, // Smaller padding
-    paddingVertical: 4, // Smaller padding
+    paddingHorizontal: 6,
+    paddingVertical: 4,
   },
   emojiText: {
-    fontSize: 18, // Smaller emoji
+    fontSize: 18,
   },
-  // Existing reactions display
   existingReactionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
