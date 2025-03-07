@@ -3,37 +3,16 @@ const path = require('path');
 const glob = require('glob');
 
 // Configuration
-const sourceDir = 'docs-reference'; // Source directory with TypeDoc MD files
-const targetDir = 'docs/docs-reference'; // Target directory for Mintlify MDX files
+const sourceDir = 'docs/references'; // Directory with TypeDoc MD files
 const mintJsonPath = 'mint.json'; // Path to mint.json file
 
-// Create target directory if it doesn't exist
-if (!fs.existsSync(targetDir)) {
-  fs.mkdirSync(targetDir, {recursive: true});
-}
-
-// Function to convert a single file
-function convertFile(sourcePath) {
+// Function to convert a single file in place
+function convertFileInPlace(filePath) {
   // Read the source file
-  const content = fs.readFileSync(sourcePath, 'utf8');
-
-  // Get the relative path from the source directory
-  const relativePath = path.relative(sourceDir, sourcePath);
-
-  // Create the target path with .mdx extension
-  const targetPath = path.join(
-    targetDir,
-    relativePath.replace(/\.md$/, '.mdx'),
-  );
-
-  // Create the directory structure if it doesn't exist
-  const targetFileDir = path.dirname(targetPath);
-  if (!fs.existsSync(targetFileDir)) {
-    fs.mkdirSync(targetFileDir, {recursive: true});
-  }
+  const content = fs.readFileSync(filePath, 'utf8');
 
   // Extract the title from the content (usually the first heading)
-  let title = path.basename(sourcePath, '.md');
+  let title = path.basename(filePath, '.md');
   const titleMatch = content.match(/^# (.+)$/m);
   if (titleMatch) {
     title = titleMatch[1];
@@ -62,10 +41,16 @@ description: "${description}"
   // Combine frontmatter and updated content
   const finalContent = frontmatter + updatedContent;
 
-  // Write the converted content to the target file
-  fs.writeFileSync(targetPath, finalContent);
+  // Create the new file path with .mdx extension
+  const mdxFilePath = filePath.replace(/\.md$/, '.mdx');
 
-  console.log(`Converted: ${sourcePath} -> ${targetPath}`);
+  // Write the converted content to the new file
+  fs.writeFileSync(mdxFilePath, finalContent);
+  
+  // Remove the original .md file
+  fs.unlinkSync(filePath);
+
+  console.log(`Converted: ${filePath} -> ${mdxFilePath}`);
 }
 
 // Find all Markdown files in the source directory
@@ -77,51 +62,65 @@ glob(`${sourceDir}/**/*.md`, (err, files) => {
 
   console.log(`Found ${files.length} files to convert`);
 
-  // Convert each file
-  files.forEach(convertFile);
+  // Convert each file in place
+  files.forEach(convertFileInPlace);
 
-  // Update mint.json with the new files
-  updateMintJson(files);
+  // Update mint.json with the new file extensions
+  updateMintJson();
 
   console.log('Conversion complete!');
 });
 
 // Function to update mint.json with the converted files
-function updateMintJson(files) {
-  // Read the mint.json file
-  const mintJsonContent = fs.readFileSync(mintJsonPath, 'utf8');
-  const mintJson = JSON.parse(mintJsonContent);
+function updateMintJson() {
+  try {
+    // Read the mint.json file
+    const mintJsonContent = fs.readFileSync(mintJsonPath, 'utf8');
+    let mintJson;
+    
+    try {
+      mintJson = JSON.parse(mintJsonContent);
+    } catch (parseError) {
+      console.error('Error parsing mint.json:', parseError);
+      return;
+    }
 
-  // Find the Reference group
-  const referenceGroup = mintJson.navigation.find(
-    item => item.group === 'Reference',
-  );
+    // Find all .mdx files in the docs/references directory
+    const mdxFiles = glob.sync('docs/references/**/*.mdx');
+    console.log(`Found ${mdxFiles.length} .mdx files to add to mint.json`);
 
-  if (referenceGroup) {
-    // Get the existing pages array
-    const existingPages = referenceGroup.pages || [];
+    // Find the Reference group
+    const referenceGroup = mintJson.navigation.find(item => item.group === "Reference");
 
-    // Generate paths for the navigation, preserving the exact structure
-    files.forEach(file => {
-      const relativePath = path.relative(sourceDir, file);
-      // Convert to the target path format and change extension from .md to .mdx
-      const targetPath = `docs/docs-reference/${relativePath.replace(
-        /\.md$/,
-        '',
-      )}`;
+    if (referenceGroup) {
+      console.log('Found Reference group in mint.json');
+      
+      // Create a new pages array with the main references entry
+      const newPages = ['docs/references'];
+      
+      // Add all the .mdx files to the pages array
+      mdxFiles.forEach(file => {
+        // Remove the .mdx extension for the navigation
+        const navPath = file.replace(/\.mdx$/, '');
+        if (!newPages.includes(navPath)) {
+          newPages.push(navPath);
+        }
+      });
+      
+      console.log('Original pages:', referenceGroup.pages);
+      console.log('New pages:', newPages);
+      
+      // Update the pages array
+      referenceGroup.pages = newPages;
+    } else {
+      console.log('Reference group not found in mint.json');
+    }
 
-      // Only add if it doesn't already exist
-      if (!existingPages.includes(targetPath)) {
-        existingPages.push(targetPath);
-      }
-    });
-
-    // Update the pages array
-    referenceGroup.pages = existingPages;
+    // Write the updated mint.json back to file
+    fs.writeFileSync(mintJsonPath, JSON.stringify(mintJson, null, 2));
+    console.log(`Updated mint.json with all nested folders and files`);
+    
+  } catch (error) {
+    console.error('Error updating mint.json:', error);
   }
-
-  // Write the updated mint.json back to file
-  fs.writeFileSync(mintJsonPath, JSON.stringify(mintJson, null, 2));
-
-  console.log(`Updated mint.json Reference group with new pages`);
 }
