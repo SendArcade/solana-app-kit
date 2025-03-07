@@ -1,3 +1,5 @@
+// FILE: src/components/thread/ThreadItem.tsx
+
 import React, { useState } from 'react';
 import { View, Alert, TouchableOpacity } from 'react-native';
 import ThreadAncestors from './ThreadAncestors';
@@ -5,63 +7,26 @@ import PostHeader from './PostHeader';
 import PostBody from './PostBody';
 import PostFooter from './PostFooter';
 import PostCTA from './PostCTA';
-import ThreadComposer from './ThreadComposer';
+import RetweetPreview from './RetweetPreview';
 import { createThreadStyles, getMergedTheme } from './thread.styles';
 import { ThreadCTAButton, ThreadPost, ThreadUser } from './thread.types';
-import RetweetPreview from './RetweetPreview';
+import { useAppDispatch } from '../../hooks/useReduxHooks';
+import { deletePostAsync } from '../../state/thread/reducer';
+import ThreadEditModal from './ThreadEditModal';
 
-/**
- * Props for the ThreadItem component
- * @interface ThreadItemProps
- */
+
 interface ThreadItemProps {
-  /** The post data to display */
   post: ThreadPost;
-  /** Current user information */
   currentUser: ThreadUser;
-  /** Array of root-level posts in the thread */
   rootPosts: ThreadPost[];
-  /** Nesting depth of the current post */
   depth?: number;
-  /** Callback fired when a post is pressed */
   onPressPost?: (post: ThreadPost) => void;
-  /** Array of call-to-action buttons to display */
   ctaButtons?: ThreadCTAButton[];
-  /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
-  /** Style overrides for specific components */
   styleOverrides?: { [key: string]: object };
-  /** User-provided stylesheet overrides */
   userStyleSheet?: { [key: string]: object };
 }
 
-/**
- * A component that renders an individual post within a thread
- * 
- * @component
- * @description
- * ThreadItem displays a single post with its replies in a threaded discussion.
- * It handles post interactions like replying, deleting, and showing nested responses.
- * The component supports customizable styling and themes.
- * 
- * Features:
- * - Displays post content with author information
- * - Shows nested replies
- * - Handles post deletion
- * - Supports reply composition
- * - Customizable appearance through themes
- * 
- * @example
- * ```tsx
- * <ThreadItem
- *   post={postData}
- *   currentUser={user}
- *   rootPosts={allPosts}
- *   depth={0}
- *   onPressPost={handlePostPress}
- * />
- * ```
- */
 export const ThreadItem: React.FC<ThreadItemProps> = ({
   post,
   currentUser,
@@ -74,6 +39,9 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
   userStyleSheet,
 }) => {
   const [showReplyComposer, setShowReplyComposer] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  const dispatch = useAppDispatch();
 
   const mergedTheme = getMergedTheme(themeOverrides);
   const styles = createThreadStyles(
@@ -86,20 +54,29 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
     setShowReplyComposer(!showReplyComposer);
   };
 
-  const containerStyle = [
-    styles.threadItemContainer,
-    depth > 0 && styles.threadItemReplyLine,
-  ];
-
+  /** Called when the user chooses Delete from the post menu. */
   const handleDeletePost = (p: ThreadPost) => {
     if (p.user.id !== currentUser.id) {
       Alert.alert('Cannot Delete', 'You are not the owner of this post.');
       return;
     }
-    // If you have a delete post logic, call it here
+    // Dispatch delete
+    dispatch(deletePostAsync(p.id));
   };
 
-  const Wrapper = onPressPost ? TouchableOpacity : View;
+  /** Called when user chooses Edit from the post menu. */
+  const handleEditPost = (p: ThreadPost) => {
+    if (p.user.id !== currentUser.id) {
+      Alert.alert('Cannot Edit', 'You are not the owner of this post.');
+      return;
+    }
+    setShowEditModal(true);
+  };
+
+  const containerStyle = [
+    styles.threadItemContainer,
+    depth > 0 && styles.threadItemReplyLine,
+  ];
 
   return (
     <View style={containerStyle}>
@@ -111,17 +88,15 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
         userStyleSheet={userStyleSheet}
       />
 
-      <Wrapper
+      <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => onPressPost && onPressPost(post)}
         style={{ flex: 1 }}
       >
-        {/* If it's a retweet, display "Retweeted Post" inline (plus the user’s optional quote) */}
-
         <PostHeader
           post={post}
-          onPressMenu={() => { }}
           onDeletePost={handleDeletePost}
+          onEditPost={handleEditPost}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
         />
@@ -150,22 +125,37 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
 
         <PostFooter
           post={post}
-          onPressComment={handleToggleReplyComposer}
+          onPressComment={() => setShowReplyComposer(!showReplyComposer)}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
         />
-      </Wrapper>
+      </TouchableOpacity>
 
       {showReplyComposer && (
         <View style={{ marginTop: 8 }}>
-          <ThreadComposer
-            currentUser={currentUser}
-            parentId={post.id}
-            onPostCreated={() => setShowReplyComposer(false)}
-            themeOverrides={themeOverrides}
-            styleOverrides={styleOverrides}
-          />
+          {/* Existing logic: show a ThreadComposer for replies */}
+          {/* ...
+              <ThreadComposer
+                currentUser={currentUser}
+                parentId={post.id}
+                onPostCreated={() => setShowReplyComposer(false)}
+                themeOverrides={themeOverrides}
+                styleOverrides={styleOverrides}
+              />
+          */}
         </View>
+      )}
+
+      {/* EDIT MODAL for text sections */}
+      {showEditModal && (
+        <ThreadEditModal
+          post={post}
+          visible={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          currentUser={currentUser}
+          themeOverrides={themeOverrides}
+          styleOverrides={styleOverrides}
+        />
       )}
 
       {post.replies.map(reply => (
@@ -184,4 +174,4 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
       ))}
     </View>
   );
-}
+};

@@ -66,6 +66,21 @@ export const createRetweetAsync = createAsyncThunk(
   }
 );
 
+// NEW: updatePostAsync
+export const updatePostAsync = createAsyncThunk(
+  'thread/updatePost',
+  async ({ postId, sections }: { postId: string; sections: ThreadSection[] }) => {
+    const res = await fetch(`${SERVER_BASE_URL}/api/posts/update`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postId, sections }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Failed to update post');
+    return data.data as ThreadPost;
+  }
+);
+
 // deletePostAsync ...
 export const deletePostAsync = createAsyncThunk('thread/deletePost', async (postId: string) => {
   const res = await fetch(`${SERVER_BASE_URL}/api/posts/${postId}`, {
@@ -76,7 +91,7 @@ export const deletePostAsync = createAsyncThunk('thread/deletePost', async (post
   return postId;
 });
 
-// NEW: addReactionAsync
+// addReactionAsync ...
 export const addReactionAsync = createAsyncThunk(
   'thread/addReaction',
   async ({ postId, reactionEmoji }: { postId: string; reactionEmoji: string }) => {
@@ -129,8 +144,6 @@ export const threadSlice = createSlice({
     },
     addRetweetLocally: (state, action: PayloadAction<ThreadPost>) => {
       state.allPosts.unshift(action.payload);
-
-      // Also increment retweetCount on the original
       if (action.payload.retweetOf) {
         const originalId = action.payload.retweetOf.id;
         const updateRetweetCount = (posts: ThreadPost[]) => {
@@ -188,12 +201,11 @@ export const threadSlice = createSlice({
       }
       addReply(state.allPosts);
     });
+
+    // createRetweetAsync
     builder.addCase(createRetweetAsync.fulfilled, (state, action) => {
       const newRetweet = action.payload;
-      // Insert at top
       state.allPosts.unshift(newRetweet);
-
-      // increment retweetCount on original
       if (newRetweet.retweetOf) {
         const originalId = newRetweet.retweetOf.id;
         const updateRetweetCount = (posts: ThreadPost[]) => {
@@ -221,19 +233,19 @@ export const threadSlice = createSlice({
       function removeRecursive(posts: ThreadPost[]): ThreadPost[] {
         return posts
           .filter((p) => p.id !== postId)
-          .map((p) => ({
-            ...p,
-            replies: removeRecursive(p.replies),
-          }));
+          .map((p) => {
+            if (p.replies.length > 0) {
+              p.replies = removeRecursive(p.replies);
+            }
+            return p;
+          });
       }
       state.allPosts = removeRecursive(state.allPosts);
     });
 
-    // NEW: addReactionAsync
+    // addReactionAsync
     builder.addCase(addReactionAsync.fulfilled, (state, action) => {
       const updatedPost = action.payload as ThreadPost;
-
-      // Helper to replace the target post in the tree
       const replacePost = (posts: ThreadPost[]): ThreadPost[] => {
         return posts.map(p => {
           if (p.id === updatedPost.id) {
@@ -249,11 +261,36 @@ export const threadSlice = createSlice({
           return p;
         });
       };
-
       state.allPosts = replacePost(state.allPosts);
+    });
+
+    // NEW: updatePostAsync
+    builder.addCase(updatePostAsync.fulfilled, (state, action) => {
+      const updatedPost = action.payload;
+      // Recursively replace the post in the tree
+      function updatePostRecursively(posts: ThreadPost[]): ThreadPost[] {
+        return posts.map((p) => {
+          if (p.id === updatedPost.id) {
+            return {
+              ...p,
+              sections: updatedPost.sections,
+            };
+          }
+          if (p.replies.length > 0) {
+            p.replies = updatePostRecursively(p.replies);
+          }
+          return p;
+        });
+      }
+      state.allPosts = updatePostRecursively(state.allPosts);
     });
   },
 });
 
-export const { addPostLocally, addReplyLocally, addRetweetLocally } = threadSlice.actions;
+export const {
+  addPostLocally,
+  addReplyLocally,
+  addRetweetLocally,
+} = threadSlice.actions;
+
 export default threadSlice.reducer;
