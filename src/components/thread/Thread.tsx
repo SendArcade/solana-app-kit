@@ -5,7 +5,7 @@ import ThreadComposer from './ThreadComposer';
 import { createThreadStyles, getMergedTheme } from './thread.styles';
 import Icons from '../../assets/svgs';
 import { ThreadPost, ThreadUser, ThreadCTAButton } from './thread.types';
-import { ThreadItem } from './ThreadItem';
+import ThreadItem from './ThreadItem';
 
 /**
  * Props for the Thread component
@@ -54,7 +54,7 @@ interface ThreadProps {
  * />
  * ```
  */
-export const Thread: React.FC<ThreadProps> = ({
+export default function Thread({
   rootPosts,
   currentUser,
   showHeader = true,
@@ -67,7 +67,7 @@ export const Thread: React.FC<ThreadProps> = ({
   userStyleSheet,
   refreshing: externalRefreshing,
   onRefresh: externalOnRefresh,
-}: ThreadProps) => {
+}: ThreadProps) {
   // Local fallback for refreshing if not provided via props
   const [localRefreshing, setLocalRefreshing] = useState(false);
 
