@@ -27,14 +27,36 @@ interface ThreadItemProps {
   styleOverrides?: {[key: string]: object};
   /** User-provided stylesheet overrides */
   userStyleSheet?: {[key: string]: object};
-
-  /**
-   * NEW: Callback if user taps avatar/username
-   */
-  onPressUser?: (user: ThreadUser) => void;
 }
 
-export const ThreadItem: React.FC<ThreadItemProps> = ({
+/**
+ * A component that renders an individual post within a thread
+ * 
+ * @component
+ * @description
+ * ThreadItem displays a single post with its replies in a threaded discussion.
+ * It handles post interactions like replying, deleting, and showing nested responses.
+ * The component supports customizable styling and themes.
+ * 
+ * Features:
+ * - Displays post content with author information
+ * - Shows nested replies
+ * - Handles post deletion
+ * - Supports reply composition
+ * - Customizable appearance through themes
+ * 
+ * @example
+ * ```tsx
+ * <ThreadItem
+ *   post={postData}
+ *   currentUser={user}
+ *   rootPosts={allPosts}
+ *   depth={0}
+ *   onPressPost={handlePostPress}
+ * />
+ * ```
+ */
+export default function ThreadItem ({
   post,
   currentUser,
   rootPosts,
@@ -44,8 +66,7 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
   themeOverrides,
   styleOverrides,
   userStyleSheet,
-  onPressUser,
-}) => {
+}: ThreadItemProps) {
   const [showReplyComposer, setShowReplyComposer] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 

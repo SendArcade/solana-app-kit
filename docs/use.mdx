@@ -5,9 +5,9 @@
 ### 1. Installation
 Install the library in a React Native or Expo application:
 ```bash
-yarn add solana-social-starter
+yarn add solana-app-kit
 # or
-npm install solana-social-starter
+npm install solana-app-kit
 ```
 
 ### 2. Configuration
@@ -15,7 +15,7 @@ Configure the authentication provider in your application:
 
 ```javascript
 // In your app's configuration
-import { CustomizationProvider } from 'solana-social-starter';
+import { CustomizationProvider } from 'solana-app-kit';
 
 const myConfig = {
   auth: {
@@ -39,7 +39,7 @@ function App() {
 Render the library's prebuilt screens and components:
 
 ```javascript
-import { Thread } from 'solana-social-starter';
+import { Thread } from 'solana-app-kit';
 
 function MyFeedScreen() {
   // Get user data from Redux or your application state
@@ -58,7 +58,7 @@ function MyFeedScreen() {
 Optionally override default theming or inject custom backgrounds:
 
 ```javascript
-import { Thread } from 'solana-social-starter';
+import { Thread } from 'solana-app-kit';
 
 function MyCustomizedFeed() {
   const themeOverrides = {
@@ -87,7 +87,7 @@ function MyCustomizedFeed() {
 Use the included services for on-chain operations or built-in screens:
 
 ```javascript
-import { pumpfunService, PumpfunScreen, NftScreen } from 'solana-social-starter';
+import { pumpfunService, PumpfunScreen, NftScreen } from 'solana-app-kit';
 
 // Using services directly
 async function buyToken() {
@@ -120,7 +120,7 @@ Extend the Redux slices or add new ones:
 
 ```javascript
 import { combineReducers } from '@reduxjs/toolkit';
-import { authReducer, threadReducer, transactionReducer } from 'solana-social-starter';
+import { authReducer, threadReducer, transactionReducer } from 'solana-app-kit';
 
 // Use existing reducers
 const rootReducer = combineReducers({

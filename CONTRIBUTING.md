@@ -1,4 +1,5 @@
 # Contributing to Solana App Kit
+
 We love your input! We want to make contributing to Solana App Kit as easy and transparent as possible, whether it's:
 
 - Reporting a bug  
