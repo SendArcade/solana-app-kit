@@ -8,7 +8,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import {usePumpfun} from '../../hooks/usePumpfun';
+import {usePumpfun} from '../../hooks/usePumpFun';
 import {PumpfunSellStyles} from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
 
