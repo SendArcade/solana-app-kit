@@ -1,11 +1,9 @@
 // FILE: server/src/controllers/threadController.ts
+
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import knex from '../db/knex';
 
-/**
- * Recursively fetch replies for a post
- */
 async function fetchRepliesRecursive(parentId: string): Promise<any[]> {
   const rows = await knex('posts')
     .where({ parent_id: parentId })
@@ -13,14 +11,10 @@ async function fetchRepliesRecursive(parentId: string): Promise<any[]> {
 
   const results: any[] = [];
   for (const row of rows) {
-    // find user in the DB
     const dbUser = await knex('users').where({ id: row.user_id }).first();
     const avatar = dbUser ? dbUser.profile_picture_url : null;
-
-    // recursively fetch sub-replies
     const replies = await fetchRepliesRecursive(row.id);
 
-    // if retweet_of is set, fetch that post data too
     let retweetData: any = null;
     if (row.retweet_of) {
       retweetData = await fetchSinglePost(row.retweet_of);
@@ -43,30 +37,21 @@ async function fetchRepliesRecursive(parentId: string): Promise<any[]> {
       retweetCount: row.retweet_count,
       quoteCount: row.quote_count,
       reactions: row.reactions || {},
-      // new retweetOf field
       retweetOf: retweetData,
     });
   }
   return results;
 }
 
-/**
- * Helper: fetch a single post by id, including user + retweetOf if present,
- * but NOT its replies. (Used to hydrate retweetOf field.)
- */
 async function fetchSinglePost(postId: string): Promise<any | null> {
   const row = await knex('posts').where({ id: postId }).first();
   if (!row) return null;
-
   const dbUser = await knex('users').where({ id: row.user_id }).first();
   const avatar = dbUser ? dbUser.profile_picture_url : null;
-
-  // If retweet_of is set, fetch that recursively
   let retweetData: any = null;
   if (row.retweet_of) {
     retweetData = await fetchSinglePost(row.retweet_of);
   }
-
   return {
     id: row.id,
     parentId: row.parent_id,
@@ -79,7 +64,7 @@ async function fetchSinglePost(postId: string): Promise<any | null> {
     },
     sections: row.sections,
     createdAt: row.created_at,
-    replies: [], // not returned in single fetch
+    replies: [],
     reactionCount: row.reaction_count,
     retweetCount: row.retweet_count,
     quoteCount: row.quote_count,
@@ -88,9 +73,6 @@ async function fetchSinglePost(postId: string): Promise<any | null> {
   };
 }
 
-/**
- * GET /api/posts
- */
 export const getAllPosts = async (req: Request, res: Response): Promise<void> => {
   try {
     const rows = await knex('posts')
@@ -99,14 +81,10 @@ export const getAllPosts = async (req: Request, res: Response): Promise<void> =>
 
     const result = [];
     for (const row of rows) {
-      // fetch user from users table
       const dbUser = await knex('users').where({ id: row.user_id }).first();
       const avatar = dbUser ? dbUser.profile_picture_url : null;
-
-      // get replies
       const replies = await fetchRepliesRecursive(row.id);
 
-      // if retweet_of is set, fetch that post
       let retweetData: any = null;
       if (row.retweet_of) {
         retweetData = await fetchSinglePost(row.retweet_of);
@@ -129,7 +107,6 @@ export const getAllPosts = async (req: Request, res: Response): Promise<void> =>
         retweetCount: row.retweet_count,
         quoteCount: row.quote_count,
         reactions: row.reactions || {},
-        // new retweetOf
         retweetOf: retweetData,
       });
     }
@@ -143,10 +120,6 @@ export const getAllPosts = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-/**
- * POST /api/posts
- * Create a new root post
- */
 export const createRootPost = async (req: Request, res: Response): Promise<void> => {
   try {
     const { user, sections } = req.body;
@@ -162,7 +135,7 @@ export const createRootPost = async (req: Request, res: Response): Promise<void>
     await knex('posts').insert({
       id: postId,
       parent_id: null,
-      user_id: user.id, // wallet address from client
+      user_id: user.id,
       username: user.username,
       user_handle: user.handle,
       user_verified: !!user.verified,
@@ -174,7 +147,6 @@ export const createRootPost = async (req: Request, res: Response): Promise<void>
       retweet_of: null,
     });
 
-    // fetch user again for avatar
     const dbUser = await knex('users').where({ id: user.id }).first();
     const avatar = dbUser ? dbUser.profile_picture_url : null;
 
@@ -199,17 +171,12 @@ export const createRootPost = async (req: Request, res: Response): Promise<void>
     };
 
     res.status(201).json({ success: true, data: newPost });
-    return;
   } catch (err: any) {
     console.error('[createRootPost] Error:', err);
     res.status(500).json({ success: false, error: err.message });
-    return;
   }
 };
 
-/**
- * POST /api/posts/reply
- */
 export const createReply = async (req: Request, res: Response): Promise<void> => {
   try {
     const { parentId, user, sections } = req.body;
@@ -221,7 +188,6 @@ export const createReply = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // check parent
     const parentRow = await knex('posts').where({ id: parentId }).first();
     if (!parentRow) {
       res.status(400).json({ success: false, error: 'Parent post does not exist' });
@@ -244,10 +210,8 @@ export const createReply = async (req: Request, res: Response): Promise<void> =>
       retweet_of: null,
     });
 
-    // increment parent's quoteCount
     await knex('posts').where({ id: parentId }).increment('quote_count', 1);
 
-    // fetch user again for avatar
     const dbUser = await knex('users').where({ id: user.id }).first();
     const avatar = dbUser ? dbUser.profile_picture_url : null;
 
@@ -271,17 +235,12 @@ export const createReply = async (req: Request, res: Response): Promise<void> =>
       retweetOf: null,
     };
     res.status(201).json({ success: true, data: newReply });
-    return;
   } catch (err: any) {
     console.error('[createReply] Error:', err);
     res.status(500).json({ success: false, error: err.message });
-    return;
   }
 };
 
-/**
- * DELETE /api/posts/:postId
- */
 export const deletePost = async (req: Request, res: Response): Promise<void> => {
   try {
     const { postId } = req.params;
@@ -294,30 +253,21 @@ export const deletePost = async (req: Request, res: Response): Promise<void> => 
       res.status(404).json({ success: false, error: 'Post not found' });
       return;
     }
-    // if it's a reply, decrement parent's quoteCount
     if (post.parent_id) {
       await knex('posts').where({ id: post.parent_id }).decrement('quote_count', 1);
     }
     await knex('posts').where({ id: postId }).del();
-
     res.json({ success: true });
-    return;
   } catch (err: any) {
     console.error('[deletePost] Error:', err);
     res.status(500).json({ success: false, error: err.message });
-    return;
   }
 };
 
-/**
- * PATCH /api/posts/:postId/reaction
- * body: { reactionEmoji: string }
- */
 export const addReaction = async (req: Request, res: Response): Promise<void> => {
   try {
     const { postId } = req.params;
     const { reactionEmoji } = req.body;
-
     if (!postId || !reactionEmoji) {
       res.status(400).json({
         success: false,
@@ -325,41 +275,32 @@ export const addReaction = async (req: Request, res: Response): Promise<void> =>
       });
       return;
     }
-
-    // fetch the post
     const post = await knex('posts').where({ id: postId }).first();
     if (!post) {
       res.status(404).json({ success: false, error: 'Post not found' });
       return;
     }
-
     let reactionsObj = post.reactions || {};
-    // increment the emoji
     if (!reactionsObj[reactionEmoji]) {
       reactionsObj[reactionEmoji] = 1;
     } else {
       reactionsObj[reactionEmoji] += 1;
     }
-
-    // sum up total
     let totalReactions = 0;
     Object.values(reactionsObj).forEach((val: any) => {
       totalReactions += val;
     });
-
     await knex('posts')
       .where({ id: postId })
       .update({
         reactions: reactionsObj,
         reaction_count: totalReactions,
       });
-
     const updatedPost = {
       ...post,
       reactions: reactionsObj,
       reaction_count: totalReactions,
     };
-
     res.json({ success: true, data: updatedPost });
   } catch (error: any) {
     console.error('[addReaction] Error:', error);
@@ -367,11 +308,6 @@ export const addReaction = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-/**
- * POST /api/posts/retweet
- * Creates a new root post that references retweetOf.
- * Increments retweet_count on the original post.
- */
 export const createRetweet = async (req: Request, res: Response): Promise<void> => {
   try {
     const { retweetOf, user, sections } = req.body;
@@ -379,21 +315,18 @@ export const createRetweet = async (req: Request, res: Response): Promise<void> 
       res
         .status(400)
         .json({ success: false, error: 'retweetOf and user are required' });
-        return;
+      return;
     }
 
-    // check existence of the retweeted post
     const originalPost = await knex('posts').where({ id: retweetOf }).first();
     if (!originalPost) {
       res
         .status(404)
         .json({ success: false, error: 'Post to retweet not found' });
-        return;
+      return;
     }
 
     const newId = uuidv4();
-
-    // Insert a new root post with retweet_of set
     await knex('posts').insert({
       id: newId,
       parent_id: null,
@@ -409,16 +342,12 @@ export const createRetweet = async (req: Request, res: Response): Promise<void> 
       retweet_of: retweetOf,
     });
 
-    // increment retweet_count on the original post
     await knex('posts')
       .where({ id: retweetOf })
       .increment('retweet_count', 1);
 
-    // fetch user again for avatar
     const dbUser = await knex('users').where({ id: user.id }).first();
     const avatar = dbUser ? dbUser.profile_picture_url : null;
-
-    // to return retweetOf hydrated data
     const retweetOfData = await fetchSinglePost(retweetOf);
 
     const newRetweetPost = {
@@ -442,9 +371,46 @@ export const createRetweet = async (req: Request, res: Response): Promise<void> 
     };
 
     res.status(201).json({ success: true, data: newRetweetPost });
-    return;
   } catch (error: any) {
     console.error('[createRetweet] Error:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * PATCH /api/posts/update
+ * Body: { postId: string, sections: Section[] }
+ * Edits the sections of an existing post.
+ */
+export const updatePost = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { postId, sections } = req.body;
+    if (!postId || !sections) {
+      res.status(400).json({ success: false, error: 'Missing postId or sections' });
+      return;
+    }
+
+    const post = await knex('posts').where({ id: postId }).first();
+    if (!post) {
+      res.status(404).json({ success: false, error: 'Post not found' });
+      return;
+    }
+
+    // Update only the sections
+    await knex('posts')
+      .where({ id: postId })
+      .update({ sections: JSON.stringify(sections) });
+
+    // Re-fetch the updated post fully (with user, retweetOf, etc.)
+    const updatedPost = await fetchSinglePost(postId);
+    if (!updatedPost) {
+      res.status(500).json({ success: false, error: 'Error refetching updated post' });
+      return;
+    }
+
+    res.json({ success: true, data: updatedPost });
+  } catch (err: any) {
+    console.error('[updatePost] Error:', err);
+    res.status(500).json({ success: false, error: err.message });
   }
 };

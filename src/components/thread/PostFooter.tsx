@@ -29,6 +29,7 @@ export default function PostFooter({
   themeOverrides,
   styleOverrides,
 }: PostFooterProps) {
+  // Local states for bookmark, reactions, and retweet modal.
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -53,6 +54,12 @@ export default function PostFooter({
   };
 
   const dispatch = useAppDispatch();
+
+  // Instead of relying solely on the passed prop, subscribe to the updated post from Redux.
+  const updatedPost =
+    useAppSelector(state =>
+      state.thread.allPosts.find(p => p.id === post.id)
+    ) || post;
 
   const mergedTheme = getMergedTheme(themeOverrides);
   const styles = createThreadStyles(mergedTheme, styleOverrides);
@@ -104,12 +111,12 @@ export default function PostFooter({
 
   // Render existing reactions
   const renderExistingReactions = () => {
-    if (!post.reactions || Object.keys(post.reactions).length === 0) {
+    if (!updatedPost.reactions || Object.keys(updatedPost.reactions).length === 0) {
       return null;
     }
     return (
       <View style={reactionStyles.existingReactionsContainer}>
-        {Object.entries(post.reactions).map(([emoji, count]) => (
+        {Object.entries(updatedPost.reactions).map(([emoji, count]) => (
           <View key={emoji} style={reactionStyles.reactionBadge}>
             <Text style={reactionStyles.reactionEmoji}>{emoji}</Text>
             <Text style={reactionStyles.reactionCount}>{count}</Text>
@@ -138,7 +145,7 @@ export default function PostFooter({
             style={styles.itemLeftIcons}
             onPress={() => onPressComment && onPressComment(post)}>
             <Icons.CommentIdle width={20} height={20} />
-            <Text style={styles.iconText}>{post.quoteCount || 0}</Text>
+            <Text style={styles.iconText}>{updatedPost.quoteCount || 0}</Text>
           </TouchableOpacity>
 
           {/* Retweet */}
@@ -146,7 +153,7 @@ export default function PostFooter({
             <TouchableOpacity onPress={handleOpenRetweetModal}>
               <Icons.RetweetIdle width={20} height={20} />
             </TouchableOpacity>
-            <Text style={styles.iconText}>{post.retweetCount || 0}</Text>
+            <Text style={styles.iconText}>{updatedPost.retweetCount || 0}</Text>
           </View>
 
           {/* Reaction icon */}
@@ -154,7 +161,7 @@ export default function PostFooter({
             <TouchableOpacity onPress={handleShowReactions}>
               <Icons.ReactionIdle width={20} height={20} />
             </TouchableOpacity>
-            <Text style={styles.iconText}>{post.reactionCount || 0}</Text>
+            <Text style={styles.iconText}>{updatedPost.reactionCount || 0}</Text>
 
             {/* Reaction bubble */}
             {showReactions && (

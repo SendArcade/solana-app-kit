@@ -6,7 +6,8 @@ import {
   createReply,
   deletePost,
   addReaction,
-  createRetweet, // <-- new import
+  createRetweet,
+  updatePost, // <-- new import
 } from '../controllers/threadController';
 
 const threadRouter = Router();
@@ -36,5 +37,6 @@ threadRouter.delete('/posts/:postId', asyncHandler(deletePost));
 threadRouter.patch('/posts/:postId/reaction', asyncHandler(addReaction));
 
 threadRouter.post('/posts/retweet', asyncHandler(createRetweet));
+threadRouter.patch('/posts/update', asyncHandler(updatePost));
 
 export { threadRouter };
