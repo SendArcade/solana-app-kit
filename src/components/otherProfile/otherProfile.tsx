@@ -1,9 +1,9 @@
 import React from "react";
 import { SafeAreaView, View, ScrollView } from "react-native";
 import SwipeTabs from "../slider/slider";
-import TopNavigation from "../topNavigation/topNavigation";
 import ProfileInfo from "./ProfileInfo/profileInfo";
 import { dummyProfileData } from "../../mocks/profileInfoData";
+import { TopNavigation } from "../topNavigation/topNavigation";
 
 const OtherProfile = () => {
   return (
