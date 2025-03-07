@@ -1,10 +1,10 @@
 <div align="center">
 
-# Solana Social Starter
+# Solana App Kit
 
 A modern React Native social application built on the Solana blockchain, providing a complete starter kit for building decentralized social experiences.
 
-![Solana Social Starter V6 (Light)](https://github.com/user-attachments/assets/41166f47-3b99-4946-8034-30741d4f2efd)
+![Solana App Kit V6 (Light)](https://github.com/user-attachments/assets/41166f47-3b99-4946-8034-30741d4f2efd)
 
 </div>
 
@@ -52,8 +52,8 @@ A modern React Native social application built on the Solana blockchain, providi
 
 1. Clone the repository:
    ```sh
-   git clone https://github.com/yourusername/solana-social-starter.git
-   cd solana-social-starter
+   git clone https://github.com/yourusername/solana-app-kit.git
+   cd solana-app-kit
    ```
 
 2. Install dependencies:
@@ -112,7 +112,7 @@ npm run android
 ## Project Structure
 
 ```
-solana-social-starter/
+solana-app-kit/
 ├── src/
 │   ├── assets/         # Images, icons, and other static assets
 │   ├── components/     # Reusable UI components

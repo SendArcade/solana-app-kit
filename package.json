@@ -1,7 +1,7 @@
 {
-  "name": "solana-social-kit",
+  "name": "solana-app-kit",
   "version": "0.1.0",
-  "description": "An open-source Solana social starter kit for React Native",
+  "description": "An open-source Solana App Kit kit for React Native",
   "private": true,
   "scripts": {
     "android": "expo run:android",
