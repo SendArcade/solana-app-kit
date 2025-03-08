@@ -1,7 +1,7 @@
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
-import { useSelector } from 'react-redux';
-import { RootState } from '../state/store';
+import {createStackNavigator} from '@react-navigation/stack';
+import {useSelector} from 'react-redux';
+import {RootState} from '../state/store';
 import MainTabs from './MainTabs';
 import TokenMillScreen from '../screens/Common/TokenMillScreen/TokenMillScreen';
 import ChatScreen from '../screens/SampleUI/Chat/ChatScreen/ChatScreen';
@@ -12,6 +12,10 @@ import PumpfunScreen from '../screens/Common/pumpfunScreen/pumpfunScreen';
 import NftScreen from '../screens/Common/NftScreen/NftScreen';
 import IntroScreen from '../screens/Common/IntroScreen/IntroScreen';
 import LoginScreen from '../screens/Common/LoginScreen/LoginScreen';
+
+// NEW IMPORT
+import OtherProfileScreen from '../screens/SampleUI/Threads/OtherProfileScreen/OtherProfileScreen';
+import PostThreadScreen from '../screens/SampleUI/Threads/PostThreadScreen/PostthreadScreen';
 
 export type RootStackParamList = {
   LoginOptions: undefined;
@@ -24,6 +28,9 @@ export type RootStackParamList = {
   NftScreen: undefined;
   PlatformSelection: undefined;
   ChatScreen: undefined;
+  // NEW ROUTE
+  OtherProfile: {userId: string};
+  PostThread: {postId: string};
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -46,6 +53,10 @@ export default function RootNavigator() {
           <Stack.Screen name="TokenMill" component={TokenMillScreen} />
           <Stack.Screen name="NftScreen" component={NftScreen} />
           <Stack.Screen name="ChatScreen" component={ChatScreen} />
+
+          {/* NEW SCREEN for viewing other user's profile */}
+          <Stack.Screen name="OtherProfile" component={OtherProfileScreen} />
+          <Stack.Screen name="PostThread" component={PostThreadScreen} />
         </>
       ) : (
         <>

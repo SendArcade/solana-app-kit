@@ -1,3 +1,5 @@
+// FILE: src/components/thread/ThreadItem.tsx
+
 import React, {useState} from 'react';
 import {View, Alert, TouchableOpacity} from 'react-native';
 import ThreadAncestors from './ThreadAncestors';
@@ -5,28 +7,21 @@ import PostHeader from './PostHeader';
 import PostBody from './PostBody';
 import PostFooter from './PostFooter';
 import PostCTA from './PostCTA';
-import ThreadComposer from './ThreadComposer';
+import RetweetPreview from './RetweetPreview';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
 import {ThreadCTAButton, ThreadPost, ThreadUser} from './thread.types';
+import {useAppDispatch} from '../../hooks/useReduxHooks';
+import {deletePostAsync} from '../../state/thread/reducer';
+import ThreadEditModal from './ThreadEditModal';
+import ThreadComposer from './ThreadComposer'; // Ensure ThreadComposer is imported
 
-/**
- * Props for the ThreadItem component
- * @interface ThreadItemProps
- */
 interface ThreadItemProps {
-  /** The post data to display */
   post: ThreadPost;
-  /** Current user information */
   currentUser: ThreadUser;
-  /** Array of root-level posts in the thread */
   rootPosts: ThreadPost[];
-  /** Nesting depth of the current post */
   depth?: number;
-  /** Callback fired when a post is pressed */
   onPressPost?: (post: ThreadPost) => void;
-  /** Array of call-to-action buttons to display */
   ctaButtons?: ThreadCTAButton[];
-  /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
   /** Style overrides for specific components */
   styleOverrides?: {[key: string]: object};
@@ -73,6 +68,9 @@ export default function ThreadItem ({
   userStyleSheet,
 }: ThreadItemProps) {
   const [showReplyComposer, setShowReplyComposer] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  const dispatch = useAppDispatch();
 
   const mergedTheme = getMergedTheme(themeOverrides);
   const styles = createThreadStyles(
@@ -85,20 +83,29 @@ export default function ThreadItem ({
     setShowReplyComposer(!showReplyComposer);
   };
 
-  const containerStyle = [
-    styles.threadItemContainer,
-    depth > 0 && styles.threadItemReplyLine,
-  ];
-
+  /** Called when the user chooses Delete from the post menu. */
   const handleDeletePost = (p: ThreadPost) => {
     if (p.user.id !== currentUser.id) {
       Alert.alert('Cannot Delete', 'You are not the owner of this post.');
       return;
     }
-    // If you have a delete post logic, call it here
+    // Dispatch delete
+    dispatch(deletePostAsync(p.id));
   };
 
-  const Wrapper = onPressPost ? TouchableOpacity : View;
+  /** Called when user chooses Edit from the post menu. */
+  const handleEditPost = (p: ThreadPost) => {
+    if (p.user.id !== currentUser.id) {
+      Alert.alert('Cannot Edit', 'You are not the owner of this post.');
+      return;
+    }
+    setShowEditModal(true);
+  };
+
+  const containerStyle = [
+    styles.threadItemContainer,
+    depth > 0 && styles.threadItemReplyLine,
+  ];
 
   return (
     <View style={containerStyle}>
@@ -110,16 +117,18 @@ export default function ThreadItem ({
         userStyleSheet={userStyleSheet}
       />
 
-      <Wrapper
+      <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => onPressPost && onPressPost(post)}
         style={{flex: 1}}>
         <PostHeader
           post={post}
-          onPressMenu={() => {}}
           onDeletePost={handleDeletePost}
+          onEditPost={handleEditPost}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
+          // Pass the new user press callback
+          onPressUser={onPressUser}
         />
 
         <PostBody
@@ -127,6 +136,12 @@ export default function ThreadItem ({
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
         />
+
+        {post.retweetOf && (
+          <View style={{marginBottom: 6}}>
+            <RetweetPreview retweetOf={post.retweetOf} onPress={onPressPost} />
+          </View>
+        )}
 
         <PostCTA
           post={post}
@@ -137,12 +152,13 @@ export default function ThreadItem ({
 
         <PostFooter
           post={post}
-          onPressComment={handleToggleReplyComposer}
+          onPressComment={() => setShowReplyComposer(!showReplyComposer)}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
         />
-      </Wrapper>
+      </TouchableOpacity>
 
+      {/* Render the reply composer when showReplyComposer is true */}
       {showReplyComposer && (
         <View style={{marginTop: 8}}>
           <ThreadComposer
@@ -153,6 +169,18 @@ export default function ThreadItem ({
             styleOverrides={styleOverrides}
           />
         </View>
+      )}
+
+      {/* EDIT MODAL for text sections */}
+      {showEditModal && (
+        <ThreadEditModal
+          post={post}
+          visible={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          currentUser={currentUser}
+          themeOverrides={themeOverrides}
+          styleOverrides={styleOverrides}
+        />
       )}
 
       {post.replies.map(reply => (
@@ -167,8 +195,9 @@ export default function ThreadItem ({
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
           userStyleSheet={userStyleSheet}
+          onPressUser={onPressUser} // pass down
         />
       ))}
     </View>
   );
-}
+};

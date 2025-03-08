@@ -1,322 +1,464 @@
-// server/src/controllers/threadController.ts
-import { Request, Response } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import {Request, Response, NextFunction} from 'express';
 import knex from '../db/knex';
+import {v4 as uuidv4} from 'uuid';
 
-async function fetchRepliesRecursive(parentId: string): Promise<any[]> {
-  const rows = await knex('posts')
-    .where({ parent_id: parentId })
-    .orderBy('created_at', 'desc');
+/**
+ * Shape of a single post in our DB
+ * We do not store username, handle, etc. directly in "posts" now.
+ */
+type DBPostRow = {
+  id: string;
+  parent_id: string | null;
+  user_id: string; // references users.id
+  sections: any; // JSON
+  reaction_count: number;
+  retweet_count: number;
+  quote_count: number;
+  created_at: string;
+  retweet_of: string | null; // references posts.id
+  reactions: Record<string, number>;
+};
 
-  const results: any[] = [];
-  for (const row of rows) {
-    // find user in the DB
-    const dbUser = await knex('users').where({ id: row.user_id }).first();
-    const avatar = dbUser ? dbUser.profile_picture_url : null;
+type DBUserRow = {
+  id: string; // user ID or wallet address
+  username: string;
+  handle: string;
+  profile_picture_url: string | null;
+  // add "verified" column if available
+};
 
-    const replies = await fetchRepliesRecursive(row.id);
+/**
+ * Merges DBPostRow with user data from DBUserRow to produce the shape the client needs.
+ */
+function mapPostRowToClientShape(postRow: DBPostRow & DBUserRow) {
+  return {
+    id: postRow.id,
+    parentId: postRow.parent_id,
+    user: {
+      id: postRow.user_id,
+      username: postRow.username,
+      handle: postRow.handle,
+      avatar: postRow.profile_picture_url
+        ? {uri: postRow.profile_picture_url}
+        : null,
+      verified: false,
+    },
+    sections: postRow.sections || [],
+    createdAt: postRow.created_at,
+    replies: [],
+    reactionCount: postRow.reaction_count,
+    retweetCount: postRow.retweet_count,
+    quoteCount: postRow.quote_count,
+    reactions: postRow.reactions || {},
+    retweetOf: postRow.retweet_of, // <-- Changed: now pass the DB field if available
+  };
+}
 
-    results.push({
-      id: row.id,
-      parentId: row.parent_id,
-      user: {
-        id: row.user_id,
-        username: row.username,
-        handle: row.user_handle,
-        verified: row.user_verified,
-        avatar: avatar,
-      },
-      sections: row.sections,
-      createdAt: row.created_at,
-      replies: replies,
-      reactionCount: row.reaction_count,
-      retweetCount: row.retweet_count,
-      quoteCount: row.quote_count,
-      // NEW: parse "reactions" from DB
-      reactions: row.reactions || {},
-    });
-  }
-  return results;
+/**
+ * Fetch retweetOf post if retweet_of is not null.
+ * We'll do a small helper that fetches that post from DB and merges user info.
+ */
+async function fetchRetweetOf(postId: string): Promise<any | null> {
+  const row = await knex<DBPostRow>('posts')
+    .select(
+      'posts.*',
+      'users.username',
+      'users.handle',
+      'users.profile_picture_url',
+    )
+    .leftJoin('users', 'users.id', 'posts.user_id')
+    .where('posts.id', postId)
+    .first();
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    parentId: row.parent_id,
+    user: {
+      id: row.user_id,
+      username: row.username,
+      handle: row.handle,
+      avatar: row.profile_picture_url ? {uri: row.profile_picture_url} : null,
+      verified: false,
+    },
+    sections: row.sections || [],
+    createdAt: row.created_at,
+    replies: [],
+    reactionCount: row.reaction_count,
+    retweetCount: row.retweet_count,
+    quoteCount: row.quote_count,
+    reactions: row.reactions || {},
+    retweetOf: null,
+  };
+}
+
+/**
+ * Recursively build up the "replies" array for a post.
+ */
+function buildReplies(post: any, allPosts: any[]): any {
+  const replies = allPosts.filter(p => p.parentId === post.id);
+  replies.forEach(r => {
+    r.replies = buildReplies(r, allPosts);
+  });
+  return replies;
 }
 
 /**
  * GET /api/posts
+ * Return all posts with user data, including nested replies.
  */
-export const getAllPosts = async (req: Request, res: Response): Promise<void> => {
+export async function getAllPosts(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
   try {
-    const rows = await knex('posts')
-      .whereNull('parent_id')
-      .orderBy('created_at', 'desc');
+    // 1) fetch all posts joined with user data
+    const rows = await knex<DBPostRow>('posts')
+      .select(
+        'posts.*',
+        'users.username',
+        'users.handle',
+        'users.profile_picture_url',
+      )
+      .leftJoin('users', 'users.id', 'posts.user_id')
+      .orderBy('posts.created_at', 'asc');
 
-    const result = [];
-    for (const row of rows) {
-      // fetch user from users table
-      const dbUser = await knex('users').where({ id: row.user_id }).first();
-      const avatar = dbUser ? dbUser.profile_picture_url : null;
+    // 2) map them to client shape
+    const partialPosts = rows.map(mapPostRowToClientShape);
 
-      const replies = await fetchRepliesRecursive(row.id);
-
-      result.push({
-        id: row.id,
-        parentId: row.parent_id,
-        user: {
-          id: row.user_id,
-          username: row.username,
-          handle: row.user_handle,
-          verified: row.user_verified,
-          avatar,
-        },
-        sections: row.sections,
-        createdAt: row.created_at,
-        replies,
-        reactionCount: row.reaction_count,
-        retweetCount: row.retweet_count,
-        quoteCount: row.quote_count,
-        // parse "reactions" from DB
-        reactions: row.reactions || {},
-      });
+    // 3) fill retweetOf if needed
+    for (const p of partialPosts) {
+      if (p.retweetOf) {
+        const retweetData = await fetchRetweetOf(p.retweetOf);
+        p.retweetOf = retweetData;
+      }
     }
 
-    res.json({ success: true, data: result });
-    return;
-  } catch (err: any) {
+    // 4) build a tree structure for replies
+    const allPostsMapped = partialPosts.map(p => {
+      return {...p, retweet_of: undefined};
+    });
+    const rootPosts = allPostsMapped.filter(p => !p.parentId);
+    rootPosts.forEach(r => {
+      r.replies = buildReplies(r, allPostsMapped);
+    });
+
+    return res.json({success: true, data: rootPosts});
+  } catch (err) {
     console.error('[getAllPosts] Error:', err);
-    res.status(500).json({ success: false, error: err.message });
-    return;
+    return res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
   }
-};
+}
 
 /**
- * POST /api/posts
- * Create a new root post
+ * Create a root-level post (no parentId).
+ * Body expects: { userId, sections }
  */
-export const createRootPost = async (req: Request, res: Response): Promise<void> => {
+export async function createRootPost(req: Request, res: Response) {
   try {
-    const { user, sections } = req.body;
-    if (!user || !sections) {
-      res.status(400).json({
-        success: false,
-        error: 'user and sections are required',
-      });
-      return;
+    const {userId, sections} = req.body;
+    if (!userId) {
+      return res.status(400).json({success: false, error: 'Missing userId'});
+    }
+    if (!sections || !Array.isArray(sections)) {
+      return res
+        .status(400)
+        .json({success: false, error: 'sections must be an array'});
     }
 
-    const postId = uuidv4();
+    const newId = uuidv4();
     await knex('posts').insert({
-      id: postId,
+      id: newId,
       parent_id: null,
-      user_id: user.id, // wallet address from client
-      username: user.username,
-      user_handle: user.handle,
-      user_verified: !!user.verified,
+      user_id: userId,
       sections: JSON.stringify(sections),
       reaction_count: 0,
       retweet_count: 0,
       quote_count: 0,
-      // Store an empty object in "reactions" column by default
-      reactions: JSON.stringify({}),
     });
 
-    // fetch user again for avatar
-    const dbUser = await knex('users').where({ id: user.id }).first();
-    const avatar = dbUser ? dbUser.profile_picture_url : null;
+    const row = await knex<DBPostRow>('posts')
+      .select(
+        'posts.*',
+        'users.username',
+        'users.handle',
+        'users.profile_picture_url',
+      )
+      .leftJoin('users', 'users.id', 'posts.user_id')
+      .where('posts.id', newId)
+      .first();
 
-    const newPost = {
-      id: postId,
-      parentId: null,
-      user: {
-        id: user.id,
-        username: user.username,
-        handle: user.handle,
-        verified: !!user.verified,
-        avatar,
-      },
-      sections,
-      createdAt: new Date().toISOString(),
-      replies: [],
-      reactionCount: 0,
-      retweetCount: 0,
-      quoteCount: 0,
-      reactions: {}, // empty object
-    };
+    if (!row) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to retrieve newly created post',
+      });
+    }
 
-    res.status(201).json({ success: true, data: newPost });
-    return;
+    const postMapped = mapPostRowToClientShape(row);
+    return res.json({success: true, data: postMapped});
   } catch (err: any) {
     console.error('[createRootPost] Error:', err);
-    res.status(500).json({ success: false, error: err.message });
-    return;
+    return res.status(500).json({success: false, error: err.message});
   }
-};
+}
 
 /**
- * POST /api/posts/reply
+ * Create a reply to a parent post.
+ * Body expects: { parentId, userId, sections }
  */
-export const createReply = async (req: Request, res: Response): Promise<void> => {
+export async function createReply(req: Request, res: Response) {
   try {
-    const { parentId, user, sections } = req.body;
-    if (!parentId || !user || !sections) {
-      res.status(400).json({
-        success: false,
-        error: 'parentId, user, and sections are required',
-      });
-      return;
+    const {parentId, userId, sections} = req.body;
+    if (!parentId || !userId || !sections) {
+      return res
+        .status(400)
+        .json({success: false, error: 'Missing parentId, userId or sections'});
     }
 
-    // check parent
-    const parentRow = await knex('posts').where({ id: parentId }).first();
-    if (!parentRow) {
-      res.status(400).json({ success: false, error: 'Parent post does not exist' });
-      return;
-    }
-
-    const postId = uuidv4();
+    const newId = uuidv4();
     await knex('posts').insert({
-      id: postId,
+      id: newId,
       parent_id: parentId,
-      user_id: user.id,
-      username: user.username,
-      user_handle: user.handle,
-      user_verified: !!user.verified,
+      user_id: userId,
       sections: JSON.stringify(sections),
       reaction_count: 0,
       retweet_count: 0,
       quote_count: 0,
-      reactions: JSON.stringify({}),
     });
 
-    // increment parent's quoteCount
-    await knex('posts').where({ id: parentId }).increment('quote_count', 1);
+    const row = await knex<DBPostRow>('posts')
+      .select(
+        'posts.*',
+        'users.username',
+        'users.handle',
+        'users.profile_picture_url',
+      )
+      .leftJoin('users', 'users.id', 'posts.user_id')
+      .where('posts.id', newId)
+      .first();
 
-    // fetch user again for avatar
-    const dbUser = await knex('users').where({ id: user.id }).first();
-    const avatar = dbUser ? dbUser.profile_picture_url : null;
+    if (!row) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to retrieve newly created reply',
+      });
+    }
 
-    const newReply = {
-      id: postId,
-      parentId,
-      user: {
-        id: user.id,
-        username: user.username,
-        handle: user.handle,
-        verified: !!user.verified,
-        avatar,
-      },
-      sections,
-      createdAt: new Date().toISOString(),
-      replies: [],
-      reactionCount: 0,
-      retweetCount: 0,
-      quoteCount: 0,
-      reactions: {},
-    };
-    res.status(201).json({ success: true, data: newReply });
-    return;
+    const postMapped = mapPostRowToClientShape(row);
+    return res.json({success: true, data: postMapped});
   } catch (err: any) {
     console.error('[createReply] Error:', err);
-    res.status(500).json({ success: false, error: err.message });
-    return;
+    return res.status(500).json({success: false, error: err.message});
   }
-};
+}
 
 /**
+ * Delete a post
  * DELETE /api/posts/:postId
  */
-export const deletePost = async (req: Request, res: Response): Promise<void> => {
+export async function deletePost(req: Request, res: Response) {
   try {
-    const { postId } = req.params;
+    const {postId} = req.params;
     if (!postId) {
-      res.status(400).json({ success: false, error: 'No postId provided' });
-      return;
+      return res
+        .status(400)
+        .json({success: false, error: 'Missing postId in params'});
     }
-    const post = await knex('posts').where({ id: postId }).first();
-    if (!post) {
-      res.status(404).json({ success: false, error: 'Post not found' });
-      return;
-    }
-    // if it's a reply, decrement parent's quoteCount
-    if (post.parent_id) {
-      await knex('posts').where({ id: post.parent_id }).decrement('quote_count', 1);
-    }
-    await knex('posts').where({ id: postId }).del();
 
-    res.json({ success: true });
-    return;
+    await knex('posts').where({id: postId}).del();
+
+    return res.json({success: true});
   } catch (err: any) {
     console.error('[deletePost] Error:', err);
-    res.status(500).json({ success: false, error: err.message });
-    return;
+    return res.status(500).json({success: false, error: err.message});
   }
-};
+}
+
+function isValidUuid(id: string): boolean {
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+}
 
 /**
  * PATCH /api/posts/:postId/reaction
- * body: { reactionEmoji: string }
+ * Body: { reactionEmoji }
  */
-export const addReaction = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { postId } = req.params;
-      const { reactionEmoji } = req.body;
-  
-      if (!postId || !reactionEmoji) {
-        res.status(400).json({
-          success: false,
-          error: 'Missing postId or reactionEmoji',
-        });
-        return; // Just return without the Response object
-      }
-  
-      // fetch the post
-      const post = await knex('posts').where({ id: postId }).first();
-      if (!post) {
-        res.status(404).json({ success: false, error: 'Post not found' });
-        return; // Just return without the Response object
-      }
-  
-      // Because the DB (JSONB) might already return an object:
-      // if it's string-based, you'd do type-checking, but let's assume it's an object:
-      let reactionsObj = post.reactions || {};
-  
-      // If needed, do a safe type check:
-      // if (typeof post.reactions === 'string') {
-      //   reactionsObj = JSON.parse(post.reactions);
-      // } else {
-      //   reactionsObj = post.reactions || {};
-      // }
-  
-      // increment the emoji
-      if (!reactionsObj[reactionEmoji]) {
-        reactionsObj[reactionEmoji] = 1;
-      } else {
-        reactionsObj[reactionEmoji] += 1;
-      }
-  
-      // sum up total
-      let totalReactions = 0;
-      Object.values(reactionsObj).forEach((val: any) => {
-        totalReactions += val;
+export const addReaction = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const {postId} = req.params;
+    const {reactionEmoji} = req.body;
+
+    if (!postId || !reactionEmoji) {
+      res.status(400).json({
+        success: false,
+        error: 'Missing postId or reactionEmoji',
       });
-  
-      // Update DB: if you used .jsonb('reactions'), you can store it directly
-      await knex('posts')
-        .where({ id: postId })
-        .update({
-          reactions: reactionsObj, // store the raw object if JSONB
-          reaction_count: totalReactions,
-        //   updated_at: new Date(),
-        });
-  
-      // return updated post
-      const updatedPost = {
-        ...post,
-        reactions: reactionsObj,
-        reaction_count: totalReactions,
-      };
-  
-      res.json({ success: true, data: updatedPost });
-      return; // Add explicit return here
-    } catch (error: any) {
-      console.error('[addReaction] Error:', error);
-      res.status(500).json({ success: false, error: error.message });
+      return;
     }
-  };
+
+    if (!isValidUuid(postId)) {
+      res.status(400).json({
+        success: false,
+        error:
+          'Invalid post id: reactions can only be added to persisted posts.',
+      });
+      return;
+    }
+
+    const post = await knex('posts').where({id: postId}).first();
+    if (!post) {
+      res.status(404).json({success: false, error: 'Post not found'});
+      return;
+    }
+
+    let reactionsObj = post.reactions || {};
+    if (typeof reactionsObj === 'string') {
+      reactionsObj = JSON.parse(reactionsObj);
+    }
+
+    if (!reactionsObj[reactionEmoji]) {
+      reactionsObj[reactionEmoji] = 1;
+    } else {
+      reactionsObj[reactionEmoji] += 1;
+    }
+
+    let totalReactions = 0;
+    Object.values(reactionsObj).forEach((val: any) => {
+      totalReactions += val;
+    });
+
+    await knex('posts').where({id: postId}).update({
+      reactions: reactionsObj,
+      reaction_count: totalReactions,
+    });
+
+    const updatedPost = {
+      ...post,
+      reactions: reactionsObj,
+      reaction_count: totalReactions,
+    };
+
+    res.json({success: true, data: updatedPost});
+    return;
+  } catch (error: any) {
+    console.error('[addReaction] Error:', error);
+    res.status(500).json({success: false, error: error.message});
+  }
+};
+
+/**
+ * POST /api/posts/retweet
+ * Body: { retweetOf, userId, sections?: ThreadSection[] }
+ */
+export async function createRetweet(req: Request, res: Response) {
+  try {
+    const {retweetOf, userId, sections = []} = req.body;
+    if (!retweetOf || !userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing retweetOf or userId',
+      });
+    }
+
+    const newId = uuidv4();
+    await knex('posts').insert({
+      id: newId,
+      parent_id: null,
+      user_id: userId,
+      sections: JSON.stringify(sections),
+      reaction_count: 0,
+      retweet_count: 0,
+      quote_count: 0,
+      retweet_of: retweetOf,
+    });
+
+    const original = await knex<DBPostRow>('posts')
+      .where({id: retweetOf})
+      .first();
+    if (original) {
+      await knex<DBPostRow>('posts')
+        .where({id: retweetOf})
+        .update({retweet_count: original.retweet_count + 1});
+    }
+
+    const row = await knex<DBPostRow>('posts')
+      .select(
+        'posts.*',
+        'users.username',
+        'users.handle',
+        'users.profile_picture_url',
+      )
+      .leftJoin('users', 'users.id', 'posts.user_id')
+      .where('posts.id', newId)
+      .first();
+
+    if (!row) {
+      return res.json({success: false, error: 'Failed to fetch retweet post'});
+    }
+
+    const mappedPost = mapPostRowToClientShape(row);
+    if (mappedPost && mappedPost.retweetOf) {
+      mappedPost.retweetOf = await fetchRetweetOf(mappedPost.retweetOf);
+    }
+
+    return res.json({success: true, data: mappedPost});
+  } catch (err: any) {
+    console.error('[createRetweet] Error:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Failed to retweet',
+    });
+  }
+}
+
+/**
+ * PATCH /api/posts/update
+ * Body: { postId, sections }
+ */
+export async function updatePost(req: Request, res: Response) {
+  try {
+    const {postId, sections} = req.body;
+    if (!postId || !sections) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing postId or sections',
+      });
+    }
+
+    await knex('posts')
+      .where({id: postId})
+      .update({sections: JSON.stringify(sections)});
+
+    const updatedRow = await knex<DBPostRow>('posts')
+      .select(
+        'posts.*',
+        'users.username',
+        'users.handle',
+        'users.profile_picture_url',
+      )
+      .leftJoin('users', 'users.id', 'posts.user_id')
+      .where('posts.id', postId)
+      .first();
+
+    if (!updatedRow) {
+      return res.json({success: false, error: 'Post not found after update'});
+    }
+    const mappedPost = mapPostRowToClientShape(updatedRow);
+
+    return res.json({success: true, data: mappedPost});
+  } catch (error: any) {
+    console.error('[updatePost] Error:', error);
+    return res.status(500).json({success: false, error: error.message});
+  }
+}

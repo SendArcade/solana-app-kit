@@ -1,16 +1,12 @@
 // File: src/components/thread/Thread.tsx
-import React, { useState } from 'react';
-import { View, Text, FlatList } from 'react-native';
+import React, {useState} from 'react';
+import {View, Text, FlatList} from 'react-native';
 import ThreadComposer from './ThreadComposer';
-import { createThreadStyles, getMergedTheme } from './thread.styles';
+import {createThreadStyles, getMergedTheme} from './thread.styles';
 import Icons from '../../assets/svgs';
 import { ThreadPost, ThreadUser, ThreadCTAButton } from './thread.types';
-import ThreadItem from './ThreadItem';
+import { ThreadItem } from './ThreadItem';
 
-/**
- * Props for the Thread component
- * @interface ThreadProps
- */
 interface ThreadProps {
   /** Array of root-level posts to display in the thread */
   rootPosts: ThreadPost[];
@@ -28,8 +24,8 @@ interface ThreadProps {
   ctaButtons?: ThreadCTAButton[];
   /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
-  styleOverrides?: { [key: string]: object };
-  userStyleSheet?: { [key: string]: object };
+  styleOverrides?: {[key: string]: object};
+  userStyleSheet?: {[key: string]: object};
   refreshing?: boolean;
   onRefresh?: () => void;
 }
@@ -72,21 +68,26 @@ export default function Thread({
   const [localRefreshing, setLocalRefreshing] = useState(false);
 
   const mergedTheme = getMergedTheme(themeOverrides);
-  const styles = createThreadStyles(mergedTheme, styleOverrides, userStyleSheet);
+  const styles = createThreadStyles(
+    mergedTheme,
+    styleOverrides,
+    userStyleSheet,
+  );
 
   // Local onRefresh if external prop is not provided
   const localOnRefresh = () => {
     setLocalRefreshing(true);
-    // Simulate a refresh delay; in production, your parent component will re-fetch
     setTimeout(() => {
       setLocalRefreshing(false);
     }, 800);
   };
 
-  const finalRefreshing = externalRefreshing !== undefined ? externalRefreshing : localRefreshing;
-  const finalOnRefresh = externalOnRefresh !== undefined ? externalOnRefresh : localOnRefresh;
+  const finalRefreshing =
+    externalRefreshing !== undefined ? externalRefreshing : localRefreshing;
+  const finalOnRefresh =
+    externalOnRefresh !== undefined ? externalOnRefresh : localOnRefresh;
 
-  const renderItem = ({ item }: { item: ThreadPost }) => (
+  const renderItem = ({item}: {item: ThreadPost}) => (
     <ThreadItem
       post={item}
       currentUser={currentUser}
@@ -96,6 +97,8 @@ export default function Thread({
       userStyleSheet={userStyleSheet}
       onPressPost={onPressPost}
       ctaButtons={ctaButtons}
+      // PASS the new callback down
+      onPressUser={onPressUser}
     />
   );
 
@@ -120,14 +123,14 @@ export default function Thread({
 
       <FlatList
         data={rootPosts}
-        keyExtractor={(post) => post.id}
+        keyExtractor={post => post.id}
         renderItem={renderItem}
         contentContainerStyle={styles.threadListContainer}
         refreshing={finalRefreshing}
         onRefresh={finalOnRefresh}
         ListEmptyComponent={
-          <View style={{ alignItems: 'center', marginTop: 24 }}>
-            <Text style={{ color: '#666' }}>No posts yet.</Text>
+          <View style={{alignItems: 'center', marginTop: 24}}>
+            <Text style={{color: '#666'}}>No posts yet.</Text>
           </View>
         }
       />
