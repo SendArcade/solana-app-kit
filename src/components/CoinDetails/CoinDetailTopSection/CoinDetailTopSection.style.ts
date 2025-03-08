@@ -1,3 +1,4 @@
+// File: src/components/CoinDetails/CoinDetailTopSection/CoinDetailTopSection.style.ts
 import {StyleSheet} from 'react-native';
 
 export const defaultTopSectionStyles = StyleSheet.create({
@@ -29,6 +30,9 @@ export const defaultTopSectionStyles = StyleSheet.create({
   },
   priceContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    minHeight: 80, // ensure enough space for the spinner overlay
   },
   mainPrice: {
     fontSize: 32,
@@ -155,8 +159,27 @@ export const defaultTopSectionStyles = StyleSheet.create({
   tweetSection: {
     marginTop: 16,
   },
-
-  // Modal
+  marketStatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  marketStatItem: {
+    alignItems: 'center',
+  },
+  marketStatLabel: {
+    fontSize: 12,
+    color: '#999999',
+    marginBottom: 4,
+  },
+  marketStatValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  // Modal styles below...
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -287,5 +310,12 @@ export const defaultTopSectionStyles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // New loading overlay style to prevent flicker
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

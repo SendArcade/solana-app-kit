@@ -89,7 +89,7 @@ const LineGraph: React.FC<LineGraphProps> = ({ data, width }) => {
               key={index}
               cx={x}
               cy={y}
-              r={8}
+              r={6}
               stroke="#318EF8"
               strokeWidth={4}
               fill="white"
@@ -103,7 +103,7 @@ const LineGraph: React.FC<LineGraphProps> = ({ data, width }) => {
         marginVertical: 8,
         borderRadius: 16,
         paddingRight: 4,
-        paddingLeft: 6
+        paddingLeft: 8
       }}
     />
   );

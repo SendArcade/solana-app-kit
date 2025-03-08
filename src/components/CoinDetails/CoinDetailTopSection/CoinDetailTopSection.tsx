@@ -1,3 +1,4 @@
+// File: src/components/CoinDetails/CoinDetailTopSection/CoinDetailTopSection.tsx
 import React, {useState} from 'react';
 import {
   View,
@@ -9,24 +10,32 @@ import {
   Dimensions,
   ViewStyle,
   StyleProp,
+  ActivityIndicator,
 } from 'react-native';
 import {FlatList} from 'react-native-gesture-handler';
 import Icons from '../../../assets/svgs/index';
 import {defaultTopSectionStyles} from './CoinDetailTopSection.style';
 import SuggestionsCard from '../suggestionsCard/suggestionsCard';
-import { DEFAULT_IMAGES } from '../../../config/constants';
 import Tweet from '../tweet/tweet';
 import LineGraph from './LineGraph';
+import {Timeframe, useCoinGeckoData} from '../../../hooks/useCoinGeckoData';
+import {
+  formatAmount,
+  formatLiquidityAsPercentage,
+} from '../../../utils/common/format';
+import {CoinDetailSearchBar} from '../CoinDetailSearchBar/CoinDetailSearchBar';
 
-type Timeframe = '1H' | '1D' | '1W' | '1M' | 'All';
-
+/**
+ * Props for custom styling
+ */
 export interface CoinDetailTopSectionCustomStyles {
   container?: StyleProp<ViewStyle>;
-  // Additional style overrides can be added here
 }
 
+/**
+ * Props for the component
+ */
 interface CoinDetailTopSectionProps {
-  graphData: Record<Timeframe, number[]>;
   tweetData: Array<{
     username: string;
     handle: string;
@@ -37,87 +46,168 @@ interface CoinDetailTopSectionProps {
     reactionCount: number;
     avatar: any;
   }>;
-  currentPrice?: string;
   customStyles?: CoinDetailTopSectionCustomStyles;
 }
 
 /**
- * This component displays the "Top" tab of the Coin Detail page,
- * including price info, a line graph, sample tweet data, and
- * a modal with expanded info.
+ * Main component for coin details top section.
+ * Now includes a search bar that lets users pick a coin from CoinGecko's list.
+ * Once a coin is selected, the entire area updates to show that coin's data.
  */
 export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
-  graphData,
   tweetData,
-  currentPrice = '$0.129585',
   customStyles = {},
 }) => {
-  // Change initial state from false to true to show the modal on page load
-  const [modalVisible, setModalVisible] = useState(true);
-  const [selectedTimeframe, setSelectedTimeframe] = useState<Timeframe>('1D');
+  // State for the selected coin ID
+  // Default to "bitcoin" as a fallback
+  const [selectedCoinId, setSelectedCoinId] = useState<string>('bitcoin');
 
-  const cardData = Array(10).fill({});
+  // Use the coin gecko data for the selected coin
+  const {
+    timeframe,
+    setTimeframe,
+    graphData,
+    timeframePrice,
+    timeframeChangeUsd,
+    timeframeChangePercent,
+    marketCap,
+    liquidityScore,
+    fdv,
+    loadingOHLC,
+    error,
+    coinName,
+    coinImage,
+  } = useCoinGeckoData(selectedCoinId);
+
+  // For the modal
+  const [modalVisible, setModalVisible] = useState(false);
+
   const styles = defaultTopSectionStyles;
+
+  // Example for “recently bought” suggestions
+  const cardData = Array(10).fill({});
 
   const renderCard = () => <SuggestionsCard />;
 
+  // Timeframe selection
+  const handleTimeframeChange = (tf: Timeframe) => {
+    setTimeframe(tf);
+  };
+
+  // Format the timeframe-based price
+  const displayedPrice = `$${timeframePrice.toFixed(6)}`;
+
+  // Format the absolute change (timeframeChangeUsd)
+  let absChangeStr =
+    timeframeChangeUsd >= 0
+      ? `+$${timeframeChangeUsd.toFixed(6)}`
+      : `-$${Math.abs(timeframeChangeUsd).toFixed(6)}`;
+
+  // Format the % change
+  let pctChangeStr =
+    timeframeChangePercent >= 0
+      ? `+${timeframeChangePercent.toFixed(2)}%`
+      : `-${Math.abs(timeframeChangePercent).toFixed(2)}%`;
+
   return (
     <View style={[styles.container, customStyles.container]}>
+      {/* Coin Search Bar */}
+      {/* <View style={{width: '90%', alignSelf: 'center', paddingTop: 16}}> */}
+        <CoinDetailSearchBar
+          onSelectCoinId={(coinId: string) => setSelectedCoinId(coinId)}
+        />
+      {/* </View> */}
+
+      {/* If there's an error fetching data for the selected coin, show it. */}
+      {error && (
+        <Text style={{color: 'red', paddingHorizontal: 16}}>
+          Error: {error}
+        </Text>
+      )}
+
       <ScrollView>
-        {/* Content */}
         <View style={styles.content}>
+          {/* Coin Basic Info (uses coin image and name from API) */}
           <View style={styles.coin}>
-            <Image source={DEFAULT_IMAGES.SENDlogo} style={styles.avatar} />
-            <Text style={styles.coinText}>$SEND</Text>
+            {coinImage ? (
+              <Image source={{uri: coinImage}} style={styles.avatar} />
+            ) : null}
+            <Text style={styles.coinText}>
+              {coinName || 'Select a coin to load...'}
+            </Text>
           </View>
 
+          {/* Price Section with overlay spinner for OHLC loading */}
           <View style={styles.priceContainer}>
-            <Text style={styles.mainPrice}>{currentPrice}</Text>
+            <Text style={styles.mainPrice}>{displayedPrice}</Text>
             <View style={styles.statsContainer}>
-              <Text style={styles.statsText}>+$0.021113</Text>
-              <Text style={styles.statsTextPercentage}>+477%</Text>
+              <Text style={styles.statsText}>{absChangeStr}</Text>
+              <Text style={styles.statsTextPercentage}>{pctChangeStr}</Text>
             </View>
+            {loadingOHLC && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="large" color="#318EF8" />
+              </View>
+            )}
           </View>
 
-          {/* Graph */}
+          {/* Graph Section */}
           <View style={styles.graphSection}>
-            <LineGraph data={graphData[selectedTimeframe]} />
+            <LineGraph data={graphData} />
             <View style={styles.timeframeButtons}>
-              {(['1H', '1D', '1W', '1M', 'All'] as const).map(timeframe => (
+              {(['1H', '1D', '1W', '1M', 'All'] as const).map(tf => (
                 <TouchableOpacity
-                  key={timeframe}
+                  key={tf}
                   style={[
                     styles.timeButton,
-                    selectedTimeframe === timeframe && styles.activeTimeButton,
+                    timeframe === tf && styles.activeTimeButton,
                   ]}
-                  onPress={() => setSelectedTimeframe(timeframe)}>
+                  onPress={() => handleTimeframeChange(tf)}>
                   <Text
                     style={[
                       styles.timeButtonText,
-                      selectedTimeframe === timeframe &&
-                        styles.activeTimeButtonText,
+                      timeframe === tf && styles.activeTimeButtonText,
                     ]}>
-                    {timeframe}
+                    {tf}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
-          {/* Buttons */}
+          {/* Market Stats (always rendered once loaded) */}
+          <View style={styles.marketStatsContainer}>
+            <View style={styles.marketStatItem}>
+              <Text style={styles.marketStatLabel}>Market Cap</Text>
+              <Text style={styles.marketStatValue}>
+                {formatAmount(marketCap)}
+              </Text>
+            </View>
+            <View style={styles.marketStatItem}>
+              <Text style={styles.marketStatLabel}>Liquidity</Text>
+              <Text style={styles.marketStatValue}>
+                {formatLiquidityAsPercentage(liquidityScore)}
+              </Text>
+            </View>
+            <View style={styles.marketStatItem}>
+              <Text style={styles.marketStatLabel}>FDV</Text>
+              <Text style={styles.marketStatValue}>{formatAmount(fdv)}</Text>
+            </View>
+          </View>
+
+          {/* Swap / Send Buttons */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity style={styles.swapButton}>
               <Icons.SwapIcon width={24} height={24} />
               <Text style={styles.swapButtonText}>Swap</Text>
             </TouchableOpacity>
-
             <TouchableOpacity style={styles.sendButton}>
-              <Icons.Arrow width={24} height={24} fill="white" />
+              <Icons.Arrow width={24} height={24} fill="transparent" />
               <Text style={styles.sendButtonText}>Send</Text>
             </TouchableOpacity>
           </View>
 
-          {/* About Section */}
+          {/* About */}
           <View>
             <View style={styles.holdersHeader}>
               <Icons.infoIcon />
@@ -125,7 +215,9 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
             </View>
             <View style={styles.descriptionContainer}>
               <Text style={styles.descriptionText}>
-                An Ecosystem token empowering the builders of Solana
+                {coinName
+                  ? `About ${coinName} - This is an example placeholder text.`
+                  : 'Search and select a coin to see more info.'}
               </Text>
               <TouchableOpacity style={styles.showMoreButton}>
                 <Text style={styles.showMoreText}>Show more</Text>
@@ -134,12 +226,12 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
             </View>
           </View>
 
-          {/* People who bought SEND */}
+          {/* People who recently bought coin (example data) */}
           <View style={styles.content}>
             <View style={styles.holdersHeader}>
               <Icons.infoIcon width={24} height={24} />
               <Text style={styles.holdersTitle}>
-                People who recently bought SEND
+                People who recently bought {coinName || '...'}
               </Text>
             </View>
           </View>
@@ -162,7 +254,7 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
         </View>
       </ScrollView>
 
-      {/* Modal */}
+      {/* Modal for expanded view */}
       <Modal
         animationType="slide"
         transparent
@@ -176,42 +268,45 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
             activeOpacity={1}
             onPress={e => e.stopPropagation()}
             style={styles.modalContainer}>
-            {/* Modal Header */}
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
-                <Image
-                  source={DEFAULT_IMAGES.SENDlogo}
-                  style={styles.modalAvatar}
-                />
+                {coinImage ? (
+                  <Image source={{uri: coinImage}} style={styles.modalAvatar} />
+                ) : null}
                 <View style={styles.modalHeaderTexts}>
-                  <Text style={styles.modalTitle}>$SEND</Text>
-                  <Text style={styles.modalSubtitle}>{currentPrice}</Text>
+                  <Text style={styles.modalTitle}>
+                    {coinName || 'Loading...'}
+                  </Text>
+                  <Text style={styles.modalSubtitle}>{displayedPrice}</Text>
                 </View>
               </View>
               <View style={styles.modalHeaderRight}>
                 <View style={styles.modalPriceInfo}>
-                  <Text style={styles.modalPriceLabel}>24h Price</Text>
-                  <Text style={styles.modalPriceChange}>+477%</Text>
+                  <Text style={styles.modalPriceLabel}>
+                    {`${timeframe} Price`}
+                  </Text>
+                  <Text style={styles.modalPriceChange}>{pctChangeStr}</Text>
                 </View>
               </View>
             </View>
 
-            {/* Graph in Modal */}
+            {/* Chart in Modal */}
             <LineGraph
-              data={graphData[selectedTimeframe]}
+              data={graphData}
               width={Dimensions.get('window').width - 72}
             />
 
-            {/* Modal Buttons */}
             <View style={styles.modalButtonsStack}>
               <TouchableOpacity style={styles.modalTopButton}>
                 <View style={styles.modalTopButtonContent}>
                   <Text style={styles.modalTopButtonText}>Held by</Text>
                   <View style={styles.modalAvatarStack}>
-                    <Image
-                      source={DEFAULT_IMAGES.SENDlogo}
-                      style={styles.modalStackAvatar1}
-                    />
+                    {coinImage ? (
+                      <Image
+                        source={{uri: coinImage}}
+                        style={styles.modalStackAvatar1}
+                      />
+                    ) : null}
                     <Image
                       source={require('../../../assets/images/thread-avatar-1.png')}
                       style={styles.modalStackAvatar2}
@@ -226,7 +321,9 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.modalBottomButton}>
-                <Text style={styles.modalBottomButtonText}>Get $SEND</Text>
+                <Text style={styles.modalBottomButtonText}>
+                  Get {coinName || '$COIN'}
+                </Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
