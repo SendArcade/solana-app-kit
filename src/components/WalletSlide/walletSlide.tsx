@@ -1,7 +1,7 @@
 import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { View, FlatList } from "react-native";
-import TopNavigation from "../topNavigation/topNavigation";
+import {TopNavigation} from "../topNavigation/topNavigation";
 import PortfolioBalance from "./portfolioBalance/portfolioBalance";
 import SearchBar from "./searchBar/searchBar";
 import PortfolioItem from "./portfolioItem/portfolioItem";
