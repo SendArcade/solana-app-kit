@@ -9,7 +9,7 @@ import AnimatedTabIcon from './AnimatedTabIcon';
 import FeedScreen from '../screens/SampleUI/Threads/FeedScreen/FeedScreen';
 import NotificationsScreen from '../screens/SampleUI/Threads/NotificationsScreen';
 import ProfileScreen from '../screens/SampleUI/Threads/ProfileScreen/ProfileScreen';
-import ModuleScreen from '../screens/Common/Modules/Modules';
+import ModuleScreen from '../screens/Common/ModulesScreen/Modules';
 
 const Tab = createBottomTabNavigator();
 
