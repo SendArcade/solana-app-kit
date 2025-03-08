@@ -60,7 +60,7 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
 }) => {
   // State for the selected coin ID
   // Default to "bitcoin" as a fallback
-  const [selectedCoinId, setSelectedCoinId] = useState<string>('bitcoin');
+  const [selectedCoinId, setSelectedCoinId] = useState<string>('send-2');
 
   // Use the coin gecko data for the selected coin
   const {
@@ -113,9 +113,9 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
     <View style={[styles.container, customStyles.container]}>
       {/* Coin Search Bar */}
       {/* <View style={{width: '90%', alignSelf: 'center', paddingTop: 16}}> */}
-        <CoinDetailSearchBar
-          onSelectCoinId={(coinId: string) => setSelectedCoinId(coinId)}
-        />
+      <CoinDetailSearchBar
+        onSelectCoinId={(coinId: string) => setSelectedCoinId(coinId)}
+      />
       {/* </View> */}
 
       {/* If there's an error fetching data for the selected coin, show it. */}
@@ -136,13 +136,25 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
               {coinName || 'Select a coin to load...'}
             </Text>
           </View>
-
-          {/* Price Section with overlay spinner for OHLC loading */}
           <View style={styles.priceContainer}>
             <Text style={styles.mainPrice}>{displayedPrice}</Text>
             <View style={styles.statsContainer}>
-              <Text style={styles.statsText}>{absChangeStr}</Text>
-              <Text style={styles.statsTextPercentage}>{pctChangeStr}</Text>
+              <Text
+                style={
+                  timeframeChangeUsd >= 0
+                    ? styles.statsTextPositive
+                    : styles.statsTextNegative
+                }>
+                {absChangeStr}
+              </Text>
+              <Text
+                style={
+                  timeframeChangePercent >= 0
+                    ? styles.statsTextPercentagePositive
+                    : styles.statsTextPercentageNegative
+                }>
+                {pctChangeStr}
+              </Text>
             </View>
             {loadingOHLC && (
               <View style={styles.loadingOverlay}>
@@ -150,7 +162,6 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
               </View>
             )}
           </View>
-
           {/* Graph Section */}
           <View style={styles.graphSection}>
             <LineGraph data={graphData} />
@@ -174,7 +185,6 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
               ))}
             </View>
           </View>
-
           {/* Market Stats (always rendered once loaded) */}
           <View style={styles.marketStatsContainer}>
             <View style={styles.marketStatItem}>
@@ -194,7 +204,6 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
               <Text style={styles.marketStatValue}>{formatAmount(fdv)}</Text>
             </View>
           </View>
-
           {/* Swap / Send Buttons */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity style={styles.swapButton}>
@@ -206,7 +215,6 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
               <Text style={styles.sendButtonText}>Send</Text>
             </TouchableOpacity>
           </View>
-
           {/* About */}
           <View>
             <View style={styles.holdersHeader}>
@@ -225,7 +233,6 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
               </TouchableOpacity>
             </View>
           </View>
-
           {/* People who recently bought coin (example data) */}
           <View style={styles.content}>
             <View style={styles.holdersHeader}>
@@ -244,9 +251,7 @@ export const CoinDetailTopSection: React.FC<CoinDetailTopSectionProps> = ({
               contentContainerStyle={styles.cardList}
             />
           </View>
-
           <View style={styles.borderLine} />
-
           {/* Tweets */}
           <View style={styles.tweetSection}>
             <Tweet data={tweetData} />

@@ -45,19 +45,34 @@ export const defaultTopSectionStyles = StyleSheet.create({
     gap: 6,
     alignItems: 'center',
   },
-  statsText: {
-    color: '#32D4DE',
+  // Add these new styles to the defaultTopSectionStyles object
+  statsTextPositive: {
+    color: '#00C853', // Green color for positive change
     fontSize: 16,
     fontWeight: '600',
   },
-  statsTextPercentage: {
-    color: '#32D4DE',
+  statsTextNegative: {
+    color: '#FF3B30', // Red color for negative change
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  statsTextPercentagePositive: {
+    color: '#00C853', // Green color for positive percentages
     fontSize: 16,
     fontWeight: '600',
     padding: 4,
-    backgroundColor: '#D6FDFF',
+    backgroundColor: '#E8F5E9', // Light green background
     borderRadius: 6,
   },
+  statsTextPercentageNegative: {
+    color: '#FF3B30', // Red color for negative percentages
+    fontSize: 16,
+    fontWeight: '600',
+    padding: 4,
+    backgroundColor: '#FFEBEE', // Light red background
+    borderRadius: 6,
+  },
+
   graphSection: {
     marginTop: 18,
   },

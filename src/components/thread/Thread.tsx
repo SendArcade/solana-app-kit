@@ -4,8 +4,8 @@ import {View, Text, FlatList} from 'react-native';
 import ThreadComposer from './ThreadComposer';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
 import Icons from '../../assets/svgs';
-import { ThreadPost, ThreadUser, ThreadCTAButton } from './thread.types';
-import { ThreadItem } from './ThreadItem';
+import {ThreadPost, ThreadUser, ThreadCTAButton} from './thread.types';
+import {ThreadItem} from './ThreadItem';
 
 interface ThreadProps {
   /** Array of root-level posts to display in the thread */
@@ -28,29 +28,14 @@ interface ThreadProps {
   userStyleSheet?: {[key: string]: object};
   refreshing?: boolean;
   onRefresh?: () => void;
+
+  /**
+   * NEW: Callback fired when the user’s avatar/username is pressed
+   */
+  onPressUser?: (user: ThreadUser) => void;
 }
 
-/**
- * Thread component that displays a list of posts with nested replies
- * 
- * @component
- * @description
- * The Thread component is a core component that renders a list of posts in a threaded
- * discussion format. It supports nested replies, post composition, and customizable
- * styling through themes and style overrides.
- * 
- * @example
- * ```tsx
- * <Thread
- *   rootPosts={posts}
- *   currentUser={user}
- *   showHeader={true}
- *   onPostCreated={() => refetchPosts()}
- *   onPressPost={(post) => handlePostPress(post)}
- * />
- * ```
- */
-export default function Thread({
+export const Thread: React.FC<ThreadProps> = ({
   rootPosts,
   currentUser,
   showHeader = true,
@@ -63,7 +48,9 @@ export default function Thread({
   userStyleSheet,
   refreshing: externalRefreshing,
   onRefresh: externalOnRefresh,
-}: ThreadProps) {
+
+  onPressUser, // new prop
+}) => {
   // Local fallback for refreshing if not provided via props
   const [localRefreshing, setLocalRefreshing] = useState(false);
 
