@@ -14,13 +14,13 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import {ThreadUser, ThreadSection} from './thread.types';
+import {ThreadUser, ThreadSection} from '../thread.types';
 import {
   createRetweetAsync,
   addRetweetLocally,
-} from '../../state/thread/reducer';
-import {useAppDispatch} from '../../hooks/useReduxHooks';
-import {useAuth} from '../../hooks/useAuth';
+} from '../../../state/thread/reducer';
+import {useAppDispatch} from '../../../hooks/useReduxHooks';
+import {useAuth} from '../../../hooks/useAuth';
 import retweetModalStyles from './RetweetModal.styles';
 import {nanoid} from '@reduxjs/toolkit';
 

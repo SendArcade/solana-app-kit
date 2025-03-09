@@ -11,10 +11,10 @@ import {
   ImageSourcePropType,
   StyleSheet,
 } from 'react-native';
-import Icons from '../../assets/svgs';
-import {createThreadStyles, getMergedTheme} from './thread.styles';
-import {ThreadPost, ThreadUser} from './thread.types';
-import {DEFAULT_IMAGES} from '../../config/constants';
+import Icons from '../../../assets/svgs';
+import {createThreadStyles, getMergedTheme} from '../thread.styles';
+import {ThreadPost, ThreadUser} from '../thread.types';
+import {DEFAULT_IMAGES} from '../../../config/constants';
 
 interface PostHeaderProps {
   /** The post data to display in the header */

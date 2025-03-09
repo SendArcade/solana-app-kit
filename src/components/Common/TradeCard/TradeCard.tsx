@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import {createThreadStyles, getMergedTheme} from '../thread/thread.styles';
-import Icon from '../../assets/svgs/index';
+import {createThreadStyles, getMergedTheme} from '../../thread/thread.styles';
+import Icon from '../../../assets/svgs/index';
 
 interface FetchedTokenData {
   avatar: string;

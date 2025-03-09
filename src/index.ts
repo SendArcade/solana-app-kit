@@ -16,7 +16,7 @@ export {useAppSelector, useAppDispatch} from './hooks/useReduxHooks';
 
 // Export Components
 export * from './components/thread';
-export * from './components/TradeCard';
+export * from './components/Common/TradeCard';
 
 // Export transaction utilities (if needed)
 export {sendPriorityTransaction} from './utils/transactions/sendPriorityTx';

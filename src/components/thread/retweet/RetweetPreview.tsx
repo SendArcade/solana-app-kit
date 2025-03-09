@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { ThreadPost } from './thread.types';
-import PostBody from './PostBody';
-import { createThreadStyles, getMergedTheme } from './thread.styles';
+import { ThreadPost } from '../thread.types';
+import PostBody from '../post/PostBody';
+import { createThreadStyles, getMergedTheme } from '../thread.styles';
 
 
 const localStyles = StyleSheet.create({

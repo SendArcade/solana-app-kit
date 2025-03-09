@@ -10,17 +10,17 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import type {ThreadPost} from './thread.types';
-import {createThreadStyles, getMergedTheme} from './thread.styles';
+import type {ThreadPost} from '../thread.types';
+import {createThreadStyles, getMergedTheme} from '../thread.styles';
 import {useSelector} from 'react-redux';
-import {RootState} from '../../state/store';
+import {RootState} from '../../../state/store';
 import {Cluster, clusterApiUrl, Connection, Transaction, VersionedTransaction} from '@solana/web3.js';
 import {Buffer} from 'buffer';
 import {TENSOR_API_KEY, HELIUS_RPC_URL, CLUSTER} from '@env';
-import {useAuth} from '../../hooks/useAuth';
-import TradeModal from './TradeModal';
-import {useAppSelector} from '../../hooks/useReduxHooks';
-import { DEFAULT_IMAGES, ENDPOINTS } from '../../config/constants';
+import {useAuth} from '../../../hooks/useAuth';
+import TradeModal from '../trade/TradeModal';
+import {useAppSelector} from '../../../hooks/useReduxHooks';
+import { DEFAULT_IMAGES, ENDPOINTS } from '../../../config/constants';
 
 /**
  * Determines the type of CTA to display based on the post's sections

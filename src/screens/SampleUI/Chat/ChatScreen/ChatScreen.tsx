@@ -17,9 +17,9 @@ import { createRetweetAsync } from '../../../../state/thread/reducer';
 import { RootState } from '../../../../state/store';
 import { ThreadPost, ThreadUser } from '../../../../components/thread/thread.types';
 import { PostBody, ThreadComposer } from '../../../../components/thread';
-import PostCTA from '../../../../components/thread/PostCTA';
-import RetweetPreview from '../../../../components/thread/RetweetPreview';
-import RetweetModal from '../../../../components/thread/RetweetModal';
+import PostCTA from '../../../../components/thread/post/PostCTA';
+import RetweetPreview from '../../../../components/thread/retweet/RetweetPreview';
+import RetweetModal from '../../../../components/thread/retweet/RetweetModal';
 import { styles, androidStyles, chatBodyOverrides } from './ChatScreen.styles';
 import { DEFAULT_IMAGES } from '../../../../config/constants';
 

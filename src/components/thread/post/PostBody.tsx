@@ -1,13 +1,13 @@
 import React from 'react';
 import {View} from 'react-native';
-import {createThreadStyles, getMergedTheme} from './thread.styles';
-import {ThreadPost} from './thread.types';
-import SectionTextOnly from './sections/SectionTextOnly';
-import SectionTextImage from './sections/SectionTextImage';
-import SectionTextVideo from './sections/SectionTextVideo';
-import SectionPoll from './sections/SectionPoll';
-import SectionTrade from './sections/SectionTrade';
-import SectionNftListing from './sections/SectionNftListing';
+import {createThreadStyles, getMergedTheme} from '../thread.styles';
+import {ThreadPost} from '../thread.types';
+import SectionTextOnly from '../sections/SectionTextOnly';
+import SectionTextImage from '../sections/SectionTextImage';
+import SectionTextVideo from '../sections/SectionTextVideo';
+import SectionPoll from '../sections/SectionPoll';
+import SectionTrade from '../sections/SectionTrade';
+import SectionNftListing from '../sections/SectionNftListing';
 
 /**
  * Props for the PostBody component
