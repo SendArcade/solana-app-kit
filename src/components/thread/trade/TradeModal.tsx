@@ -13,9 +13,6 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
-import {useAuth} from '../../hooks/useAuth';
-import {useAppDispatch} from '../../hooks/useReduxHooks';
-import {addPostLocally, createRootPostAsync} from '../../state/thread/reducer';
 import {
   Transaction,
   VersionedTransaction,
@@ -24,10 +21,13 @@ import {
   Cluster,
 } from '@solana/web3.js';
 import {TENSOR_API_KEY, HELIUS_RPC_URL, CLUSTER} from '@env';
-import {ThreadPost, ThreadSection, ThreadUser, TradeData} from './thread.types';
+import {ThreadPost, ThreadSection, ThreadUser, TradeData} from '../thread.types';
 import styles from './tradeModal.style'; // Keep using your existing style definitions for everything else
 import SelectTokenModal, {TokenInfo} from './SelectTokenModal';
-import {ENDPOINTS} from '../../config/constants';
+import {ENDPOINTS} from '../../../config/constants';
+import { useAppDispatch } from '../../../hooks/useReduxHooks';
+import { useAuth } from '../../../hooks/useAuth';
+import { addPostLocally, createRootPostAsync } from '../../../state/thread/reducer';
 
 const JUPITER_SWAP_ENDPOINT = ENDPOINTS.jupiter.swap;
 

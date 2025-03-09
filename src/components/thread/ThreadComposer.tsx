@@ -26,7 +26,7 @@ import {
 } from 'react-native-image-picker';
 import {TENSOR_API_KEY} from '@env';
 import {useAuth} from '../../hooks/useAuth';
-import TradeModal from './TradeModal';
+import TradeModal from './/trade/TradeModal';
 import {DEFAULT_IMAGES} from '../../config/constants';
 import {NftItem, useFetchNFTs} from '../../hooks/useFetchNFTs';
 

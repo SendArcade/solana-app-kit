@@ -10,12 +10,13 @@ import {
   TouchableWithoutFeedback,
   Alert,
 } from 'react-native';
-import Icons from '../../assets/svgs';
-import {createThreadStyles, getMergedTheme} from './thread.styles';
-import {ThreadPost, ThreadUser} from './thread.types';
-import {useAppDispatch, useAppSelector} from '../../hooks/useReduxHooks';
-import {addReactionAsync} from '../../state/thread/reducer';
-import RetweetModal from './RetweetModal';
+import Icons from '../../../assets/svgs';
+import {createThreadStyles, getMergedTheme} from '../thread.styles';
+import {ThreadPost, ThreadUser} from '../thread.types';
+import {useAppDispatch, useAppSelector} from '../../../hooks/useReduxHooks';
+import {addReactionAsync} from '../../../state/thread/reducer';
+import RetweetModal from '../retweet/RetweetModal';
+import { DEFAULT_IMAGES } from '../../../config/constants';
 
 interface PostFooterProps {
   post: ThreadPost;
@@ -51,7 +52,7 @@ export default function PostFooter({
     verified: false,
     avatar: profilePicUrl
       ? {uri: profilePicUrl}
-      : require('../../assets/images/User.png'),
+      : DEFAULT_IMAGES.user,
   };
 
   const dispatch = useAppDispatch();

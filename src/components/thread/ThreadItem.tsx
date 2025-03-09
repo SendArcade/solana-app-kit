@@ -3,11 +3,11 @@
 import React, {useState} from 'react';
 import {View, Alert, TouchableOpacity} from 'react-native';
 import ThreadAncestors from './ThreadAncestors';
-import PostHeader from './PostHeader';
-import PostBody from './PostBody';
-import PostFooter from './PostFooter';
-import PostCTA from './PostCTA';
-import RetweetPreview from './RetweetPreview';
+import PostHeader from './post/PostHeader';
+import PostBody from './post/PostBody';
+import PostFooter from './post/PostFooter';
+import PostCTA from './post/PostCTA';
+import RetweetPreview from './retweet/RetweetPreview';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
 import {ThreadCTAButton, ThreadPost, ThreadUser} from './thread.types';
 import {useAppDispatch} from '../../hooks/useReduxHooks';
