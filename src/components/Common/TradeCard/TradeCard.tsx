@@ -80,7 +80,7 @@ async function fetchTokenRealtimeData(mint: string): Promise<FetchedTokenData> {
       currentPriceUsd,
     };
   } catch (error) {
-    console.error('Error fetching token realtime data', error);
+    console.error('Error fetching token realtime data from trade card', error);
     return {
       avatar: 'https://example.com/default.png',
       name: 'Unknown Token',

@@ -1,4 +1,4 @@
-// File: src/components/otherProfile/ProfileInfo/profileInfo.style.ts
+// File: src/components/Profile/ProfileInfo/profileInfo.style.ts
 import {StyleSheet} from 'react-native';
 import COLORS from '../../../assets/colors';
 
@@ -39,35 +39,5 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.black,
-  },
-  followingStatsContainer: {
-    flexDirection: 'row',
-    gap: 4,
-    marginTop: 16,
-  },
-  imageContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    left: -4,
-  },
-  firstimage: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-  },
-  secondImage: {
-    marginLeft: -18,
-  },
-  textContainer: {
-    justifyContent: 'center',
-    width: 250,
-    marginLeft: 4,
-  },
-  text: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: COLORS.greyMid,
-    textAlign: 'left',
-    flexWrap: 'wrap',
   },
 });

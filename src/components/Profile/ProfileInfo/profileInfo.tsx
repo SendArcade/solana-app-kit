@@ -1,3 +1,4 @@
+// File: src/components/Profile/ProfileInfo/profileInfo.tsx
 import React from 'react';
 import {Image, View, Text, TouchableOpacity} from 'react-native';
 import {findMentioned} from '../../../utils/common/findMentioned';
@@ -14,23 +15,29 @@ interface ProfileInfoProps {
   username: string;
   /** The user’s wallet address */
   userWallet: string;
-  /** If this is the owner’s own profile, we hide or show certain items */
+  /** If it's the owner's own profile */
   isOwnProfile: boolean;
-  /** Called when user taps on the avatar (e.g., to pick a new avatar) */
+  /** Called when user taps the avatar */
   onAvatarPress?: () => void;
-  /** Called when user taps on “Edit Profile” */
+  /** Called when user taps “Edit Profile” */
   onEditProfile?: () => void;
-
-  /** Optionally override the displayed text in the “bio” example. */
+  /** An optional custom bio text */
   bioText?: string;
+  /** If I'm currently following this user */
+  amIFollowing?: boolean;
+  /** If they follow me */
+  areTheyFollowingMe?: boolean;
+  /** Called to follow/unfollow */
+  onFollowPress?: () => void;
+  onUnfollowPress?: () => void;
+  /** The real follower/following counts */
+  followersCount?: number;
+  followingCount?: number;
+  /** Tapping the “followers” or “following” count => open screen */
+  onPressFollowers?: () => void;
+  onPressFollowing?: () => void;
 }
 
-/**
- * ProfileInfo displays the top portion of a user's profile:
- * - Avatar + Name + Handle
- * - short bio, follower counts
- * - If not isOwnProfile, shows “Follows you,” buy card, perks card, add button
- */
 const ProfileInfo: React.FC<ProfileInfoProps> = ({
   profilePicUrl,
   username,
@@ -39,28 +46,36 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
   onAvatarPress,
   onEditProfile,
   bioText,
+  amIFollowing = false,
+  areTheyFollowingMe = false,
+  onFollowPress,
+  onUnfollowPress,
+  followersCount = 0,
+  followingCount = 0,
+  onPressFollowers,
+  onPressFollowing,
 }) => {
-  // Example placeholders
   const handleString = userWallet
     ? '@' + userWallet.slice(0, 6) + '...' + userWallet.slice(-4)
     : '@no_wallet';
-  // If the parent didn’t pass a custom bio, we default here:
+
   const sampleBio =
     bioText ||
     `Hey folks! I'm ${username} building on Solana. Mention @someone to highlight.`;
 
-  const canShowFollowsYou = !isOwnProfile;
+  const canShowFollowsYou = !isOwnProfile && areTheyFollowingMe;
   const canShowBuyPerks = !isOwnProfile;
   const canShowAddButton = !isOwnProfile;
 
   return (
     <View style={styles.profileInfo}>
-      {/* Top row with avatar & name */}
+      {/* Row with avatar & name */}
       <View style={{flexDirection: 'row', gap: 12, alignItems: 'center'}}>
         <TouchableOpacity
           style={styles.profImgContainer}
           onPress={onAvatarPress}
-          disabled={!isOwnProfile ? true : false}>
+          disabled={!isOwnProfile}
+        >
           <Image
             style={styles.profImg}
             source={
@@ -94,7 +109,8 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
                   fontWeight: '500',
                   textAlign: 'left',
                   color: '#999999',
-                }}>
+                }}
+              >
                 Follows you
               </Text>
             )}
@@ -107,20 +123,26 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
         <Text style={styles.bioSection}>{findMentioned(sampleBio)}</Text>
       </View>
 
-      {/* follower/following placeholders */}
+      {/* follower/following row */}
       <View style={{flexDirection: 'row', gap: 12, marginTop: 8}}>
-        <View style={{flexDirection: 'row', gap: 2}}>
-          <Text style={{fontSize: 12, fontWeight: '600'}}>98 </Text>
+        <TouchableOpacity style={{flexDirection: 'row', gap: 2}} onPress={onPressFollowers}>
+          <Text style={{fontSize: 12, fontWeight: '600'}}>
+            {followersCount}
+          </Text>
           <Text style={{fontSize: 12, fontWeight: '500', color: '#B7B7B7'}}>
             Followers
           </Text>
-        </View>
-        <View style={{flexDirection: 'row', gap: 2}}>
-          <Text style={{fontSize: 12, fontWeight: '600'}}>42 </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={{flexDirection: 'row', gap: 2}} onPress={onPressFollowing}>
+          <Text style={{fontSize: 12, fontWeight: '600'}}>
+            {followingCount}
+          </Text>
           <Text style={{fontSize: 12, fontWeight: '500', color: '#B7B7B7'}}>
             Following
           </Text>
-        </View>
+        </TouchableOpacity>
+
         <View style={{flexDirection: 'row', gap: 2}}>
           <ProfileIcons.PinLocation />
           <Text style={{fontSize: 12, fontWeight: '500', color: '#B7B7B7'}}>
@@ -129,35 +151,35 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
         </View>
       </View>
 
-      {/* Edit profile button: only relevant if isOwnProfile === true */}
+      {/* Edit profile button if it's my own profile */}
       {isOwnProfile && (
         <View style={{marginTop: 8}}>
-          <TouchableOpacity
-            style={styles.editProfileBtn}
-            onPress={onEditProfile}>
+          <TouchableOpacity style={styles.editProfileBtn} onPress={onEditProfile}>
             <Text style={styles.editProfileBtnText}>Edit Profile</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* buy card */}
+      {/* buy card, perks => only for other profile */}
       {canShowBuyPerks && (
         <View style={{marginTop: 12}}>
           <BuyCard />
         </View>
       )}
-
-      {/* perks card */}
       {canShowBuyPerks && (
         <View style={{marginTop: 12}}>
           <PerksCard />
         </View>
       )}
 
-      {/* “Follow Back” / “Send to wallet” buttons, etc */}
       {canShowAddButton && (
         <View style={{marginTop: 12}}>
-          <AddButton />
+          <AddButton
+            amIFollowing={amIFollowing}
+            areTheyFollowingMe={areTheyFollowingMe}
+            onPressFollow={onFollowPress || (() => {})}
+            onPressUnfollow={onUnfollowPress || (() => {})}
+          />
         </View>
       )}
     </View>
