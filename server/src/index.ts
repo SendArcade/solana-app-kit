@@ -13,7 +13,7 @@ import {
 } from './types/interfaces';
 import { PublicKey } from '@solana/web3.js';
 import { launchRouter } from './routes/pumpfunLaunch';
-import { buildCompressedNftListingTx } from './utils/compressedNftListing';
+// import { buildCompressedNftListingTx } from './utils/compressedNftListing';
 import { threadRouter } from './routes/threadRoutes';
 import knex from './db/knex';
 import jupiterSwapRouter from './routes/jupiterSwapRoutes';
@@ -369,20 +369,20 @@ app.get(
   },
 );
 
-app.post('/api/build-compressed-nft-listing-tx', async (req: any, res: any) => {
-  try {
-    const result = await buildCompressedNftListingTx(req.body);
-    return res.json(result);
-  } catch (err: any) {
-    console.error('Failed to build compressed NFT listing tx:', err);
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
+// app.post('/api/build-compressed-nft-listing-tx', async (req: any, res: any) => {
+//   try {
+//     const result = await buildCompressedNftListingTx(req.body);
+//     return res.json(result);
+//   } catch (err: any) {
+//     console.error('Failed to build compressed NFT listing tx:', err);
+//     return res.status(500).json({ success: false, error: err.message });
+//   }
+// });
 
 // Start the Express server.
 // Note: We now try connecting to the database and running migrations,
 // but if these fail we log the error and continue to start the server.
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 
 (async function startServer() {
