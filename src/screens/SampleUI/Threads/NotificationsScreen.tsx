@@ -1,7 +1,7 @@
 import React from 'react';
 import {View, Text, StyleSheet, SafeAreaView, Platform} from 'react-native';
-import OtherProfile from '../../../components/otherProfile/otherProfile';
-import SwipeTabs from '../../../components/slider/slider';
+import SwipeTabs from '../../../components/Profile/slider/slider';
+import Profile from '../../../components/Profile/profile';
 
 export default function NotificationsScreen() {
   return (
@@ -10,7 +10,6 @@ export default function NotificationsScreen() {
         styles.container,
         Platform.OS === 'android' && styles.androidContainer,
       ]}>
-      <OtherProfile />
 
       {/* <SwipeTabs/> */}
     </View>

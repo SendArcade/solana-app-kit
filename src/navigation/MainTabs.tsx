@@ -2,7 +2,6 @@ import React from 'react';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {Platform} from 'react-native';
 import HomeScreen from '../screens/SampleUI/Threads/HomeScreen';
-import SearchScreen from '../screens/Common/SearchScreen/SearchScreen';
 
 import Icons from '../assets/svgs';
 
@@ -10,6 +9,7 @@ import AnimatedTabIcon from './AnimatedTabIcon';
 import FeedScreen from '../screens/SampleUI/Threads/FeedScreen/FeedScreen';
 import NotificationsScreen from '../screens/SampleUI/Threads/NotificationsScreen';
 import ProfileScreen from '../screens/SampleUI/Threads/ProfileScreen/ProfileScreen';
+import ModuleScreen from '../screens/Common/ModulesScreen/Modules';
 
 const Tab = createBottomTabNavigator();
 
@@ -61,8 +61,8 @@ export default function MainTabs() {
         }}
       />
       <Tab.Screen
-        name="Search"
-        component={SearchScreen}
+        name="Modules"
+        component={ModuleScreen}
         options={{
           tabBarIcon: ({focused, size}) => (
             <AnimatedTabIcon

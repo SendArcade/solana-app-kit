@@ -1,67 +1,39 @@
+// FILE: src/components/thread/ThreadItem.tsx
+
 import React, {useState} from 'react';
 import {View, Alert, TouchableOpacity} from 'react-native';
 import ThreadAncestors from './ThreadAncestors';
-import PostHeader from './PostHeader';
-import PostBody from './PostBody';
-import PostFooter from './PostFooter';
-import PostCTA from './PostCTA';
-import ThreadComposer from './ThreadComposer';
+import PostHeader from './post/PostHeader';
+import PostBody from './post/PostBody';
+import PostFooter from './post/PostFooter';
+import PostCTA from './post/PostCTA';
+import RetweetPreview from './retweet/RetweetPreview';
 import {createThreadStyles, getMergedTheme} from './thread.styles';
 import {ThreadCTAButton, ThreadPost, ThreadUser} from './thread.types';
+import {useAppDispatch} from '../../hooks/useReduxHooks';
+import {deletePostAsync} from '../../state/thread/reducer';
+import ThreadEditModal from './ThreadEditModal';
+import ThreadComposer from './ThreadComposer';
 
-/**
- * Props for the ThreadItem component
- * @interface ThreadItemProps
- */
 interface ThreadItemProps {
-  /** The post data to display */
   post: ThreadPost;
-  /** Current user information */
   currentUser: ThreadUser;
-  /** Array of root-level posts in the thread */
   rootPosts: ThreadPost[];
-  /** Nesting depth of the current post */
   depth?: number;
-  /** Callback fired when a post is pressed */
   onPressPost?: (post: ThreadPost) => void;
-  /** Array of call-to-action buttons to display */
   ctaButtons?: ThreadCTAButton[];
-  /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
-  /** Style overrides for specific components */
   styleOverrides?: {[key: string]: object};
-  /** User-provided stylesheet overrides */
   userStyleSheet?: {[key: string]: object};
+  onPressUser?: (user: ThreadUser) => void;
+
+  /**
+   * NEW: If true, do not show sub-replies or the local composer in this item.
+   */
+  disableReplies?: boolean;
 }
 
-/**
- * A component that renders an individual post within a thread
- * 
- * @component
- * @description
- * ThreadItem displays a single post with its replies in a threaded discussion.
- * It handles post interactions like replying, deleting, and showing nested responses.
- * The component supports customizable styling and themes.
- * 
- * Features:
- * - Displays post content with author information
- * - Shows nested replies
- * - Handles post deletion
- * - Supports reply composition
- * - Customizable appearance through themes
- * 
- * @example
- * ```tsx
- * <ThreadItem
- *   post={postData}
- *   currentUser={user}
- *   rootPosts={allPosts}
- *   depth={0}
- *   onPressPost={handlePostPress}
- * />
- * ```
- */
-export default function ThreadItem ({
+export const ThreadItem: React.FC<ThreadItemProps> = ({
   post,
   currentUser,
   rootPosts,
@@ -71,8 +43,13 @@ export default function ThreadItem ({
   themeOverrides,
   styleOverrides,
   userStyleSheet,
-}: ThreadItemProps) {
-  const [showReplyComposer, setShowReplyComposer] = useState(false);
+  onPressUser,
+  disableReplies,
+}) => {
+  const [showReplies, setShowReplies] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  const dispatch = useAppDispatch();
 
   const mergedTheme = getMergedTheme(themeOverrides);
   const styles = createThreadStyles(
@@ -80,10 +57,6 @@ export default function ThreadItem ({
     styleOverrides,
     userStyleSheet,
   );
-
-  const handleToggleReplyComposer = () => {
-    setShowReplyComposer(!showReplyComposer);
-  };
 
   const containerStyle = [
     styles.threadItemContainer,
@@ -95,31 +68,41 @@ export default function ThreadItem ({
       Alert.alert('Cannot Delete', 'You are not the owner of this post.');
       return;
     }
-    // If you have a delete post logic, call it here
+    dispatch(deletePostAsync(p.id));
   };
 
-  const Wrapper = onPressPost ? TouchableOpacity : View;
+  const handleEditPost = (p: ThreadPost) => {
+    if (p.user.id !== currentUser.id) {
+      Alert.alert('Cannot Edit', 'You are not the owner of this post.');
+      return;
+    }
+    setShowEditModal(true);
+  };
 
   return (
     <View style={containerStyle}>
-      <ThreadAncestors
-        post={post}
-        rootPosts={rootPosts}
-        themeOverrides={themeOverrides}
-        styleOverrides={styleOverrides}
-        userStyleSheet={userStyleSheet}
-      />
+      {/* If not root, show ancestors (unless disableReplies) */}
+      {!disableReplies && (
+        <ThreadAncestors
+          post={post}
+          rootPosts={rootPosts}
+          themeOverrides={themeOverrides}
+          styleOverrides={styleOverrides}
+          userStyleSheet={userStyleSheet}
+        />
+      )}
 
-      <Wrapper
+      <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => onPressPost && onPressPost(post)}
         style={{flex: 1}}>
         <PostHeader
           post={post}
-          onPressMenu={() => {}}
           onDeletePost={handleDeletePost}
+          onEditPost={handleEditPost}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
+          onPressUser={onPressUser}
         />
 
         <PostBody
@@ -127,6 +110,17 @@ export default function ThreadItem ({
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
         />
+
+        {post.retweetOf && (
+          <View style={{marginBottom: 6}}>
+            <RetweetPreview
+              retweetOf={post.retweetOf}
+              onPress={onPressPost}
+              themeOverrides={themeOverrides}
+              styleOverrides={styleOverrides}
+            />
+          </View>
+        )}
 
         <PostCTA
           post={post}
@@ -137,38 +131,58 @@ export default function ThreadItem ({
 
         <PostFooter
           post={post}
-          onPressComment={handleToggleReplyComposer}
+          onPressComment={() => {
+            if (!disableReplies) {
+              setShowReplies(!showReplies);
+            }
+          }}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
         />
-      </Wrapper>
+      </TouchableOpacity>
 
-      {showReplyComposer && (
+      {/* If !disableReplies => user can expand replies + composer */}
+      {!disableReplies && showReplies && (
         <View style={{marginTop: 8}}>
           <ThreadComposer
             currentUser={currentUser}
             parentId={post.id}
-            onPostCreated={() => setShowReplyComposer(false)}
+            onPostCreated={() => {
+              /* optional callback if needed */
+            }}
             themeOverrides={themeOverrides}
             styleOverrides={styleOverrides}
           />
+
+          {/* Render the existing replies */}
+          {post.replies.map(reply => (
+            <ThreadItem
+              key={reply.id}
+              post={reply}
+              currentUser={currentUser}
+              rootPosts={rootPosts}
+              depth={depth + 1}
+              onPressPost={onPressPost}
+              ctaButtons={ctaButtons}
+              themeOverrides={themeOverrides}
+              styleOverrides={styleOverrides}
+              userStyleSheet={userStyleSheet}
+              onPressUser={onPressUser}
+            />
+          ))}
         </View>
       )}
 
-      {post.replies.map(reply => (
-        <ThreadItem
-          key={reply.id}
-          post={reply}
+      {showEditModal && (
+        <ThreadEditModal
+          post={post}
+          visible={showEditModal}
+          onClose={() => setShowEditModal(false)}
           currentUser={currentUser}
-          rootPosts={rootPosts}
-          depth={depth + 1}
-          onPressPost={onPressPost}
-          ctaButtons={ctaButtons}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
-          userStyleSheet={userStyleSheet}
         />
-      ))}
+      )}
     </View>
   );
-}
+};

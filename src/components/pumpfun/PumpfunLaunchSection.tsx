@@ -11,7 +11,7 @@ import {
   TextStyle,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import {usePumpfun} from '../../hooks/usePumpFun';
+import {usePumpfun} from '../../hooks/usePumpfun';
 import {PumpfunLaunchStyles} from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
 

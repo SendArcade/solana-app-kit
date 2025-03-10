@@ -26,9 +26,9 @@ import {
 } from 'react-native-image-picker';
 import {TENSOR_API_KEY} from '@env';
 import {useAuth} from '../../hooks/useAuth';
-import TradeModal from './TradeModal';
+import TradeModal from './/trade/TradeModal';
 import {DEFAULT_IMAGES} from '../../config/constants';
-import { NftItem, useFetchNFTs } from '../../hooks/useFetchNFTs';
+import {NftItem, useFetchNFTs} from '../../hooks/useFetchNFTs';
 
 /**
  * Props for the ThreadComposer component
@@ -51,13 +51,13 @@ interface ThreadComposerProps {
 
 /**
  * A component for composing new posts and replies in a thread
- * 
+ *
  * @component
  * @description
  * ThreadComposer provides a rich text editor for creating new posts and replies in a thread.
  * It supports text input, image attachments, and NFT listings. The component handles both
  * root-level posts and nested replies, with appropriate styling and behavior for each case.
- * 
+ *
  * Features:
  * - Text input with placeholder text
  * - Image attachment support
@@ -65,7 +65,7 @@ interface ThreadComposerProps {
  * - Reply composition
  * - Offline fallback support
  * - Customizable theming
- * 
+ *
  * @example
  * ```tsx
  * <ThreadComposer
@@ -161,6 +161,7 @@ export default function ThreadComposer({
     // Fallback post if network fails
     const fallbackPost = {
       id: 'local-' + Math.random().toString(36).substr(2, 9),
+      userId: currentUser.id,
       user: currentUser,
       sections,
       createdAt: new Date().toISOString(),
@@ -173,19 +174,19 @@ export default function ThreadComposer({
 
     try {
       if (parentId) {
-        // create a reply
+        // create a reply by passing only the user id
         await dispatch(
           createReplyAsync({
             parentId,
-            user: currentUser,
+            userId: currentUser.id,
             sections,
           }),
         ).unwrap();
       } else {
-        // create a root post
+        // create a root post by passing only the user id
         await dispatch(
           createRootPostAsync({
-            user: currentUser,
+            userId: currentUser.id,
             sections,
           }),
         ).unwrap();

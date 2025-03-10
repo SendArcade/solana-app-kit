@@ -1,5 +1,5 @@
 // FILE: src/components/thread/sections/SectionNftListing.tsx
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {View, Text, Image, ActivityIndicator} from 'react-native';
 import {NftListingData} from '../thread.types';
 import styles from './SectionNftListing.style';
@@ -8,70 +8,47 @@ import {DEFAULT_IMAGES} from '../../../config/constants';
 
 /**
  * Props for the SectionNftListing component
- * @interface SectionNftListingProps
  */
 interface SectionNftListingProps {
-  /** The NFT listing data to display */
   listingData?: NftListingData;
 }
 
 /**
  * A component that renders an NFT listing card in a post section
  * 
- * @component
- * @description
- * SectionNftListing displays detailed information about an NFT listing in a post.
- * It fetches additional NFT data from the Tensor API and shows the NFT's image,
- * name, collection, price, last sale, and rarity information. The component
- * handles loading states and errors gracefully.
- * 
- * Features:
- * - NFT image display
- * - Collection information
- * - Price and last sale data
- * - Rarity ranking
- * - Loading states
- * - Error handling
- * - Responsive layout
- * 
- * @example
- * ```tsx
- * <SectionNftListing
- *   listingData={{
- *     mint: "mint_address_here",
- *     name: "Cool NFT #123",
- *     owner: "wallet_address_here",
- *     priceSol: 1.5
- *   }}
- * />
- * ```
+ * Issues resolved:
+ *  - Only fetch data once per mint (no repeated updates).
+ *  - Handle rate-limit (429) without infinite loops.
  */
-export default function SectionNftListing({
-  listingData,
-}: SectionNftListingProps) {
+export default function SectionNftListing({listingData}: SectionNftListingProps) {
   const [loading, setLoading] = useState(false);
   const [nftData, setNftData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Fetches NFT data from the Tensor API
-   * @returns {Promise<void>}
-   */
+  // Keep track of which mint we last fetched, so we don’t re-fetch on re-render
+  const lastFetchedMintRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!listingData) return;
+    if (!listingData?.mint) {
+      return;
+    }
+    // If we already fetched for this mint, do not fetch again
+    if (lastFetchedMintRef.current === listingData.mint) {
+      return;
+    }
+
     let cancelled = false;
+    setLoading(true);
+    setError(null);
 
     const fetchNftData = async () => {
       try {
-        setLoading(true);
-        setError(null);
         const url = `https://api.mainnet.tensordev.io/api/v1/mint?mints=${listingData.mint}`;
         const resp = await fetch(url, {
           headers: {
             'x-tensor-api-key': TENSOR_API_KEY,
           },
         });
-
         if (!resp.ok) {
           throw new Error(`Tensor API error: ${resp.status}`);
         }
@@ -80,14 +57,16 @@ export default function SectionNftListing({
 
         if (Array.isArray(data) && data.length > 0) {
           setNftData(data[0]);
+        } else {
+          setError('No data returned from Tensor.');
         }
       } catch (err: any) {
-        if (!cancelled) {
-          setError(err.message || 'Failed to fetch NFT data');
-        }
+        setError(err.message || 'Failed to fetch NFT data');
       } finally {
         if (!cancelled) {
           setLoading(false);
+          // Mark that we've fetched for this mint
+          lastFetchedMintRef.current = listingData.mint;
         }
       }
     };
@@ -96,31 +75,21 @@ export default function SectionNftListing({
     return () => {
       cancelled = true;
     };
-  }, [listingData]);
+  }, [listingData?.mint]);
 
   if (!listingData) {
     return <Text>[Missing listing data]</Text>;
   }
 
-  /**
-   * Formats a price in lamports to SOL with 2 decimal places
-   * @param {string} lamports - The price in lamports
-   * @returns {string | null} The formatted price in SOL or null if invalid
-   */
   function formatSolPrice(lamports: string) {
     if (!lamports) return null;
     const solPrice = parseFloat(lamports) / 1_000_000_000;
     return solPrice.toFixed(2);
   }
 
-  /**
-   * Safely returns an image source for an NFT
-   * @param {string | undefined} uri - The NFT image URI
-   * @returns {ImageSourcePropType} The image source object
-   */
   function getNftImageSource(uri?: string) {
     if (!uri || typeof uri !== 'string') {
-      return DEFAULT_IMAGES.user;
+      return DEFAULT_IMAGES.user; // fallback
     }
     return {uri};
   }
@@ -177,6 +146,7 @@ export default function SectionNftListing({
             </View>
           </>
         )}
+
         {error && (
           <Text style={{color: 'red', marginTop: 8, fontSize: 12}}>
             {error}

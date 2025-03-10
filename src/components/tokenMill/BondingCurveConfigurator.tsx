@@ -55,13 +55,13 @@ const initialBidBnAndroid = initialAskBnAndroid.map(price =>
 
 /**
  * A component for configuring bonding curves with visual feedback
- * 
+ *
  * @component
  * @description
  * BondingCurveConfigurator provides an interactive interface for configuring
  * bonding curves with real-time visual feedback. It supports multiple curve types
  * and allows users to adjust various parameters through sliders.
- * 
+ *
  * Features:
  * - Multiple curve types (linear, power, exponential, logarithmic)
  * - Real-time curve visualization
@@ -74,7 +74,7 @@ const initialBidBnAndroid = initialAskBnAndroid.map(price =>
  * - Platform-specific optimizations
  * - Loading states
  * - Customizable styling
- * 
+ *
  * @example
  * ```tsx
  * <BondingCurveConfigurator
@@ -119,23 +119,31 @@ export default function BondingCurveConfigurator({
   const [isLoading, setIsLoading] = useState(false);
 
   /**
-   * Computes the bonding curve based on current parameters
+   * Computes the bonding curve based on current parameters.
+   * An optional overrideCurveType can be provided to immediately use a new curve type.
    * @param {Object} overrides - Optional parameter overrides for computation
+   * @param {CurveType} overrideCurveType - Optional override for curve type
    * @returns {void}
    */
   const computeBondingCurve = useCallback(
-    (overrides?: {
-      points?: number;
-      basePrice?: number;
-      topPrice?: number;
-      power?: number;
-      feePercent?: number;
-    }) => {
+    (
+      overrides?: {
+        points?: number;
+        basePrice?: number;
+        topPrice?: number;
+        power?: number;
+        feePercent?: number;
+      },
+      overrideCurveType?: CurveType,
+    ) => {
       const localPoints = overrides?.points ?? points;
       const localBase = overrides?.basePrice ?? basePrice;
       const localTop = overrides?.topPrice ?? topPrice;
       const localPower = overrides?.power ?? power;
       const localFee = overrides?.feePercent ?? feePercent;
+
+      // Use the overrideCurveType if provided; otherwise, use the current state value.
+      const currentCurveType = overrideCurveType ?? curveType;
 
       const newAskBn: BN[] = [];
       const newBidBn: BN[] = [];
@@ -143,7 +151,7 @@ export default function BondingCurveConfigurator({
       for (let i = 0; i < localPoints; i++) {
         const t = i / Math.max(localPoints - 1, 1);
         let price: number;
-        switch (curveType) {
+        switch (currentCurveType) {
           case 'linear':
             price = localBase + t * (localTop - localBase);
             break;
@@ -218,7 +226,8 @@ export default function BondingCurveConfigurator({
       setCurveType(type);
       // Delay compute to allow loader to render.
       setTimeout(() => {
-        computeBondingCurve(); // uses current state (which will update on next render)
+        // Pass the new curve type so computeBondingCurve uses it immediately.
+        computeBondingCurve({}, type);
         setIsLoading(false);
       }, 0);
     } else {

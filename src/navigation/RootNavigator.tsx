@@ -13,6 +13,11 @@ import NftScreen from '../screens/Common/NftScreen/NftScreen';
 import IntroScreen from '../screens/Common/IntroScreen/IntroScreen';
 import LoginScreen from '../screens/Common/LoginScreen/LoginScreen';
 
+// NEW IMPORT
+import OtherProfileScreen from '../screens/SampleUI/Threads/OtherProfileScreen/OtherProfileScreen';
+import PostThreadScreen from '../screens/SampleUI/Threads/PostThreadScreen/PostthreadScreen';
+import FollowersFollowingListScreen from '../components/thread/FollowersFollowingListScreen/FollowersFollowingListScreen';
+
 export type RootStackParamList = {
   LoginOptions: undefined;
   MainTabs: undefined;
@@ -24,6 +29,10 @@ export type RootStackParamList = {
   NftScreen: undefined;
   PlatformSelection: undefined;
   ChatScreen: undefined;
+  // NEW ROUTE
+  OtherProfile: { userId: string };
+  PostThread: { postId: string };
+  FollowersFollowingList : undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -32,7 +41,7 @@ export default function RootNavigator() {
   const isLoggedIn = useSelector((state: RootState) => state.auth.isLoggedIn);
 
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
       {isLoggedIn ? (
         <>
           <Stack.Screen
@@ -46,6 +55,15 @@ export default function RootNavigator() {
           <Stack.Screen name="TokenMill" component={TokenMillScreen} />
           <Stack.Screen name="NftScreen" component={NftScreen} />
           <Stack.Screen name="ChatScreen" component={ChatScreen} />
+
+          {/* NEW SCREEN for viewing other user's profile */}
+          <Stack.Screen name="OtherProfile" component={OtherProfileScreen} />
+          <Stack.Screen name="PostThread" component={PostThreadScreen} />
+          <Stack.Screen
+            name="FollowersFollowingList"
+            component={FollowersFollowingListScreen}
+            options={{ title: '' }} // or "Followers / Following"
+          />
         </>
       ) : (
         <>

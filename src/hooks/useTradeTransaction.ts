@@ -1,3 +1,5 @@
+// FILE: src/hooks/useTradeTransaction.ts
+
 import {useSelector} from 'react-redux';
 import {Alert} from 'react-native';
 import {useEmbeddedSolanaWallet} from '@privy-io/expo';
@@ -8,17 +10,23 @@ import {
   PublicKey,
   TransactionInstruction,
   LAMPORTS_PER_SOL,
+  VersionedTransaction,
+  Transaction,
+  Cluster,
 } from '@solana/web3.js';
 import {sendPriorityTransaction} from '../utils/transactions/sendPriorityTx';
 import {sendJitoBundleTransaction} from '../utils/transactions/sendJitoBundleTx';
 import {RootState} from '../state/store';
 import {useCustomization} from '../CustomizationProvider';
-import { VersionedTransaction } from '@solana/web3.js';
-import { Transaction } from '@solana/web3.js';
-import { CLUSTER, HELIUS_RPC_URL, SERVER_URL } from '@env';
-import { Cluster } from '@solana/web3.js';
-import { ENDPOINTS, PUBLIC_KEYS } from '../config/constants';
+import {CLUSTER, HELIUS_RPC_URL, SERVER_URL} from '@env';
+import {ENDPOINTS, PUBLIC_KEYS} from '../config/constants';
 
+/**
+ * Hook to handle trade transactions.
+ *
+ * Now, sendTrade accepts a mode ('priority' | 'jito'),
+ * a recipient address, and an amount in SOL.
+ */
 export function useTradeTransaction() {
   const solanaWallet = useEmbeddedSolanaWallet();
   const {transaction: transactionConfig} = useCustomization();
@@ -26,7 +34,21 @@ export function useTradeTransaction() {
     (state: RootState) => state.transaction.selectedFeeTier,
   );
 
-  const sendTrade = async (mode: 'priority' | 'jito') => {
+  /**
+   * sendTrade:
+   * 1. Accepts additional parameters: recipient (string) and amountSol (number).
+   * 2. Constructs a SystemProgram.transfer instruction for the given recipient and amount.
+   * 3. Uses the priority or Jito transaction method based on the mode.
+   *
+   * @param mode - Either 'priority' or 'jito'
+   * @param recipient - SOL address to send funds to.
+   * @param amountSol - Amount in SOL to send.
+   */
+  const sendTrade = async (
+    mode: 'priority' | 'jito',
+    recipient: string,
+    amountSol: number,
+  ) => {
     const walletPublicKey =
       solanaWallet.wallets && solanaWallet.wallets.length > 0
         ? solanaWallet.wallets[0].publicKey
@@ -48,31 +70,33 @@ export function useTradeTransaction() {
         return;
       }
 
+      // Determine the RPC endpoint.
       const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
       const connection = new Connection(rpcUrl, 'confirmed');
       const senderPubkey = new PublicKey(walletPublicKey);
       console.log('senderPubkey', senderPubkey);
       console.log('walletPublicKey', walletPublicKey);
+      const receiverPubkey = new PublicKey(recipient.trim());
+      console.log('receiverPubkey', receiverPubkey);
+
       const balance = await connection.getBalance(senderPubkey);
-      const transferLamports = 20000000;
-      const estimatedFee = 500000;
+      // Convert the SOL amount to lamports.
+      const transferLamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
+      const estimatedFee = 500000; // Estimated fee in lamports..
       const totalRequired = transferLamports + estimatedFee;
 
       console.log('balance', balance);
-
       if (balance < totalRequired) {
         Alert.alert(
           'Insufficient Balance',
-          `Your wallet has ${balance} lamports, but the transaction needs ${totalRequired} (including fees).`,
+          `Your wallet has ${balance} lamports, but the transaction requires ${totalRequired} lamports (including fees).`,
         );
         return;
       }
 
-      // Define the receiver public key (hard-coded)
-      const receiverPubkey = new PublicKey(PUBLIC_KEYS.defaultReceiver);
+   
 
       let txSignature: string;
-
       const transferInstruction = SystemProgram.transfer({
         fromPubkey: senderPubkey,
         toPubkey: receiverPubkey,
@@ -183,7 +207,9 @@ export function useTradeTransaction() {
         transaction = Transaction.from(txBuffer);
       }
 
-      const provider = solanaWallet.wallets && solanaWallet.wallets.length > 0 ? await solanaWallet.wallets[0].getProvider() : null;
+      const provider = solanaWallet.wallets && solanaWallet.wallets.length > 0
+        ? await solanaWallet.wallets[0].getProvider()
+        : null;
       if (!provider) {
         throw new Error('Provider not available');
       }

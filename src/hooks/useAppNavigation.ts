@@ -8,6 +8,7 @@ import {
 } from '@react-navigation/native';
 import {BottomTabNavigationProp} from '@react-navigation/bottom-tabs';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/RootNavigator';
 
 /**
  * Main tab param list
@@ -23,11 +24,6 @@ export type MainTabParamList = {
 /**
  * Root stack param list
  */
-export type RootStackParamList = {
-  Intro: undefined;
-  LoginOptions: undefined;
-  MainTabs: NavigatorScreenParams<MainTabParamList>;
-};
 
 /**
  * Combine stack & tab props for a single type

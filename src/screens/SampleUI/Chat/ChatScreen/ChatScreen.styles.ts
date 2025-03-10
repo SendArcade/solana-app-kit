@@ -75,6 +75,20 @@ export const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: '#FFFFFF',
   },
+  quoteReplyButton: {
+    // backgroundColor: '#1d9bf0',
+    paddingVertical: 3,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+  },
+  quoteReplyText: {
+    color: '#2558D4',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });
 
 export const androidStyles = StyleSheet.create({
