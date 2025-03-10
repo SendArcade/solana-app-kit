@@ -3,8 +3,9 @@ import { StyleSheet } from "react-native";
 export const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    justifyContent: "flex-start",
+    justifyContent: "space-between", // Changed from flex-start to space-between
     alignItems: "center",
+    width: "100%", // Ensure container takes full width
     gap: 8,
   },
   btn: {
@@ -15,11 +16,13 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 16,
+    flex: 1, // Make buttons grow equally to fill space
   },
   text: {
     color: "white",
     fontSize: 12,
     fontWeight: "bold",
+    textAlign: "center", // Ensure text is centered
   },
   lastBtn: {
     backgroundColor: "white",

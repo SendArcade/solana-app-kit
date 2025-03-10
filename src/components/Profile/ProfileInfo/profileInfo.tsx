@@ -179,6 +179,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
             areTheyFollowingMe={areTheyFollowingMe}
             onPressFollow={onFollowPress || (() => {})}
             onPressUnfollow={onUnfollowPress || (() => {})}
+            recipientAddress = {userWallet}
           />
         </View>
       )}
