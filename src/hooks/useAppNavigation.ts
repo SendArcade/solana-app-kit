@@ -27,6 +27,7 @@ export type RootStackParamList = {
   Intro: undefined;
   LoginOptions: undefined;
   MainTabs: NavigatorScreenParams<MainTabParamList>;
+  PostThread: { postId: string };
 };
 
 /**

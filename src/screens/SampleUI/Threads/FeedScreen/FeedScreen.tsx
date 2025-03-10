@@ -12,7 +12,7 @@ import {fetchAllPosts} from '../../../../state/thread/reducer';
 import {fetchUserProfile} from '../../../../state/auth/reducer';
 import {DEFAULT_IMAGES} from '../../../../config/constants';
 import {NavigationProp, useNavigation} from '@react-navigation/native';
-import { RootStackParamList } from '../../../../navigation/RootNavigator';
+import {RootStackParamList} from '../../../../navigation/RootNavigator';
 
 export default function FeedScreen() {
   const dispatch = useAppDispatch();
@@ -99,7 +99,7 @@ export default function FeedScreen() {
    */
   const handlePressUser = (user: ThreadUser) => {
     // user.id is the wallet address stored in the post
-    navigation.navigate('OtherProfile', { userId: user.id } as never);
+    navigation.navigate('OtherProfile', {userId: user.id} as never);
   };
 
   return (

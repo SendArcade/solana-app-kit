@@ -1,4 +1,3 @@
-// File: /Users/bhuwantyagi/Desktop/sendAi/solana-social-starter/src/hooks/useTradeTransaction.ts
 import {useSelector} from 'react-redux';
 import {Alert} from 'react-native';
 import {useEmbeddedSolanaWallet} from '@privy-io/expo';

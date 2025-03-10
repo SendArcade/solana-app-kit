@@ -17,9 +17,9 @@ import { createRetweetAsync } from '../../../../state/thread/reducer';
 import { RootState } from '../../../../state/store';
 import { ThreadPost, ThreadUser } from '../../../../components/thread/thread.types';
 import { PostBody, ThreadComposer } from '../../../../components/thread';
-import PostCTA from '../../../../components/thread/PostCTA';
-import RetweetPreview from '../../../../components/thread/RetweetPreview';
-import RetweetModal from '../../../../components/thread/RetweetModal';
+import PostCTA from '../../../../components/thread/post/PostCTA';
+import RetweetPreview from '../../../../components/thread/retweet/RetweetPreview';
+import RetweetModal from '../../../../components/thread/retweet/RetweetModal';
 import { styles, androidStyles, chatBodyOverrides } from './ChatScreen.styles';
 import { DEFAULT_IMAGES } from '../../../../config/constants';
 
@@ -157,7 +157,7 @@ export default function ChatScreen() {
   return (
     <SafeAreaView
       style={[
-        { flex: 1, backgroundColor: '#FFFFFF' },
+        {flex: 1, backgroundColor: '#FFFFFF'},
         Platform.OS === 'android' && androidStyles.safeArea,
       ]}>
       <KeyboardAvoidingView
@@ -172,7 +172,10 @@ export default function ChatScreen() {
         />
 
         <View style={styles.composerContainer}>
-          <ThreadComposer currentUser={currentUser} onPostCreated={scrollToEnd} />
+          <ThreadComposer
+            currentUser={currentUser}
+            onPostCreated={scrollToEnd}
+          />
         </View>
       </KeyboardAvoidingView>
 
@@ -187,6 +190,9 @@ export default function ChatScreen() {
           }}
           retweetOf={quoteReplyPostId}
           currentUser={currentUser}
+          headerText="Reply"
+          placeholderText="Add a reply to this message"
+          buttonText="Reply"
         />
       )}
     </SafeAreaView>

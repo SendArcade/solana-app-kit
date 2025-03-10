@@ -1,15 +1,14 @@
 import React, {useState} from 'react';
 import {SafeAreaView, Text, TouchableOpacity, View} from 'react-native';
 import {styles} from './CoinDetailPage.style';
-import { CoinDetailTopSection } from '../../../../components/CoinDetails/CoinDetailTopSection/CoinDetailTopSection';
-import { CoinDetailLatestSection } from '../../../../components/CoinDetails/CoinDetailLatestSection/CoinDetailLatestSection';
-import { CoinDetailPeopleSection } from '../../../../components/CoinDetails/CoinDetailPeopleSection/CoinDetailPeopleSection';
-import { CoinDetailPhotosSection } from '../../../../components/CoinDetails/CoinDetailPhotosSection/CoinDetailPhotosSection';
-import { CoinDetailVideosSection } from '../../../../components/CoinDetails/CoinDetailVideosSection/CoinDetailVideosSection';
-import { DEFAULT_IMAGES } from '../../../../config/constants';
+import {CoinDetailTopSection} from '../../../../components/CoinDetails/CoinDetailTopSection/CoinDetailTopSection';
+import {CoinDetailLatestSection} from '../../../../components/CoinDetails/CoinDetailLatestSection/CoinDetailLatestSection';
+import {CoinDetailPeopleSection} from '../../../../components/CoinDetails/CoinDetailPeopleSection/CoinDetailPeopleSection';
+import {CoinDetailPhotosSection} from '../../../../components/CoinDetails/CoinDetailPhotosSection/CoinDetailPhotosSection';
+import {CoinDetailVideosSection} from '../../../../components/CoinDetails/CoinDetailVideosSection/CoinDetailVideosSection';
+import {DEFAULT_IMAGES} from '../../../../config/constants';
 
 // Import the new modular components
-
 
 // Example mock data for top section
 const graphData = {
@@ -52,9 +51,7 @@ const CoinDetailPage = () => {
       case 'Top':
         return (
           <CoinDetailTopSection
-            graphData={graphData}
             tweetData={tweetData}
-            // You can pass style overrides as well:
             // customStyles={{ container: { backgroundColor: '#f2f2f2' } }}
           />
         );
@@ -68,13 +65,13 @@ const CoinDetailPage = () => {
         return <CoinDetailVideosSection />;
       default:
         return (
-          <CoinDetailTopSection graphData={graphData} tweetData={tweetData} />
+          <CoinDetailTopSection tweetData={tweetData} />
         );
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View>
         <View style={styles.headerList}>
           <View style={styles.list}>
@@ -95,7 +92,7 @@ const CoinDetailPage = () => {
         </View>
       </View>
       <View style={styles.MainSection}>{renderSection()}</View>
-    </SafeAreaView>
+    </View>
   );
 };
 
