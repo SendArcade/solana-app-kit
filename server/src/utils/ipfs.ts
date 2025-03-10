@@ -1,13 +1,14 @@
 // server/src/utils/ipfs.ts
 import fs from 'fs';
 import path from 'path';
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch';
 import FormData from 'form-data';
 
 export async function uploadToIpfs(
   imagePath: string,
   metadata: Record<string, any>,
 ): Promise<string> {
+  const { default: fetch } = await import('node-fetch');
   const resolvedPath = path.resolve(imagePath);
   const fileBuffer = fs.readFileSync(resolvedPath);
 
@@ -45,7 +46,7 @@ export async function uploadToIpfs(
   const metadataResponseJSON = await metadataResponse.json() as { metadataUri: string };
   const metadataUri = metadataResponseJSON.metadataUri;
 
-  console.log('Pump Fun metadata URI:', metadataUri);
+  console.log('Metadata URI:', metadataUri);
   return metadataUri;
 }
 

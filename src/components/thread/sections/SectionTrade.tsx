@@ -2,7 +2,7 @@
 import React from 'react';
 import {View, Text} from 'react-native';
 import {TradeData} from '../thread.types';
-import TradeCard from '../../TradeCard/TradeCard';
+import { TradeCard } from '../../Common/TradeCard';
 
 /**
  * Props for the SectionTrade component

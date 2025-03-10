@@ -1,16 +1,11 @@
-// File: src/components/thread/Thread.tsx
-import React, { useState } from 'react';
-import { View, Text, FlatList } from 'react-native';
+import React, {useState} from 'react';
+import {View, Text, FlatList} from 'react-native';
 import ThreadComposer from './ThreadComposer';
-import { createThreadStyles, getMergedTheme } from './thread.styles';
+import {createThreadStyles, getMergedTheme} from './thread.styles';
 import Icons from '../../assets/svgs';
-import { ThreadPost, ThreadUser, ThreadCTAButton } from './thread.types';
-import ThreadItem from './ThreadItem';
+import {ThreadPost, ThreadUser, ThreadCTAButton} from './thread.types';
+import {ThreadItem} from './ThreadItem';
 
-/**
- * Props for the Thread component
- * @interface ThreadProps
- */
 interface ThreadProps {
   /** Array of root-level posts to display in the thread */
   rootPosts: ThreadPost[];
@@ -28,33 +23,24 @@ interface ThreadProps {
   ctaButtons?: ThreadCTAButton[];
   /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
-  styleOverrides?: { [key: string]: object };
-  userStyleSheet?: { [key: string]: object };
+  styleOverrides?: {[key: string]: object};
+  userStyleSheet?: {[key: string]: object};
   refreshing?: boolean;
   onRefresh?: () => void;
+
+  /**
+   * Callback fired when the user’s avatar/username is pressed
+   */
+  onPressUser?: (user: ThreadUser) => void;
+
+  /**
+   * If true, do NOT show sub replies or reply composers within each post
+   * (used for feed, or anywhere we only want a preview).
+   */
+  disableReplies?: boolean;
 }
 
-/**
- * Thread component that displays a list of posts with nested replies
- * 
- * @component
- * @description
- * The Thread component is a core component that renders a list of posts in a threaded
- * discussion format. It supports nested replies, post composition, and customizable
- * styling through themes and style overrides.
- * 
- * @example
- * ```tsx
- * <Thread
- *   rootPosts={posts}
- *   currentUser={user}
- *   showHeader={true}
- *   onPostCreated={() => refetchPosts()}
- *   onPressPost={(post) => handlePostPress(post)}
- * />
- * ```
- */
-export default function Thread({
+export const Thread: React.FC<ThreadProps> = ({
   rootPosts,
   currentUser,
   showHeader = true,
@@ -67,26 +53,33 @@ export default function Thread({
   userStyleSheet,
   refreshing: externalRefreshing,
   onRefresh: externalOnRefresh,
-}: ThreadProps) {
-  // Local fallback for refreshing if not provided via props
+  onPressUser,
+  disableReplies = false,
+}) => {
+  // Local fallback for refreshing if not provided
   const [localRefreshing, setLocalRefreshing] = useState(false);
 
   const mergedTheme = getMergedTheme(themeOverrides);
-  const styles = createThreadStyles(mergedTheme, styleOverrides, userStyleSheet);
+  const styles = createThreadStyles(
+    mergedTheme,
+    styleOverrides,
+    userStyleSheet,
+  );
 
   // Local onRefresh if external prop is not provided
   const localOnRefresh = () => {
     setLocalRefreshing(true);
-    // Simulate a refresh delay; in production, your parent component will re-fetch
     setTimeout(() => {
       setLocalRefreshing(false);
     }, 800);
   };
 
-  const finalRefreshing = externalRefreshing !== undefined ? externalRefreshing : localRefreshing;
-  const finalOnRefresh = externalOnRefresh !== undefined ? externalOnRefresh : localOnRefresh;
+  const finalRefreshing =
+    externalRefreshing !== undefined ? externalRefreshing : localRefreshing;
+  const finalOnRefresh =
+    externalOnRefresh !== undefined ? externalOnRefresh : localOnRefresh;
 
-  const renderItem = ({ item }: { item: ThreadPost }) => (
+  const renderItem = ({item}: {item: ThreadPost}) => (
     <ThreadItem
       post={item}
       currentUser={currentUser}
@@ -96,6 +89,8 @@ export default function Thread({
       userStyleSheet={userStyleSheet}
       onPressPost={onPressPost}
       ctaButtons={ctaButtons}
+      onPressUser={onPressUser}
+      disableReplies={disableReplies}
     />
   );
 
@@ -120,14 +115,14 @@ export default function Thread({
 
       <FlatList
         data={rootPosts}
-        keyExtractor={(post) => post.id}
+        keyExtractor={post => post.id}
         renderItem={renderItem}
         contentContainerStyle={styles.threadListContainer}
         refreshing={finalRefreshing}
         onRefresh={finalOnRefresh}
         ListEmptyComponent={
-          <View style={{ alignItems: 'center', marginTop: 24 }}>
-            <Text style={{ color: '#666' }}>No posts yet.</Text>
+          <View style={{alignItems: 'center', marginTop: 24}}>
+            <Text style={{color: '#666'}}>No posts yet.</Text>
           </View>
         }
       />
