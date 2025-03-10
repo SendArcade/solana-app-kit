@@ -1,4 +1,3 @@
-// FILE: src/components/Profile/slider/slider.tsx
 import React, {memo, useState, useCallback} from 'react';
 import {
   View,
@@ -16,7 +15,7 @@ import Collectibles, {NftItem} from '../collectibles/collectibles';
 import {styles, tabBarStyles} from './slider.style';
 
 type SwipeTabsProps = {
-  /** The user's array of posts (flattened or not) */
+  /** The user's array of posts (root only in this scenario) */
   myPosts: ThreadPost[];
 
   /** The user's array of NFTs. */
@@ -39,7 +38,7 @@ type SwipeTabsProps = {
   refreshingNfts?: boolean;
 
   /**
-   * **New:** Fired when a post is pressed (or the “Reply Post” label is pressed).
+   * Fired when a post is pressed (or the “Reply Post” label is pressed).
    */
   onPressPost?: (post: ThreadPost) => void;
 };
@@ -60,7 +59,6 @@ function PostPage({
 }) {
   const [localRefreshing, setLocalRefreshing] = useState(false);
 
-  // If onRefresh is not provided, we use a default local refresh handler.
   const handleLocalRefresh = useCallback(() => {
     setLocalRefreshing(true);
     setTimeout(() => {
@@ -93,19 +91,23 @@ function PostPage({
               if (onPressPost) {
                 onPressPost(item);
               }
-            }}>
+            }}
+          >
             <Text style={styles.replyLabel}>Reply Post</Text>
           </TouchableOpacity>
         ) : null}
 
-        <PostHeader post={item} />
-        <PostBody post={item} />
-        <PostFooter
-          post={item}
-          onPressComment={() => {
-            // No-op or open a composer for replying
+        {/* Entire post clickable if you like: */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            onPressPost?.(item);
           }}
-        />
+        >
+          <PostHeader post={item} />
+          <PostBody post={item} />
+          <PostFooter post={item} />
+        </TouchableOpacity>
       </View>
     );
   };
