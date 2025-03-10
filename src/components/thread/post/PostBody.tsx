@@ -62,7 +62,7 @@ export default function PostBody({
   const styles = createThreadStyles(mergedTheme, styleOverrides);
 
   return (
-    <View style={{marginTop: 8}}>
+    <View style={{marginTop: 8, padding: 0}}>
       {post.sections.map(section => (
         <View key={section.id} style={styles.extraContentContainer}>
           <View style={{width: '84%'}}>{renderSection(section)}</View>

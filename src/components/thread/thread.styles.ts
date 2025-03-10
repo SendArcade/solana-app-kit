@@ -256,6 +256,8 @@ export function createThreadStyles(
       paddingVertical: 10,
       paddingHorizontal: 20,
       borderRadius: 20,
+      width: '100%',
+      alignItems: 'center',
     },
     threadPostCTAButtonLabel: {
       color: '#FFFFFF',
@@ -298,75 +300,6 @@ export function createThreadStyles(
       paddingHorizontal: 24,
       paddingVertical: 12,
       borderRadius: 8,
-    },
-
-    /* TradeCard */
-    tradeCardContainer: {
-      width: '100%',
-      gap: 10,
-      padding: 12,
-      marginBottom: 8,
-      flex: 1,
-    },
-    tradeCardCombinedSides: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      backgroundColor: theme['--thread-bg-secondary'],
-      borderRadius: 12,
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      marginBottom: 8,
-    },
-    tradeCardLeftSide: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    tradeCardTokenImage: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      marginRight: 8,
-    },
-    tradeCardNamePriceContainer: {
-      flexDirection: 'column',
-    },
-    tradeCardTokenName: {
-      fontSize: 14,
-      fontWeight: '600',
-      marginBottom: 2,
-      color: theme['--thread-text-primary'],
-    },
-    tradeCardTokenPrice: {
-      fontSize: 14,
-      color: '#999999',
-      fontWeight: '500',
-    },
-    tradeCardRightSide: {
-      alignItems: 'flex-end',
-    },
-    tradeCardSolPrice: {
-      color: '#32DE6B',
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    tradeCardUsdPrice: {
-      fontSize: 13,
-      color: '#777',
-    },
-    tradeCardSwapIcon: {
-      backgroundColor: theme['--thread-bg-secondary'],
-      width: 30,
-      height: 30,
-      borderRadius: 15,
-      alignItems: 'center',
-      justifyContent: 'center',
-      position: 'absolute',
-      left: '50%',
-      top: '50%',
-      borderWidth: 8,
-      borderColor: '#FFFFFF',
-      zIndex: 10,
-      transform: [{translateX: -15}, {translateY: -15}],
     },
 
     /* NFT Listing styles */

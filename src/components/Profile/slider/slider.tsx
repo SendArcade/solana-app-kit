@@ -1,5 +1,5 @@
 // FILE: src/components/Profile/slider/slider.tsx
-import React, {memo, useState} from 'react';
+import React, {memo, useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -60,12 +60,13 @@ function PostPage({
 }) {
   const [localRefreshing, setLocalRefreshing] = useState(false);
 
-  const handleLocalRefresh = () => {
+  // If onRefresh is not provided, we use a default local refresh handler.
+  const handleLocalRefresh = useCallback(() => {
     setLocalRefreshing(true);
     setTimeout(() => {
       setLocalRefreshing(false);
     }, 800);
-  };
+  }, []);
 
   const finalRefreshing =
     refreshing !== undefined ? refreshing : localRefreshing;
@@ -84,7 +85,6 @@ function PostPage({
 
   const renderPostItem = ({item}: {item: ThreadPost}) => {
     const isReply = !!item.parentId;
-
     return (
       <View style={styles.postCard}>
         {isReply ? (

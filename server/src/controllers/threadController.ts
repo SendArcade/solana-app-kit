@@ -3,34 +3,26 @@ import {Request, Response, NextFunction} from 'express';
 import knex from '../db/knex';
 import {v4 as uuidv4} from 'uuid';
 
-/**
- * Shape of a single post in our DB
- * We do not store username, handle, etc. directly in "posts" now.
- */
 type DBPostRow = {
   id: string;
   parent_id: string | null;
-  user_id: string; // references users.id
-  sections: any; // JSON
+  user_id: string;
+  sections: any;
   reaction_count: number;
   retweet_count: number;
   quote_count: number;
   created_at: string;
-  retweet_of: string | null; // references posts.id
+  retweet_of: string | null;
   reactions: Record<string, number>;
 };
 
 type DBUserRow = {
-  id: string; // user ID or wallet address
+  id: string;
   username: string;
   handle: string;
   profile_picture_url: string | null;
-  // add "verified" column if available
 };
 
-/**
- * Merges DBPostRow with user data from DBUserRow to produce the shape the client needs.
- */
 function mapPostRowToClientShape(postRow: DBPostRow & DBUserRow) {
   return {
     id: postRow.id,
@@ -51,14 +43,10 @@ function mapPostRowToClientShape(postRow: DBPostRow & DBUserRow) {
     retweetCount: postRow.retweet_count,
     quoteCount: postRow.quote_count,
     reactions: postRow.reactions || {},
-    retweetOf: postRow.retweet_of, // <-- Changed: now pass the DB field if available
+    retweetOf: postRow.retweet_of,
   };
 }
 
-/**
- * Fetch retweetOf post if retweet_of is not null.
- * We'll do a small helper that fetches that post from DB and merges user info.
- */
 async function fetchRetweetOf(postId: string): Promise<any | null> {
   const row = await knex<DBPostRow>('posts')
     .select(
@@ -72,7 +60,6 @@ async function fetchRetweetOf(postId: string): Promise<any | null> {
     .first();
 
   if (!row) return null;
-
   return {
     id: row.id,
     parentId: row.parent_id,
@@ -94,12 +81,9 @@ async function fetchRetweetOf(postId: string): Promise<any | null> {
   };
 }
 
-/**
- * Recursively build up the "replies" array for a post.
- */
 function buildReplies(post: any, allPosts: any[]): any {
-  const replies = allPosts.filter(p => p.parentId === post.id);
-  replies.forEach(r => {
+  const replies = allPosts.filter((p: any) => p.parentId === post.id);
+  replies.forEach((r: any) => {
     r.replies = buildReplies(r, allPosts);
   });
   return replies;
@@ -107,7 +91,6 @@ function buildReplies(post: any, allPosts: any[]): any {
 
 /**
  * GET /api/posts
- * Return all posts with user data, including nested replies.
  */
 export async function getAllPosts(
   req: Request,
@@ -115,7 +98,6 @@ export async function getAllPosts(
   next: NextFunction,
 ) {
   try {
-    // 1) fetch all posts joined with user data
     const rows = await knex<DBPostRow>('posts')
       .select(
         'posts.*',
@@ -126,10 +108,9 @@ export async function getAllPosts(
       .leftJoin('users', 'users.id', 'posts.user_id')
       .orderBy('posts.created_at', 'asc');
 
-    // 2) map them to client shape
     const partialPosts = rows.map(mapPostRowToClientShape);
 
-    // 3) fill retweetOf if needed
+    // fill retweetOf
     for (const p of partialPosts) {
       if (p.retweetOf) {
         const retweetData = await fetchRetweetOf(p.retweetOf);
@@ -137,10 +118,11 @@ export async function getAllPosts(
       }
     }
 
-    // 4) build a tree structure for replies
-    const allPostsMapped = partialPosts.map(p => {
-      return {...p, retweet_of: undefined};
-    });
+    // build tree
+    const allPostsMapped = partialPosts.map(p => ({
+      ...p,
+      retweet_of: undefined,
+    }));
     const rootPosts = allPostsMapped.filter(p => !p.parentId);
     rootPosts.forEach(r => {
       r.replies = buildReplies(r, allPostsMapped);
@@ -157,7 +139,7 @@ export async function getAllPosts(
 }
 
 /**
- * Create a root-level post (no parentId).
+ * Create a root-level post
  * Body expects: { userId, sections }
  */
 export async function createRootPost(req: Request, res: Response) {
@@ -210,8 +192,9 @@ export async function createRootPost(req: Request, res: Response) {
 }
 
 /**
- * Create a reply to a parent post.
- * Body expects: { parentId, userId, sections }
+ * Create a reply
+ * Body: { parentId, userId, sections }
+ * - increments the parent's quote_count in DB
  */
 export async function createReply(req: Request, res: Response) {
   try {
@@ -232,6 +215,16 @@ export async function createReply(req: Request, res: Response) {
       retweet_count: 0,
       quote_count: 0,
     });
+
+    // increment parent's quote_count
+    const parentPost = await knex<DBPostRow>('posts')
+      .where({id: parentId})
+      .first();
+    if (parentPost) {
+      await knex('posts')
+        .where({id: parentId})
+        .update({quote_count: parentPost.quote_count + 1});
+    }
 
     const row = await knex<DBPostRow>('posts')
       .select(
@@ -261,7 +254,9 @@ export async function createReply(req: Request, res: Response) {
 
 /**
  * Delete a post
- * DELETE /api/posts/:postId
+ * - If it's a retweet, decrement the retweet_count of the original post
+ * - If it is a reply, decrement the parent's quote_count
+ * - Then delete, letting DB CASCADE handle nested replies
  */
 export async function deletePost(req: Request, res: Response) {
   try {
@@ -272,19 +267,48 @@ export async function deletePost(req: Request, res: Response) {
         .json({success: false, error: 'Missing postId in params'});
     }
 
+    const post = await knex<DBPostRow>('posts').where({id: postId}).first();
+    if (!post) {
+      return res.status(404).json({success: false, error: 'Post not found'});
+    }
+
+    // if retweet, decrement retweet_count of retweet_of
+    if (post.retweet_of) {
+      const original = await knex<DBPostRow>('posts')
+        .where({id: post.retweet_of})
+        .first();
+      if (original && original.retweet_count > 0) {
+        await knex('posts')
+          .where({id: original.id})
+          .update({retweet_count: original.retweet_count - 1});
+      }
+    }
+
+    // if reply, decrement parent's quote_count
+    if (post.parent_id) {
+      const parent = await knex<DBPostRow>('posts')
+        .where({id: post.parent_id})
+        .first();
+      if (parent && parent.quote_count > 0) {
+        await knex('posts')
+          .where({id: parent.id})
+          .update({quote_count: parent.quote_count - 1});
+      }
+    }
+
+    // DB cascade will remove children
     await knex('posts').where({id: postId}).del();
 
-    return res.json({success: true});
+    return res.json({
+      success: true,
+      postId,
+      retweetOf: post.retweet_of,
+      parentId: post.parent_id,
+    });
   } catch (err: any) {
     console.error('[deletePost] Error:', err);
     return res.status(500).json({success: false, error: err.message});
   }
-}
-
-function isValidUuid(id: string): boolean {
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(id);
 }
 
 /**
@@ -307,16 +331,7 @@ export const addReaction = async (
       return;
     }
 
-    if (!isValidUuid(postId)) {
-      res.status(400).json({
-        success: false,
-        error:
-          'Invalid post id: reactions can only be added to persisted posts.',
-      });
-      return;
-    }
-
-    const post = await knex('posts').where({id: postId}).first();
+    const post = await knex<DBPostRow>('posts').where({id: postId}).first();
     if (!post) {
       res.status(404).json({success: false, error: 'Post not found'});
       return;
@@ -350,7 +365,6 @@ export const addReaction = async (
     };
 
     res.json({success: true, data: updatedPost});
-    return;
   } catch (error: any) {
     console.error('[addReaction] Error:', error);
     res.status(500).json({success: false, error: error.message});
@@ -359,7 +373,8 @@ export const addReaction = async (
 
 /**
  * POST /api/posts/retweet
- * Body: { retweetOf, userId, sections?: ThreadSection[] }
+ * Body: { retweetOf, userId, sections? }
+ * - Increments the retweetOf post’s retweet_count
  */
 export async function createRetweet(req: Request, res: Response) {
   try {
@@ -383,6 +398,7 @@ export async function createRetweet(req: Request, res: Response) {
       retweet_of: retweetOf,
     });
 
+    // increment original's retweet_count
     const original = await knex<DBPostRow>('posts')
       .where({id: retweetOf})
       .first();
@@ -425,6 +441,7 @@ export async function createRetweet(req: Request, res: Response) {
 /**
  * PATCH /api/posts/update
  * Body: { postId, sections }
+ * - For editing text sections, etc.
  */
 export async function updatePost(req: Request, res: Response) {
   try {
