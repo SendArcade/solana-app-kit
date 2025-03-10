@@ -16,4 +16,5 @@ declare module '@env' {
   export const TENSOR_API_KEY: string;
   export const SERVER_URL: string;
   export const CLUSTER: string;
+  export const COINGECKO_API_KEY: string;
 }

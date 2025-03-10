@@ -1,3 +1,4 @@
+// File: src/components/CoinDetails/CoinDetailTopSection/CoinDetailTopSection.style.ts
 import {StyleSheet} from 'react-native';
 
 export const defaultTopSectionStyles = StyleSheet.create({
@@ -29,6 +30,9 @@ export const defaultTopSectionStyles = StyleSheet.create({
   },
   priceContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    minHeight: 80, // ensure enough space for the spinner overlay
   },
   mainPrice: {
     fontSize: 32,
@@ -41,19 +45,34 @@ export const defaultTopSectionStyles = StyleSheet.create({
     gap: 6,
     alignItems: 'center',
   },
-  statsText: {
-    color: '#32D4DE',
+  // Add these new styles to the defaultTopSectionStyles object
+  statsTextPositive: {
+    color: '#00C853', // Green color for positive change
     fontSize: 16,
     fontWeight: '600',
   },
-  statsTextPercentage: {
-    color: '#32D4DE',
+  statsTextNegative: {
+    color: '#FF3B30', // Red color for negative change
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  statsTextPercentagePositive: {
+    color: '#00C853', // Green color for positive percentages
     fontSize: 16,
     fontWeight: '600',
     padding: 4,
-    backgroundColor: '#D6FDFF',
+    backgroundColor: '#E8F5E9', // Light green background
     borderRadius: 6,
   },
+  statsTextPercentageNegative: {
+    color: '#FF3B30', // Red color for negative percentages
+    fontSize: 16,
+    fontWeight: '600',
+    padding: 4,
+    backgroundColor: '#FFEBEE', // Light red background
+    borderRadius: 6,
+  },
+
   graphSection: {
     marginTop: 18,
   },
@@ -155,8 +174,27 @@ export const defaultTopSectionStyles = StyleSheet.create({
   tweetSection: {
     marginTop: 16,
   },
-
-  // Modal
+  marketStatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  marketStatItem: {
+    alignItems: 'center',
+  },
+  marketStatLabel: {
+    fontSize: 12,
+    color: '#999999',
+    marginBottom: 4,
+  },
+  marketStatValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  // Modal styles below...
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -287,5 +325,12 @@ export const defaultTopSectionStyles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // New loading overlay style to prevent flicker
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
