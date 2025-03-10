@@ -13,12 +13,10 @@ export {useTradeTransaction} from './hooks/useTradeTransaction';
 export {useAppSelector, useAppDispatch} from './hooks/useReduxHooks';
 
 // Export Services or Providers
-export * from './services/walletProviders';
 
 // Export Components
 export * from './components/thread';
-export * from './components/wallet';
-export * from './components/TradeCard';
+export * from './components/Common/TradeCard';
 
 // Export transaction utilities (if needed)
 export {sendPriorityTransaction} from './utils/transactions/sendPriorityTx';

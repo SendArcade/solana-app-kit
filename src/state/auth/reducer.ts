@@ -1,13 +1,12 @@
-// File: src/state/auth/reducer.ts
-import { SERVER_URL } from '@env';
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import {SERVER_URL} from '@env';
+import {createSlice, createAsyncThunk, PayloadAction} from '@reduxjs/toolkit';
 
 export interface AuthState {
   provider: 'privy' | 'dynamic' | 'turnkey' | null;
   address: string | null;
   isLoggedIn: boolean;
   profilePicUrl: string | null;
-  username: string | null;    // <-- new for storing user’s chosen display name
+  username: string | null; // new for storing user’s chosen display name
 }
 
 const initialState: AuthState = {
@@ -26,14 +25,18 @@ const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 export const fetchUserProfile = createAsyncThunk(
   'auth/fetchUserProfile',
   async (userId: string, thunkAPI) => {
-    const response = await fetch(`${SERVER_BASE_URL}/api/profile?userId=${userId}`);
+    const response = await fetch(
+      `${SERVER_BASE_URL}/api/profile?userId=${userId}`,
+    );
     const data = await response.json();
     if (data.success) {
-      return { profilePicUrl: data.url, username: data.username };
+      return {profilePicUrl: data.url, username: data.username};
     } else {
-      return thunkAPI.rejectWithValue(data.error || 'Failed to fetch user profile');
+      return thunkAPI.rejectWithValue(
+        data.error || 'Failed to fetch user profile',
+      );
     }
-  }
+  },
 );
 
 /**
@@ -41,23 +44,32 @@ export const fetchUserProfile = createAsyncThunk(
  */
 export const updateUsername = createAsyncThunk(
   'auth/updateUsername',
-  async ({ userId, newUsername }: { userId: string; newUsername: string }, thunkAPI) => {
+  async (
+    {userId, newUsername}: {userId: string; newUsername: string},
+    thunkAPI,
+  ) => {
     try {
-      const response = await fetch(`${SERVER_BASE_URL}/api/profile/updateUsername`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, username: newUsername }),
-      });
+      const response = await fetch(
+        `${SERVER_BASE_URL}/api/profile/updateUsername`,
+        {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({userId, username: newUsername}),
+        },
+      );
       const data = await response.json();
-      console.log('updateUsername response:', data);
       if (!data.success) {
-        return thunkAPI.rejectWithValue(data.error || 'Failed to update username');
+        return thunkAPI.rejectWithValue(
+          data.error || 'Failed to update username',
+        );
       }
       return data.username as string;
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.message || 'Error updating username');
+      return thunkAPI.rejectWithValue(
+        error.message || 'Error updating username',
+      );
     }
-  }
+  },
 );
 
 const authSlice = createSlice({
@@ -71,7 +83,7 @@ const authSlice = createSlice({
         address: string;
         profilePicUrl?: string;
         username?: string;
-      }>
+      }>,
     ) {
       state.provider = action.payload.provider;
       state.address = action.payload.address;
@@ -91,10 +103,20 @@ const authSlice = createSlice({
     },
   },
   extraReducers: builder => {
-    // fetchUserProfile
+    // When user profile fetch completes, only overwrite our Redux state
+    // if the fetched userId is the same as the current user’s address.
     builder.addCase(fetchUserProfile.fulfilled, (state, action) => {
-      state.profilePicUrl = action.payload.profilePicUrl;
-      state.username = action.payload.username;
+      const {profilePicUrl, username} = action.payload;
+      const requestedUserId = action.meta.arg;
+      // Only set global profilePicUrl and username if this is the same user:
+      if (
+        requestedUserId &&
+        state.address &&
+        requestedUserId.toLowerCase() === state.address.toLowerCase()
+      ) {
+        state.profilePicUrl = profilePicUrl;
+        state.username = username;
+      }
     });
 
     // updateUsername
@@ -104,5 +126,6 @@ const authSlice = createSlice({
   },
 });
 
-export const { loginSuccess, logoutSuccess, updateProfilePic } = authSlice.actions;
+export const {loginSuccess, logoutSuccess, updateProfilePic} =
+  authSlice.actions;
 export default authSlice.reducer;
