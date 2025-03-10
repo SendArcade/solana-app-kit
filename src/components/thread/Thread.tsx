@@ -1,4 +1,3 @@
-// File: src/components/thread/Thread.tsx
 import React, {useState} from 'react';
 import {View, Text, FlatList} from 'react-native';
 import ThreadComposer from './ThreadComposer';
@@ -30,9 +29,15 @@ interface ThreadProps {
   onRefresh?: () => void;
 
   /**
-   * NEW: Callback fired when the user’s avatar/username is pressed
+   * Callback fired when the user’s avatar/username is pressed
    */
   onPressUser?: (user: ThreadUser) => void;
+
+  /**
+   * If true, do NOT show sub replies or reply composers within each post
+   * (used for feed, or anywhere we only want a preview).
+   */
+  disableReplies?: boolean;
 }
 
 export const Thread: React.FC<ThreadProps> = ({
@@ -48,10 +53,10 @@ export const Thread: React.FC<ThreadProps> = ({
   userStyleSheet,
   refreshing: externalRefreshing,
   onRefresh: externalOnRefresh,
-
-  onPressUser, // new prop
+  onPressUser,
+  disableReplies = false,
 }) => {
-  // Local fallback for refreshing if not provided via props
+  // Local fallback for refreshing if not provided
   const [localRefreshing, setLocalRefreshing] = useState(false);
 
   const mergedTheme = getMergedTheme(themeOverrides);
@@ -84,8 +89,8 @@ export const Thread: React.FC<ThreadProps> = ({
       userStyleSheet={userStyleSheet}
       onPressPost={onPressPost}
       ctaButtons={ctaButtons}
-      // PASS the new callback down
       onPressUser={onPressUser}
+      disableReplies={disableReplies}
     />
   );
 
