@@ -1,5 +1,5 @@
 import {Request, Response, NextFunction} from 'express';
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch';
 
 /**
  * jupiterSwapHandler
@@ -20,6 +20,7 @@ export async function jupiterSwapHandler(
 ): Promise<void> {
   try {
     // Extract parameters from the body
+    const { default: fetch } = await import('node-fetch');
     const {quoteResponse, userPublicKey, feeAccount, destinationTokenAccount} =
       req.body;
 
