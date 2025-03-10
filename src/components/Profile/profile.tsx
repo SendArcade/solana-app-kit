@@ -39,6 +39,7 @@ import {
 import {flattenPosts} from '../thread/thread.utils';
 import {setStatusBarStyle} from 'expo-status-bar';
 import {useAppNavigation} from '../../hooks/useAppNavigation';
+import { followUser, unfollowUser } from '../../state/users/reducer';
 
 /**
  * Data about the user whose profile we’re showing
@@ -186,7 +187,10 @@ export default function Profile({
           if (data.success && Array.isArray(data.followers)) {
             setFollowersList(data.followers);
             // Check if *I* am in there => amIFollowing = true
-            if (myWallet && data.followers.findIndex((x: any) => x.id === myWallet) >= 0) {
+            if (
+              myWallet &&
+              data.followers.findIndex((x: any) => x.id === myWallet) >= 0
+            ) {
               setAmIFollowing(true);
             } else {
               setAmIFollowing(false);
@@ -258,21 +262,16 @@ export default function Profile({
       return;
     }
     try {
-      const response = await fetch(`${SERVER_URL}/api/profile/follow`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
+      // Dispatch the Redux action
+      await dispatch(
+        followUser({
           followerId: myWallet,
           followingId: userWallet,
         }),
-      });
-      const data = await response.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to follow user');
-      }
+      ).unwrap();
+
+      // Update local state for immediate UI response
       setAmIFollowing(true);
-      // Optionally update the local followersList so that user sees changes
-      // e.g. The userWallet's followers now includes me (myWallet)
       setFollowersList(prev => {
         if (!prev.some(u => u.id === myWallet)) {
           return [
@@ -281,7 +280,7 @@ export default function Profile({
               id: myWallet,
               username: 'Me',
               handle: '@me',
-              profile_picture_url: '', // or from Redux
+              profile_picture_url: '',
             },
           ];
         }
@@ -298,20 +297,15 @@ export default function Profile({
       return;
     }
     try {
-      const response = await fetch(`${SERVER_URL}/api/profile/unfollow`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
+      await dispatch(
+        unfollowUser({
           followerId: myWallet,
           followingId: userWallet,
         }),
-      });
-      const data = await response.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to unfollow user');
-      }
+      ).unwrap();
+
+      // Update local state for immediate UI response
       setAmIFollowing(false);
-      // Remove from local followers
       setFollowersList(prev => prev.filter(u => u.id !== myWallet));
     } catch (err: any) {
       Alert.alert('Unfollow Error', err.message);
@@ -429,7 +423,6 @@ export default function Profile({
       Alert.alert('No Followers', 'This user has no followers yet.');
       return;
     }
-    // Navigate to the new screen, passing the entire array
     navigation.navigate('FollowersFollowingList', {
       mode: 'followers',
       userId: userWallet,
@@ -447,6 +440,12 @@ export default function Profile({
       userId: userWallet,
       userList: followingList,
     } as never);
+  };
+
+  // (Optional) If you need a callback for "Send to wallet" from the parent:
+  const handleSendToWallet = () => {
+    // You can keep it empty or do something else here if you like
+    console.log('Send to wallet was clicked!');
   };
 
   // ============== Rendering ================
@@ -469,10 +468,8 @@ export default function Profile({
         areTheyFollowingMe={areTheyFollowingMe}
         onFollowPress={handleFollow}
         onUnfollowPress={handleUnfollow}
-        // Pass the real counts:
         followersCount={followersList.length}
         followingCount={followingList.length}
-        // Pass press handlers:
         onPressFollowers={handlePressFollowers}
         onPressFollowing={handlePressFollowing}
       />
@@ -483,13 +480,19 @@ export default function Profile({
           myNFTs={resolvedNfts}
           loadingNfts={resolvedLoadingNfts}
           fetchNftsError={resolvedNftError}
-          // If you want to add “pull to refresh,” pass callbacks here
           onPressPost={post => {
-            // Example: Navigate to a thread screen
-            // navigation.navigate('PostThread', {postId: post.id});
+            // Example: navigate to a detail screen or do nothing
+            // navigation.navigate('PostThread', { postId: post.id });
           }}
         />
       </View>
+
+      {/* 
+        If it's *not* my own profile, we show the AddButton with "Send to wallet".
+        Already inside <ProfileInfo>, we show <AddButton> for "otherProfile." 
+        But if you prefer to show it here, you could do so. For demonstration, 
+        we rely on the existing logic that calls <AddButton> from <ProfileInfo>.
+      */}
 
       {/* Avatar Option Modal */}
       {isOwnProfile && (
@@ -525,7 +528,7 @@ export default function Profile({
         </Modal>
       )}
 
-      {/* Confirm NFT or library if you unify them */}
+      {/* Confirm NFT if selected */}
       {isOwnProfile && selectedSource === 'nft' && confirmModalVisible && (
         <Modal
           animationType="fade"
@@ -543,7 +546,10 @@ export default function Profile({
                   source={{uri: localFileUri}}
                   style={confirmModalStyles.preview}
                   onError={err => {
-                    Alert.alert('Image Load Error', JSON.stringify(err.nativeEvent));
+                    Alert.alert(
+                      'Image Load Error',
+                      JSON.stringify(err.nativeEvent),
+                    );
                   }}
                 />
               ) : (
