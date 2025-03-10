@@ -17,6 +17,7 @@ import LoginScreen from '../screens/Common/LoginScreen/LoginScreen';
 import OtherProfileScreen from '../screens/SampleUI/Threads/OtherProfileScreen/OtherProfileScreen';
 import PostThreadScreen from '../screens/SampleUI/Threads/PostThreadScreen/PostthreadScreen';
 import FollowersFollowingListScreen from '../components/thread/FollowersFollowingListScreen/FollowersFollowingListScreen';
+import ProfileScreen from '../screens/SampleUI/Threads/ProfileScreen/ProfileScreen';
 
 export type RootStackParamList = {
   LoginOptions: undefined;
@@ -33,6 +34,7 @@ export type RootStackParamList = {
   OtherProfile: { userId: string };
   PostThread: { postId: string };
   FollowersFollowingList : undefined;
+  ProfileScreen: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -64,6 +66,7 @@ export default function RootNavigator() {
             component={FollowersFollowingListScreen}
             options={{ title: '' }} // or "Followers / Following"
           />
+          <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
         </>
       ) : (
         <>

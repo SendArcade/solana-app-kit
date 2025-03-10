@@ -1,5 +1,3 @@
-// FILE: src/components/thread/ThreadItem.tsx
-
 import React, {useState} from 'react';
 import {View, Alert, TouchableOpacity} from 'react-native';
 import ThreadAncestors from './ThreadAncestors';
@@ -13,22 +11,33 @@ import {ThreadCTAButton, ThreadPost, ThreadUser} from './thread.types';
 import {useAppDispatch} from '../../hooks/useReduxHooks';
 import {deletePostAsync} from '../../state/thread/reducer';
 import ThreadEditModal from './ThreadEditModal';
-import ThreadComposer from './ThreadComposer';
 
 interface ThreadItemProps {
+  /** The post to display. */
   post: ThreadPost;
+  /** The current logged-in user. */
   currentUser: ThreadUser;
+  /** An array of root-level posts; used to gather ancestor info. */
   rootPosts: ThreadPost[];
+  /** Depth in the reply hierarchy (for optional styling). */
   depth?: number;
+  /** Invoked if a post is pressed, e.g. to navigate to PostThreadScreen. */
   onPressPost?: (post: ThreadPost) => void;
+  /** Array of custom CTA buttons to render below the post body. */
   ctaButtons?: ThreadCTAButton[];
+  /** Theming overrides. */
   themeOverrides?: Partial<Record<string, any>>;
+  /** Style overrides for specific keys in the default style. */
   styleOverrides?: {[key: string]: object};
+  /** A user-provided stylesheet that merges with internal styles. */
   userStyleSheet?: {[key: string]: object};
-  onPressUser?: (user: ThreadUser) => void;
-
   /**
-   * NEW: If true, do not show sub-replies or the local composer in this item.
+   * Invoked if the user’s avatar/username is pressed (e.g., to open a profile).
+   */
+  onPressUser?: (user: ThreadUser) => void;
+  /**
+   * (Currently unused) If true, replies inside this post are hidden.
+   * We no longer expand local replies on comment-click but keep the prop for potential usage.
    */
   disableReplies?: boolean;
 }
@@ -46,10 +55,8 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
   onPressUser,
   disableReplies,
 }) => {
-  const [showReplies, setShowReplies] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-
   const dispatch = useAppDispatch();
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const mergedTheme = getMergedTheme(themeOverrides);
   const styles = createThreadStyles(
@@ -81,20 +88,19 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
 
   return (
     <View style={containerStyle}>
-      {/* If not root, show ancestors (unless disableReplies) */}
-      {!disableReplies && (
-        <ThreadAncestors
-          post={post}
-          rootPosts={rootPosts}
-          themeOverrides={themeOverrides}
-          styleOverrides={styleOverrides}
-          userStyleSheet={userStyleSheet}
-        />
-      )}
+      {/* Ancestor info if this post is a reply. (No inline children are shown here.) */}
+      <ThreadAncestors
+        post={post}
+        rootPosts={rootPosts}
+        themeOverrides={themeOverrides}
+        styleOverrides={styleOverrides}
+        userStyleSheet={userStyleSheet}
+      />
 
+      {/* Entire post is tappable => navigate to full PostThreadScreen */}
       <TouchableOpacity
         activeOpacity={0.8}
-        onPress={() => onPressPost && onPressPost(post)}
+        onPress={() => onPressPost?.(post)}
         style={{flex: 1}}>
         <PostHeader
           post={post}
@@ -111,6 +117,7 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
           styleOverrides={styleOverrides}
         />
 
+        {/* If it's a retweet, show the retweet preview inside this post. */}
         {post.retweetOf && (
           <View style={{marginBottom: 6}}>
             <RetweetPreview
@@ -131,48 +138,17 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
 
         <PostFooter
           post={post}
-          onPressComment={() => {
-            if (!disableReplies) {
-              setShowReplies(!showReplies);
-            }
-          }}
+          /**
+           * Previously, we toggled local replies here.
+           * Now we simply open the same “onPressPost” navigation:
+           */
+          onPressComment={() => onPressPost?.(post)}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
         />
       </TouchableOpacity>
 
-      {/* If !disableReplies => user can expand replies + composer */}
-      {!disableReplies && showReplies && (
-        <View style={{marginTop: 8}}>
-          <ThreadComposer
-            currentUser={currentUser}
-            parentId={post.id}
-            onPostCreated={() => {
-              /* optional callback if needed */
-            }}
-            themeOverrides={themeOverrides}
-            styleOverrides={styleOverrides}
-          />
-
-          {/* Render the existing replies */}
-          {post.replies.map(reply => (
-            <ThreadItem
-              key={reply.id}
-              post={reply}
-              currentUser={currentUser}
-              rootPosts={rootPosts}
-              depth={depth + 1}
-              onPressPost={onPressPost}
-              ctaButtons={ctaButtons}
-              themeOverrides={themeOverrides}
-              styleOverrides={styleOverrides}
-              userStyleSheet={userStyleSheet}
-              onPressUser={onPressUser}
-            />
-          ))}
-        </View>
-      )}
-
+      {/* “Edit Post” Modal */}
       {showEditModal && (
         <ThreadEditModal
           post={post}
@@ -186,3 +162,5 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
     </View>
   );
 };
+
+export default ThreadItem;
