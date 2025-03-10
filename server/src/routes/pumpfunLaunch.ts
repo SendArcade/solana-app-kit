@@ -4,7 +4,7 @@ import multer from 'multer';
 import {UploadMetadataController} from '../controllers/uploadMetadataController';
 
 // We store uploads in ./uploads by default
-const upload = multer({dest: 'uploads/'});
+const upload = multer({ storage: multer.memoryStorage() });
 
 const launchRouter = Router();
 

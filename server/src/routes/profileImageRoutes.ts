@@ -10,7 +10,7 @@ import path from 'path';
 import os from 'os';
 import knex from '../db/knex';
 import { uploadToIpfs } from '../utils/ipfs';
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch';
 
 const profileImageRouter = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -61,6 +61,7 @@ profileImageRouter.post(
 
       // 6) Attempt to fetch the returned metadata JSON
       let ipfsImageUrl = ipfsResult;
+      const { default: fetch } = await import('node-fetch');
       const metadataResponse = await fetch(ipfsResult);
       if (metadataResponse.ok) {
         const metadataJson: any = await metadataResponse.json();

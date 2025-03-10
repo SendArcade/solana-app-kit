@@ -1,13 +1,14 @@
 // server/src/utils/ipfs.ts
 import fs from 'fs';
 import path from 'path';
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch';
 import FormData from 'form-data';
 
 export async function uploadToIpfs(
   imagePath: string,
   metadata: Record<string, any>,
 ): Promise<string> {
+  const { default: fetch } = await import('node-fetch');
   const resolvedPath = path.resolve(imagePath);
   const fileBuffer = fs.readFileSync(resolvedPath);
 
