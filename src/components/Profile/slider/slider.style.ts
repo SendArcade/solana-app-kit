@@ -1,3 +1,4 @@
+// FILE: src/components/Profile/slider/slider.style.ts
 import {StyleSheet} from 'react-native';
 
 export const styles = StyleSheet.create({
@@ -13,20 +14,14 @@ export const styles = StyleSheet.create({
     paddingTop: 40,
     alignItems: 'center',
   },
-  // Text shown when there's no data
   emptyText: {
     fontSize: 14,
     color: '#999',
   },
-  // Posts list container
   postList: {
     paddingVertical: 12,
     paddingHorizontal: 10,
   },
-  /**
-   * The container for a single post in the list.
-   * We'll make it appear like a card with subtle shadow, margin, etc.
-   */
   postCard: {
     backgroundColor: '#fefefe',
     borderRadius: 10,
@@ -42,9 +37,6 @@ export const styles = StyleSheet.create({
     // Android elevation
     elevation: 2,
   },
-  /**
-   * Label to indicate that this post is a reply (if parentId is present).
-   */
   replyLabel: {
     alignSelf: 'flex-start',
     paddingHorizontal: 8,

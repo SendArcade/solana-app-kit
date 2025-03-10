@@ -1,7 +1,7 @@
 import React from 'react';
-import {createStackNavigator} from '@react-navigation/stack';
-import {useSelector} from 'react-redux';
-import {RootState} from '../state/store';
+import { createStackNavigator } from '@react-navigation/stack';
+import { useSelector } from 'react-redux';
+import { RootState } from '../state/store';
 import MainTabs from './MainTabs';
 import TokenMillScreen from '../screens/Common/TokenMillScreen/TokenMillScreen';
 import ChatScreen from '../screens/SampleUI/Chat/ChatScreen/ChatScreen';
@@ -16,6 +16,7 @@ import LoginScreen from '../screens/Common/LoginScreen/LoginScreen';
 // NEW IMPORT
 import OtherProfileScreen from '../screens/SampleUI/Threads/OtherProfileScreen/OtherProfileScreen';
 import PostThreadScreen from '../screens/SampleUI/Threads/PostThreadScreen/PostthreadScreen';
+import FollowersFollowingListScreen from '../components/thread/FollowersFollowingListScreen/FollowersFollowingListScreen';
 
 export type RootStackParamList = {
   LoginOptions: undefined;
@@ -29,8 +30,9 @@ export type RootStackParamList = {
   PlatformSelection: undefined;
   ChatScreen: undefined;
   // NEW ROUTE
-  OtherProfile: {userId: string};
-  PostThread: {postId: string};
+  OtherProfile: { userId: string };
+  PostThread: { postId: string };
+  FollowersFollowingList : undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -39,7 +41,7 @@ export default function RootNavigator() {
   const isLoggedIn = useSelector((state: RootState) => state.auth.isLoggedIn);
 
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
       {isLoggedIn ? (
         <>
           <Stack.Screen
@@ -57,6 +59,11 @@ export default function RootNavigator() {
           {/* NEW SCREEN for viewing other user's profile */}
           <Stack.Screen name="OtherProfile" component={OtherProfileScreen} />
           <Stack.Screen name="PostThread" component={PostThreadScreen} />
+          <Stack.Screen
+            name="FollowersFollowingList"
+            component={FollowersFollowingListScreen}
+            options={{ title: '' }} // or "Followers / Following"
+          />
         </>
       ) : (
         <>

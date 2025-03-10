@@ -4,38 +4,86 @@ import {styles} from './addButton.style';
 import Icons from '../../../assets/svgs/index';
 
 /**
- * Props to manage the buttons displayed
+ * Props controlling the follow-unfollow logic and additional actions.
  */
 export interface AddButtonProps {
-  onFollowBack?: () => void;
+  /**
+   * If `true`, we currently follow this user.
+   */
+  amIFollowing: boolean;
+  /**
+   * If `true`, this user follows me. Helps determine "Follow Back".
+   */
+  areTheyFollowingMe: boolean;
+  /**
+   * Called when we tap the “Follow” or “Follow Back” button.
+   */
+  onPressFollow: () => void;
+  /**
+   * Called when we tap the “Unfollow” or “Following” button.
+   */
+  onPressUnfollow: () => void;
+
+  /**
+   * Optional: callback for “Send to Wallet” button if you want to keep it.
+   */
   onSendToWallet?: () => void;
-  // Additional actions if you want them
-  // onBuyTime?: () => void;
-  // onAdd?: () => void;
 }
 
+/**
+ * A small action row for following or sending a wallet transaction.
+ * 
+ * It supports logic for "Follow", "Follow Back", or "Following" states:
+ * - If `amIFollowing === true`: show “Following” => pressing it calls onPressUnfollow
+ * - Else if `areTheyFollowingMe === true`: show “Follow Back”
+ * - Otherwise: show “Follow”
+ */
 const AddButton: React.FC<AddButtonProps> = ({
-  onFollowBack,
+  amIFollowing,
+  areTheyFollowingMe,
+  onPressFollow,
+  onPressUnfollow,
   onSendToWallet,
 }) => {
+  /**
+   * Decide label for the main follow button
+   */
+  let followLabel = 'Follow';
+  if (amIFollowing) {
+    followLabel = 'Following';
+  } else if (!amIFollowing && areTheyFollowingMe) {
+    followLabel = 'Follow Back';
+  }
+
+  /**
+   * Press handler
+   */
+  const handlePressFollowButton = () => {
+    if (amIFollowing) {
+      // We are currently following => so user tapping means “Unfollow”
+      onPressUnfollow();
+    } else {
+      // We are NOT following => means “Follow” or “Follow Back”
+      onPressFollow();
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.btn} onPress={onFollowBack}>
-        <Text style={styles.text}>Follow Back</Text>
-        {/* <Icons.AddBtnIcon style={styles.icon}/> */}
+      {/* Follow/Unfollow button */}
+      <TouchableOpacity style={styles.btn} onPress={handlePressFollowButton}>
+        <Text style={styles.text}>{followLabel}</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.btn} onPress={onSendToWallet}>
-        <Text style={styles.text}>Send to Wallet</Text>
-        {/* <Icons.AddBtnIcon style={styles.icon}/> */}
-      </TouchableOpacity>
-
-      {/*
-        Example to re-enable:
-        <TouchableOpacity style={styles.btn}>
-          <Text style={styles.text}>Buy Time</Text>
+      {/* Example second button, e.g. “Send to Wallet” */}
+      {onSendToWallet && (
+        <TouchableOpacity style={styles.btn} onPress={onSendToWallet}>
+          <Text style={styles.text}>Send to Wallet</Text>
         </TouchableOpacity>
+      )}
 
+      {/* 
+        Optionally you can add more, e.g.:
         <TouchableOpacity style={[styles.btn, styles.lastBtn]}>
           <Text style={styles.lastBtnText}>+</Text>
         </TouchableOpacity>
