@@ -1,5 +1,3 @@
-/* FILE: src/components/Profile/profile.tsx */
-
 import React, {useEffect, useState} from 'react';
 import {
   View,
@@ -39,7 +37,7 @@ import {
 import {flattenPosts} from '../thread/thread.utils';
 import {setStatusBarStyle} from 'expo-status-bar';
 import {useAppNavigation} from '../../hooks/useAppNavigation';
-import { followUser, unfollowUser } from '../../state/users/reducer';
+import {followUser, unfollowUser} from '../../state/users/reducer';
 
 /**
  * Data about the user whose profile we’re showing
@@ -98,14 +96,14 @@ export default function Profile({
     user?.username || 'Anonymous',
   );
 
-  // Flattened posts for the user
+  // Flattened posts for the user (including replies)
   const [myPosts, setMyPosts] = useState<ThreadPost[]>(posts);
 
-  // **New**: Keep track of the real followers/following arrays
+  // Real followers/following arrays
   const [followersList, setFollowersList] = useState<any[]>([]);
   const [followingList, setFollowingList] = useState<any[]>([]);
 
-  // If this is not my own profile, we also track if "I" am following them, and if they follow me
+  // If not my own profile, track if "I" am following them, and if they follow me
   const [amIFollowing, setAmIFollowing] = useState(false);
   const [areTheyFollowingMe, setAreTheyFollowingMe] = useState(false);
 
@@ -123,8 +121,9 @@ export default function Profile({
   const [avatarOptionModalVisible, setAvatarOptionModalVisible] =
     useState(false);
   const [localFileUri, setLocalFileUri] = useState<string | null>(null);
-  const [selectedSource, setSelectedSource] =
-    useState<'library' | 'nft' | null>(null);
+  const [selectedSource, setSelectedSource] = useState<
+    'library' | 'nft' | null
+  >(null);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
 
   const [editNameModalVisible, setEditNameModalVisible] = useState(false);
@@ -239,7 +238,7 @@ export default function Profile({
   }, [posts, dispatch]);
 
   /**
-   * Flatten all posts => filter for the user
+   * Flatten all posts => filter for the user => show both root & replies
    */
   useEffect(() => {
     if (!userWallet) {
@@ -248,11 +247,13 @@ export default function Profile({
     }
     const basePosts = posts && posts.length > 0 ? posts : allReduxPosts;
     const flattened = flattenPosts(basePosts);
-    const userPosts = flattened.filter(
+    // Show all posts belonging to this user
+    const userAllPosts = flattened.filter(
       p => p.user.id.toLowerCase() === userWallet.toLowerCase(),
     );
-    userPosts.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
-    setMyPosts(userPosts);
+    // Sort newest-first
+    userAllPosts.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+    setMyPosts(userAllPosts);
   }, [allReduxPosts, userWallet, posts]);
 
   // ============== Follow / Unfollow ================
@@ -262,7 +263,6 @@ export default function Profile({
       return;
     }
     try {
-      // Dispatch the Redux action
       await dispatch(
         followUser({
           followerId: myWallet,
@@ -304,7 +304,6 @@ export default function Profile({
         }),
       ).unwrap();
 
-      // Update local state for immediate UI response
       setAmIFollowing(false);
       setFollowersList(prev => prev.filter(u => u.id !== myWallet));
     } catch (err: any) {
@@ -312,7 +311,7 @@ export default function Profile({
     }
   };
 
-  // ============== Avatar picking flow (only if own profile) ================
+  // ============== Avatar picking flow ================
   const handleAvatarPress = () => {
     if (!isOwnProfile) return;
     setAvatarOptionModalVisible(true);
@@ -417,7 +416,7 @@ export default function Profile({
     }
   };
 
-  // ============== Press handlers for the followers/following counts => navigate
+  // Stats presses
   const handlePressFollowers = () => {
     if (followersList.length === 0) {
       Alert.alert('No Followers', 'This user has no followers yet.');
@@ -442,21 +441,18 @@ export default function Profile({
     } as never);
   };
 
-  // (Optional) If you need a callback for "Send to wallet" from the parent:
+  // (Optional) "Send to wallet"
   const handleSendToWallet = () => {
-    // You can keep it empty or do something else here if you like
     console.log('Send to wallet was clicked!');
   };
 
-  // ============== Rendering ================
   return (
     <SafeAreaView
       style={[
         styles.container,
         containerStyle,
         Platform.OS === 'android' && androidStyles.safeArea,
-      ]}
-    >
+      ]}>
       <ProfileInfo
         profilePicUrl={profilePicUrl}
         username={localUsername}
@@ -480,19 +476,12 @@ export default function Profile({
           myNFTs={resolvedNfts}
           loadingNfts={resolvedLoadingNfts}
           fetchNftsError={resolvedNftError}
+          // Added onPressPost => navigate to PostThread
           onPressPost={post => {
-            // Example: navigate to a detail screen or do nothing
-            // navigation.navigate('PostThread', { postId: post.id });
+            navigation.navigate('PostThread', {postId: post.id});
           }}
         />
       </View>
-
-      {/* 
-        If it's *not* my own profile, we show the AddButton with "Send to wallet".
-        Already inside <ProfileInfo>, we show <AddButton> for "otherProfile." 
-        But if you prefer to show it here, you could do so. For demonstration, 
-        we rely on the existing logic that calls <AddButton> from <ProfileInfo>.
-      */}
 
       {/* Avatar Option Modal */}
       {isOwnProfile && (
@@ -500,27 +489,23 @@ export default function Profile({
           animationType="fade"
           transparent
           visible={avatarOptionModalVisible}
-          onRequestClose={() => setAvatarOptionModalVisible(false)}
-        >
+          onRequestClose={() => setAvatarOptionModalVisible(false)}>
           <View style={modalStyles.overlay}>
             <View style={modalStyles.optionContainer}>
               <Text style={modalStyles.optionTitle}>Choose avatar source</Text>
               <TouchableOpacity
                 style={modalStyles.optionButton}
-                onPress={handlePickProfilePicture}
-              >
+                onPress={handlePickProfilePicture}>
                 <Text style={modalStyles.optionButtonText}>Library</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={modalStyles.optionButton}
-                onPress={handleSelectNftOption}
-              >
+                onPress={handleSelectNftOption}>
                 <Text style={modalStyles.optionButtonText}>My NFTs</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[modalStyles.optionButton, {backgroundColor: 'gray'}]}
-                onPress={() => setAvatarOptionModalVisible(false)}
-              >
+                onPress={() => setAvatarOptionModalVisible(false)}>
                 <Text style={modalStyles.optionButtonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -534,8 +519,7 @@ export default function Profile({
           animationType="fade"
           transparent
           visible={confirmModalVisible}
-          onRequestClose={handleCancelUpload}
-        >
+          onRequestClose={handleCancelUpload}>
           <View style={confirmModalStyles.overlay}>
             <View style={confirmModalStyles.container}>
               <Text style={confirmModalStyles.title}>
@@ -563,8 +547,7 @@ export default function Profile({
                     confirmModalStyles.modalButton,
                     {backgroundColor: '#aaa'},
                   ]}
-                  onPress={handleCancelUpload}
-                >
+                  onPress={handleCancelUpload}>
                   <Text style={confirmModalStyles.buttonText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -572,8 +555,7 @@ export default function Profile({
                     confirmModalStyles.modalButton,
                     {backgroundColor: '#1d9bf0'},
                   ]}
-                  onPress={handleConfirmUpload}
-                >
+                  onPress={handleConfirmUpload}>
                   <Text style={confirmModalStyles.buttonText}>Confirm</Text>
                 </TouchableOpacity>
               </View>
@@ -596,14 +578,12 @@ export default function Profile({
           <View style={inlineConfirmStyles.buttonRow}>
             <TouchableOpacity
               style={[inlineConfirmStyles.button, {backgroundColor: '#aaa'}]}
-              onPress={handleCancelUpload}
-            >
+              onPress={handleCancelUpload}>
               <Text style={inlineConfirmStyles.buttonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[inlineConfirmStyles.button, {backgroundColor: '#1d9bf0'}]}
-              onPress={handleConfirmUpload}
-            >
+              onPress={handleConfirmUpload}>
               <Text style={inlineConfirmStyles.buttonText}>Confirm</Text>
             </TouchableOpacity>
           </View>
@@ -616,8 +596,7 @@ export default function Profile({
           animationType="slide"
           transparent
           visible={editNameModalVisible}
-          onRequestClose={() => setEditNameModalVisible(false)}
-        >
+          onRequestClose={() => setEditNameModalVisible(false)}>
           <View style={editNameModalStyles.overlay}>
             <View style={editNameModalStyles.container}>
               <Text style={editNameModalStyles.title}>Edit Profile Name</Text>
@@ -629,9 +608,11 @@ export default function Profile({
               />
               <View style={editNameModalStyles.btnRow}>
                 <TouchableOpacity
-                  style={[editNameModalStyles.button, {backgroundColor: 'gray'}]}
-                  onPress={() => setEditNameModalVisible(false)}
-                >
+                  style={[
+                    editNameModalStyles.button,
+                    {backgroundColor: 'gray'},
+                  ]}
+                  onPress={() => setEditNameModalVisible(false)}>
                   <Text style={editNameModalStyles.btnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -639,8 +620,7 @@ export default function Profile({
                     editNameModalStyles.button,
                     {backgroundColor: '#1d9bf0'},
                   ]}
-                  onPress={handleSaveName}
-                >
+                  onPress={handleSaveName}>
                   <Text style={editNameModalStyles.btnText}>Save</Text>
                 </TouchableOpacity>
               </View>
@@ -657,3 +637,4 @@ const androidStyles = StyleSheet.create({
     paddingTop: 30,
   },
 });
+

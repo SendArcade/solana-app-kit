@@ -1,18 +1,20 @@
-import React, {useEffect, useState, useCallback} from 'react';
+// File: src/screens/SampleUI/Threads/FeedScreen/FeedScreen.tsx
+import React, {useCallback, useEffect, useState} from 'react';
 import {SafeAreaView, StyleSheet, Platform} from 'react-native';
+import {NavigationProp, useNavigation} from '@react-navigation/native';
+
+import {Thread} from '../../../../components/thread/Thread';
 import {
-  ThreadCTAButton,
-  ThreadPost,
   ThreadUser,
+  ThreadPost,
+  ThreadCTAButton,
 } from '../../../../components/thread/thread.types';
 import {useAppDispatch, useAppSelector} from '../../../../hooks/useReduxHooks';
-import {Thread} from '../../../../components/thread/Thread';
-import COLORS from '../../../../assets/colors';
 import {fetchAllPosts} from '../../../../state/thread/reducer';
 import {fetchUserProfile} from '../../../../state/auth/reducer';
-import {DEFAULT_IMAGES} from '../../../../config/constants';
-import {NavigationProp, useNavigation} from '@react-navigation/native';
+import COLORS from '../../../../assets/colors';
 import {RootStackParamList} from '../../../../navigation/RootNavigator';
+import {DEFAULT_IMAGES} from '../../../../config/constants';
 
 export default function FeedScreen() {
   const dispatch = useAppDispatch();
@@ -23,10 +25,10 @@ export default function FeedScreen() {
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
   const userName = useAppSelector(state => state.auth.username);
 
-  const [rootPosts, setRootPosts] = useState<ThreadPost[]>([]);
+  const [feedPosts, setFeedPosts] = useState<ThreadPost[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Build the current user object from Redux data
+  // Build current user object from Redux data
   const currentUser: ThreadUser = {
     id: userWallet || 'anonymous-user',
     username: userName || 'Anonymous',
@@ -37,12 +39,12 @@ export default function FeedScreen() {
     avatar: storedProfilePic ? {uri: storedProfilePic} : DEFAULT_IMAGES.user,
   };
 
-  // On mount, fetch all posts from the server
+  // On mount, fetch all posts
   useEffect(() => {
     dispatch(fetchAllPosts());
   }, [dispatch]);
 
-  // Once we have userWallet, fetch DB profile pic + user name
+  // Once we have userWallet, fetch DB profile info (username, profile pic)
   useEffect(() => {
     if (userWallet) {
       dispatch(fetchUserProfile(userWallet)).catch(err => {
@@ -51,12 +53,12 @@ export default function FeedScreen() {
     }
   }, [userWallet, dispatch]);
 
-  // Filter out root posts (no parentId)
+  // We now include both root posts AND replies in the feed
   useEffect(() => {
-    const roots = allPosts.filter(p => !p.parentId);
+    const sortedAll = [...allPosts];
     // Sort descending by createdAt
-    roots.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
-    setRootPosts(roots);
+    sortedAll.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+    setFeedPosts(sortedAll);
   }, [allPosts]);
 
   // Pull-to-refresh
@@ -66,7 +68,7 @@ export default function FeedScreen() {
     setRefreshing(false);
   }, [dispatch]);
 
-  // Example CTA buttons (optional)
+  // Example CTA buttons (completely optional)
   const ctaButtons: ThreadCTAButton[] = [
     {
       label: 'Mint NFT',
@@ -94,14 +96,6 @@ export default function FeedScreen() {
     },
   ];
 
-  /**
-   * Handle pressing a user's avatar/username on any post => navigate to OtherProfile
-   */
-  const handlePressUser = (user: ThreadUser) => {
-    // user.id is the wallet address stored in the post
-    navigation.navigate('OtherProfile', {userId: user.id} as never);
-  };
-
   return (
     <SafeAreaView
       style={[
@@ -109,18 +103,30 @@ export default function FeedScreen() {
         Platform.OS === 'android' && styles.androidContainer,
       ]}>
       <Thread
-        rootPosts={rootPosts}
+        rootPosts={feedPosts} // Passing all posts (including replies)
         currentUser={currentUser}
         ctaButtons={ctaButtons}
+        // Set disableReplies to false so that replies render with their parent snippet.
+        disableReplies={false}
         refreshing={refreshing}
         onRefresh={onRefresh}
-        // NEW: pass user-press callback
-        onPressUser={handlePressUser}
+        // onPressPost navigates to the PostThreadScreen with the post’s ID.
+        onPressPost={post => {
+          navigation.navigate('PostThread', {postId: post.id});
+        }}
         themeOverrides={{'--thread-bg-primary': '#F0F0F0'}}
         styleOverrides={{
           container: {padding: 6},
           button: {borderRadius: 8},
           buttonLabel: {fontWeight: 'bold'},
+        }}
+        onPressUser={user => {
+          // Check if the tapped user is the current (logged-in) user
+          if (user.id === currentUser.id) {
+            navigation.navigate('ProfileScreen' as never); // Show own profile
+          } else {
+            navigation.navigate('OtherProfile', {userId: user.id}); // Show other profile
+          }
         }}
       />
     </SafeAreaView>
