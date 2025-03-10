@@ -1,19 +1,16 @@
-import React, {useEffect, useState} from 'react';
-import {View, StyleSheet, Platform, Alert} from 'react-native';
+// File: src/screens/SampleUI/Threads/OtherProfileScreen/OtherProfileScreen.tsx
+import React, {useEffect, useState, useMemo} from 'react';
+import {View, StyleSheet, Platform} from 'react-native';
 import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
 import {RootStackParamList} from '../../../../navigation/RootNavigator';
-import {useAppDispatch} from '../../../../hooks/useReduxHooks';
+import {useAppDispatch, useAppSelector} from '../../../../hooks/useReduxHooks';
 import {fetchUserProfile} from '../../../../state/auth/reducer';
 import Profile from '../../../../components/Profile/profile';
 import {ThreadPost} from '../../../../components/thread/thread.types';
 import {fetchAllPosts} from '../../../../state/thread/reducer';
-import {useAppSelector} from '../../../../hooks/useReduxHooks';
 import {NftItem, useFetchNFTs} from '../../../../hooks/useFetchNFTs';
 import COLORS from '../../../../assets/colors';
 
-/**
- * This screen is for viewing another person's profile (not the logged-in user).
- */
 type OtherProfileRouteProp = RouteProp<RootStackParamList, 'OtherProfile'>;
 
 export default function OtherProfileScreen() {
@@ -34,7 +31,6 @@ export default function OtherProfileScreen() {
     dispatch(fetchUserProfile(userId))
       .unwrap()
       .then(value => {
-        // structure: value => { profilePicUrl, username }
         if (value.profilePicUrl) {
           setProfilePicUrl(value.profilePicUrl);
         }
@@ -68,7 +64,7 @@ export default function OtherProfileScreen() {
     setMyPosts(userPosts);
   }, [allPosts, userId]);
 
-  // Also fetch NFTs
+  // Also fetch NFTs using the custom hook
   const {nfts, loading: loadingNfts, error: nftsError} = useFetchNFTs(userId);
 
   return (
@@ -85,7 +81,7 @@ export default function OtherProfileScreen() {
           username: username,
         }}
         posts={myPosts}
-        nfts={nfts as NftItem[]}
+        nfts={nfts}
         loadingNfts={loadingNfts}
         fetchNftsError={nftsError}
       />
