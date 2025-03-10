@@ -118,7 +118,7 @@ export default function FeedScreen() {
         onPressUser={handlePressUser}
         themeOverrides={{'--thread-bg-primary': '#F0F0F0'}}
         styleOverrides={{
-          container: {padding: 10},
+          container: {padding: 6},
           button: {borderRadius: 8},
           buttonLabel: {fontWeight: 'bold'},
         }}

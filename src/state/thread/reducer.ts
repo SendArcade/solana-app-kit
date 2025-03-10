@@ -1,5 +1,4 @@
-// File: src/state/thread/reducer.ts
-
+// FILE: src/state/thread/reducer.ts
 import {createSlice, createAsyncThunk, PayloadAction} from '@reduxjs/toolkit';
 import type {
   ThreadPost,
@@ -21,8 +20,6 @@ export const fetchAllPosts = createAsyncThunk(
       if (!data.success) {
         return rejectWithValue(data.error || 'Failed to fetch posts');
       }
-      // The server returns an array of top-level posts (with nested replies).
-      // We'll store them in state. If no data, fallback to mocks.
       return data.data.length > 0 ? data.data : fallbackPosts;
     } catch (error: any) {
       console.error('Fetch posts error, using fallback posts:', error.message);
@@ -33,7 +30,7 @@ export const fetchAllPosts = createAsyncThunk(
 
 /**
  * createRootPostAsync
- * Instead of passing user object, pass userId only
+ * Instead of passing a full user object, we pass userId only.
  */
 export const createRootPostAsync = createAsyncThunk(
   'thread/createRootPost',
@@ -45,13 +42,13 @@ export const createRootPostAsync = createAsyncThunk(
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to create post');
-    return data.data; // newly created post from server
+    return data.data;
   },
 );
 
 /**
  * createReplyAsync
- * pass userId, sections, parentId
+ * Pass userId, sections, parentId.
  */
 export const createReplyAsync = createAsyncThunk(
   'thread/createReply',
@@ -73,7 +70,7 @@ export const createReplyAsync = createAsyncThunk(
 
 /**
  * createRetweetAsync
- * pass userId, retweetOf, sections?
+ * Pass userId, retweetOf, and optionally sections.
  */
 export const createRetweetAsync = createAsyncThunk(
   'thread/createRetweet',
@@ -108,7 +105,10 @@ export const updatePostAsync = createAsyncThunk(
   },
 );
 
-// deletePostAsync
+/**
+ * deletePostAsync
+ * Now returns an object with postId, retweetOf, and parentId.
+ */
 export const deletePostAsync = createAsyncThunk(
   'thread/deletePost',
   async (postId: string) => {
@@ -117,7 +117,7 @@ export const deletePostAsync = createAsyncThunk(
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to delete post');
-    return postId;
+    return data; // Expected shape: { success: true, postId, retweetOf, parentId }
   },
 );
 
@@ -148,18 +148,32 @@ const initialState: ThreadState = {
   error: null,
 };
 
+function removePostRecursive(
+  posts: ThreadPost[],
+  postId: string,
+): ThreadPost[] {
+  return posts
+    .filter(p => p.id !== postId)
+    .map(p => {
+      if (p.replies.length > 0) {
+        p.replies = removePostRecursive(p.replies, postId);
+      }
+      return p;
+    });
+}
+
 export const threadSlice = createSlice({
   name: 'thread',
   initialState,
   reducers: {
     /**
-     * Allows creating a post locally if offline or in fallback scenario
+     * Allows creating a post locally if offline or in fallback scenario.
      */
     addPostLocally: (state, action: PayloadAction<ThreadPost>) => {
       state.allPosts.unshift(action.payload);
     },
     /**
-     * Allows adding a reply locally
+     * Allows adding a reply locally.
      */
     addReplyLocally: (
       state,
@@ -182,7 +196,7 @@ export const threadSlice = createSlice({
       addReply(state.allPosts);
     },
     /**
-     * Allows adding a retweet locally
+     * Allows adding a retweet locally.
      */
     addRetweetLocally: (state, action: PayloadAction<ThreadPost>) => {
       state.allPosts.unshift(action.payload);
@@ -221,7 +235,6 @@ export const threadSlice = createSlice({
 
     // createRootPostAsync
     builder.addCase(createRootPostAsync.fulfilled, (state, action) => {
-      // The server returns the new post with user data
       state.allPosts.unshift(action.payload);
     });
 
@@ -229,7 +242,6 @@ export const threadSlice = createSlice({
     builder.addCase(createReplyAsync.fulfilled, (state, action) => {
       const newReply = action.payload;
       const parentId = newReply.parentId;
-      // Insert into the parent's replies
       function insertReply(posts: ThreadPost[]): boolean {
         for (const post of posts) {
           if (post.id === parentId) {
@@ -250,20 +262,19 @@ export const threadSlice = createSlice({
     builder.addCase(createRetweetAsync.fulfilled, (state, action) => {
       const newRetweet = action.payload;
       state.allPosts.unshift(newRetweet);
-      if (newRetweet.retweetOf) {
-        const originalId = newRetweet.retweetOf.id;
-        const updateRetweetCount = (posts: ThreadPost[]) => {
+      if (newRetweet.retweetOf?.id) {
+        function updateRetweetCount(posts: ThreadPost[]): boolean {
           for (const p of posts) {
-            if (p.id === originalId) {
+            if (p.id === newRetweet?.retweetOf?.id) {
               p.retweetCount += 1;
               return true;
             }
-            if (p.replies.length) {
+            if (p.replies.length > 0) {
               if (updateRetweetCount(p.replies)) return true;
             }
           }
           return false;
-        };
+        }
         updateRetweetCount(state.allPosts);
       }
     });
@@ -277,11 +288,7 @@ export const threadSlice = createSlice({
       function updatePostRecursively(posts: ThreadPost[]): ThreadPost[] {
         return posts.map(p => {
           if (p.id === updatedPost.id) {
-            // just replace sections, etc.
-            return {
-              ...p,
-              sections: updatedPost.sections,
-            };
+            return {...p, sections: updatedPost.sections};
           }
           if (p.replies.length > 0) {
             p.replies = updatePostRecursively(p.replies);
@@ -294,18 +301,42 @@ export const threadSlice = createSlice({
 
     // deletePostAsync
     builder.addCase(deletePostAsync.fulfilled, (state, action) => {
-      const postId = action.payload;
-      function removeRecursive(posts: ThreadPost[]): ThreadPost[] {
-        return posts
-          .filter(p => p.id !== postId)
-          .map(p => {
-            if (p.replies.length > 0) {
-              p.replies = removeRecursive(p.replies);
+      const {postId, retweetOf, parentId} = action.payload;
+      state.allPosts = removePostRecursive(state.allPosts, postId);
+
+      // If this post is a retweet, decrement the original post's retweetCount.
+      if (retweetOf) {
+        function decrementRetweet(posts: ThreadPost[]): boolean {
+          for (const p of posts) {
+            if (p.id === retweetOf) {
+              if (p.retweetCount > 0) p.retweetCount -= 1;
+              return true;
             }
-            return p;
-          });
+            if (p.replies.length > 0) {
+              if (decrementRetweet(p.replies)) return true;
+            }
+          }
+          return false;
+        }
+        decrementRetweet(state.allPosts);
       }
-      state.allPosts = removeRecursive(state.allPosts);
+
+      // If this post is a reply, decrement the parent's quoteCount.
+      if (parentId) {
+        function decrementQuote(posts: ThreadPost[]): boolean {
+          for (const p of posts) {
+            if (p.id === parentId) {
+              if (p.quoteCount > 0) p.quoteCount -= 1;
+              return true;
+            }
+            if (p.replies.length > 0) {
+              if (decrementQuote(p.replies)) return true;
+            }
+          }
+          return false;
+        }
+        decrementQuote(state.allPosts);
+      }
     });
 
     // addReactionAsync
@@ -333,5 +364,4 @@ export const threadSlice = createSlice({
 
 export const {addPostLocally, addReplyLocally, addRetweetLocally} =
   threadSlice.actions;
-
 export default threadSlice.reducer;
