@@ -10,6 +10,7 @@ export interface NftItem {
   name: string;
   image: string;
   collection?: string;
+  isCompressed : boolean
 }
 
 export function useFetchNFTs(walletAddress?: string) {
