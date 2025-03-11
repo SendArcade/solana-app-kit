@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Image,
@@ -99,9 +99,14 @@ export default function ThreadComposer({
   const [selectedListingNft, setSelectedListingNft] = useState<NftItem | null>(
     null,
   );
+  const [activeListings, setActiveListings] = useState<NftItem[]>([]);
+  const [loadingActiveListings, setLoadingActiveListings] = useState(false);
+  const [activeListingsError, setActiveListingsError] = useState<string | null>(null);
 
   // Show/hide the TradeModal
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const SOL_TO_LAMPORTS = 1_000_000_000;
+
 
   // Merged theme
   const mergedTheme = getMergedTheme(themeOverrides);
@@ -112,11 +117,76 @@ export default function ThreadComposer({
   );
 
   // Reuse shared NFT hook
-  const {
-    nfts: listingItems,
-    loading: loadingListings,
-    error: fetchNftsError,
-  } = useFetchNFTs(userPublicKey || undefined);
+  const fixImageUrl = (url: string): string => {
+    if (!url) return '';
+    if (url.startsWith('ipfs://'))
+      return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
+    if (url.startsWith('ar://'))
+      return url.replace('ar://', 'https://arweave.net/');
+    if (url.startsWith('/')) return `https://arweave.net${url}`;
+    if (!url.startsWith('http') && !url.startsWith('data:'))
+      return `https://${url}`;
+    return url;
+  };
+
+  // Add this function to fetch active listings
+  const fetchActiveListings = useCallback(async () => {
+    if (!userPublicKey) return;
+    setLoadingActiveListings(true);
+    setActiveListingsError(null);
+
+    try {
+      const url = `https://api.mainnet.tensordev.io/api/v1/user/active_listings?wallets=${userPublicKey}&sortBy=PriceAsc&limit=50`;
+      const options = {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          'x-tensor-api-key': TENSOR_API_KEY,
+        },
+      };
+
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch active listings: ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.listings && Array.isArray(data.listings)) {
+        const mappedListings = data.listings.map((item: any) => {
+          const mintObj = item.mint || {};
+          const mintAddress = typeof item.mint === 'object' && item.mint.onchainId
+            ? item.mint.onchainId
+            : item.mint;
+          const nftName = mintObj?.name || 'Unnamed NFT';
+          const nftImage = fixImageUrl(mintObj?.imageUri || '');
+          const nftCollection = mintObj?.collName || '';
+          const lamports = parseInt(item.grossAmount || '0', 10);
+          const priceSol = lamports / SOL_TO_LAMPORTS;
+
+          return {
+            mint: mintAddress,
+            name: nftName,
+            collection: nftCollection,
+            image: nftImage,
+            priceSol,
+            isCompressed: item.compressed || false
+          } as NftItem;
+        });
+
+        setActiveListings(mappedListings);
+      } else {
+        setActiveListings([]);
+      }
+    } catch (err: any) {
+      console.error('Error fetching active listings:', err);
+      setActiveListingsError(err.message || 'Failed to fetch active listings');
+    } finally {
+      setLoadingActiveListings(false);
+    }
+  }, [userPublicKey]);
+
+
+
 
   /**
    * Post creation logic
@@ -215,6 +285,12 @@ export default function ThreadComposer({
     }
   };
 
+  useEffect(() => {
+    if (userPublicKey) {
+      fetchActiveListings();
+    }
+  }, [userPublicKey, fetchActiveListings]);
+
   /**
    * Media picking
    */
@@ -244,7 +320,10 @@ export default function ThreadComposer({
    * Listing Flow
    */
   const handleNftListingPress = () => {
-    setShowListingModal(true);
+    // Refresh listings when the modal is opened
+    fetchActiveListings().then(() => {
+      setShowListingModal(true);
+    });
   };
 
   const handleSelectListing = (item: NftItem) => {
@@ -346,9 +425,9 @@ export default function ThreadComposer({
         visible={showListingModal}
         onClose={() => setShowListingModal(false)}
         onSelectListing={handleSelectListing}
-        listingItems={listingItems}
-        loadingListings={loadingListings}
-        fetchNftsError={fetchNftsError}
+        listingItems={activeListings}
+        loadingListings={loadingActiveListings}
+        fetchNftsError={activeListingsError}
         styles={styles} // Pass your existing styles
       />
 
