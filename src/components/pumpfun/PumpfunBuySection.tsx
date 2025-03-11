@@ -9,7 +9,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import {usePumpfun} from '../../hooks/usePumpfun';
+import {usePumpFun} from '../../hooks/usePumpFun';
 import {PumpfunBuyStyles} from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
 
@@ -61,7 +61,7 @@ export const PumpfunBuySection: React.FC<PumpfunBuySectionProps> = ({
   buttonStyle,
   buyButtonLabel = 'Buy via Pump.fun',
 }) => {
-  const {buyToken} = usePumpfun();
+  const {buyToken} = usePumpFun();
 
   const [tokenAddress, setTokenAddress] = useState('');
   const [solAmount, setSolAmount] = useState('0.001');

@@ -8,7 +8,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import {usePumpfun} from '../../hooks/usePumpfun';
+import {usePumpFun} from '../../hooks/usePumpFun';
 import {PumpfunSellStyles} from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
 
@@ -82,7 +82,7 @@ export const PumpfunSellSection: React.FC<PumpfunSellSectionProps> = ({
   buttonStyle,
   sellButtonLabel = 'Sell Token',
 }) => {
-  const {sellToken} = usePumpfun();
+  const {sellToken} = usePumpFun();
 
   const [tokenAddress, setTokenAddress] = useState('');
   const [tokenAmount, setTokenAmount] = useState('0.0');
