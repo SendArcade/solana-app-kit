@@ -12,7 +12,7 @@ import {
 /**
  * usePumpfun hook: centralizes buy, sell, and launch logic for Pumpfun tokens.
  */
-export function usePumpfun() {
+export function usePumpFun() {
   const {solanaWallet} = useAuth();
 
   /**

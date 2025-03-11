@@ -11,7 +11,7 @@ import {
   TextStyle,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import {usePumpfun} from '../../hooks/usePumpfun';
+import {usePumpFun} from '../../hooks/usePumpFun';
 import {PumpfunLaunchStyles} from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
 
@@ -67,7 +67,7 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
   buttonStyle,
   launchButtonLabel = 'Launch Token',
 }) => {
-  const {launchToken} = usePumpfun();
+  const {launchToken} = usePumpFun();
 
   const [tokenName, setTokenName] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
