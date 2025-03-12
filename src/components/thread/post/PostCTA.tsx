@@ -30,7 +30,9 @@ import { DEFAULT_IMAGES, ENDPOINTS } from '../../../config/constants';
 function getPostSectionType(post: ThreadPost) {
   for (const section of post.sections) {
     if (section.type === 'TEXT_TRADE') return 'trade';
-    if (section.type === 'NFT_LISTING') return 'nft';
+    if (section.type === 'NFT_LISTING') {
+      return section.listingData?.isCollection ? 'collection' : 'nft';
+    }
   }
   return null;
 }
@@ -115,6 +117,8 @@ export default function PostCTA({
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [tradeLoading, setTradeLoading] = useState(false);
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
+  const [floorNft, setFloorNft] = useState<any>(null);
+  const [loadingFloor, setLoadingFloor] = useState(false);
 
   // For NFT buying spinner
   const [nftLoading, setNftLoading] = useState(false);
@@ -140,11 +144,73 @@ export default function PostCTA({
     userStyleSheet as {[key: string]: object} | undefined,
   );
 
+  function getCollectionData(post: ThreadPost) {
+    for (const section of post.sections) {
+      if (section.type === 'NFT_LISTING' && section.listingData) {
+        if (section.listingData.isCollection && section.listingData.collId) {
+          return {
+            collId: section.listingData.collId,
+            name: section.listingData.collectionName || section.listingData.name,
+            image: section.listingData.image,
+            description: section.listingData.collectionDescription
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  const fetchFloorNFTForCollection = async (collId: string) => {
+    try {
+      setLoadingFloor(true);
+      setNftStatusMsg('Fetching collection floor...');
+      
+      const options = {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          'x-tensor-api-key': TENSOR_API_KEY,
+        },
+      };
+      
+      const url = `https://api.mainnet.tensordev.io/api/v1/mint/collection?collId=${encodeURIComponent(
+        collId
+      )}&sortBy=ListingPriceAsc&limit=1`;
+      
+      const resp = await fetch(url, options);
+      if (!resp.ok) {
+        throw new Error(`Failed to fetch collection floor: ${resp.status}`);
+      }
+      
+      const data = await resp.json();
+      if (data.mints && data.mints.length > 0) {
+        const floor = data.mints[0];
+        if (floor && floor.mint && floor.listing) {
+          const owner = floor.listing.seller;
+          const maxPrice = parseFloat(floor.listing.price) / 1_000_000_000;
+          console.log(
+            `Floor NFT: mint=${floor.mint}, owner=${owner}, maxPrice=${maxPrice}`,
+          );
+          setNftStatusMsg(`Found floor: ${maxPrice.toFixed(5)} SOL`);
+          return { mint: floor.mint, owner, maxPrice };
+        }
+      }
+      
+      throw new Error('No floor NFT found for this collection');
+    } catch (err: any) {
+      console.error('Error fetching floor NFT:', err);
+      throw err;
+    } finally {
+      setLoadingFloor(false);
+    }
+  };
+
   // Determine which CTA to show based on the post content
   const sectionType = getPostSectionType(post);
   if (!sectionType) return null;
 
   const tradeData = sectionType === 'trade' ? getTradeData(post) : null;
+  const collectionData = sectionType === 'collection' ? getCollectionData(post) : null;
 
   /**
    * Opens the trade modal for copying a trade
@@ -249,10 +315,111 @@ export default function PostCTA({
     }
   };
 
+  const handleBuyCollectionFloor = async () => {
+    if (!collectionData) {
+      Alert.alert('Error', 'No collection data available for this post.');
+      return;
+    }
+    
+    if (!userPublicKey) {
+      Alert.alert('Error', 'Wallet not connected.');
+      return;
+    }
+    
+    try {
+      setNftLoading(true);
+      setNftStatusMsg('Fetching collection floor...');
+      
+      // Get the floor NFT for this collection
+      const floorDetails = await fetchFloorNFTForCollection(collectionData.collId);
+      if (!floorDetails) {
+        throw new Error('No floor NFT found for this collection.');
+      }
+      
+      setNftStatusMsg('Fetching blockhash ...');
+      const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
+      const connection = new Connection(rpcUrl, 'confirmed');
+      const {blockhash} = await connection.getRecentBlockhash();
+      
+      setNftStatusMsg(`Preparing to buy floor NFT at ${floorDetails.maxPrice.toFixed(5)} SOL...`);
+      const maxPriceInLamports = floorDetails.maxPrice * 1_000_000_000;
+      
+      const buyUrl = `https://api.mainnet.tensordev.io/api/v1/tx/buy?buyer=${userPublicKey}&mint=${floorDetails.mint}&owner=${floorDetails.owner}&maxPrice=${maxPriceInLamports}&blockhash=${blockhash}`;
+
+      const resp = await fetch(buyUrl, {
+        headers: {
+          'x-tensor-api-key': TENSOR_API_KEY,
+        },
+      });
+      
+      const rawText = await resp.text();
+      let data: any;
+      try {
+        data = JSON.parse(rawText);
+      } catch (parseErr) {
+        throw new Error('Tensor returned non-JSON response.');
+      }
+      
+      if (!data.txs || data.txs.length === 0) {
+        throw new Error('No transactions returned from Tensor buy endpoint.');
+      }
+
+      setNftStatusMsg(`Signing ${data.txs.length} transaction(s)...`);
+      for (let i = 0; i < data.txs.length; i++) {
+        const txObj = data.txs[i];
+        let transaction: Transaction | VersionedTransaction;
+
+        if (txObj.txV0) {
+          const txBuffer = Buffer.from(txObj.txV0.data, 'base64');
+          transaction = VersionedTransaction.deserialize(txBuffer);
+        } else if (txObj.tx) {
+          const txBuffer = Buffer.from(txObj.tx.data, 'base64');
+          transaction = Transaction.from(txBuffer);
+        } else {
+          throw new Error(`Unknown transaction format in item #${i + 1}`);
+        }
+
+        if (!userWallet) {
+          throw new Error('Wallet not connected.');
+        }
+        
+        const provider = await userWallet.getProvider();
+        const {signature} = await provider.request({
+          method: 'signAndSendTransaction',
+          params: {transaction, connection},
+        });
+        
+        if (!signature) {
+          throw new Error(
+            'Failed to sign transaction or no signature returned.',
+          );
+        }
+
+        setNftStatusMsg(`TX #${i + 1} signature: ${signature}`);
+      }
+      
+      setNftConfirmationMsg(`Successfully purchased floor NFT from ${collectionData.name} collection!`);
+      setNftConfirmationVisible(true);
+    } catch (err: any) {
+      console.error('Error during buy transaction:', err);
+      Alert.alert('Error', err.message || 'Failed to buy floor NFT.');
+    } finally {
+      setNftLoading(false);
+      setNftStatusMsg('');
+    }
+  };
+
   // Set CTA label and onPress based on section type
-  const ctaLabel = sectionType === 'trade' ? 'Copy Trade' : 'Buy NFT';
-  const onCtaPress =
-    sectionType === 'trade' ? handleOpenTradeModal : handleBuyListedNft;
+  let ctaLabel = 'Copy Trade';
+  let onCtaPress = handleOpenTradeModal;
+  
+  if (sectionType === 'nft') {
+    ctaLabel = 'Buy NFT';
+    onCtaPress = handleBuyListedNft;
+  } else if (sectionType === 'collection') {
+    ctaLabel = 'Buy Collection Floor';
+    onCtaPress = handleBuyCollectionFloor;
+  }
 
   return (
     <View

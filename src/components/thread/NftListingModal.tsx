@@ -192,83 +192,87 @@ const NftListingModal = ({
         }
     };
 
-    const shareNftPurchase = async (
-        floorNft: FloorNFT,
-        collection: CollectionResult
-    ) => {
-        if (!userPublicKey) {
-            Alert.alert('Error', 'Cannot share: Wallet not connected');
-            return;
-        }
+// Modify the shareNftPurchase function to share collection data
+const shareNftPurchase = async (
+    floorNft: FloorNFT,
+    collection: CollectionResult
+) => {
+    if (!userPublicKey) {
+        Alert.alert('Error', 'Cannot share: Wallet not connected');
+        return;
+    }
+
+    try {
+        // Create the NFT listing section with collection data
+        const sections: ThreadSection[] = [
+            {
+                id: 'section-' + Math.random().toString(36).substr(2, 9),
+                type: 'NFT_LISTING' as ThreadSectionType,
+                listingData: {
+                    collId: collection.collId, // Important for buying floor
+                    owner: userPublicKey,
+                    name: collection.name,
+                    image: fixImageUrl(collection.imageUri),
+                    isCollection: true, // Flag this as a collection
+                    collectionName: collection.name,
+                    collectionImage: fixImageUrl(collection.imageUri),
+                    collectionDescription: collection.description
+                },
+            }
+        ];
+
+        // Add a text section about the purchase
+        sections.push({
+            id: 'section-' + Math.random().toString(36).substr(2, 9),
+            type: 'TEXT_ONLY' as ThreadSectionType,
+            text: `I just purchased from ${collection.name} collection for ${floorNft.maxPrice.toFixed(5)} SOL! Check out this collection! 🎉`
+        });
+
+        // Create a proper user object that satisfies ThreadUser
+        const user: ThreadUser = {
+            id: userPublicKey,
+            username: userName || 'Anonymous',
+            handle: userPublicKey
+                ? '@' + userPublicKey.slice(0, 6) + '...' + userPublicKey.slice(-4)
+                : '@anonymous',
+            verified: true,
+            avatar: storedProfilePic ? { uri: storedProfilePic } : DEFAULT_IMAGES.user,
+        };
+
+        // Create a fallback post with proper typing
+        const fallbackPost = {
+            id: 'local-' + Math.random().toString(36).substr(2, 9),
+            userId: userPublicKey,
+            user,
+            sections,
+            createdAt: new Date().toISOString(),
+            replies: [],
+            reactionCount: 0,
+            retweetCount: 0,
+            quoteCount: 0,
+        };
 
         try {
-            // Create the NFT listing section with proper type annotation
-            const sections: ThreadSection[] = [
-                {
-                    id: 'section-' + Math.random().toString(36).substr(2, 9),
-                    type: 'NFT_LISTING' as ThreadSectionType, // Use the proper enum type
-                    listingData: {
-                        mint: floorNft.mint,
-                        owner: userPublicKey,
-                        priceSol: floorNft.maxPrice,
-                        name: collection.name,
-                        image: fixImageUrl(collection.imageUri),
-                    },
-                    // Text should be in a separate section if you want to include it
-                }
-            ];
+            // Create a root post with the NFT listing
+            await dispatch(
+                createRootPostAsync({
+                    userId: userPublicKey,
+                    sections,
+                })
+            ).unwrap();
 
-            // If you want to add a text section as well
-            sections.push({
-                id: 'section-' + Math.random().toString(36).substr(2, 9),
-                type: 'TEXT_ONLY' as ThreadSectionType,
-                text: `I just purchased ${collection.name} for ${floorNft.maxPrice.toFixed(5)} SOL! 🎉`
-            });
-
-            // Create a proper user object that satisfies ThreadUser
-            const user: ThreadUser = {
-                id: userPublicKey,
-                username: userName || 'Anonymous', // Or get from auth state
-                handle: userPublicKey
-                    ? '@' + userPublicKey.slice(0, 6) + '...' + userPublicKey.slice(-4)
-                    : '@anonymous', // Or get from auth state
-                verified: true,
-                avatar: storedProfilePic ? { uri: storedProfilePic } : DEFAULT_IMAGES.user,
-            };
-
-            // Create a fallback post with proper typing
-            const fallbackPost = {
-                id: 'local-' + Math.random().toString(36).substr(2, 9),
-                userId: userPublicKey,
-                user,
-                sections,
-                createdAt: new Date().toISOString(),
-                replies: [],
-                reactionCount: 0,
-                retweetCount: 0,
-                quoteCount: 0,
-            };
-
-            try {
-                // Create a root post with the NFT listing
-                await dispatch(
-                    createRootPostAsync({
-                        userId: userPublicKey,
-                        sections,
-                    })
-                ).unwrap();
-
-                Alert.alert('Success', 'Your NFT purchase has been shared!');
-            } catch (error: any) {
-                console.warn('Network request failed, adding post locally:', error.message);
-                dispatch(addPostLocally(fallbackPost));
-                Alert.alert('Limited Connectivity', 'Your post was saved locally.');
-            }
-        } catch (err: any) {
-            console.error('Error sharing NFT purchase:', err);
-            Alert.alert('Error', 'Failed to share your purchase. Please try again.');
+            Alert.alert('Success', 'Your collection purchase has been shared!');
+        } catch (error: any) {
+            console.warn('Network request failed, adding post locally:', error.message);
+            dispatch(addPostLocally(fallbackPost));
+            Alert.alert('Limited Connectivity', 'Your post was saved locally.');
         }
-    };
+    } catch (err: any) {
+        console.error('Error sharing collection purchase:', err);
+        Alert.alert('Error', 'Failed to share your purchase. Please try again.');
+    }
+};
+
 
     // Handle buy floor functionality - from BuySection.tsx
     const handleBuyFloor = async (coll: CollectionResult) => {

@@ -15,12 +15,16 @@ export type ThreadSectionType =
   | 'NFT_LISTING';
 
 export interface NftListingData {
-  mint: string;
+  mint?: string;  // Now optional since we might only have collection data
   owner: string | null;
   name?: string;
   image?: string;
   priceSol?: number;
-  collId?: string;
+  collId?: string;  // Collection ID for floor buying
+  isCollection?: boolean; // Flag to indicate if this is a collection listing
+  collectionName?: string;
+  collectionImage?: string;
+  collectionDescription?: string;
 }
 
 export interface TradeData {
