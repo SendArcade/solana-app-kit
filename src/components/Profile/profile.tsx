@@ -546,7 +546,7 @@ export default function Profile({
               ) : (
                 <FlatList
                   data={resolvedNfts}
-                  keyExtractor={item => item.mint}
+                  keyExtractor={item => item.mint || `random-${Math.random().toString(36).substr(2, 9)}`}
                   style={{marginVertical: 10}}
                   renderItem={({item}) => (
                     <TouchableOpacity
@@ -573,9 +573,9 @@ export default function Profile({
                             {item.collection}
                           </Text>
                         ) : null}
-                        <Text style={modalStyles.nftMint} numberOfLines={1}>
-                          {item.mint.slice(0, 8) + '...' + item.mint.slice(-4)}
-                        </Text>
+                        {item?.mint && <Text style={modalStyles.nftMint} numberOfLines={1}>
+                          {item?.mint?.slice(0, 8) + '...' + item?.mint?.slice(-4)}
+                        </Text>}
                       </View>
                     </TouchableOpacity>
                   )}
