@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Image,
@@ -11,24 +11,25 @@ import {
   Alert,
 } from 'react-native';
 import Icons from '../../assets/svgs';
-import {useAppDispatch, useAppSelector} from '../../hooks/useReduxHooks';
+import { useAppDispatch, useAppSelector } from '../../hooks/useReduxHooks';
 import {
   createRootPostAsync,
   createReplyAsync,
   addPostLocally,
   addReplyLocally,
 } from '../../state/thread/reducer';
-import {createThreadStyles, getMergedTheme} from './thread.styles';
-import {ThreadSection, ThreadSectionType, ThreadUser} from './thread.types';
+import { createThreadStyles, getMergedTheme } from './thread.styles';
+import { ThreadSection, ThreadSectionType, ThreadUser } from './thread.types';
 import {
   ImageLibraryOptions,
   launchImageLibrary,
 } from 'react-native-image-picker';
-import {TENSOR_API_KEY} from '@env';
-import {useAuth} from '../../hooks/useAuth';
+import { TENSOR_API_KEY } from '@env';
+import { useAuth } from '../../hooks/useAuth';
 import TradeModal from './/trade/TradeModal';
-import {DEFAULT_IMAGES} from '../../config/constants';
-import {NftItem, useFetchNFTs} from '../../hooks/useFetchNFTs';
+import { DEFAULT_IMAGES } from '../../config/constants';
+import { NftItem, useFetchNFTs } from '../../hooks/useFetchNFTs';
+import NftListingModal from './NftListingModal';
 
 /**
  * Props for the ThreadComposer component
@@ -44,9 +45,9 @@ interface ThreadComposerProps {
   /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
   /** Style overrides for specific components */
-  styleOverrides?: {[key: string]: object};
+  styleOverrides?: { [key: string]: object };
   /** User-provided stylesheet overrides */
-  userStyleSheet?: {[key: string]: object};
+  userStyleSheet?: { [key: string]: object };
 }
 
 /**
@@ -86,7 +87,7 @@ export default function ThreadComposer({
 }: ThreadComposerProps) {
   const dispatch = useAppDispatch();
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
-  const {solanaWallet} = useAuth();
+  const { solanaWallet } = useAuth();
   const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
 
   // Basic composer state
@@ -98,9 +99,14 @@ export default function ThreadComposer({
   const [selectedListingNft, setSelectedListingNft] = useState<NftItem | null>(
     null,
   );
+  const [activeListings, setActiveListings] = useState<NftItem[]>([]);
+  const [loadingActiveListings, setLoadingActiveListings] = useState(false);
+  const [activeListingsError, setActiveListingsError] = useState<string | null>(null);
 
   // Show/hide the TradeModal
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const SOL_TO_LAMPORTS = 1_000_000_000;
+
 
   // Merged theme
   const mergedTheme = getMergedTheme(themeOverrides);
@@ -111,11 +117,76 @@ export default function ThreadComposer({
   );
 
   // Reuse shared NFT hook
-  const {
-    nfts: listingItems,
-    loading: loadingListings,
-    error: fetchNftsError,
-  } = useFetchNFTs(userPublicKey || undefined);
+  const fixImageUrl = (url: string): string => {
+    if (!url) return '';
+    if (url.startsWith('ipfs://'))
+      return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
+    if (url.startsWith('ar://'))
+      return url.replace('ar://', 'https://arweave.net/');
+    if (url.startsWith('/')) return `https://arweave.net${url}`;
+    if (!url.startsWith('http') && !url.startsWith('data:'))
+      return `https://${url}`;
+    return url;
+  };
+
+  // Add this function to fetch active listings
+  const fetchActiveListings = useCallback(async () => {
+    if (!userPublicKey) return;
+    setLoadingActiveListings(true);
+    setActiveListingsError(null);
+
+    try {
+      const url = `https://api.mainnet.tensordev.io/api/v1/user/active_listings?wallets=${userPublicKey}&sortBy=PriceAsc&limit=50`;
+      const options = {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          'x-tensor-api-key': TENSOR_API_KEY,
+        },
+      };
+
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch active listings: ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.listings && Array.isArray(data.listings)) {
+        const mappedListings = data.listings.map((item: any) => {
+          const mintObj = item.mint || {};
+          const mintAddress = typeof item.mint === 'object' && item.mint.onchainId
+            ? item.mint.onchainId
+            : item.mint;
+          const nftName = mintObj?.name || 'Unnamed NFT';
+          const nftImage = fixImageUrl(mintObj?.imageUri || '');
+          const nftCollection = mintObj?.collName || '';
+          const lamports = parseInt(item.grossAmount || '0', 10);
+          const priceSol = lamports / SOL_TO_LAMPORTS;
+
+          return {
+            mint: mintAddress,
+            name: nftName,
+            collection: nftCollection,
+            image: nftImage,
+            priceSol,
+            isCompressed: item.compressed || false
+          } as NftItem;
+        });
+
+        setActiveListings(mappedListings);
+      } else {
+        setActiveListings([]);
+      }
+    } catch (err: any) {
+      console.error('Error fetching active listings:', err);
+      setActiveListingsError(err.message || 'Failed to fetch active listings');
+    } finally {
+      setLoadingActiveListings(false);
+    }
+  }, [userPublicKey]);
+
+
+
 
   /**
    * Post creation logic
@@ -139,7 +210,7 @@ export default function ThreadComposer({
       sections.push({
         id: 'section-' + Math.random().toString(36).substr(2, 9),
         type: 'TEXT_IMAGE',
-        imageUrl: {uri: selectedImage},
+        imageUrl: { uri: selectedImage },
       });
     }
 
@@ -203,7 +274,7 @@ export default function ThreadComposer({
         error.message,
       );
       if (parentId) {
-        dispatch(addReplyLocally({parentId, reply: fallbackPost}));
+        dispatch(addReplyLocally({ parentId, reply: fallbackPost }));
       } else {
         dispatch(addPostLocally(fallbackPost));
       }
@@ -213,6 +284,12 @@ export default function ThreadComposer({
       onPostCreated && onPostCreated();
     }
   };
+
+  useEffect(() => {
+    if (userPublicKey) {
+      fetchActiveListings();
+    }
+  }, [userPublicKey, fetchActiveListings]);
 
   /**
    * Media picking
@@ -243,7 +320,10 @@ export default function ThreadComposer({
    * Listing Flow
    */
   const handleNftListingPress = () => {
-    setShowListingModal(true);
+    // Refresh listings when the modal is opened
+    fetchActiveListings().then(() => {
+      setShowListingModal(true);
+    });
   };
 
   const handleSelectListing = (item: NftItem) => {
@@ -258,10 +338,10 @@ export default function ThreadComposer({
           <Image
             source={
               storedProfilePic
-                ? {uri: storedProfilePic}
+                ? { uri: storedProfilePic }
                 : currentUser.avatar
-                ? currentUser.avatar
-                : DEFAULT_IMAGES.user
+                  ? currentUser.avatar
+                  : DEFAULT_IMAGES.user
             }
             style={styles.composerAvatar}
           />
@@ -281,8 +361,8 @@ export default function ThreadComposer({
           {/* Selected image preview */}
           {selectedImage && (
             <Image
-              source={{uri: selectedImage}}
-              style={{width: 100, height: 100, marginTop: 10}}
+              source={{ uri: selectedImage }}
+              style={{ width: 100, height: 100, marginTop: 10 }}
             />
           )}
 
@@ -290,10 +370,10 @@ export default function ThreadComposer({
           {selectedListingNft && (
             <View style={styles.composerTradePreview}>
               <Image
-                source={{uri: selectedListingNft.image}}
+                source={{ uri: selectedListingNft.image }}
                 style={styles.composerTradeImage}
               />
-              <View style={{marginLeft: 8, flex: 1}}>
+              <View style={{ marginLeft: 8, flex: 1 }}>
                 <Text style={styles.composerTradeName} numberOfLines={1}>
                   {selectedListingNft.name}
                 </Text>
@@ -302,7 +382,7 @@ export default function ThreadComposer({
               <TouchableOpacity
                 style={styles.composerTradeRemove}
                 onPress={() => setSelectedListingNft(null)}>
-                <Text style={{color: '#fff', fontWeight: '600'}}>X</Text>
+                <Text style={{ color: '#fff', fontWeight: '600' }}>X</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -316,23 +396,23 @@ export default function ThreadComposer({
 
               <TouchableOpacity
                 onPress={handleNftListingPress}
-                style={{marginLeft: 8}}>
-                <Text style={{fontSize: 12, color: '#666666'}}>
+                style={{ marginLeft: 8 }}>
+                <Text style={{ fontSize: 12, color: '#666666' }}>
                   NFT Listing
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => setShowTradeModal(true)}
-                style={{marginLeft: 8}}>
-                <Text style={{fontSize: 12, color: '#333333'}}>
+                style={{ marginLeft: 8 }}>
+                <Text style={{ fontSize: 12, color: '#333333' }}>
                   Trade/Share
                 </Text>
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity onPress={handlePost}>
-              <Text style={{color: '#1d9bf0', fontWeight: '600'}}>
+              <Text style={{ color: '#1d9bf0', fontWeight: '600' }}>
                 {parentId ? 'Reply' : 'Post'}
               </Text>
             </TouchableOpacity>
@@ -341,61 +421,15 @@ export default function ThreadComposer({
       </View>
 
       {/* Listing Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
+      <NftListingModal
         visible={showListingModal}
-        onRequestClose={() => setShowListingModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>NFT Listing Modal</Text>
-
-            {loadingListings ? (
-              <ActivityIndicator
-                size="large"
-                color="#1d9bf0"
-                style={{marginTop: 20}}
-              />
-            ) : fetchNftsError ? (
-              <Text style={{marginTop: 16, color: '#666', textAlign: 'center'}}>
-                {fetchNftsError}
-              </Text>
-            ) : listingItems.length === 0 ? (
-              <Text style={{marginTop: 16, color: '#666', textAlign: 'center'}}>
-                No NFTs found.
-              </Text>
-            ) : (
-              <FlatList
-                data={listingItems}
-                keyExtractor={item => item.mint}
-                renderItem={({item}) => (
-                  <TouchableOpacity
-                    style={styles.listingCard}
-                    onPress={() => handleSelectListing(item)}>
-                    <Image
-                      source={{uri: item.image}}
-                      style={styles.listingImage}
-                    />
-                    <View style={{flex: 1, marginLeft: 10}}>
-                      <Text style={styles.listingName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      {/* Optional: show item.collection */}
-                    </View>
-                  </TouchableOpacity>
-                )}
-                style={{marginTop: 10, width: '100%'}}
-              />
-            )}
-
-            <TouchableOpacity
-              onPress={() => setShowListingModal(false)}
-              style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowListingModal(false)}
+        onSelectListing={handleSelectListing}
+        listingItems={activeListings}
+        loadingListings={loadingActiveListings}
+        fetchNftsError={activeListingsError}
+        styles={styles} // Pass your existing styles
+      />
 
       {/* Trade Modal */}
       <TradeModal
