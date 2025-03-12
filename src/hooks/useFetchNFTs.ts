@@ -42,7 +42,7 @@ export function useFetchNFTs(walletAddress?: string) {
         const dataArray = Array.isArray(data) ? data : [];
         const parsed = dataArray
           .map((item: any) => {
-            if (!item.setterMintMe) return null;
+            // if (!item.setterMintMe) return null;
             return {
               mint: item.setterMintMe,
               name: item.name || 'Unnamed NFT',
