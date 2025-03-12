@@ -27,7 +27,7 @@ interface PostBodyProps {
  * @param {ThreadPost['sections'][number]} section - The section to render
  * @returns {JSX.Element | null} The rendered section component or null if type is unsupported
  */
-function renderSection(section: ThreadPost['sections'][number]) {
+function renderSection(section: ThreadPost['sections'][number], user: ThreadPost['user'], createdAt: string) {
   switch (section.type) {
     case 'TEXT_ONLY':
       return <SectionTextOnly text={section.text} />;
@@ -43,7 +43,7 @@ function renderSection(section: ThreadPost['sections'][number]) {
       );
 
     case 'TEXT_TRADE':
-      return <SectionTrade text={section.text} tradeData={section.tradeData} />;
+      return <SectionTrade text={section.text} tradeData={section.tradeData} user={user} createdAt={createdAt} />;
 
     case 'POLL':
       return <SectionPoll pollData={section.pollData} />;
@@ -82,12 +82,14 @@ function renderSection(section: ThreadPost['sections'][number]) {
 function PostBody({post, themeOverrides, styleOverrides}: PostBodyProps) {
   const mergedTheme = getMergedTheme(themeOverrides);
   const styles = createThreadStyles(mergedTheme, styleOverrides);
+  const {user, createdAt} = post;
+
 
   return (
     <View style={{marginTop: 8, padding: 0}}>
       {post.sections.map(section => (
         <View key={section.id} style={styles.extraContentContainer}>
-          <View style={{width: '84%'}}>{renderSection(section)}</View>
+          <View style={{width: '84%'}}>{renderSection(section, user, createdAt)}</View>
         </View>
       ))}
     </View>

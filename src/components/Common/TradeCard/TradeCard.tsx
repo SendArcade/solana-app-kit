@@ -1,6 +1,6 @@
 // FILE: src/components/Common/TradeCard/TradeCard.tsx
 
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,12 @@ import {
   Dimensions,
   StyleProp,
   ViewStyle,
+  ImageSourcePropType,
 } from 'react-native';
 import Icon from '../../../assets/svgs/index';
-import {getMergedTheme} from '../../thread/thread.styles';
+import { getMergedTheme } from '../../thread/thread.styles';
 import styles from './TradeCard.style';
-import {useCoinGeckoData, Timeframe} from '../../../hooks/useCoinGeckoData';
+import { useCoinGeckoData, Timeframe } from '../../../hooks/useCoinGeckoData';
 import LineGraph from '../../CoinDetails/CoinDetailTopSection/LineGraph';
 
 export interface TradeData {
@@ -23,13 +24,13 @@ export interface TradeData {
   inputAmountLamports?: string;
   outputAmountLamports?: string;
   aggregator?: string;
-
   inputSymbol: string;
   inputQuantity: string;
   inputUsdValue?: string;
   outputSymbol: string;
   outputQuantity: string;
   outputUsdValue?: string;
+  executionTimestamp?: any;
 }
 
 /**
@@ -53,8 +54,9 @@ export interface TradeCardProps {
   onTrade?: () => void;
   showGraphForOutputToken?: boolean;
   themeOverrides?: Partial<Record<string, any>>;
-  styleOverrides?: {[key: string]: object};
-  userStyleSheet?: {[key: string]: object};
+  styleOverrides?: { [key: string]: object };
+  userStyleSheet?: { [key: string]: object };
+  userAvatar?: ImageSourcePropType;
 }
 
 /**
@@ -68,6 +70,7 @@ function TradeCard({
   themeOverrides,
   styleOverrides,
   userStyleSheet,
+  userAvatar,
 }: TradeCardProps) {
   const mergedTheme = getMergedTheme(themeOverrides);
 
@@ -87,9 +90,11 @@ function TradeCard({
     loadingOHLC,
     error,
     refreshCoinData,
+    timestamps,
     coinName,
     coinImage,
   } = useCoinGeckoData(coingeckoIdOutput);
+
 
   // On mount, fetch the jupiter metadata for input & output tokens
   useEffect(() => {
@@ -139,6 +144,36 @@ function TradeCard({
     backgroundColor: '#FFFFFF',
   };
 
+  const calculateExecutionInfo = () => {
+    // Get price information
+    let executionPrice: number | undefined;
+
+    if (tradeData.inputAmountLamports && tradeData.outputAmountLamports) {
+      const inputLamports = parseFloat(tradeData.inputAmountLamports);
+      const outputLamports = parseFloat(tradeData.outputAmountLamports);
+
+      if (inputLamports > 0 && outputLamports > 0) {
+        executionPrice = inputLamports / outputLamports;
+      }
+    } else if (tradeData.inputQuantity && tradeData.outputQuantity) {
+      const inputQty = parseFloat(tradeData.inputQuantity);
+      const outputQty = parseFloat(tradeData.outputQuantity);
+
+      if (inputQty > 0 && outputQty > 0) {
+        executionPrice = inputQty / outputQty;
+      }
+    }
+
+    // Get timestamp information - use provided timestamp or fallback to current
+    const executionTimestamp = tradeData.executionTimestamp;
+
+    return { executionPrice, executionTimestamp };
+  };
+
+  const { executionPrice, executionTimestamp } = calculateExecutionInfo();
+
+  // console.log('executionPrice:', executionPrice, "------", timestamps,"////////////", executionTimestamp, );
+
   if (isOutputChartMode) {
     const isLoading = loadingMeta || loadingOHLC;
 
@@ -150,10 +185,10 @@ function TradeCard({
             <Image
               source={
                 coinImage
-                  ? {uri: coinImage}
+                  ? { uri: coinImage }
                   : fallbackOutLogo
-                  ? {uri: fallbackOutLogo}
-                  : require('../../../assets/images/SENDlogo.png')
+                    ? { uri: fallbackOutLogo }
+                    : require('../../../assets/images/SENDlogo.png')
               }
               style={styles.tradeCardTokenImage}
             />
@@ -167,7 +202,7 @@ function TradeCard({
             </View>
           </View>
           <View style={styles.tradeCardRightSide}>
-            <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
+            <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
               {tradeData.outputQuantity} {tradeData.outputSymbol}
             </Text>
             <Text style={styles.tradeCardUsdPrice}>
@@ -206,12 +241,12 @@ function TradeCard({
 
           {/* Refresh icon to manually re-fetch */}
           <TouchableOpacity
-            style={{marginLeft: 16, flexDirection: 'row', alignItems: 'center'}}
+            style={{ marginLeft: 16, flexDirection: 'row', alignItems: 'center' }}
             onPress={refreshCoinData}
             accessibilityLabel="Refresh Chart">
             <Icon.SwapIcon width={20} height={20} />
-            <Text style={{color: '#1d9bf0', marginLeft: 4}}>Refresh</Text>
-          </TouchableOpacity>  
+            <Text style={{ color: '#1d9bf0', marginLeft: 4 }}>Refresh</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Chart container with fixed height */}
@@ -219,16 +254,51 @@ function TradeCard({
           {isLoading ? (
             <ActivityIndicator size="large" color="#1d9bf0" />
           ) : graphData.length > 0 ? (
-            <LineGraph
-              data={graphData}
-              width={Dimensions.get('window').width - 70}
-            />
+            <>
+          <LineGraph
+                data={graphData}
+                width={Dimensions.get('window').width - 70}
+                executionPrice={executionPrice}
+                executionTimestamp={executionTimestamp}
+                timestamps={timestamps}
+                userAvatar={userAvatar} // Pass the user avatar to LineGraph
+              />
+              {/* Add a legend explaining the markers */}
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'center',
+                marginTop: 5,
+                opacity: 0.7
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
+                  <View style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: '#318EF8',
+                    marginRight: 4
+                  }} />
+                  <Text style={{ fontSize: 10 }}>Current</Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: '#FF5722',
+                    marginRight: 4
+                  }} />
+                  <Text style={{ fontSize: 10 }}>Trade Execution</Text>
+                </View>
+              </View>
+            </>
           ) : error ? (
-            <Text style={{color: 'red', marginTop: 6}}>
+            <Text style={{ color: 'red', marginTop: 6 }}>
               Error: {error.toString()}
             </Text>
           ) : (
-            <Text style={{color: '#999', marginTop: 6}}>
+            <Text style={{ color: '#999', marginTop: 6 }}>
               No chart data found. Try a different timeframe or refresh.
             </Text>
           )}
@@ -243,19 +313,19 @@ function TradeCard({
   return (
     <View style={styles.tradeCardContainer}>
       {isLoading ? (
-        <View style={{alignItems: 'center', justifyContent: 'center'}}>
+        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="small" color="#1d9bf0" />
         </View>
       ) : (
         <>
-          <View style={{position: 'relative'}}>
+          <View style={{ position: 'relative' }}>
             {/* First block: Input token */}
             <View style={styles.tradeCardCombinedSides}>
               <View style={styles.tradeCardLeftSide}>
                 <Image
                   source={
                     fallbackInLogo
-                      ? {uri: fallbackInLogo}
+                      ? { uri: fallbackInLogo }
                       : require('../../../assets/images/SENDlogo.png')
                   }
                   style={styles.tradeCardTokenImage}
@@ -270,7 +340,7 @@ function TradeCard({
                 </View>
               </View>
               <View style={styles.tradeCardRightSide}>
-                <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
+                <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
                   {tradeData.inputQuantity} {tradeData.inputSymbol}
                 </Text>
                 <Text style={styles.tradeCardUsdPrice}>
@@ -290,7 +360,7 @@ function TradeCard({
                 <Image
                   source={
                     fallbackOutLogo
-                      ? {uri: fallbackOutLogo}
+                      ? { uri: fallbackOutLogo }
                       : require('../../../assets/images/SENDlogo.png')
                   }
                   style={styles.tradeCardTokenImage}
@@ -305,7 +375,7 @@ function TradeCard({
                 </View>
               </View>
               <View style={styles.tradeCardRightSide}>
-                <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
+                <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
                   {tradeData.outputQuantity} {tradeData.outputSymbol}
                 </Text>
                 <Text style={styles.tradeCardUsdPrice}>
@@ -326,7 +396,7 @@ function TradeCard({
                 alignItems: 'center',
               }}
               onPress={onTrade}>
-              <Text style={{color: '#fff', fontWeight: 'bold'}}>Trade Now</Text>
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Trade Now</Text>
             </TouchableOpacity>
           )}
         </>

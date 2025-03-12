@@ -28,6 +28,7 @@ export function useCoinGeckoData(coinId: string) {
 
   // Graph data (OHLC close values)
   const [graphData, setGraphData] = useState<number[]>([]);
+  const [timestamps, setTimestamps] = useState<number[]>([]);
 
   // Market stats
   const [marketCap, setMarketCap] = useState<number>(0);
@@ -60,6 +61,7 @@ export function useCoinGeckoData(coinId: string) {
       // If no coinId, reset
       setCoinName('');
       setCoinImage('');
+      setTimestamps([]);
       setMarketCap(0);
       setLiquidityScore(0);
       setFdv(0);
@@ -174,12 +176,15 @@ export function useCoinGeckoData(coinId: string) {
       if (!Array.isArray(rawData)) {
         setError('OHLC data is not an array.');
         setGraphData([]);
+        setTimestamps([]);
         return;
       }
 
       // each item => [timestamp, open, high, low, close]
       const closeData = rawData.map((item: number[]) => item[4] || 0);
+      const timeData = rawData.map((item: number[]) => item[0] || 0);
       setGraphData(closeData);
+      setTimestamps(timeData);
     } catch (err: any) {
       console.error(err);
       setError('Error fetching OHLC data from CoinGecko.');
@@ -230,6 +235,7 @@ export function useCoinGeckoData(coinId: string) {
     timeframe,
     setTimeframe,
     graphData,
+    timestamps,
     timeframePrice,
     timeframeChangeUsd,
     timeframeChangePercent,
