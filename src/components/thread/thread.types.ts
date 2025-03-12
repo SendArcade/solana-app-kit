@@ -24,20 +24,21 @@ export interface NftListingData {
 }
 
 export interface TradeData {
-  // Mints for reference
   inputMint: string;
   outputMint: string;
   aggregator?: string;
+  inputSymbol: string;
+  inputQuantity: string;
+  inputUsdValue?: string;
+  outputSymbol: string;
+  outputQuantity: string;
+  outputUsdValue?: string;
 
-  // Final trade details
-  inputSymbol: string; // e.g. "SOL"
-  inputQuantity: string; // e.g. "1.5"
-  inputUsdValue: string; // e.g. "$30.00"
-
-  outputSymbol: string; // e.g. "USDC"
-  outputQuantity: string; // e.g. "120"
-  outputUsdValue: string; // e.g. "$120.00"
+  // (Add the two lines below if missing)
+  inputAmountLamports?: string; // <--- ADD THIS
+  outputAmountLamports?: string; // <--- ADD THIS
 }
+
 
 export interface PollData {
   question: string;
