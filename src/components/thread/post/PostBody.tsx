@@ -23,56 +23,6 @@ interface PostBodyProps {
 }
 
 /**
- * A component that renders the body content of a post in a thread
- * 
- * @component
- * @description
- * PostBody handles the rendering of different types of content sections in a post,
- * including text, images, videos, polls, trades, and NFT listings. It supports
- * multiple sections per post and delegates rendering to specialized section components.
- * 
- * Features:
- * - Multiple content section support
- * - Section type-specific rendering
- * - Customizable styling
- * - Responsive layout
- * 
- * Supported Section Types:
- * - TEXT_ONLY: Plain text content
- * - TEXT_IMAGE: Text with an image
- * - TEXT_VIDEO: Text with a video
- * - TEXT_TRADE: Trade information
- * - POLL: Poll data
- * - NFT_LISTING: NFT listing details
- * 
- * @example
- * ```tsx
- * <PostBody
- *   post={postData}
- *   themeOverrides={{ '--primary-color': '#1D9BF0' }}
- * />
- * ```
- */
-export default function PostBody({
-  post,
-  themeOverrides,
-  styleOverrides,
-}: PostBodyProps) {
-  const mergedTheme = getMergedTheme(themeOverrides);
-  const styles = createThreadStyles(mergedTheme, styleOverrides);
-
-  return (
-    <View style={{marginTop: 8, padding: 0}}>
-      {post.sections.map(section => (
-        <View key={section.id} style={styles.extraContentContainer}>
-          <View style={{width: '84%'}}>{renderSection(section)}</View>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-/**
  * Renders a single post section by delegating to the appropriate section component
  * @param {ThreadPost['sections'][number]} section - The section to render
  * @returns {JSX.Element | null} The rendered section component or null if type is unsupported
@@ -105,3 +55,75 @@ function renderSection(section: ThreadPost['sections'][number]) {
       return null;
   }
 }
+
+/**
+ * A component that renders the body content of a post in a thread
+ *
+ * @component
+ * @description
+ * PostBody handles the rendering of different types of content sections in a post,
+ * including text, images, videos, polls, trades, and NFT listings. It supports
+ * multiple sections per post and delegates rendering to specialized section components.
+ *
+ * Features:
+ * - Multiple content section support
+ * - Section type-specific rendering
+ * - Customizable styling
+ * - Responsive layout
+ *
+ * @example
+ * ```tsx
+ * <PostBody
+ *   post={postData}
+ *   themeOverrides={{ '--primary-color': '#1D9BF0' }}
+ * />
+ * ```
+ */
+function PostBody({post, themeOverrides, styleOverrides}: PostBodyProps) {
+  const mergedTheme = getMergedTheme(themeOverrides);
+  const styles = createThreadStyles(mergedTheme, styleOverrides);
+
+  return (
+    <View style={{marginTop: 8, padding: 0}}>
+      {post.sections.map(section => (
+        <View key={section.id} style={styles.extraContentContainer}>
+          <View style={{width: '84%'}}>{renderSection(section)}</View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Memo comparison to skip re-renders unless `post` or style props actually change.
+ */
+function arePropsEqual(
+  prev: Readonly<PostBodyProps>,
+  next: Readonly<PostBodyProps>,
+): boolean {
+  // If the post reference changed, check if the ID is the same
+  // and if number of sections is the same. If sections changed length => re-render.
+  if (prev.post.id !== next.post.id) return false;
+  const prevSections = prev.post.sections || [];
+  const nextSections = next.post.sections || [];
+  if (prevSections.length !== nextSections.length) return false;
+
+  // For a deeper check, compare each section's type or ID quickly
+  for (let i = 0; i < prevSections.length; i++) {
+    if (
+      prevSections[i].id !== nextSections[i].id ||
+      prevSections[i].type !== nextSections[i].type
+    ) {
+      return false;
+    }
+  }
+
+  // Optional: theme/style overrides if you want to skip if they changed references
+  // For safety, if the user passes new objects each time, it's considered changed:
+  if (prev.themeOverrides !== next.themeOverrides) return false;
+  if (prev.styleOverrides !== next.styleOverrides) return false;
+
+  return true;
+}
+
+export default React.memo(PostBody, arePropsEqual);

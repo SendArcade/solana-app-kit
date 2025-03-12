@@ -41,6 +41,83 @@ export const modalStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+
+  // NFT overlay + container for listing user NFTs
+  nftOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  nftContainer: {
+    width: '90%',
+    maxHeight: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+  },
+  nftTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  nftError: {
+    color: '#c00',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  nftItem: {
+    flexDirection: 'row',
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  nftImageContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 6,
+    backgroundColor: '#eee',
+    overflow: 'hidden',
+    marginRight: 6,
+  },
+  nftImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  nftPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nftName: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  nftCollection: {
+    fontSize: 12,
+    color: '#777',
+    marginBottom: 2,
+  },
+  nftMint: {
+    fontSize: 10,
+    color: '#999',
+  },
+  closeButton: {
+    backgroundColor: '#aaa',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
 });
 
 export const confirmModalStyles = StyleSheet.create({
