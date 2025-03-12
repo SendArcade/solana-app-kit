@@ -2,7 +2,7 @@
 import React from 'react';
 import {View, Text} from 'react-native';
 import {TradeData} from '../thread.types';
-import { TradeCard } from '../../Common/TradeCard';
+import {TradeCard} from '../../Common/TradeCard';
 
 /**
  * Props for the SectionTrade component
@@ -17,21 +17,21 @@ interface SectionTradeProps {
 
 /**
  * A component that renders a trade card in a post section
- * 
+ *
  * @component
  * @description
  * SectionTrade displays a trade card with optional text content in a post.
  * The trade card shows detailed information about a token swap, including
  * input and output tokens, quantities, and USD values. The component uses
  * the TradeCard component to render the actual trade details.
- * 
+ *
  * Features:
  * - Text and trade card combination
  * - Optional text content
  * - Detailed trade information display
  * - Missing data handling
  * - Consistent styling
- * 
+ *
  * @example
  * ```tsx
  * <SectionTrade
@@ -49,7 +49,7 @@ interface SectionTradeProps {
  * />
  * ```
  */
-export default function SectionTrade({text, tradeData}: SectionTradeProps) {
+function SectionTrade({text, tradeData}: SectionTradeProps) {
   return (
     <View>
       {!!text && (
@@ -58,10 +58,39 @@ export default function SectionTrade({text, tradeData}: SectionTradeProps) {
         </Text>
       )}
       {tradeData ? (
-        <TradeCard tradeData={tradeData} />
+        <TradeCard tradeData={tradeData} showGraphForOutputToken={true} />
       ) : (
         <Text>[Missing trade data]</Text>
       )}
     </View>
   );
 }
+
+/**
+ * Memo comparison to skip re-renders unless `text` or `tradeData` changes.
+ */
+function arePropsEqual(
+  prev: Readonly<SectionTradeProps>,
+  next: Readonly<SectionTradeProps>,
+) {
+  if (prev.text !== next.text) return false;
+  const p = prev.tradeData;
+  const n = next.tradeData;
+  // If either side is missing tradeData => not equal
+  if (!p || !n) return p === n; // they’re equal only if both are null/undefined
+  // Compare each field
+  if (p.inputMint !== n.inputMint) return false;
+  if (p.outputMint !== n.outputMint) return false;
+  if (p.inputSymbol !== n.inputSymbol) return false;
+  if (p.outputSymbol !== n.outputSymbol) return false;
+  if (p.inputQuantity !== n.inputQuantity) return false;
+  if (p.outputQuantity !== n.outputQuantity) return false;
+  if (p.inputUsdValue !== n.inputUsdValue) return false;
+  if (p.outputUsdValue !== n.outputUsdValue) return false;
+  if (p.aggregator !== n.aggregator) return false;
+  if (p.inputAmountLamports !== n.inputAmountLamports) return false;
+  if (p.outputAmountLamports !== n.outputAmountLamports) return false;
+  return true;
+}
+
+export default React.memo(SectionTrade, arePropsEqual);
