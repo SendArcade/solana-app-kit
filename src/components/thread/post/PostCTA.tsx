@@ -10,7 +10,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import type {ThreadPost} from '../thread.types';
+import type {ThreadPost, ThreadUser} from '../thread.types';
 import {createThreadStyles, getMergedTheme} from '../thread.styles';
 import {useSelector} from 'react-redux';
 import {RootState} from '../../../state/store';
@@ -119,6 +119,10 @@ export default function PostCTA({
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
   const [floorNft, setFloorNft] = useState<any>(null);
   const [loadingFloor, setLoadingFloor] = useState(false);
+  const userName = useAppSelector(state => state.auth.username);
+
+  
+
 
   // For NFT buying spinner
   const [nftLoading, setNftLoading] = useState(false);
@@ -136,6 +140,16 @@ export default function PostCTA({
   // For simplicity, using the first connected wallet
   const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
   const userWallet = solanaWallet?.wallets?.[0] || null;
+
+  const currentUser: ThreadUser = {
+    id: userPublicKey || 'anonymous-user',
+    username: userName || 'Anonymous',
+    handle: userPublicKey
+      ? '@' + userPublicKey.slice(0, 6) + '...' + userPublicKey.slice(-4)
+      : '@anonymous',
+    verified: true,
+    avatar: storedProfilePic ? {uri: storedProfilePic} : DEFAULT_IMAGES.user,
+  };
 
   const mergedTheme = getMergedTheme(themeOverrides);
   const styles = createThreadStyles(
@@ -442,12 +456,7 @@ export default function PostCTA({
         <TradeModal
           visible={showTradeModal}
           onClose={() => setShowTradeModal(false)}
-          currentUser={{
-            id: 'current-user',
-            username: 'You',
-            handle: '@you',
-            avatar: storedProfilePic ? {uri: storedProfilePic} : DEFAULT_IMAGES.user,
-          }}
+          currentUser={currentUser}
           disableTabs={true}
           initialInputToken={{
             address: tradeData.inputMint,
