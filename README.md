@@ -28,7 +28,7 @@ A modern React Native social application built on the Solana blockchain, providi
 - **React Native**: Cross-platform mobile development
 - **Expo**: Simplified React Native development and deployment
 - **Solana**: Fast, secure, and censorship-resistant blockchain
-- **Dialect**: Decentralized messaging via Blinks
+- **Dialect**: Native Blinks Support
 - **Privy**: Authentication and wallet management
 - **Redux**: State management with Redux Toolkit
 - **React Navigation**: Tab and stack-based navigation
