@@ -1,8 +1,9 @@
 // FILE: src/components/thread/sections/SectionTrade.tsx
 import React from 'react';
-import {View, Text} from 'react-native';
-import {TradeData} from '../thread.types';
+import {View, Text, ImageSourcePropType} from 'react-native';
+import {ThreadUser, TradeData} from '../thread.types';
 import {TradeCard} from '../../Common/TradeCard';
+import { DEFAULT_IMAGES } from '../../../config/constants';
 
 /**
  * Props for the SectionTrade component
@@ -13,6 +14,8 @@ interface SectionTradeProps {
   text?: string;
   /** The trade data to display in the card */
   tradeData?: TradeData;
+  user?: ThreadUser;
+  createdAt?: string;
 }
 
 /**
@@ -49,7 +52,24 @@ interface SectionTradeProps {
  * />
  * ```
  */
-function SectionTrade({text, tradeData}: SectionTradeProps) {
+
+function getUserAvatar(u?: ThreadUser): ImageSourcePropType {
+  if (!u) return DEFAULT_IMAGES.user;
+  
+  if (u.avatar) {
+    if (typeof u.avatar === 'string') {
+      return {uri: u.avatar};
+    }
+    return u.avatar;
+  }
+  
+  return DEFAULT_IMAGES.user;
+}
+function SectionTrade({text, tradeData, user, createdAt}: SectionTradeProps) {
+
+  const executionTimestamp = createdAt;
+
+  const userAvatar = getUserAvatar(user);
   return (
     <View>
       {!!text && (
@@ -58,7 +78,14 @@ function SectionTrade({text, tradeData}: SectionTradeProps) {
         </Text>
       )}
       {tradeData ? (
-        <TradeCard tradeData={tradeData} showGraphForOutputToken={true} />
+    <TradeCard 
+    tradeData={{
+      ...tradeData,
+      executionTimestamp // Add executionTimestamp to tradeData
+    }}
+    showGraphForOutputToken={true} 
+    userAvatar={userAvatar} // Pass user avatar to TradeCard
+  />
       ) : (
         <Text>[Missing trade data]</Text>
       )}
