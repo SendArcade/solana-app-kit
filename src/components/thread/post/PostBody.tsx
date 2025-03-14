@@ -1,3 +1,4 @@
+// FILE: src/components/thread/post/PostBody.tsx
 import React from 'react';
 import {View} from 'react-native';
 import {createThreadStyles, getMergedTheme} from '../thread.styles';
@@ -20,14 +21,22 @@ interface PostBodyProps {
   themeOverrides?: Partial<Record<string, any>>;
   /** Style overrides for specific components */
   styleOverrides?: {[key: string]: object};
+  /**
+   * A numeric value used to refresh the trade chart in SectionTrade,
+   * if it’s included in the post's sections.
+   */
+  externalRefreshTrigger?: number;
 }
 
 /**
  * Renders a single post section by delegating to the appropriate section component
- * @param {ThreadPost['sections'][number]} section - The section to render
- * @returns {JSX.Element | null} The rendered section component or null if type is unsupported
  */
-function renderSection(section: ThreadPost['sections'][number], user: ThreadPost['user'], createdAt: string) {
+function renderSection(
+  section: ThreadPost['sections'][number],
+  user: ThreadPost['user'],
+  createdAt: string,
+  externalRefreshTrigger?: number,
+) {
   switch (section.type) {
     case 'TEXT_ONLY':
       return <SectionTextOnly text={section.text} />;
@@ -43,7 +52,15 @@ function renderSection(section: ThreadPost['sections'][number], user: ThreadPost
       );
 
     case 'TEXT_TRADE':
-      return <SectionTrade text={section.text} tradeData={section.tradeData} user={user} createdAt={createdAt} />;
+      return (
+        <SectionTrade
+          text={section.text}
+          tradeData={section.tradeData}
+          user={user}
+          createdAt={createdAt}
+          externalRefreshTrigger={externalRefreshTrigger}
+        />
+      );
 
     case 'POLL':
       return <SectionPoll pollData={section.pollData} />;
@@ -56,40 +73,23 @@ function renderSection(section: ThreadPost['sections'][number], user: ThreadPost
   }
 }
 
-/**
- * A component that renders the body content of a post in a thread
- *
- * @component
- * @description
- * PostBody handles the rendering of different types of content sections in a post,
- * including text, images, videos, polls, trades, and NFT listings. It supports
- * multiple sections per post and delegates rendering to specialized section components.
- *
- * Features:
- * - Multiple content section support
- * - Section type-specific rendering
- * - Customizable styling
- * - Responsive layout
- *
- * @example
- * ```tsx
- * <PostBody
- *   post={postData}
- *   themeOverrides={{ '--primary-color': '#1D9BF0' }}
- * />
- * ```
- */
-function PostBody({post, themeOverrides, styleOverrides}: PostBodyProps) {
+function PostBody({
+  post,
+  themeOverrides,
+  styleOverrides,
+  externalRefreshTrigger,
+}: PostBodyProps) {
   const mergedTheme = getMergedTheme(themeOverrides);
   const styles = createThreadStyles(mergedTheme, styleOverrides);
   const {user, createdAt} = post;
-
 
   return (
     <View style={{marginTop: 8, padding: 0}}>
       {post.sections.map(section => (
         <View key={section.id} style={styles.extraContentContainer}>
-          <View style={{width: '84%'}}>{renderSection(section, user, createdAt)}</View>
+          <View style={{width: '84%'}}>
+            {renderSection(section, user, createdAt, externalRefreshTrigger)}
+          </View>
         </View>
       ))}
     </View>
@@ -99,18 +99,16 @@ function PostBody({post, themeOverrides, styleOverrides}: PostBodyProps) {
 /**
  * Memo comparison to skip re-renders unless `post` or style props actually change.
  */
-function arePropsEqual(
-  prev: Readonly<PostBodyProps>,
-  next: Readonly<PostBodyProps>,
-): boolean {
-  // If the post reference changed, check if the ID is the same
-  // and if number of sections is the same. If sections changed length => re-render.
+function arePropsEqual(prev: PostBodyProps, next: PostBodyProps): boolean {
+  // Compare post IDs
   if (prev.post.id !== next.post.id) return false;
+
+  // Compare number of sections
   const prevSections = prev.post.sections || [];
   const nextSections = next.post.sections || [];
   if (prevSections.length !== nextSections.length) return false;
 
-  // For a deeper check, compare each section's type or ID quickly
+  // Compare each section by id & type
   for (let i = 0; i < prevSections.length; i++) {
     if (
       prevSections[i].id !== nextSections[i].id ||
@@ -120,10 +118,12 @@ function arePropsEqual(
     }
   }
 
-  // Optional: theme/style overrides if you want to skip if they changed references
-  // For safety, if the user passes new objects each time, it's considered changed:
+  // Compare theme/style references
   if (prev.themeOverrides !== next.themeOverrides) return false;
   if (prev.styleOverrides !== next.styleOverrides) return false;
+
+  // Compare externalRefreshTrigger
+  if (prev.externalRefreshTrigger !== next.externalRefreshTrigger) return false;
 
   return true;
 }

@@ -91,8 +91,7 @@ function PostPage({
               if (onPressPost) {
                 onPressPost(item);
               }
-            }}
-          >
+            }}>
             <Text style={styles.replyLabel}>Reply Post</Text>
           </TouchableOpacity>
         ) : null}
@@ -102,8 +101,7 @@ function PostPage({
           activeOpacity={0.8}
           onPress={() => {
             onPressPost?.(item);
-          }}
-        >
+          }}>
           <PostHeader post={item} />
           <PostBody post={item} />
           <PostFooter post={item} />
