@@ -74,8 +74,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
         <TouchableOpacity
           style={styles.profImgContainer}
           onPress={onAvatarPress}
-          disabled={!isOwnProfile}
-        >
+          disabled={!isOwnProfile}>
           <Image
             style={styles.profImg}
             source={
@@ -109,8 +108,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
                   fontWeight: '500',
                   textAlign: 'left',
                   color: '#999999',
-                }}
-              >
+                }}>
                 Follows you
               </Text>
             )}
@@ -125,7 +123,9 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
 
       {/* follower/following row */}
       <View style={{flexDirection: 'row', gap: 12, marginTop: 8}}>
-        <TouchableOpacity style={{flexDirection: 'row', gap: 2}} onPress={onPressFollowers}>
+        <TouchableOpacity
+          style={{flexDirection: 'row', gap: 2}}
+          onPress={onPressFollowers}>
           <Text style={{fontSize: 12, fontWeight: '600'}}>
             {followersCount}
           </Text>
@@ -134,7 +134,9 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={{flexDirection: 'row', gap: 2}} onPress={onPressFollowing}>
+        <TouchableOpacity
+          style={{flexDirection: 'row', gap: 2}}
+          onPress={onPressFollowing}>
           <Text style={{fontSize: 12, fontWeight: '600'}}>
             {followingCount}
           </Text>
@@ -154,7 +156,9 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
       {/* Edit profile button if it's my own profile */}
       {isOwnProfile && (
         <View style={{marginTop: 8}}>
-          <TouchableOpacity style={styles.editProfileBtn} onPress={onEditProfile}>
+          <TouchableOpacity
+            style={styles.editProfileBtn}
+            onPress={onEditProfile}>
             <Text style={styles.editProfileBtnText}>Edit Profile</Text>
           </TouchableOpacity>
         </View>
@@ -179,7 +183,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
             areTheyFollowingMe={areTheyFollowingMe}
             onPressFollow={onFollowPress || (() => {})}
             onPressUnfollow={onUnfollowPress || (() => {})}
-            recipientAddress = {userWallet}
+            recipientAddress={userWallet}
           />
         </View>
       )}

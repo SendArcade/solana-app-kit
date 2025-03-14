@@ -92,7 +92,7 @@ export default function MainTabs() {
           tabBarIcon: ({focused, size}) => (
             <AnimatedTabIcon
               focused={focused}
-              size={size * 1.4}
+              size={size * 1.15}
               icon={
                 Icons.FeedIcon as React.ComponentType<{
                   width: number;
