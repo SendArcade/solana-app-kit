@@ -1,4 +1,7 @@
-import React, {useEffect, useState} from 'react';
+/**
+ * File: src/components/Profile/profile.tsx
+ */
+import React, {useEffect, useState, useCallback, useMemo} from 'react';
 import {
   View,
   SafeAreaView,
@@ -14,7 +17,7 @@ import {
   TextInput,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system'; // <-- newly added
+import {setStatusBarStyle} from 'expo-status-bar';
 import {useAppSelector, useAppDispatch} from '../../hooks/useReduxHooks';
 import {
   fetchUserProfile,
@@ -22,12 +25,10 @@ import {
   updateUsername,
 } from '../../state/auth/reducer';
 import {fetchAllPosts} from '../../state/thread/reducer';
-import {SERVER_URL} from '@env';
 import {ThreadPost} from '../thread/thread.types';
 import {NftItem, useFetchNFTs} from '../../hooks/useFetchNFTs';
 
-import ProfileInfo from './ProfileInfo/profileInfo';
-import SwipeTabs from './slider/slider';
+import ProfileView, {UserProfileData} from './ProfileView';
 import {
   styles,
   modalStyles,
@@ -35,38 +36,28 @@ import {
   inlineConfirmStyles,
   editNameModalStyles,
 } from './profile.style';
-import {setStatusBarStyle} from 'expo-status-bar';
 import {flattenPosts} from '../thread/thread.utils';
 import {useAppNavigation} from '../../hooks/useAppNavigation';
 import {followUser, unfollowUser} from '../../state/users/reducer';
 
-/**
- * Data about the user whose profile we’re showing
- */
-export interface UserProfileData {
-  address: string;
-  profilePicUrl: string;
-  username: string;
-}
+import {
+  uploadProfileAvatar,
+  fetchFollowers,
+  fetchFollowing,
+  checkIfUserFollowsMe,
+} from '../../services/profileService';
 
-/**
- * Props for the Profile component
- */
 export interface ProfileProps {
-  /** If true => show the "Edit Profile" flow, etc. */
   isOwnProfile?: boolean;
-  /** The user data (wallet address, profile image, display name) */
-  user: UserProfileData;
-  /** Pre-fetched posts (optional) */
+  user: {
+    address: string;
+    profilePicUrl?: string;
+    username?: string;
+  };
   posts?: ThreadPost[];
-  /** Pre-fetched NFTs (optional) */
   nfts?: NftItem[];
-  /** Whether NFT data is loading */
   loadingNfts?: boolean;
-  /** Any NFT fetch error */
   fetchNftsError?: string | null;
-
-  /** Optional styling for container */
   containerStyle?: object;
 }
 
@@ -83,13 +74,10 @@ export default function Profile({
   const allReduxPosts = useAppSelector(state => state.thread.allPosts);
   const navigation = useAppNavigation();
 
-  // The logged-in user’s wallet from Redux
   const myWallet = useAppSelector(state => state.auth.address);
-
-  // The user whose profile we are displaying
   const userWallet = user?.address || null;
 
-  // Local states for profile image & name
+  // Local states
   const [profilePicUrl, setProfilePicUrl] = useState<string>(
     user?.profilePicUrl || '',
   );
@@ -97,28 +85,24 @@ export default function Profile({
     user?.username || 'Anonymous',
   );
 
-  // Flattened posts for the user (including replies)
-  const [myPosts, setMyPosts] = useState<ThreadPost[]>(posts);
-
-  // Real followers/following arrays
+  // We removed the separate `myPosts` local state. Instead, we will memoize below.
   const [followersList, setFollowersList] = useState<any[]>([]);
   const [followingList, setFollowingList] = useState<any[]>([]);
-
-  // If not my own profile, track if “I” am following them, and if they follow me
   const [amIFollowing, setAmIFollowing] = useState(false);
   const [areTheyFollowingMe, setAreTheyFollowingMe] = useState(false);
 
-  // ============= NFT fetch logic or use the provided NFTs =============
+  // NFT
   const {
     nfts: fetchedNfts,
     loading: defaultNftLoading,
     error: defaultNftError,
   } = useFetchNFTs(userWallet || undefined);
+
   const resolvedNfts = nfts.length > 0 ? nfts : fetchedNfts;
   const resolvedLoadingNfts = loadingNfts || defaultNftLoading;
   const resolvedNftError = fetchNftsError || defaultNftError;
 
-  // ============= States for avatar picking & modals =============
+  // Modals
   const [avatarOptionModalVisible, setAvatarOptionModalVisible] =
     useState(false);
   const [localFileUri, setLocalFileUri] = useState<string | null>(null);
@@ -126,11 +110,8 @@ export default function Profile({
     'library' | 'nft' | null
   >(null);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
-
-  // Show the NFT list modal
   const [nftsModalVisible, setNftsModalVisible] = useState(false);
 
-  // For editing name
   const [editNameModalVisible, setEditNameModalVisible] = useState(false);
   const [tempName, setTempName] = useState(localUsername || '');
 
@@ -138,127 +119,74 @@ export default function Profile({
     setStatusBarStyle('dark');
   }, []);
 
-  // ============ Fetch user profile, followers, following if needed ============
+  // 1) Fetch user profile (if needed)
   useEffect(() => {
     if (!userWallet) return;
     dispatch(fetchUserProfile(userWallet))
       .unwrap()
       .then(value => {
-        if (value.profilePicUrl) {
-          setProfilePicUrl(value.profilePicUrl);
-        }
-        if (value.username) {
-          setLocalUsername(value.username);
-        }
+        if (value.profilePicUrl) setProfilePicUrl(value.profilePicUrl);
+        if (value.username) setLocalUsername(value.username);
       })
       .catch(err => {
         console.error('Failed to fetch user profile:', err);
       });
   }, [userWallet, dispatch]);
 
-  // If it's my own profile => fetch my followers/following
+  // 2) If it's my own profile => fetch my followers/following
   useEffect(() => {
     if (!userWallet || !isOwnProfile) return;
-    if (SERVER_URL) {
-      fetch(`${SERVER_URL}/api/profile/followers?userId=${userWallet}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.followers)) {
-            setFollowersList(data.followers);
-          }
-        })
-        .catch(e => console.warn('Error fetching my followers:', e));
+    fetchFollowers(userWallet).then(list => setFollowersList(list));
+    fetchFollowing(userWallet).then(list => setFollowingList(list));
+  }, [userWallet, isOwnProfile]);
 
-      fetch(`${SERVER_URL}/api/profile/following?userId=${userWallet}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.following)) {
-            setFollowingList(data.following);
-          }
-        })
-        .catch(e => console.warn('Error fetching my following:', e));
-    }
-  }, [dispatch, userWallet, isOwnProfile]);
-
-  // If viewing another user => fetch their followers/following
+  // 3) If another user's profile => fetch their followers/following, check follow
   useEffect(() => {
     if (!userWallet || isOwnProfile) return;
-    if (SERVER_URL) {
-      // fetch their followers
-      fetch(`${SERVER_URL}/api/profile/followers?userId=${userWallet}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.followers)) {
-            setFollowersList(data.followers);
-            // check if I am in that list => means I follow them
-            if (
-              myWallet &&
-              data.followers.findIndex((x: any) => x.id === myWallet) >= 0
-            ) {
-              setAmIFollowing(true);
-            } else {
-              setAmIFollowing(false);
-            }
-          }
-        })
-        .catch(e => console.warn('Error fetching target user followers:', e));
 
-      // fetch their following
-      fetch(`${SERVER_URL}/api/profile/following?userId=${userWallet}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.following)) {
-            setFollowingList(data.following);
-          }
-        })
-        .catch(e => console.warn('Error fetching target user following:', e));
-    }
+    fetchFollowers(userWallet).then(followers => {
+      setFollowersList(followers);
+      if (myWallet && followers.findIndex((x: any) => x.id === myWallet) >= 0) {
+        setAmIFollowing(true);
+      } else {
+        setAmIFollowing(false);
+      }
+    });
 
-    // check if user is in my followers => do they follow me
-    if (SERVER_URL && myWallet) {
-      fetch(`${SERVER_URL}/api/profile/followers?userId=${myWallet}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.followers)) {
-            if (data.followers.some((f: any) => f.id === userWallet)) {
-              setAreTheyFollowingMe(true);
-            } else {
-              setAreTheyFollowingMe(false);
-            }
-          }
-        })
-        .catch(e => console.warn('Error checking if they follow me:', e));
+    fetchFollowing(userWallet).then(following => {
+      setFollowingList(following);
+    });
+
+    if (myWallet) {
+      checkIfUserFollowsMe(myWallet, userWallet).then(result => {
+        setAreTheyFollowingMe(result);
+      });
     }
   }, [userWallet, isOwnProfile, myWallet]);
 
-  // ============ Possibly fetch all posts if not provided ============
+  // 4) Possibly fetch all posts from Redux if not provided
   useEffect(() => {
     if (!posts || posts.length === 0) {
-      dispatch(fetchAllPosts()).catch(err =>
-        console.error('Failed to fetch posts:', err),
-      );
+      dispatch(fetchAllPosts()).catch(err => {
+        console.error('Failed to fetch posts:', err);
+      });
     }
   }, [posts, dispatch]);
 
-  // ============ Flatten & filter posts for this user ============
-  useEffect(() => {
-    if (!userWallet) {
-      setMyPosts([]);
-      return;
-    }
-    const basePosts = posts && posts.length > 0 ? posts : allReduxPosts;
-    const flattened = flattenPosts(basePosts);
-    const userAllPosts = flattened.filter(
+  // 5) Flatten & filter user posts, memoized
+  const myPosts = useMemo(() => {
+    if (!userWallet) return [];
+    const base = posts && posts.length > 0 ? posts : allReduxPosts;
+    const flat = flattenPosts(base);
+    const userAll = flat.filter(
       p => p.user.id.toLowerCase() === userWallet.toLowerCase(),
     );
-    userAllPosts.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
-    setMyPosts(userAllPosts);
-  }, [allReduxPosts, userWallet, posts]);
+    userAll.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+    return userAll;
+  }, [userWallet, posts, allReduxPosts]);
 
-  // ============================================================
-  //  Follow / Unfollow user
-  // ============================================================
-  const handleFollow = async () => {
+  // ============ Follow / Unfollow
+  const handleFollow = useCallback(async () => {
     if (!myWallet || !userWallet) {
       Alert.alert('Cannot Follow', 'Missing user or my address');
       return;
@@ -267,7 +195,6 @@ export default function Profile({
       await dispatch(
         followUser({followerId: myWallet, followingId: userWallet}),
       ).unwrap();
-      // update local state
       setAmIFollowing(true);
       setFollowersList(prev => {
         if (!prev.some(u => u.id === myWallet)) {
@@ -281,9 +208,9 @@ export default function Profile({
     } catch (err: any) {
       Alert.alert('Follow Error', err.message);
     }
-  };
+  }, [dispatch, myWallet, userWallet]);
 
-  const handleUnfollow = async () => {
+  const handleUnfollow = useCallback(async () => {
     if (!myWallet || !userWallet) {
       Alert.alert('Cannot Unfollow', 'Missing user or my address');
       return;
@@ -297,20 +224,16 @@ export default function Profile({
     } catch (err: any) {
       Alert.alert('Unfollow Error', err.message);
     }
-  };
+  }, [dispatch, myWallet, userWallet]);
 
-  // ============================================================
-  //  Avatar: library or NFT picking
-  // ============================================================
-  function handleAvatarPress() {
+  // ============ Avatar picks
+  const handleAvatarPress = useCallback(() => {
     if (!isOwnProfile) return;
     setAvatarOptionModalVisible(true);
-  }
+  }, [isOwnProfile]);
 
-  // Launch image picker from library
-  const handlePickProfilePicture = async () => {
+  const handlePickProfilePicture = useCallback(async () => {
     try {
-      // NOTE: The older "MediaTypeOptions" is deprecated, but still works for now:
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: false,
@@ -324,29 +247,21 @@ export default function Profile({
     } catch (error: any) {
       Alert.alert('Error picking image', error.message);
     }
-  };
+  }, []);
 
-  // Show NFT modal
-  const handleSelectNftOption = () => {
+  const handleSelectNftOption = useCallback(() => {
     setAvatarOptionModalVisible(false);
     setNftsModalVisible(true);
-  };
+  }, []);
 
-  /**
-   * Called when user picks an NFT from the list
-   */
-  const handleSelectNftAsAvatar = (nft: NftItem) => {
-    setLocalFileUri(nft.image); // this is a remote URL
+  const handleSelectNftAsAvatar = useCallback((nft: NftItem) => {
+    setLocalFileUri(nft.image);
     setSelectedSource('nft');
     setNftsModalVisible(false);
     setConfirmModalVisible(true);
-  };
+  }, []);
 
-
-  /**
-   * Confirm uploading new avatar => same approach for library or NFT
-   */
-  const handleConfirmUpload = async () => {
+  const handleConfirmUpload = useCallback(async () => {
     if (!isOwnProfile) {
       Alert.alert('Permission Denied', 'Cannot change avatar for other user');
       setConfirmModalVisible(false);
@@ -354,7 +269,7 @@ export default function Profile({
       setSelectedSource(null);
       return;
     }
-    if (!userWallet || !localFileUri || !SERVER_URL) {
+    if (!userWallet || !localFileUri) {
       Alert.alert('Missing Data', 'No valid image or user to upload to');
       setConfirmModalVisible(false);
       setLocalFileUri(null);
@@ -363,27 +278,9 @@ export default function Profile({
     }
 
     try {
-      const formData = new FormData();
-      formData.append('userId', userWallet);
-      formData.append('profilePic', {
-        uri: localFileUri,
-        type: 'image/jpeg',
-        name: `profile_${Date.now()}.jpg`,
-      } as any);
-      console.log('>>> Uploading avatar:', formData.get('profilePic'));
-      const SERVER_BASE_URL = SERVER_URL || 'http://localhost:8080';
-      console.log('>>> Uploading to:', SERVER_BASE_URL);
-      const response = await fetch(`${SERVER_BASE_URL}/api/profile/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-      console.log('>>> Response:', response);
-      const data = await response.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Upload failed');
-      }
-      dispatch(updateProfilePic(data.url));
-      setProfilePicUrl(data.url);
+      const newUrl = await uploadProfileAvatar(userWallet, localFileUri);
+      dispatch(updateProfilePic(newUrl));
+      setProfilePicUrl(newUrl);
     } catch (err: any) {
       Alert.alert('Upload Error', err.message);
       console.log('>>> handleConfirmUpload error:', err);
@@ -392,28 +289,23 @@ export default function Profile({
       setLocalFileUri(null);
       setSelectedSource(null);
     }
-  };
+  }, [dispatch, userWallet, localFileUri, isOwnProfile]);
 
-  /**
-   * Cancel upload
-   */
-  const handleCancelUpload = () => {
+  const handleCancelUpload = useCallback(() => {
     setConfirmModalVisible(false);
     setLocalFileUri(null);
     setSelectedSource(null);
-  };
+  }, []);
 
-  // ============================================================
-  //  Name editing flow
-  // ============================================================
-  const handleOpenEditModal = () => {
+  // ============ Editing Name
+  const handleOpenEditModal = useCallback(() => {
     if (!isOwnProfile) return;
     setTempName(localUsername || '');
     setEditNameModalVisible(true);
-  };
+  }, [isOwnProfile, localUsername]);
 
-  const handleSaveName = async () => {
-    if (!isOwnProfile || !userWallet || !tempName.trim() || !SERVER_URL) {
+  const handleSaveName = useCallback(async () => {
+    if (!isOwnProfile || !userWallet || !tempName.trim()) {
       setEditNameModalVisible(false);
       return;
     }
@@ -427,10 +319,10 @@ export default function Profile({
     } finally {
       setEditNameModalVisible(false);
     }
-  };
+  }, [dispatch, tempName, isOwnProfile, userWallet]);
 
-  // Stats pressing => Followers or Following
-  const handlePressFollowers = () => {
+  // ============ Followers / Following
+  const handlePressFollowers = useCallback(() => {
     if (followersList.length === 0) {
       Alert.alert('No Followers', 'This user has no followers yet.');
       return;
@@ -440,9 +332,9 @@ export default function Profile({
       userId: userWallet,
       userList: followersList,
     } as never);
-  };
+  }, [followersList, navigation, userWallet]);
 
-  const handlePressFollowing = () => {
+  const handlePressFollowing = useCallback(() => {
     if (followingList.length === 0) {
       Alert.alert('No Following', 'This user is not following anyone yet.');
       return;
@@ -452,11 +344,18 @@ export default function Profile({
       userId: userWallet,
       userList: followingList,
     } as never);
-  };
+  }, [followingList, navigation, userWallet]);
 
-  // ============================================================
-  //  RENDER
-  // ============================================================
+  // Memoize the final user object so it doesn't change if name/pic/wallet are unchanged
+  const resolvedUser: UserProfileData = useMemo(
+    () => ({
+      address: userWallet || '',
+      profilePicUrl,
+      username: localUsername,
+    }),
+    [userWallet, profilePicUrl, localUsername],
+  );
+
   return (
     <SafeAreaView
       style={[
@@ -464,11 +363,13 @@ export default function Profile({
         containerStyle,
         Platform.OS === 'android' && androidStyles.safeArea,
       ]}>
-      <ProfileInfo
-        profilePicUrl={profilePicUrl}
-        username={localUsername}
-        userWallet={userWallet || ''}
+      <ProfileView
         isOwnProfile={isOwnProfile}
+        user={resolvedUser}
+        myPosts={myPosts}
+        myNFTs={resolvedNfts}
+        loadingNfts={resolvedLoadingNfts}
+        fetchNftsError={resolvedNftError}
         onAvatarPress={handleAvatarPress}
         onEditProfile={handleOpenEditModal}
         amIFollowing={amIFollowing}
@@ -479,19 +380,11 @@ export default function Profile({
         followingCount={followingList.length}
         onPressFollowers={handlePressFollowers}
         onPressFollowing={handlePressFollowing}
+        onPressPost={post => {
+          navigation.navigate('PostThread', {postId: post.id});
+        }}
+        containerStyle={containerStyle}
       />
-
-      <View style={{flex: 1}}>
-        <SwipeTabs
-          myPosts={myPosts}
-          myNFTs={resolvedNfts}
-          loadingNfts={resolvedLoadingNfts}
-          fetchNftsError={resolvedNftError}
-          onPressPost={post => {
-            navigation.navigate('PostThread', {postId: post.id});
-          }}
-        />
-      </View>
 
       {/* (A) Avatar Option Modal */}
       {isOwnProfile && (
@@ -546,7 +439,10 @@ export default function Profile({
               ) : (
                 <FlatList
                   data={resolvedNfts}
-                  keyExtractor={item => item.mint || `random-${Math.random().toString(36).substr(2, 9)}`}
+                  keyExtractor={item =>
+                    item.mint ||
+                    `random-${Math.random().toString(36).substr(2, 9)}`
+                  }
                   style={{marginVertical: 10}}
                   renderItem={({item}) => (
                     <TouchableOpacity
@@ -573,9 +469,13 @@ export default function Profile({
                             {item.collection}
                           </Text>
                         ) : null}
-                        {item?.mint && <Text style={modalStyles.nftMint} numberOfLines={1}>
-                          {item?.mint?.slice(0, 8) + '...' + item?.mint?.slice(-4)}
-                        </Text>}
+                        {item.mint && (
+                          <Text style={modalStyles.nftMint} numberOfLines={1}>
+                            {item.mint.slice(0, 8) +
+                              '...' +
+                              item.mint.slice(-4)}
+                          </Text>
+                        )}
                       </View>
                     </TouchableOpacity>
                   )}
