@@ -3,73 +3,37 @@ import React from 'react';
 import {View, Text, ImageSourcePropType} from 'react-native';
 import {ThreadUser, TradeData} from '../thread.types';
 import {TradeCard} from '../../Common/TradeCard';
-import { DEFAULT_IMAGES } from '../../../config/constants';
+import {DEFAULT_IMAGES} from '../../../config/constants';
 
-/**
- * Props for the SectionTrade component
- * @interface SectionTradeProps
- */
 interface SectionTradeProps {
-  /** Optional text content to display above the trade card */
   text?: string;
-  /** The trade data to display in the card */
   tradeData?: TradeData;
   user?: ThreadUser;
   createdAt?: string;
+  externalRefreshTrigger?: number;
 }
-
-/**
- * A component that renders a trade card in a post section
- *
- * @component
- * @description
- * SectionTrade displays a trade card with optional text content in a post.
- * The trade card shows detailed information about a token swap, including
- * input and output tokens, quantities, and USD values. The component uses
- * the TradeCard component to render the actual trade details.
- *
- * Features:
- * - Text and trade card combination
- * - Optional text content
- * - Detailed trade information display
- * - Missing data handling
- * - Consistent styling
- *
- * @example
- * ```tsx
- * <SectionTrade
- *   text="Just executed this trade!"
- *   tradeData={{
- *     inputMint: "So11111111111111111111111111111111111111112",
- *     outputMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
- *     inputSymbol: "SOL",
- *     outputSymbol: "USDC",
- *     inputQuantity: "1.5",
- *     outputQuantity: "30.5",
- *     inputUsdValue: "$45.00",
- *     outputUsdValue: "$30.50"
- *   }}
- * />
- * ```
- */
 
 function getUserAvatar(u?: ThreadUser): ImageSourcePropType {
   if (!u) return DEFAULT_IMAGES.user;
-  
   if (u.avatar) {
     if (typeof u.avatar === 'string') {
       return {uri: u.avatar};
     }
     return u.avatar;
   }
-  
   return DEFAULT_IMAGES.user;
 }
-function SectionTrade({text, tradeData, user, createdAt}: SectionTradeProps) {
 
+function SectionTrade({
+  text,
+  tradeData,
+  user,
+  createdAt,
+  externalRefreshTrigger,
+}: SectionTradeProps) {
   const executionTimestamp = createdAt;
-
   const userAvatar = getUserAvatar(user);
+
   return (
     <View>
       {!!text && (
@@ -78,14 +42,15 @@ function SectionTrade({text, tradeData, user, createdAt}: SectionTradeProps) {
         </Text>
       )}
       {tradeData ? (
-    <TradeCard 
-    tradeData={{
-      ...tradeData,
-      executionTimestamp // Add executionTimestamp to tradeData
-    }}
-    showGraphForOutputToken={true} 
-    userAvatar={userAvatar} // Pass user avatar to TradeCard
-  />
+        <TradeCard
+          tradeData={{
+            ...tradeData,
+            executionTimestamp,
+          }}
+          showGraphForOutputToken={true}
+          userAvatar={userAvatar}
+          externalRefreshTrigger={externalRefreshTrigger}
+        />
       ) : (
         <Text>[Missing trade data]</Text>
       )}
@@ -93,19 +58,16 @@ function SectionTrade({text, tradeData, user, createdAt}: SectionTradeProps) {
   );
 }
 
-/**
- * Memo comparison to skip re-renders unless `text` or `tradeData` changes.
- */
 function arePropsEqual(
   prev: Readonly<SectionTradeProps>,
   next: Readonly<SectionTradeProps>,
 ) {
   if (prev.text !== next.text) return false;
+  if (prev.externalRefreshTrigger !== next.externalRefreshTrigger) return false;
+
   const p = prev.tradeData;
   const n = next.tradeData;
-  // If either side is missing tradeData => not equal
-  if (!p || !n) return p === n; // they’re equal only if both are null/undefined
-  // Compare each field
+  if (!p || !n) return p === n;
   if (p.inputMint !== n.inputMint) return false;
   if (p.outputMint !== n.outputMint) return false;
   if (p.inputSymbol !== n.inputSymbol) return false;
