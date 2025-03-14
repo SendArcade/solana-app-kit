@@ -1,3 +1,6 @@
+/**
+ * File: src/components/Profile/profile.style.ts
+ */
 import {StyleSheet} from 'react-native';
 
 export const styles = StyleSheet.create({
@@ -41,8 +44,6 @@ export const modalStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-
-  // NFT overlay + container for listing user NFTs
   nftOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
