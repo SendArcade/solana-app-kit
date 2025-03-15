@@ -36,6 +36,8 @@
     "@react-navigation/native-stack": "^7.2.0",
     "@react-navigation/stack": "^7.1.1",
     "@reduxjs/toolkit": "^2.5.1",
+    "@solana-mobile/mobile-wallet-adapter-protocol-web3js": "^2.1.5",
+    "@solana-mobile/mobile-wallet-adapter-walletlib": "^1.4.0-beta2",
     "@solana/spl-token": "^0.4.12",
     "@solana/wallet-adapter-react": "^0.15.35",
     "@solana/wallet-adapter-wallets": "^0.19.32",

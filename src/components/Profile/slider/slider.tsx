@@ -1,179 +1,87 @@
-import React, {memo, useState, useCallback} from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  ActivityIndicator,
-  TouchableOpacity,
-} from 'react-native';
+// File: src/components/Profile/slider/slider.tsx
+import React, {memo, useState} from 'react';
+import {View, Text, FlatList} from 'react-native';
 import {TabView, SceneMap, TabBar} from 'react-native-tab-view';
-
 import {ThreadPost} from '../../thread/thread.types';
-import {PostHeader, PostBody, PostFooter} from '../../thread';
 import Collectibles, {NftItem} from '../collectibles/collectibles';
-
+import {PostHeader, PostBody, PostFooter} from '../../thread';
 import {styles, tabBarStyles} from './slider.style';
+import ActionsPage from './ActionsPage';
 
 type SwipeTabsProps = {
-  /** The user's array of posts (root only in this scenario) */
   myPosts: ThreadPost[];
-
-  /** The user's array of NFTs. */
   myNFTs: NftItem[];
-
-  /** Whether the NFT data is loading. */
   loadingNfts?: boolean;
-
-  /** NFT fetch error message (if any). */
   fetchNftsError?: string | null;
-
-  /** Callback to refresh posts. */
-  onRefreshPosts?: () => void;
-  /** Whether posts data is refreshing. */
-  refreshingPosts?: boolean;
-
-  /** Callback to refresh NFTs. */
-  onRefreshNfts?: () => void;
-  /** Whether NFTs data is refreshing. */
-  refreshingNfts?: boolean;
-
-  /**
-   * Fired when a post is pressed (or the “Reply Post” label is pressed).
-   */
+  myActions: any[];
+  loadingActions?: boolean;
+  fetchActionsError?: string | null;
   onPressPost?: (post: ThreadPost) => void;
 };
 
-/**
- * Renders the user's posts in a FlatList.
- */
 function PostPage({
   myPosts,
-  onRefresh,
-  refreshing,
   onPressPost,
 }: {
   myPosts: ThreadPost[];
-  onRefresh?: () => void;
-  refreshing?: boolean;
   onPressPost?: (post: ThreadPost) => void;
 }) {
-  const [localRefreshing, setLocalRefreshing] = useState(false);
-
-  const handleLocalRefresh = useCallback(() => {
-    setLocalRefreshing(true);
-    setTimeout(() => {
-      setLocalRefreshing(false);
-    }, 800);
-  }, []);
-
-  const finalRefreshing =
-    refreshing !== undefined ? refreshing : localRefreshing;
-  const finalOnRefresh =
-    onRefresh !== undefined ? onRefresh : handleLocalRefresh;
-
   if (!myPosts || myPosts.length === 0) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.emptyText}>
-          You haven&apos;t posted or replied yet!
-        </Text>
+        <Text style={styles.emptyText}>No posts yet!</Text>
       </View>
     );
   }
-
-  const renderPostItem = ({item}: {item: ThreadPost}) => {
+  
+  const renderPost = ({item}: {item: ThreadPost}) => {
     const isReply = !!item.parentId;
     return (
       <View style={styles.postCard}>
-        {isReply ? (
-          <TouchableOpacity
-            onPress={() => {
-              if (onPressPost) {
-                onPressPost(item);
-              }
-            }}>
-            <Text style={styles.replyLabel}>Reply Post</Text>
-          </TouchableOpacity>
-        ) : null}
-
-        {/* Entire post clickable if you like: */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            onPressPost?.(item);
-          }}>
+        {isReply && <Text style={styles.replyLabel}>Reply Post</Text>}
+        <View>
           <PostHeader post={item} />
           <PostBody post={item} />
           <PostFooter post={item} />
-        </TouchableOpacity>
+        </View>
       </View>
     );
   };
-
+  
   return (
     <FlatList
       data={myPosts}
-      keyExtractor={post => post.id}
-      renderItem={renderPostItem}
+      renderItem={renderPost}
+      keyExtractor={p => p.id}
       contentContainerStyle={styles.postList}
-      refreshing={finalRefreshing}
-      onRefresh={finalOnRefresh}
     />
   );
 }
 
-/**
- * Renders the user's NFT collectibles.
- */
 function CollectiblesPage({
   nfts,
   loading,
   fetchNftsError,
-  onRefresh,
-  refreshing,
 }: {
   nfts: NftItem[];
   loading?: boolean;
   fetchNftsError?: string | null;
-  onRefresh?: () => void;
-  refreshing?: boolean;
 }) {
   return (
     <View style={styles.tabContent}>
-      <Collectibles
-        nfts={nfts}
-        loading={loading}
-        error={fetchNftsError}
-        onRefresh={onRefresh}
-        refreshing={refreshing}
-      />
+      <Collectibles nfts={nfts} loading={loading} error={fetchNftsError} />
     </View>
   );
 }
 
-/**
- * Placeholder for the "Actions" tab.
- */
-function ActionsPage() {
-  return (
-    <View style={[styles.tabContent, styles.centered]}>
-      <Text style={styles.emptyText}>No Actions defined yet.</Text>
-    </View>
-  );
-}
-
-/**
- * Main component with tab navigation for "Posts", "Collectibles" and "Actions".
- */
 function SwipeTabs({
   myPosts,
   myNFTs,
   loadingNfts,
   fetchNftsError,
-  onRefreshPosts,
-  refreshingPosts,
-  onRefreshNfts,
-  refreshingNfts,
+  myActions,
+  loadingActions,
+  fetchActionsError,
   onPressPost,
 }: SwipeTabsProps) {
   const [index, setIndex] = useState<number>(0);
@@ -182,28 +90,25 @@ function SwipeTabs({
     {key: 'collectibles', title: 'Collectibles'},
     {key: 'actions', title: 'Actions'},
   ]);
-
+  
   const renderScene = SceneMap({
-    posts: () => (
-      <PostPage
-        myPosts={myPosts}
-        onRefresh={onRefreshPosts}
-        refreshing={refreshingPosts}
-        onPressPost={onPressPost}
-      />
-    ),
+    posts: () => <PostPage myPosts={myPosts} onPressPost={onPressPost} />,
     collectibles: () => (
       <CollectiblesPage
         nfts={myNFTs}
         loading={loadingNfts}
         fetchNftsError={fetchNftsError}
-        onRefresh={onRefreshNfts}
-        refreshing={refreshingNfts}
       />
     ),
-    actions: ActionsPage,
+    actions: () => (
+      <ActionsPage
+        myActions={myActions}
+        loadingActions={loadingActions}
+        fetchActionsError={fetchActionsError}
+      />
+    ),
   });
-
+  
   const renderTabBar = (props: any) => (
     <TabBar
       {...props}
@@ -214,7 +119,7 @@ function SwipeTabs({
       indicatorStyle={tabBarStyles.indicator}
     />
   );
-
+  
   return (
     <View style={styles.tabView}>
       <TabView
@@ -223,10 +128,8 @@ function SwipeTabs({
         onIndexChange={setIndex}
         renderTabBar={renderTabBar}
         swipeEnabled
-        tabBarPosition="top"
-        initialLayout={{width: 400}}
-        style={styles.tabView}
         lazy
+        style={styles.tabView}
       />
     </View>
   );

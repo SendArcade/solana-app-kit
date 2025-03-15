@@ -1,6 +1,4 @@
-/**
- * File: src/components/Profile/ProfileView.tsx
- */
+// File: src/components/Profile/ProfileView.tsx
 import React from 'react';
 import {View, StyleProp, ViewStyle} from 'react-native';
 import ProfileInfo from './ProfileInfo/profileInfo';
@@ -35,11 +33,11 @@ export interface ProfileViewProps {
   onPressFollowing?: () => void;
   onPressPost?: (post: ThreadPost) => void;
   containerStyle?: StyleProp<ViewStyle>;
+  myActions: any[];
+  loadingActions: boolean;
+  fetchActionsError: string | null;
 }
 
-/**
- * Renders the Profile layout: includes ProfileInfo and a tabbed view.
- */
 function ProfileViewComponent({
   isOwnProfile,
   user,
@@ -59,6 +57,9 @@ function ProfileViewComponent({
   onPressFollowing,
   onPressPost,
   containerStyle,
+  myActions,
+  loadingActions,
+  fetchActionsError,
 }: ProfileViewProps) {
   return (
     <View style={[profileStyles.container, containerStyle]}>
@@ -78,7 +79,7 @@ function ProfileViewComponent({
         onPressFollowers={onPressFollowers}
         onPressFollowing={onPressFollowing}
       />
-
+  
       <View style={{flex: 1}}>
         <SwipeTabs
           myPosts={myPosts}
@@ -86,6 +87,9 @@ function ProfileViewComponent({
           loadingNfts={loadingNfts}
           fetchNftsError={fetchNftsError}
           onPressPost={onPressPost}
+          myActions={myActions}
+          loadingActions={loadingActions}
+          fetchActionsError={fetchActionsError}
         />
       </View>
     </View>
@@ -97,18 +101,20 @@ function arePropsEqual(prev: ProfileViewProps, next: ProfileViewProps) {
   if (prev.user.address !== next.user.address) return false;
   if (prev.user.profilePicUrl !== next.user.profilePicUrl) return false;
   if (prev.user.username !== next.user.username) return false;
-
+  
   if (prev.loadingNfts !== next.loadingNfts) return false;
   if (prev.fetchNftsError !== next.fetchNftsError) return false;
   if (prev.amIFollowing !== next.amIFollowing) return false;
   if (prev.areTheyFollowingMe !== next.areTheyFollowingMe) return false;
   if (prev.followersCount !== next.followersCount) return false;
   if (prev.followingCount !== next.followingCount) return false;
-
-  // Compare array references for myPosts and myNFTs
+  
   if (prev.myPosts !== next.myPosts) return false;
   if (prev.myNFTs !== next.myNFTs) return false;
+  if (prev.myActions !== next.myActions) return false;
+  if (prev.loadingActions !== next.loadingActions) return false;
+  if (prev.fetchActionsError !== next.fetchActionsError) return false;
   return true;
 }
-
+  
 export default React.memo(ProfileViewComponent, arePropsEqual);
