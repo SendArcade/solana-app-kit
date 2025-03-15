@@ -1,6 +1,4 @@
-/**
- * File: src/components/Profile/profile.tsx
- */
+// File: src/components/Profile/profile.tsx
 import React, {useEffect, useState, useCallback, useMemo} from 'react';
 import {
   View,
@@ -46,6 +44,7 @@ import {
   fetchFollowing,
   checkIfUserFollowsMe,
 } from '../../services/profileService';
+import { HELIUS_API_KEY } from '@env';
 
 export interface ProfileProps {
   isOwnProfile?: boolean;
@@ -77,7 +76,7 @@ export default function Profile({
   const myWallet = useAppSelector(state => state.auth.address);
   const userWallet = user?.address || null;
 
-  // Local states
+  // Local states for profile picture and username
   const [profilePicUrl, setProfilePicUrl] = useState<string>(
     user?.profilePicUrl || '',
   );
@@ -85,13 +84,18 @@ export default function Profile({
     user?.username || 'Anonymous',
   );
 
-  // We removed the separate `myPosts` local state. Instead, we will memoize below.
+  // Followers/following state
   const [followersList, setFollowersList] = useState<any[]>([]);
   const [followingList, setFollowingList] = useState<any[]>([]);
   const [amIFollowing, setAmIFollowing] = useState(false);
   const [areTheyFollowingMe, setAreTheyFollowingMe] = useState(false);
 
-  // NFT
+  // --- ACTIONS state ---
+  const [myActions, setMyActions] = useState<any[]>([]);
+  const [loadingActions, setLoadingActions] = useState<boolean>(false);
+  const [fetchActionsError, setFetchActionsError] = useState<string | null>(null);
+
+  // NFT fetch hook
   const {
     nfts: fetchedNfts,
     loading: defaultNftLoading,
@@ -102,24 +106,54 @@ export default function Profile({
   const resolvedLoadingNfts = loadingNfts || defaultNftLoading;
   const resolvedNftError = fetchNftsError || defaultNftError;
 
-  // Modals
-  const [avatarOptionModalVisible, setAvatarOptionModalVisible] =
-    useState(false);
-  const [localFileUri, setLocalFileUri] = useState<string | null>(null);
-  const [selectedSource, setSelectedSource] = useState<
-    'library' | 'nft' | null
-  >(null);
-  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
-  const [nftsModalVisible, setNftsModalVisible] = useState(false);
-
-  const [editNameModalVisible, setEditNameModalVisible] = useState(false);
-  const [tempName, setTempName] = useState(localUsername || '');
-
+  // --- Fetch Actions ---
   useEffect(() => {
-    setStatusBarStyle('dark');
-  }, []);
-
-  // 1) Fetch user profile (if needed)
+    if (!userWallet) return;
+  
+    let isCancelled = false;
+    setLoadingActions(true);
+    setFetchActionsError(null);
+  
+    const fetchActions = async () => {
+      try {
+        console.log('Fetching actions for wallet:', userWallet);
+        const heliusUrl = `https://api.helius.xyz/v0/addresses/${userWallet}/transactions?api-key=${HELIUS_API_KEY}&limit=20`;
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        
+        const res = await fetch(heliusUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+  
+        if (!res.ok) {
+          throw new Error(`Helius fetch failed with status ${res.status}`);
+        }
+  
+        const data = await res.json();
+        console.log('Data received, items:', data?.length || 0);
+  
+        if (!isCancelled) {
+          setMyActions(data || []);
+        }
+      } catch (err: any) {
+        console.error('Error fetching actions:', err.message);
+        if (!isCancelled) {
+          setFetchActionsError(err.message || 'Failed to fetch actions');
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoadingActions(false);
+        }
+      }
+    };
+  
+    fetchActions();
+    return () => {
+      isCancelled = true;
+    };
+  }, [userWallet]);
+  
+  // --- Fetch user profile if needed ---
   useEffect(() => {
     if (!userWallet) return;
     dispatch(fetchUserProfile(userWallet))
@@ -132,18 +166,16 @@ export default function Profile({
         console.error('Failed to fetch user profile:', err);
       });
   }, [userWallet, dispatch]);
-
-  // 2) If it's my own profile => fetch my followers/following
+  
+  // --- Followers/Following logic ---
   useEffect(() => {
     if (!userWallet || !isOwnProfile) return;
     fetchFollowers(userWallet).then(list => setFollowersList(list));
     fetchFollowing(userWallet).then(list => setFollowingList(list));
   }, [userWallet, isOwnProfile]);
-
-  // 3) If another user's profile => fetch their followers/following, check follow
+  
   useEffect(() => {
     if (!userWallet || isOwnProfile) return;
-
     fetchFollowers(userWallet).then(followers => {
       setFollowersList(followers);
       if (myWallet && followers.findIndex((x: any) => x.id === myWallet) >= 0) {
@@ -152,19 +184,17 @@ export default function Profile({
         setAmIFollowing(false);
       }
     });
-
     fetchFollowing(userWallet).then(following => {
       setFollowingList(following);
     });
-
     if (myWallet) {
       checkIfUserFollowsMe(myWallet, userWallet).then(result => {
         setAreTheyFollowingMe(result);
       });
     }
   }, [userWallet, isOwnProfile, myWallet]);
-
-  // 4) Possibly fetch all posts from Redux if not provided
+  
+  // --- Fetch posts if not provided ---
   useEffect(() => {
     if (!posts || posts.length === 0) {
       dispatch(fetchAllPosts()).catch(err => {
@@ -172,8 +202,8 @@ export default function Profile({
       });
     }
   }, [posts, dispatch]);
-
-  // 5) Flatten & filter user posts, memoized
+  
+  // --- Flatten & filter user posts ---
   const myPosts = useMemo(() => {
     if (!userWallet) return [];
     const base = posts && posts.length > 0 ? posts : allReduxPosts;
@@ -184,8 +214,8 @@ export default function Profile({
     userAll.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
     return userAll;
   }, [userWallet, posts, allReduxPosts]);
-
-  // ============ Follow / Unfollow
+  
+  // --- Follow / Unfollow handlers ---
   const handleFollow = useCallback(async () => {
     if (!myWallet || !userWallet) {
       Alert.alert('Cannot Follow', 'Missing user or my address');
@@ -209,7 +239,7 @@ export default function Profile({
       Alert.alert('Follow Error', err.message);
     }
   }, [dispatch, myWallet, userWallet]);
-
+  
   const handleUnfollow = useCallback(async () => {
     if (!myWallet || !userWallet) {
       Alert.alert('Cannot Unfollow', 'Missing user or my address');
@@ -225,13 +255,26 @@ export default function Profile({
       Alert.alert('Unfollow Error', err.message);
     }
   }, [dispatch, myWallet, userWallet]);
-
-  // ============ Avatar picks
+  
+  // --- Avatar selection, modals, editing name logic (unchanged) ---
+  const [avatarOptionModalVisible, setAvatarOptionModalVisible] =
+    useState(false);
+  const [localFileUri, setLocalFileUri] = useState<string | null>(null);
+  const [selectedSource, setSelectedSource] = useState<'library' | 'nft' | null>(null);
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [nftsModalVisible, setNftsModalVisible] = useState(false);
+  const [editNameModalVisible, setEditNameModalVisible] = useState(false);
+  const [tempName, setTempName] = useState(localUsername || '');
+  
+  useEffect(() => {
+    setStatusBarStyle('dark');
+  }, []);
+  
   const handleAvatarPress = useCallback(() => {
     if (!isOwnProfile) return;
     setAvatarOptionModalVisible(true);
   }, [isOwnProfile]);
-
+  
   const handlePickProfilePicture = useCallback(async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -248,19 +291,19 @@ export default function Profile({
       Alert.alert('Error picking image', error.message);
     }
   }, []);
-
+  
   const handleSelectNftOption = useCallback(() => {
     setAvatarOptionModalVisible(false);
     setNftsModalVisible(true);
   }, []);
-
+  
   const handleSelectNftAsAvatar = useCallback((nft: NftItem) => {
     setLocalFileUri(nft.image);
     setSelectedSource('nft');
     setNftsModalVisible(false);
     setConfirmModalVisible(true);
   }, []);
-
+  
   const handleConfirmUpload = useCallback(async () => {
     if (!isOwnProfile) {
       Alert.alert('Permission Denied', 'Cannot change avatar for other user');
@@ -276,7 +319,7 @@ export default function Profile({
       setSelectedSource(null);
       return;
     }
-
+  
     try {
       const newUrl = await uploadProfileAvatar(userWallet, localFileUri);
       dispatch(updateProfilePic(newUrl));
@@ -290,20 +333,19 @@ export default function Profile({
       setSelectedSource(null);
     }
   }, [dispatch, userWallet, localFileUri, isOwnProfile]);
-
+  
   const handleCancelUpload = useCallback(() => {
     setConfirmModalVisible(false);
     setLocalFileUri(null);
     setSelectedSource(null);
   }, []);
-
-  // ============ Editing Name
+  
   const handleOpenEditModal = useCallback(() => {
     if (!isOwnProfile) return;
     setTempName(localUsername || '');
     setEditNameModalVisible(true);
   }, [isOwnProfile, localUsername]);
-
+  
   const handleSaveName = useCallback(async () => {
     if (!isOwnProfile || !userWallet || !tempName.trim()) {
       setEditNameModalVisible(false);
@@ -320,8 +362,7 @@ export default function Profile({
       setEditNameModalVisible(false);
     }
   }, [dispatch, tempName, isOwnProfile, userWallet]);
-
-  // ============ Followers / Following
+  
   const handlePressFollowers = useCallback(() => {
     if (followersList.length === 0) {
       Alert.alert('No Followers', 'This user has no followers yet.');
@@ -333,7 +374,7 @@ export default function Profile({
       userList: followersList,
     } as never);
   }, [followersList, navigation, userWallet]);
-
+  
   const handlePressFollowing = useCallback(() => {
     if (followingList.length === 0) {
       Alert.alert('No Following', 'This user is not following anyone yet.');
@@ -345,8 +386,7 @@ export default function Profile({
       userList: followingList,
     } as never);
   }, [followingList, navigation, userWallet]);
-
-  // Memoize the final user object so it doesn't change if name/pic/wallet are unchanged
+  
   const resolvedUser: UserProfileData = useMemo(
     () => ({
       address: userWallet || '',
@@ -355,7 +395,7 @@ export default function Profile({
     }),
     [userWallet, profilePicUrl, localUsername],
   );
-
+  
   return (
     <SafeAreaView
       style={[
@@ -384,8 +424,11 @@ export default function Profile({
           navigation.navigate('PostThread', {postId: post.id});
         }}
         containerStyle={containerStyle}
+        myActions={myActions}
+        loadingActions={loadingActions}
+        fetchActionsError={fetchActionsError}
       />
-
+  
       {/* (A) Avatar Option Modal */}
       {isOwnProfile && (
         <Modal
@@ -415,7 +458,7 @@ export default function Profile({
           </View>
         </Modal>
       )}
-
+  
       {/* (B) NFT Selection Modal */}
       {isOwnProfile && (
         <Modal
@@ -429,8 +472,7 @@ export default function Profile({
               {resolvedLoadingNfts ? (
                 <View style={{marginTop: 20}}>
                   <ActivityIndicator size="large" color="#1d9bf0" />
-                  <Text
-                    style={{marginTop: 8, color: '#666', textAlign: 'center'}}>
+                  <Text style={{marginTop: 8, color: '#666', textAlign: 'center'}}>
                     Loading your NFTs...
                   </Text>
                 </View>
@@ -471,9 +513,7 @@ export default function Profile({
                         ) : null}
                         {item.mint && (
                           <Text style={modalStyles.nftMint} numberOfLines={1}>
-                            {item.mint.slice(0, 8) +
-                              '...' +
-                              item.mint.slice(-4)}
+                            {item.mint.slice(0, 8) + '...' + item.mint.slice(-4)}
                           </Text>
                         )}
                       </View>
@@ -495,7 +535,7 @@ export default function Profile({
           </View>
         </Modal>
       )}
-
+  
       {/* (C) Confirm Modal if source = 'nft' or library */}
       {isOwnProfile && selectedSource === 'nft' && confirmModalVisible && (
         <Modal
@@ -546,7 +586,7 @@ export default function Profile({
           </View>
         </Modal>
       )}
-
+  
       {/* For library selection => inline confirm row at the bottom */}
       {isOwnProfile && selectedSource === 'library' && localFileUri && (
         <View style={inlineConfirmStyles.container}>
@@ -572,7 +612,7 @@ export default function Profile({
           </View>
         </View>
       )}
-
+  
       {/* (E) Edit Name Modal */}
       {isOwnProfile && (
         <Modal
@@ -620,3 +660,5 @@ const androidStyles = StyleSheet.create({
     paddingTop: 30,
   },
 });
+
+
