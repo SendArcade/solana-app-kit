@@ -188,7 +188,7 @@ const LineGraph: React.FC<LineGraphProps> = ({ data, width, executionPrice, exec
     function findNearestPriceIndex() {
       if (!data || data.length === 0) return -1;
       
-      let closestIndex = 0;
+      let closestIndex = 0; 
       let minPriceDiff = Math.abs(data[0] - Number(executionPrice));
       
       for (let i = 1; i < data.length; i++) {
