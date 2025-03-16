@@ -2,7 +2,6 @@
 import {createSlice, createAsyncThunk, PayloadAction} from '@reduxjs/toolkit';
 import type {
   ThreadPost,
-  ThreadUser,
   ThreadSection,
 } from '../../components/thread/thread.types';
 import {allposts as fallbackPosts} from '../../mocks/posts';
@@ -31,14 +30,22 @@ export const fetchAllPosts = createAsyncThunk(
 /**
  * createRootPostAsync
  * Instead of passing a full user object, we pass userId only.
+ *
+ * NOTE: We now also support an optional `localId` that references the local post’s ID.
+ * This helps remove any local duplicates if we already inserted a local post.
  */
 export const createRootPostAsync = createAsyncThunk(
   'thread/createRootPost',
-  async (payload: {userId: string; sections: ThreadSection[]}) => {
+  async (payload: {
+    userId: string;
+    sections: ThreadSection[];
+    localId?: string;
+  }) => {
+    const {userId, sections} = payload;
     const res = await fetch(`${SERVER_BASE_URL}/api/posts`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
+      body: JSON.stringify({userId, sections}),
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to create post');
@@ -235,6 +242,12 @@ export const threadSlice = createSlice({
 
     // createRootPostAsync
     builder.addCase(createRootPostAsync.fulfilled, (state, action) => {
+      // If there's a local ID, remove the local post to avoid duplication
+      const localId = action.meta.arg.localId;
+      if (localId && localId.startsWith('local-')) {
+        state.allPosts = state.allPosts.filter(p => p.id !== localId);
+      }
+      // Now unshift the new "official" post from server
       state.allPosts.unshift(action.payload);
     });
 

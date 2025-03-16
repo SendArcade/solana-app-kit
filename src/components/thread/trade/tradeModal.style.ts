@@ -1,25 +1,28 @@
 import {StyleSheet, Platform} from 'react-native';
 
 export default StyleSheet.create({
-  modalOverlay: {
+  /** Main Modal / Container styles */
+  flexFill: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  darkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  centeredWrapper: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  modalContentContainer: {
+    width: '90%',
+    maxHeight: '90%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
     padding: 16,
   },
-  modalContainer: {
-    width: '100%',
-    maxHeight: '90%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
-  },
+
+  /** Header styles */
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -39,6 +42,8 @@ export default StyleSheet.create({
     fontWeight: '600',
     color: '#999',
   },
+
+  /** Tab row styles */
   tabRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -62,6 +67,8 @@ export default StyleSheet.create({
   tabButtonTextActive: {
     color: '#FFF',
   },
+
+  /** Token row and selectors */
   tokenRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -96,6 +103,8 @@ export default StyleSheet.create({
     fontWeight: '700',
     color: '#4A90E2',
   },
+
+  /** Text inputs and labels */
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
@@ -113,10 +122,12 @@ export default StyleSheet.create({
     marginBottom: 16,
     backgroundColor: '#F9F9F9',
   },
+
+  /** Buttons & loaders */
   swapButton: {
     backgroundColor: '#000000',
     paddingVertical: 14,
-    marginBottom : 14,
+    marginBottom: 14,
     borderRadius: 25,
     alignItems: 'center',
     marginTop: 10,
@@ -126,6 +137,19 @@ export default StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  activityLoader: {
+    marginTop: 16,
+  },
+
+  /** Tab content wrapper */
+  fullWidthScroll: {
+    width: '100%',
+  },
+  tabContentContainer: {
+    width: '100%',
+  },
+
+  /** Result & error messages */
   resultText: {
     marginTop: 20,
     fontSize: 16,
@@ -137,5 +161,65 @@ export default StyleSheet.create({
     fontSize: 16,
     color: 'red',
     textAlign: 'center',
+  },
+
+  /**
+   * Confirmation ("Share your trade?") Modal Styles
+   */
+  sharePromptBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  sharePromptContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  sharePromptBox: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 24,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 3},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  sharePromptTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 10,
+    textAlign: 'center',
+    color: '#333',
+  },
+  sharePromptDescription: {
+    fontSize: 15,
+    color: '#555',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  sharePromptButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  sharePromptBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  sharePromptBtnCancel: {
+    backgroundColor: '#bbb',
+  },
+  sharePromptBtnConfirm: {
+    backgroundColor: '#1d9bf0',
+  },
+  sharePromptBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

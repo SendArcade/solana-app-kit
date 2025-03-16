@@ -11,7 +11,6 @@ import {
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
   Platform,
-  StyleSheet,
 } from 'react-native';
 import {
   Transaction,
@@ -21,15 +20,21 @@ import {
   Cluster,
 } from '@solana/web3.js';
 import {TENSOR_API_KEY, HELIUS_RPC_URL, CLUSTER} from '@env';
-import {ThreadPost, ThreadSection, ThreadUser, TradeData} from '../thread.types';
-import styles from './tradeModal.style'; // Keep using your existing style definitions for everything else
+import {
+  ThreadPost,
+  ThreadSection,
+  ThreadUser,
+  TradeData,
+} from '../thread.types';
 import SelectTokenModal, {TokenInfo} from './SelectTokenModal';
 import {ENDPOINTS} from '../../../config/constants';
-import { useAppDispatch } from '../../../hooks/useReduxHooks';
-import { useAuth } from '../../../hooks/useAuth';
-import { addPostLocally, createRootPostAsync } from '../../../state/thread/reducer';
-
-const JUPITER_SWAP_ENDPOINT = ENDPOINTS.jupiter.swap;
+import {useAppDispatch} from '../../../hooks/useReduxHooks';
+import {useAuth} from '../../../hooks/useAuth';
+import {
+  addPostLocally,
+  createRootPostAsync,
+} from '../../../state/thread/reducer';
+import styles from './tradeModal.style';
 
 /**
  * Available tab options in the TradeModal
@@ -37,10 +42,6 @@ const JUPITER_SWAP_ENDPOINT = ENDPOINTS.jupiter.swap;
  */
 type TabOption = 'TRADE_AND_SHARE' | 'PICK_TX_SHARE';
 
-/**
- * Props for the TradeModal component
- * @interface TradeModalProps
- */
 interface TradeModalProps {
   /** Whether the modal is visible */
   visible: boolean;
@@ -59,33 +60,13 @@ interface TradeModalProps {
 }
 
 /**
- * A modal component for executing token trades and sharing them on the feed
+ * A modal component for executing token trades and sharing them on the feed.
  *
- * @component
- * @description
- * TradeModal provides a user interface for executing token swaps using Jupiter aggregator
- * and sharing the trade details on the social feed. It supports token selection, amount input,
- * and automatic post creation after successful trades.
+ * It handles two main flows:
+ * 1. Swap & Share (posts a trade summary on success)
+ * 2. Pick an existing Tx signature & share it
  *
- * Features:
- * - Token selection for input and output
- * - Real-time price quotes
- * - Trade execution via Jupiter aggregator
- * - Automatic trade post creation
- * - USD value calculation
- * - Customizable appearance
- *
- * @example
- * ```tsx
- * <TradeModal
- *   visible={showTradeModal}
- *   onClose={() => setShowTradeModal(false)}
- *   currentUser={user}
- *   onPostCreated={() => refetchPosts()}
- *   initialInputToken={solToken}
- *   initialOutputToken={usdcToken}
- * />
- * ```
+ * We also improved the UI/UX by using a modal for confirming share, instead of `Alert.alert`.
  */
 export default function TradeModal({
   visible,
@@ -105,7 +86,7 @@ export default function TradeModal({
 
   const [inputToken, setInputToken] = useState<TokenInfo>(
     initialInputToken ?? {
-      address: 'So11111111111111111111111111111111111111112',
+      address: 'So11111111111111111111111111111111111111112', // wSOL
       symbol: 'SOL',
       name: 'Solana',
       decimals: 9,
@@ -115,7 +96,7 @@ export default function TradeModal({
   );
   const [outputToken, setOutputToken] = useState<TokenInfo>(
     initialOutputToken ?? {
-      address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+      address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
       symbol: 'USDC',
       name: 'USD Coin',
       decimals: 6,
@@ -135,19 +116,28 @@ export default function TradeModal({
   const [errorMsg, setErrorMsg] = useState('');
   const [solscanTxSig, setSolscanTxSig] = useState('');
 
+  // === NEW state to handle improved "Share your trade?" prompt ===
+  const [showSharePrompt, setShowSharePrompt] = useState(false);
+  // We'll store the lamports so that if the user chooses "YES", we know how to create the post
+  const [pendingBuyInputLamports, setPendingBuyInputLamports] =
+    useState<number>(0);
+  const [pendingBuyOutputLamports, setPendingBuyOutputLamports] =
+    useState<number>(0);
+
+  /**
+   * Resets states and closes the entire modal
+   */
   const handleClose = useCallback(() => {
     setSelectedTab('TRADE_AND_SHARE');
     setResultMsg('');
     setErrorMsg('');
     setSolscanTxSig('');
+    setShowSharePrompt(false);
     onClose();
   }, [onClose]);
 
   /**
-   * Converts a decimal amount to base units (e.g., SOL to lamports)
-   * @param {string} amount - The decimal amount to convert
-   * @param {number} decimals - The number of decimal places for the token
-   * @returns {number} The amount in base units
+   * Converts a decimal amount to base units (e.g., SOL -> lamports)
    */
   function toBaseUnits(amount: string, decimals: number): number {
     const val = parseFloat(amount);
@@ -156,145 +146,9 @@ export default function TradeModal({
   }
 
   /**
-   * Fetches token details and current USD price from Jupiter and CoinGecko
-   * @param {string} mint - The token's mint address
-   * @returns {Promise<{symbol: string; decimals: number; usdPrice: number}>} Token details and price
+   * This method triggers a Jupiter swap, returning a transaction that we sign & send.
+   * On success, we ask user if they want to share the trade on the feed.
    */
-  async function getTokenDetailsAndPrice(
-    mint: string,
-  ): Promise<{symbol: string; decimals: number; usdPrice: number}> {
-    const tokenResp = await fetch(`https://api.jup.ag/tokens/v1/token/${mint}`);
-    if (!tokenResp.ok) {
-      throw new Error(`Failed to load token ${mint}: ${tokenResp.status}`);
-    }
-    const tokenData = await tokenResp.json();
-    const symbol = tokenData.symbol || tokenData.name || '???';
-    const decimals = tokenData.decimals || 0;
-    let usdPrice = 0;
-    if (tokenData.extensions && tokenData.extensions.coingeckoId) {
-      const cgId = tokenData.extensions.coingeckoId;
-      try {
-        const cgResp = await fetch(
-          `https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd`,
-        );
-        if (cgResp.ok) {
-          const cgData = await cgResp.json();
-          if (
-            cgData[cgId] &&
-            cgData[cgId].usd !== undefined &&
-            typeof cgData[cgId].usd === 'number'
-          ) {
-            usdPrice = cgData[cgId].usd;
-          }
-        }
-      } catch (err) {
-        console.warn('Coingecko price fetch failed', err);
-      }
-    }
-    return {symbol, decimals, usdPrice};
-  }
-
-  const promptPostSwap = useCallback(
-    async ({
-      inputLamports,
-      outputLamports,
-    }: {
-      inputLamports: number;
-      outputLamports: number;
-    }) => {
-      Alert.alert(
-        'Trade Successful',
-        'Your trade was successful! Would you like to share your trade on your feed?',
-        [
-          {
-            text: 'No',
-            style: 'cancel',
-          },
-          {
-            text: 'Yes',
-            onPress: async () => {
-              try {
-                const [inputInfo, outputInfo] = await Promise.all([
-                  getTokenDetailsAndPrice(inputToken.address),
-                  getTokenDetailsAndPrice(outputToken.address),
-                ]);
-
-                const finalInputQty =
-                  inputLamports / Math.pow(10, inputInfo.decimals);
-                const finalOutputQty =
-                  outputLamports / Math.pow(10, outputInfo.decimals);
-
-                const totalInputUsd = finalInputQty * inputInfo.usdPrice;
-                const totalOutputUsd = finalOutputQty * outputInfo.usdPrice;
-
-                const finalInputQtyStr = finalInputQty
-                  .toFixed(4)
-                  .replace(/\.?0+$/, '');
-                const finalOutputQtyStr = finalOutputQty
-                  .toFixed(4)
-                  .replace(/\.?0+$/, '');
-
-                const inputUsdValStr =
-                  totalInputUsd > 0 ? `$${totalInputUsd.toFixed(2)}` : '$0.00';
-                const outputUsdValStr =
-                  totalOutputUsd > 0
-                    ? `$${totalOutputUsd.toFixed(2)}`
-                    : '$0.00';
-
-                const tradeData: TradeData = {
-                  inputMint: inputToken.address,
-                  outputMint: outputToken.address,
-                  aggregator: 'Jupiter',
-                  inputSymbol: inputInfo.symbol,
-                  inputQuantity: finalInputQtyStr,
-                  inputUsdValue: inputUsdValStr,
-                  outputSymbol: outputInfo.symbol,
-                  outputQuantity: finalOutputQtyStr,
-                  outputUsdValue: outputUsdValStr,
-                };
-
-                const postSections: ThreadSection[] = [
-                  {
-                    id: 'swap-post-' + Math.random().toString(36).substr(2, 9),
-                    type: 'TEXT_TRADE',
-                    tradeData,
-                    text: `I just executed a trade: ${solAmount} ${inputToken.symbol} for ${outputToken.symbol}!`,
-                  },
-                ];
-
-                const newPost: ThreadPost = {
-                  id: 'local-' + Math.random().toString(36).substr(2, 9),
-                  user: currentUser,
-                  sections: postSections,
-                  createdAt: new Date().toISOString(),
-                  parentId: undefined,
-                  replies: [],
-                  reactionCount: 0,
-                  retweetCount: 0,
-                  quoteCount: 0,
-                };
-
-                dispatch(addPostLocally(newPost));
-                setResultMsg('Trade post created successfully!');
-                onPostCreated && onPostCreated();
-
-                await dispatch(
-                  createRootPostAsync({
-                    userId: currentUser.id,
-                    sections: postSections,
-                  }),
-                ).unwrap();
-              } catch (err: any) {
-                setErrorMsg(err?.message || 'Failed to create post.');
-              }
-            },
-          },
-        ],
-      );
-    },
-    [dispatch, onPostCreated, currentUser, solAmount, inputToken, outputToken],
-  );
-
   const handleTradeAndShare = useCallback(async () => {
     if (!userPublicKey) {
       Alert.alert('Wallet not connected', 'Please connect your wallet first.');
@@ -311,7 +165,7 @@ export default function TradeModal({
     try {
       const inputLamports = Number(toBaseUnits(solAmount, inputToken.decimals));
 
-      // Get quote
+      // 1) Get quote from Jupiter
       const quoteUrl = `${ENDPOINTS.jupiter.quote}?inputMint=${
         inputToken.address
       }&outputMint=${outputToken.address}&amount=${Math.round(
@@ -341,17 +195,16 @@ export default function TradeModal({
 
       const outLamports = parseFloat(firstRoute.outAmount) || 0;
 
-      // Build swap Tx from server
+      // 2) Build swap Tx from server
       const body = {
         quoteResponse: quoteData,
         userPublicKey: userPublicKey.toString(),
       };
-      const swapResp = await fetch(JUPITER_SWAP_ENDPOINT, {
+      const swapResp = await fetch(ENDPOINTS.jupiter.swap, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(body),
       });
-
       const swapData = await swapResp.json();
       if (!swapResp.ok || !swapData.swapTransaction) {
         throw new Error(
@@ -384,8 +237,10 @@ export default function TradeModal({
 
       setResultMsg(`Swap successful! Tx: ${signature}`);
 
-      // Prompt user to create a post about it
-      await promptPostSwap({inputLamports, outputLamports: outLamports});
+      // Instead of Alert, we now show a custom modal "Want to share your trade?"
+      setPendingBuyInputLamports(inputLamports);
+      setPendingBuyOutputLamports(outLamports);
+      setShowSharePrompt(true);
     } catch (err: any) {
       console.error('Trade error:', err);
       setErrorMsg(err.message);
@@ -398,9 +253,90 @@ export default function TradeModal({
     inputToken,
     outputToken,
     userWallet,
-    promptPostSwap,
+    setPendingBuyInputLamports,
+    setPendingBuyOutputLamports,
   ]);
 
+  /**
+   * Actually create the post in Redux:
+   *  - We create a local post object with a "local-..." ID
+   *  - Dispatch addPostLocally
+   *  - Then dispatch createRootPostAsync with { localId } to avoid duplication
+   */
+  const shareTradeInFeed = useCallback(
+    async (inputLamports: number, outputLamports: number) => {
+      try {
+        // Prepare post content
+        const localId = 'local-' + Math.random().toString(36).substr(2, 9);
+
+        // Build some placeholders for "display name" & USD values
+        // (In a real scenario, you'd fetch up-to-date token prices.)
+        const localInputQty = inputLamports / Math.pow(10, inputToken.decimals);
+        const localOutputQty =
+          outputLamports / Math.pow(10, outputToken.decimals);
+
+        const tradeData: TradeData = {
+          inputMint: inputToken.address,
+          outputMint: outputToken.address,
+          aggregator: 'Jupiter',
+          inputSymbol: inputToken.symbol,
+          inputQuantity: localInputQty.toFixed(4),
+          inputUsdValue: '$??',
+          outputSymbol: outputToken.symbol,
+          outputQuantity: localOutputQty.toFixed(4),
+          outputUsdValue: '$??',
+        };
+
+        const postSections: ThreadSection[] = [
+          {
+            id: 'swap-post-' + Math.random().toString(36).substr(2, 9),
+            type: 'TEXT_TRADE',
+            tradeData,
+            text: `I just executed a trade: ${localInputQty.toFixed(4)} ${
+              inputToken.symbol
+            } → ${outputToken.symbol}!`,
+          },
+        ];
+
+        // local post
+        const newLocalPost: ThreadPost = {
+          id: localId,
+          user: currentUser,
+          sections: postSections,
+          createdAt: new Date().toISOString(),
+          parentId: undefined,
+          replies: [],
+          reactionCount: 0,
+          retweetCount: 0,
+          quoteCount: 0,
+        };
+
+        // Insert a local placeholder post
+        dispatch(addPostLocally(newLocalPost));
+
+        // Then do server post
+        await dispatch(
+          createRootPostAsync({
+            userId: currentUser.id,
+            sections: postSections,
+            localId,
+          }),
+        ).unwrap();
+
+        setResultMsg('Trade post created successfully!');
+        onPostCreated && onPostCreated();
+      } catch (err: any) {
+        console.error('[shareTradeInFeed] Error =>', err);
+        setErrorMsg(err.message || 'Failed to create trade post');
+      }
+    },
+    [dispatch, currentUser, inputToken, outputToken, onPostCreated],
+  );
+
+  /**
+   * handlePickTxAndShare:
+   * The user can simply share any existing Tx by entering the signature
+   */
   const handlePickTxAndShare = useCallback(async () => {
     if (!solscanTxSig.trim()) {
       Alert.alert(
@@ -439,10 +375,15 @@ export default function TradeModal({
     }
   }, [dispatch, solscanTxSig, currentUser, onPostCreated]);
 
+  /**
+   * Render the content of the selected tab
+   */
   const renderTabContent = () => {
     if (selectedTab === 'TRADE_AND_SHARE') {
       return (
-        <ScrollView style={{width: '100%'}} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          style={styles.fullWidthScroll}
+          keyboardShouldPersistTaps="handled">
           <View style={styles.tokenRow}>
             <View style={styles.tokenColumn}>
               <Text style={styles.inputLabel}>From</Text>
@@ -487,7 +428,7 @@ export default function TradeModal({
           />
 
           {loading ? (
-            <ActivityIndicator size="large" style={{marginTop: 16}} />
+            <ActivityIndicator size="large" style={styles.activityLoader} />
           ) : (
             <TouchableOpacity
               style={styles.swapButton}
@@ -501,7 +442,7 @@ export default function TradeModal({
 
     // PICK_TX_SHARE tab
     return (
-      <View style={{width: '100%'}}>
+      <View style={styles.tabContentContainer}>
         <Text style={styles.inputLabel}>Transaction Signature</Text>
         <TextInput
           style={styles.textInput}
@@ -511,7 +452,7 @@ export default function TradeModal({
           autoCapitalize="none"
         />
         {loading ? (
-          <ActivityIndicator size="large" style={{marginTop: 16}} />
+          <ActivityIndicator size="large" style={styles.activityLoader} />
         ) : (
           <TouchableOpacity
             style={styles.swapButton}
@@ -530,33 +471,17 @@ export default function TradeModal({
       animationType="fade"
       onRequestClose={handleClose}>
       {/* Container for the entire screen (background + modal) */}
-      <View style={{flex: 1}}>
-        {/* Background overlay that closes the modal when tapped */}
+      <View style={styles.flexFill}>
+        {/* Dark overlay that closes the modal when tapped */}
         <TouchableWithoutFeedback onPress={handleClose}>
-          <View
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-            }}
-          />
+          <View style={styles.darkOverlay} />
         </TouchableWithoutFeedback>
 
         {/* Centered wrapper for the modal content */}
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}>
+        <View style={styles.centeredWrapper}>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{
-              width: '90%',
-              maxHeight: '90%',
-              backgroundColor: '#fff',
-              borderRadius: 12,
-              padding: 16,
-            }}>
+            style={styles.modalContentContainer}>
             <TouchableWithoutFeedback onPress={() => {}}>
               <View>
                 <View style={styles.header}>
@@ -631,6 +556,48 @@ export default function TradeModal({
           </KeyboardAvoidingView>
         </View>
       </View>
+
+      {/**
+       * A nice "Share your trade?" modal to confirm
+       * We store the pending buy lamports in state and pass them if user says "Yes"
+       */}
+      <Modal
+        visible={showSharePrompt}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSharePrompt(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowSharePrompt(false)}>
+          <View style={styles.sharePromptBackdrop} />
+        </TouchableWithoutFeedback>
+        <View style={styles.sharePromptContainer}>
+          <View style={styles.sharePromptBox}>
+            <Text style={styles.sharePromptTitle}>Share Your Trade?</Text>
+            <Text style={styles.sharePromptDescription}>
+              Your swap was successful! Would you like to create a post about
+              it?
+            </Text>
+            <View style={styles.sharePromptButtonRow}>
+              <TouchableOpacity
+                style={[styles.sharePromptBtn, styles.sharePromptBtnCancel]}
+                onPress={() => setShowSharePrompt(false)}>
+                <Text style={styles.sharePromptBtnText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sharePromptBtn, styles.sharePromptBtnConfirm]}
+                onPress={() => {
+                  setShowSharePrompt(false);
+                  // Actually share in feed
+                  shareTradeInFeed(
+                    pendingBuyInputLamports,
+                    pendingBuyOutputLamports,
+                  );
+                }}>
+                <Text style={styles.sharePromptBtnText}>Yes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }

@@ -1,6 +1,6 @@
 // File: src/components/Profile/slider/slider.tsx
 import React, {memo, useState} from 'react';
-import {View, Text, FlatList} from 'react-native';
+import {View, Text, FlatList, TouchableOpacity} from 'react-native';
 import {TabView, SceneMap, TabBar} from 'react-native-tab-view';
 import {ThreadPost} from '../../thread/thread.types';
 import Collectibles, {NftItem} from '../collectibles/collectibles';
@@ -38,12 +38,27 @@ function PostPage({
     const isReply = !!item.parentId;
     return (
       <View style={styles.postCard}>
-        {isReply && <Text style={styles.replyLabel}>Reply Post</Text>}
-        <View>
+        {isReply ? (
+          <TouchableOpacity
+            onPress={() => {
+              if (onPressPost) {
+                onPressPost(item);
+              }
+            }}>
+            <Text style={styles.replyLabel}>Reply Post</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Entire post clickable if you like: */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            onPressPost?.(item);
+          }}>
           <PostHeader post={item} />
           <PostBody post={item} />
           <PostFooter post={item} />
-        </View>
+        </TouchableOpacity>
       </View>
     );
   };
