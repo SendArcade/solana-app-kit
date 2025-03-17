@@ -4,6 +4,10 @@ import {View, Text, TouchableOpacity, Alert} from 'react-native';
 import Icons from '../../assets/svgs';
 import {useAuth} from '../../hooks/useAuth';
 import styles from '../../screens/Common/LoginScreen/LoginScreen.styles';
+import {
+  transact,
+  Web3MobileWallet,
+} from "@solana-mobile/mobile-wallet-adapter-protocol-web3js";
 
 /**
  * Props for the EmbeddedWalletAuth component
@@ -64,6 +68,25 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
     solanaWallet,
   } = useAuth();
 
+  const loginWithMWA = async () => {
+    const APP_IDENTITY = {
+      name: 'React Native dApp',
+      uri:  'https://yourdapp.com',
+      icon: "favicon.ico", // Full path resolves to https://yourdapp.com/favicon.ico
+    };
+    
+    const authorizationResult = await transact(async (wallet: Web3MobileWallet) => {
+        const authorizationResult = await wallet.authorize({
+            cluster: 'devnet',
+            identity: APP_IDENTITY,
+        });
+    
+        /* After approval, signing requests are available in the session. */
+        console.log(authorizationResult)
+        return authorizationResult;
+    });
+  }
+
   /**
    * Effect hook to handle wallet connection and callback
    * Triggers when user, wallet, or callback changes
@@ -86,6 +109,10 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
 
   return (
     <View style={styles.bottomButtonsContainer}>
+      <TouchableOpacity style={styles.loginButton} onPress={loginWithMWA}>
+        <Icons.Google width={24} height={24} />
+      <Text style={styles.buttonText}>Continue with MWA</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={styles.loginButton} onPress={loginWithGoogle}>
         <Icons.Google width={24} height={24} />
         <Text style={styles.buttonText}>Continue with Google</Text>
