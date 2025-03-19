@@ -2,7 +2,7 @@ import {SERVER_URL} from '@env';
 import {createSlice, createAsyncThunk, PayloadAction} from '@reduxjs/toolkit';
 
 export interface AuthState {
-  provider: 'privy' | 'dynamic' | 'turnkey' | null;
+  provider: 'privy' | 'dynamic' | 'turnkey' | 'mwa' |  null;
   address: string | null;
   isLoggedIn: boolean;
   profilePicUrl: string | null;
