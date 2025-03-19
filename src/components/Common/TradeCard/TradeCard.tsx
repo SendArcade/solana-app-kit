@@ -131,12 +131,12 @@ function TradeCard({
     setLoadingMeta(true);
     (async () => {
       try {
-        const [inMeta, outMeta] = await Promise.all([
-          fetchJupiterTokenData(tradeData.inputMint),
+        const [outMeta] = await Promise.all([
+          // fetchJupiterTokenData(tradeData.inputMint),
           fetchJupiterTokenData(tradeData.outputMint),
         ]);
         if (!canceled) {
-          setInputTokenMeta(inMeta);
+          // setInputTokenMeta(inMeta);
           setOutputTokenMeta(outMeta);
           prevMintPairRef.current = {
             inputMint: tradeData.inputMint,

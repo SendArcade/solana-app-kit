@@ -12,6 +12,14 @@ export interface UserProfileData {
   address: string;
   profilePicUrl: string;
   username: string;
+  // Instead of separate coin fields, we now store an object
+  attachmentData?: {
+    coin?: {
+      mint: string;
+      symbol?: string;
+      name?: string;
+    };
+  };
 }
 
 export interface ProfileViewProps {
@@ -61,6 +69,9 @@ function ProfileViewComponent({
   loadingActions,
   fetchActionsError,
 }: ProfileViewProps) {
+  // Instead of extracting separate coin fields, now use the attachmentData object.
+  const attachmentData = user.attachmentData || {};
+
   return (
     <View style={[profileStyles.container, containerStyle]}>
       <ProfileInfo
@@ -78,8 +89,10 @@ function ProfileViewComponent({
         followingCount={followingCount}
         onPressFollowers={onPressFollowers}
         onPressFollowing={onPressFollowing}
+        // Pass the new attachmentData object
+        attachmentData={attachmentData}
       />
-  
+
       <View style={{flex: 1}}>
         <SwipeTabs
           myPosts={myPosts}
@@ -101,14 +114,14 @@ function arePropsEqual(prev: ProfileViewProps, next: ProfileViewProps) {
   if (prev.user.address !== next.user.address) return false;
   if (prev.user.profilePicUrl !== next.user.profilePicUrl) return false;
   if (prev.user.username !== next.user.username) return false;
-  
+
   if (prev.loadingNfts !== next.loadingNfts) return false;
   if (prev.fetchNftsError !== next.fetchNftsError) return false;
   if (prev.amIFollowing !== next.amIFollowing) return false;
   if (prev.areTheyFollowingMe !== next.areTheyFollowingMe) return false;
   if (prev.followersCount !== next.followersCount) return false;
   if (prev.followingCount !== next.followingCount) return false;
-  
+
   if (prev.myPosts !== next.myPosts) return false;
   if (prev.myNFTs !== next.myNFTs) return false;
   if (prev.myActions !== next.myActions) return false;
@@ -116,5 +129,5 @@ function arePropsEqual(prev: ProfileViewProps, next: ProfileViewProps) {
   if (prev.fetchActionsError !== next.fetchActionsError) return false;
   return true;
 }
-  
+
 export default React.memo(ProfileViewComponent, arePropsEqual);

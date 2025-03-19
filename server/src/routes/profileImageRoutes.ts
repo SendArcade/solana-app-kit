@@ -1,19 +1,23 @@
-/*************************************
- * FILE: server/src/routes/profileImageRoutes.ts
- *************************************/
+/**
+ * File: server/src/routes/profileImageRoutes.ts
+ *
+ * A router that handles:
+ * - Uploading profile images (stored on IPFS via uploadToIpfs)
+ * - Basic profile fetch/update (username, attach coin, follow/unfollow, etc.)
+ */
 
-import { Router } from 'express';
+import {Router} from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import knex from '../db/knex';
-import { uploadToIpfs } from '../utils/ipfs';
+import {uploadToIpfs} from '../utils/ipfs';
 // import fetch from 'node-fetch';
 
 const profileImageRouter = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({storage: multer.memoryStorage()});
 
 /**
  * ------------------------------------------
@@ -27,17 +31,19 @@ profileImageRouter.post(
     try {
       const userId = req.body.userId;
       if (!userId) {
-        return res.status(400).json({ success: false, error: 'Missing userId' });
+        return res.status(400).json({success: false, error: 'Missing userId'});
       }
       if (!req.file) {
-        return res.status(400).json({ success: false, error: 'No file uploaded' });
+        return res
+          .status(400)
+          .json({success: false, error: 'No file uploaded'});
       }
 
       // 1) Compress the image using sharp
       const outputFormat = 'jpeg';
       const compressedBuffer = await sharp(req.file.buffer)
-        .resize({ width: 1024, withoutEnlargement: true })
-        .toFormat(outputFormat, { quality: 80 })
+        .resize({width: 1024, withoutEnlargement: true})
+        .toFormat(outputFormat, {quality: 80})
         .toBuffer();
 
       // 2) Write to a temp file
@@ -61,7 +67,7 @@ profileImageRouter.post(
 
       // 6) Attempt to fetch the returned metadata JSON
       let ipfsImageUrl = ipfsResult;
-      const { default: fetch } = await import('node-fetch');
+      const {default: fetch} = await import('node-fetch');
       const metadataResponse = await fetch(ipfsResult);
       if (metadataResponse.ok) {
         const metadataJson: any = await metadataResponse.json();
@@ -71,7 +77,7 @@ profileImageRouter.post(
       }
 
       // 7) Upsert user in "users" table, setting profile_picture_url
-      const existingUser = await knex('users').where({ id: userId }).first();
+      const existingUser = await knex('users').where({id: userId}).first();
       if (!existingUser) {
         await knex('users').insert({
           id: userId,
@@ -82,16 +88,16 @@ profileImageRouter.post(
           updated_at: new Date(),
         });
       } else {
-        await knex('users').where({ id: userId }).update({
+        await knex('users').where({id: userId}).update({
           profile_picture_url: ipfsImageUrl,
           updated_at: new Date(),
         });
       }
 
-      return res.json({ success: true, url: ipfsImageUrl });
+      return res.json({success: true, url: ipfsImageUrl});
     } catch (error: any) {
       console.error('[Profile upload error]', error);
-      return res.status(500).json({ success: false, error: error.message });
+      return res.status(500).json({success: false, error: error.message});
     }
   },
 );
@@ -105,24 +111,24 @@ profileImageRouter.get('/', async (req: any, res: any) => {
   try {
     const userId = req.query.userId;
     if (!userId) {
-      return res.status(400).json({ success: false, error: 'Missing userId' });
+      return res.status(400).json({success: false, error: 'Missing userId'});
     }
 
-    const user = await knex('users').where({ id: userId }).first();
+    const user = await knex('users').where({id: userId}).first();
     if (!user) {
-      return res.status(404).json({ success: false, error: 'User not found' });
+      return res.status(404).json({success: false, error: 'User not found'});
     }
 
-    // Return basic user info, possibly we can also return followers/following counts
-    // (But we have separate endpoints for that.)
+    // Return the user's data, including the attachment_data field.
     return res.json({
       success: true,
       url: user.profile_picture_url,
       username: user.username,
+      attachmentData: user.attachment_data || {}, // e.g., { coin: { mint, symbol, name, image, description } }
     });
   } catch (error: any) {
     console.error('[Profile fetch error]', error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({success: false, error: error.message});
   }
 });
 
@@ -133,15 +139,14 @@ profileImageRouter.get('/', async (req: any, res: any) => {
  */
 profileImageRouter.post('/updateUsername', async (req: any, res: any) => {
   try {
-    const { userId, username } = req.body;
+    const {userId, username} = req.body;
     if (!userId || !username) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing userId or username',
-      });
+      return res
+        .status(400)
+        .json({success: false, error: 'Missing userId or username'});
     }
 
-    const existingUser = await knex('users').where({ id: userId }).first();
+    const existingUser = await knex('users').where({id: userId}).first();
     if (!existingUser) {
       await knex('users').insert({
         id: userId,
@@ -152,16 +157,16 @@ profileImageRouter.post('/updateUsername', async (req: any, res: any) => {
         updated_at: new Date(),
       });
     } else {
-      await knex('users').where({ id: userId }).update({
+      await knex('users').where({id: userId}).update({
         username,
         updated_at: new Date(),
       });
     }
 
-    return res.json({ success: true, username });
+    return res.json({success: true, username});
   } catch (error: any) {
     console.error('[updateUsername error]', error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({success: false, error: error.message});
   }
 });
 
@@ -173,37 +178,42 @@ profileImageRouter.post('/updateUsername', async (req: any, res: any) => {
  */
 profileImageRouter.post('/follow', async (req: any, res: any) => {
   try {
-    const { followerId, followingId } = req.body;
+    const {followerId, followingId} = req.body;
     if (!followerId || !followingId) {
       return res
         .status(400)
-        .json({ success: false, error: 'Missing followerId or followingId' });
+        .json({success: false, error: 'Missing followerId or followingId'});
     }
     if (followerId === followingId) {
       return res
         .status(400)
-        .json({ success: false, error: 'Cannot follow yourself' });
+        .json({success: false, error: 'Cannot follow yourself'});
     }
 
     // Ensure both users exist
-    const followerExists = await knex('users').where({ id: followerId }).first();
-    const followingExists = await knex('users').where({ id: followingId }).first();
+    const followerExists = await knex('users').where({id: followerId}).first();
+    const followingExists = await knex('users')
+      .where({id: followingId})
+      .first();
     if (!followerExists || !followingExists) {
       return res
         .status(404)
-        .json({ success: false, error: 'Follower or following user not found' });
+        .json({success: false, error: 'Follower or following user not found'});
     }
 
     // Insert into follows if not already present
-    await knex('follows').insert({
-      follower_id: followerId,
-      following_id: followingId,
-    }).onConflict(['follower_id', 'following_id']).ignore();
+    await knex('follows')
+      .insert({
+        follower_id: followerId,
+        following_id: followingId,
+      })
+      .onConflict(['follower_id', 'following_id'])
+      .ignore();
 
-    return res.json({ success: true });
+    return res.json({success: true});
   } catch (error: any) {
     console.error('[Follow user error]', error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({success: false, error: error.message});
   }
 });
 
@@ -215,22 +225,22 @@ profileImageRouter.post('/follow', async (req: any, res: any) => {
  */
 profileImageRouter.post('/unfollow', async (req: any, res: any) => {
   try {
-    const { followerId, followingId } = req.body;
+    const {followerId, followingId} = req.body;
     if (!followerId || !followingId) {
       return res
         .status(400)
-        .json({ success: false, error: 'Missing followerId or followingId' });
+        .json({success: false, error: 'Missing followerId or followingId'});
     }
 
     // Delete from follows table
     await knex('follows')
-      .where({ follower_id: followerId, following_id: followingId })
+      .where({follower_id: followerId, following_id: followingId})
       .del();
 
-    return res.json({ success: true });
+    return res.json({success: true});
   } catch (error: any) {
     console.error('[Unfollow user error]', error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({success: false, error: error.message});
   }
 });
 
@@ -246,12 +256,12 @@ profileImageRouter.get('/followers', async (req: any, res: any) => {
     if (!userId) {
       return res
         .status(400)
-        .json({ success: false, error: 'Missing userId param' });
+        .json({success: false, error: 'Missing userId param'});
     }
 
     const rows = await knex('follows')
       .select('follower_id')
-      .where({ following_id: userId });
+      .where({following_id: userId});
 
     const followerIds = rows.map(r => r.follower_id);
 
@@ -264,7 +274,7 @@ profileImageRouter.get('/followers', async (req: any, res: any) => {
     });
   } catch (error: any) {
     console.error('[Get followers error]', error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({success: false, error: error.message});
   }
 });
 
@@ -280,12 +290,12 @@ profileImageRouter.get('/following', async (req: any, res: any) => {
     if (!userId) {
       return res
         .status(400)
-        .json({ success: false, error: 'Missing userId param' });
+        .json({success: false, error: 'Missing userId param'});
     }
 
     const rows = await knex('follows')
       .select('following_id')
-      .where({ follower_id: userId });
+      .where({follower_id: userId});
 
     const followingIds = rows.map(r => r.following_id);
 
@@ -298,7 +308,65 @@ profileImageRouter.get('/following', async (req: any, res: any) => {
     });
   } catch (error: any) {
     console.error('[Get following error]', error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * ------------------------------------------
+ *  NEW: Attach or update a coin on the user's profile
+ *  Body: { userId, attachmentData } where attachmentData = {
+ *    coin: { mint: string; symbol?: string; name?: string; image?: string; description?: string; }
+ *  }
+ * ------------------------------------------
+ */
+profileImageRouter.post('/attachCoin', async (req: any, res: any) => {
+  try {
+    const {userId, attachmentData} = req.body;
+    /**
+     * Example of attachmentData:
+     * {
+     *   coin: {
+     *     mint: string;
+     *     symbol?: string;
+     *     name?: string;
+     *     image?: string;       // from Helius
+     *     description?: string; // user-provided
+     *   }
+     * }
+     */
+    if (
+      !userId ||
+      !attachmentData ||
+      !attachmentData.coin ||
+      !attachmentData.coin.mint
+    ) {
+      return res.status(400).json({
+        success: false,
+        error:
+          'Missing userId or valid attachmentData (must include coin with mint)',
+      });
+    }
+
+    // Ensure user exists
+    const existingUser = await knex('users').where({id: userId}).first();
+    if (!existingUser) {
+      return res.status(404).json({success: false, error: 'User not found'});
+    }
+
+    // We store the entire object under "attachment_data" => { coin: {...} }
+    await knex('users').where({id: userId}).update({
+      attachment_data: attachmentData,
+      updated_at: new Date(),
+    });
+
+    return res.json({
+      success: true,
+      attachmentData,
+    });
+  } catch (error: any) {
+    console.error('[AttachCoin error]', error);
+    return res.status(500).json({success: false, error: error.message});
   }
 });
 

@@ -1,15 +1,14 @@
-// File: src/components/Profile/slider/ActionDetailModal.tsx
-import React, { useState } from "react";
+import React, {useState} from 'react';
 import {
   Modal,
   View,
   Text,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   ScrollView,
   Linking,
-} from "react-native";
-import * as Clipboard from "expo-clipboard";
+} from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 
 export interface Action {
   signature?: string;
@@ -23,7 +22,6 @@ export interface Action {
   feePayer?: string;
   source?: string;
   events?: any[] | object;
-  // ... any other properties you might need
 }
 
 export interface ActionDetailModalProps {
@@ -37,16 +35,16 @@ export interface ActionDetailModalProps {
  */
 function getActionColor(actionLabel: string): string {
   const label = actionLabel.toLowerCase();
-  if (label.includes("transfer")) {
-    return "#1d9bf0"; // Blue for transfers
-  } else if (label.includes("swap")) {
-    return "#9c27b0"; // Purple for swaps
-  } else if (label.includes("buy")) {
-    return "#4caf50"; // Green for buys
-  } else if (label.includes("sell")) {
-    return "#f44336"; // Red for sells
+  if (label.includes('transfer')) {
+    return '#1d9bf0'; // Blue for transfers
+  } else if (label.includes('swap')) {
+    return '#9c27b0'; // Purple for swaps
+  } else if (label.includes('buy')) {
+    return '#4caf50'; // Green for buys
+  } else if (label.includes('sell')) {
+    return '#f44336'; // Red for sells
   }
-  return "#607d8b"; // Default blue-gray for unknown actions
+  return '#607d8b'; // Default blue-gray for unknown actions
 }
 
 const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
@@ -55,55 +53,56 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   onClose,
 }) => {
   const [showInstructions, setShowInstructions] = useState(false);
-  
+
   if (!action) return null;
 
   // Determine the action label.
-  let actionLabel = action.transactionType || action.type || "Unknown Action";
+  let actionLabel = action.transactionType || action.type || 'Unknown Action';
   if (
-    (!actionLabel || actionLabel === "Unknown Action") &&
+    (!actionLabel || actionLabel === 'Unknown Action') &&
     action.instructions?.length
   ) {
     const firstInstruction = action.instructions[0];
     if (
-      firstInstruction.program === "system" &&
+      firstInstruction.program === 'system' &&
       firstInstruction.parsed &&
-      firstInstruction.parsed.type === "transfer"
+      firstInstruction.parsed.type === 'transfer'
     ) {
-      actionLabel = "Transfer";
+      actionLabel = 'Transfer';
     } else if (
-      firstInstruction.program === "token-mill" &&
+      firstInstruction.program === 'token-mill' &&
       firstInstruction.parsed &&
-      firstInstruction.parsed.type === "buy"
+      firstInstruction.parsed.type === 'buy'
     ) {
-      actionLabel = "Buy";
+      actionLabel = 'Buy';
     } else if (
-      firstInstruction.program === "token-mill" &&
+      firstInstruction.program === 'token-mill' &&
       firstInstruction.parsed &&
-      firstInstruction.parsed.type === "sell"
+      firstInstruction.parsed.type === 'sell'
     ) {
-      actionLabel = "Sell";
+      actionLabel = 'Sell';
     }
   }
 
   const accentColor = getActionColor(actionLabel);
-  const signature = action.signature || "UnknownSignature";
+  const signature = action.signature || 'UnknownSignature';
   const truncatedSignature =
-    signature.length > 16 ? signature.slice(0, 8) + "..." + signature.slice(-6) : signature;
-  const slot = action.slot || "—";
-  const description = action.description || "No description available.";
-  const fee = action.fee !== undefined ? action.fee : "N/A";
+    signature.length > 16
+      ? signature.slice(0, 8) + '...' + signature.slice(-6)
+      : signature;
+  const slot = action.slot || '—';
+  const description = action.description || 'No description available.';
+  const fee = action.fee !== undefined ? action.fee : 'N/A';
 
   // Format timestamp into separate date and time strings.
-  let formattedDate = "N/A";
-  let formattedTime = "N/A";
+  let formattedDate = 'N/A';
+  let formattedTime = 'N/A';
   if (action.timestamp) {
     const d = new Date(action.timestamp * 1000);
     formattedDate = d.toLocaleDateString();
     formattedTime = d.toLocaleTimeString();
   }
 
-  // Build Solscan URL – adjust query parameters if needed.
   const solscanURL = `https://solscan.io/tx/${signature}`;
 
   const copySignature = () => {
@@ -111,27 +110,33 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   };
 
   const openSolscan = () => {
-    Linking.openURL(solscanURL).catch((err) =>
-      console.error("Failed to open Solscan:", err)
+    Linking.openURL(solscanURL).catch(err =>
+      console.error('Failed to open Solscan:', err),
     );
   };
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={modalStyles.overlay}>
-        <View style={modalStyles.container}>
+        <View style={modalStyles.modalContainer}>
+          {/* Draggable Handle */}
+          <View style={modalStyles.handleBar} />
           {/* Header */}
           <View style={modalStyles.header}>
-            <Text style={modalStyles.title}>Transaction Details</Text>
-            <TouchableOpacity onPress={onClose} style={modalStyles.closeButton}>
-              <Text style={modalStyles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
+            <Text style={modalStyles.headerTitle}>Transaction Details</Text>
+            <Pressable
+              onPress={onClose}
+              style={({pressed}) => [{opacity: pressed ? 0.7 : 1}]}>
+              <Text style={modalStyles.closeText}>✕</Text>
+            </Pressable>
           </View>
-          <ScrollView style={modalStyles.content}>
+          <ScrollView
+            style={modalStyles.content}
+            showsVerticalScrollIndicator={false}>
             {/* Basic Details */}
             <View style={modalStyles.detailRow}>
               <Text style={modalStyles.detailLabel}>Type:</Text>
-              <Text style={[modalStyles.detailValue, { color: accentColor }]}>
+              <Text style={[modalStyles.detailValue, {color: accentColor}]}>
                 {actionLabel}
               </Text>
             </View>
@@ -139,18 +144,23 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
               <Text style={modalStyles.detailLabel}>Description:</Text>
               <Text style={modalStyles.detailValue}>{description}</Text>
             </View>
-            {/* Signature Row with copy icon */}
+            {/* Signature Row with copy functionality */}
             <View style={modalStyles.detailRow}>
               <Text style={modalStyles.detailLabel}>Signature:</Text>
-              <TouchableOpacity onPress={copySignature} style={modalStyles.copyIcon}>
-                <Text style={modalStyles.copyIconText}>📋</Text>
-              </TouchableOpacity>
+              <Pressable onPress={copySignature} style={modalStyles.copyButton}>
+                <Text style={modalStyles.copyButtonText}>Copy</Text>
+              </Pressable>
               <Text style={modalStyles.detailValue}>{truncatedSignature}</Text>
             </View>
             {/* Solscan Button */}
-            <TouchableOpacity onPress={openSolscan} style={modalStyles.solscanButton}>
+            <Pressable
+              onPress={openSolscan}
+              style={({pressed}) => [
+                modalStyles.solscanButton,
+                {opacity: pressed ? 0.8 : 1},
+              ]}>
               <Text style={modalStyles.solscanButtonText}>View on Solscan</Text>
-            </TouchableOpacity>
+            </Pressable>
             <View style={modalStyles.detailRow}>
               <Text style={modalStyles.detailLabel}>Slot:</Text>
               <Text style={modalStyles.detailValue}>{slot}</Text>
@@ -181,31 +191,30 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
             )}
             {/* Instructions Dropdown */}
             {action.instructions && action.instructions.length > 0 && (
-              <View style={{ marginTop: 16 }}>
-                <Text style={modalStyles.sectionTitle}>Instructions:</Text>
+              <View style={modalStyles.instructionsContainer}>
+                <Text style={modalStyles.sectionTitle}>Instructions</Text>
                 {showInstructions ? (
                   action.instructions.map((instr, idx) => (
-                    <View key={idx} style={modalStyles.instructionRow}>
+                    <View key={idx} style={modalStyles.instructionBox}>
                       <Text style={modalStyles.instructionText}>
                         {JSON.stringify(instr, null, 2)}
                       </Text>
                     </View>
                   ))
                 ) : (
-                  <View style={modalStyles.instructionRow}>
+                  <View style={modalStyles.instructionBox}>
                     <Text style={modalStyles.instructionText}>
                       {JSON.stringify(action.instructions[0]).slice(0, 100)}...
                     </Text>
                   </View>
                 )}
-                <TouchableOpacity
+                <Pressable
                   onPress={() => setShowInstructions(!showInstructions)}
-                  style={modalStyles.toggleContainer}
-                >
-                  <Text style={modalStyles.toggleText}>
-                    {showInstructions ? "Show Less" : "Show More"}
+                  style={modalStyles.toggleButton}>
+                  <Text style={modalStyles.toggleButtonText}>
+                    {showInstructions ? 'Show Less' : 'Show More'}
                   </Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
             )}
           </ScrollView>
@@ -218,98 +227,113 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
 const modalStyles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
   },
-  container: {
-    width: "90%",
-    maxHeight: "80%",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+    paddingBottom: 20,
+  },
+  handleBar: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#ccc',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginVertical: 10,
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  title: {
+  headerTitle: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: '700',
+    color: '#333',
   },
-  closeButton: {
-    backgroundColor: "#1d9bf0",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  closeButtonText: {
-    color: "#fff",
-    fontWeight: "600",
+  closeText: {
+    fontSize: 24,
+    color: '#888',
   },
   content: {
-    borderTopWidth: 1,
-    borderTopColor: "#eee",
-    paddingTop: 12,
+    paddingHorizontal: 20,
+    paddingTop: 10,
   },
   detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   detailLabel: {
-    fontWeight: "600",
+    fontWeight: '600',
     width: 100,
+    color: '#555',
   },
   detailValue: {
     flex: 1,
-    color: "#333",
+    color: '#333',
+    fontSize: 14,
+  },
+  copyButton: {
+    marginRight: 8,
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  copyButtonText: {
+    fontSize: 12,
+    color: '#1d9bf0',
+    fontWeight: '600',
+  },
+  solscanButton: {
+    backgroundColor: '#e8f4fd',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginVertical: 10,
+  },
+  solscanButtonText: {
+    color: '#1d9bf0',
+    fontWeight: '600',
+    fontSize: 14,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
     marginBottom: 8,
+    color: '#333',
   },
-  instructionRow: {
+  instructionsContainer: {
+    marginTop: 16,
+  },
+  instructionBox: {
+    backgroundColor: '#f7f7f7',
+    padding: 10,
+    borderRadius: 8,
     marginBottom: 6,
-    backgroundColor: "#f5f5f5",
-    padding: 8,
-    borderRadius: 6,
   },
   instructionText: {
     fontSize: 12,
-    color: "#555",
+    color: '#555',
   },
-  toggleContainer: {
-    alignSelf: "flex-end",
-    padding: 4,
+  toggleButton: {
+    alignSelf: 'flex-end',
+    marginTop: 4,
   },
-  toggleText: {
+  toggleButtonText: {
     fontSize: 12,
-    color: "#1d9bf0",
-    fontWeight: "600",
-  },
-  copyIcon: {
-    marginRight: 6,
-  },
-  copyIconText: {
-    fontSize: 16,
-  },
-  solscanButton: {
-    marginVertical: 8,
-    backgroundColor: "#e8f4fd",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    alignSelf: "flex-start",
-  },
-  solscanButtonText: {
-    color: "#1d9bf0",
-    fontWeight: "600",
-    fontSize: 14,
+    color: '#1d9bf0',
+    fontWeight: '600',
   },
 });
 
