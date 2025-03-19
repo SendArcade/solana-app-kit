@@ -88,7 +88,9 @@ export default function ThreadComposer({
   const dispatch = useAppDispatch();
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
   const { solanaWallet } = useAuth();
-  const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
+  const myWallet = useAppSelector(state => state.auth.address);
+
+  const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || myWallet ||  null;
 
   // Basic composer state
   const [textValue, setTextValue] = useState('');
