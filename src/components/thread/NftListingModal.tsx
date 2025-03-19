@@ -79,7 +79,9 @@ const NftListingModal = ({
 }: NftListingModalProps) => {
     // Get wallet information for buy functionality
     const { solanaWallet } = useAuth();
-    const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
+  const myWallet = useAppSelector(state => state.auth.address);
+
+    const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || myWallet || null;
     const userWallet: any = solanaWallet;
     const dispatch = useAppDispatch();
 
