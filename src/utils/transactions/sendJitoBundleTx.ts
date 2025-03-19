@@ -1,31 +1,15 @@
-// FILE: src/utils/transactions/sendJitoBundleTx.ts
-
+// File: src/utils/transactions/sendJitoBundleTx.ts
+import {Platform} from 'react-native';
 import {
-  Connection,
-  PublicKey,
-  VersionedTransaction,
-  TransactionMessage,
-  TransactionInstruction,
   ComputeBudgetProgram,
+  TransactionMessage,
+  VersionedTransaction,
+  PublicKey,
+  Connection,
   SystemProgram,
 } from '@solana/web3.js';
-import {Buffer} from 'buffer';
-import {sendJitoBundle, getSolscanLinks} from './jitoBundling';
-import { PUBLIC_KEYS } from '../../config/constants';
+import type {TransactionInstruction} from '@solana/web3.js';
 
-/** pick random tip account */
-function getRandomTipAccount(): PublicKey {
-  const randomIndex = Math.floor(
-    Math.random() * PUBLIC_KEYS.jitoTipAccounts.length,
-  );
-  return new PublicKey(PUBLIC_KEYS.jitoTipAccounts[randomIndex]);
-}
-
-/**
- * For Jito bundling, we cannot do a typical "signAndSendTransaction" because
- * we must push multiple transactions to the block engine. Instead we do the partial
- * signature flow with `signTransaction`, then we call `sendJitoBundle`.
- */
 export async function sendJitoBundleTransaction(
   provider: any,
   feeTier: 'low' | 'medium' | 'high' | 'very-high',
@@ -34,87 +18,133 @@ export async function sendJitoBundleTransaction(
   connection: Connection,
   feeMapping: Record<string, number>,
 ): Promise<string> {
-  console.log('[sendJitoBundleTransaction] preparing transaction for Jito');
+  console.log('[sendJitoBundleTransaction] Starting embedded Jito tx...');
+  const computeUnitLimitIx = ComputeBudgetProgram.setComputeUnitLimit({ units: 2_000_000 });
+  const allInstructions = [computeUnitLimitIx, ...instructions];
 
-  const microLamports = feeMapping[feeTier];
-  if (!microLamports) {
-    throw new Error(`Fee tier not found: ${feeTier}`);
-  }
+  const { blockhash } = await connection.getLatestBlockhash();
+  console.log('[sendJitoBundleTransaction] blockhash:', blockhash);
 
-  // create instructions for tip & compute
-  const tipAccount = getRandomTipAccount();
-  const tipIx = SystemProgram.transfer({
-    fromPubkey: walletPublicKey,
-    toPubkey: tipAccount,
-    lamports: 1000, // example tip
-  });
-  const computeLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
-    units: 2_000_000,
-  });
-  const computePriceIx = ComputeBudgetProgram.setComputeUnitPrice({
-    microLamports,
-  });
-
-  const finalInstructions = [
-    tipIx,
-    computeLimitIx,
-    computePriceIx,
-    ...instructions,
-  ];
-  const {blockhash} = await connection.getLatestBlockhash();
-
-  // Build a single VersionedTransaction
   const messageV0 = new TransactionMessage({
     payerKey: walletPublicKey,
     recentBlockhash: blockhash,
-    instructions: finalInstructions,
+    instructions: allInstructions,
   }).compileToV0Message();
 
-  const tx = new VersionedTransaction(messageV0);
+  const transaction = new VersionedTransaction(messageV0);
+  console.log('[sendJitoBundleTransaction] Compiled transaction (embedded)', transaction);
 
-  // 1) We do partial sign using provider method: signTransaction
-  // because we do NOT want to broadcast to normal Solana, but Jito block engine.
-  const signedTxObj = await provider.request({
-    method: 'signTransaction',
+  console.log('[sendJitoBundleTransaction] signAndSendTransaction...');
+  const {signature} = await provider.request({
+    method: 'signAndSendTransaction',
     params: {
-      transaction: tx,
+      transaction,
       connection,
     },
   });
-  if (!signedTxObj || !signedTxObj.transaction) {
-    throw new Error('[Jito] No transaction returned from signTransaction');
+  console.log('[sendJitoBundleTransaction] signAndSendTransaction returned signature:', signature);
+  if (!signature) {
+    throw new Error('No signature from signAndSendTransaction');
   }
 
-  let signedTx: VersionedTransaction;
-  // parse the transaction object returned
-  try {
-    const base64Tx = signedTxObj.transaction;
-    const buffer = Buffer.from(base64Tx, 'base64');
-    signedTx = VersionedTransaction.deserialize(buffer);
-  } catch (err) {
-    throw new Error('[Jito] signTransaction result parse failed: ' + err);
+  // confirm
+  console.log('[sendJitoBundleTransaction] Confirming transaction...');
+  const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+  console.log('[sendJitoBundleTransaction] Confirmation result:', confirmation.value);
+  if (confirmation.value.err) {
+    throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+  }
+  return signature;
+}
+
+export async function sendJitoBundleTransactionMWA(
+  connection: Connection,
+  recipient: string,
+  lamports: number,
+  feeMapping: Record<string, number>,
+) {
+  console.log('[sendJitoBundleTransactionMWA] Starting MWA Jito tx, recipient=', recipient, 'lamports=', lamports);
+  if (Platform.OS !== 'android') {
+    throw new Error('MWA is only supported on Android for Jito as well.');
   }
 
-  // 2) Now we have a fully-signed transaction for jito bundling
-  // We'll send the single transaction as a bundle
-  const bundleResponse = await sendJitoBundle([signedTx]);
-  if (bundleResponse?.result) {
-    console.log(
-      '[sendJitoBundleTransaction] bundle sent, ID:',
-      bundleResponse.result,
-    );
-    const solscanLinks = await getSolscanLinks(bundleResponse.result);
-    if (solscanLinks.length > 0) {
-      console.log(
-        '[sendJitoBundleTransaction] found transaction sig(s):',
-        solscanLinks,
-      );
-      return solscanLinks[0];
+  const mwaModule = require('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
+  const {transact} = mwaModule;
+
+  return await transact(async (mobileWallet: any) => {
+    try {
+      console.log('[sendJitoBundleTransactionMWA] Inside transact callback, authorizing...');
+      const authResult = await mobileWallet.authorize({
+        cluster: 'devnet',
+        identity: {
+          name: 'React Native dApp',
+          uri: 'https://yourdapp.com',
+          icon: 'favicon.ico',
+        },
+      });
+      console.log('[sendJitoBundleTransactionMWA] Auth result:', authResult);
+
+      const {Buffer} = require('buffer');
+      const userEncodedPubkey = authResult.accounts[0].address;
+      const userPubkeyBytes = Buffer.from(userEncodedPubkey, 'base64');
+      const userPubkey = new PublicKey(userPubkeyBytes);
+      console.log('[sendJitoBundleTransactionMWA] userPubkey:', userPubkey.toBase58());
+
+      // build instructions
+      const computeUnitLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
+        units: 2_000_000,
+      });
+      const transferIx = SystemProgram.transfer({
+        fromPubkey: userPubkey,
+        toPubkey: new PublicKey(recipient),
+        lamports,
+      });
+      const instructions = [computeUnitLimitIx, transferIx];
+      console.log('[sendJitoBundleTransactionMWA] instructions count:', instructions.length);
+
+      console.log('[sendJitoBundleTransactionMWA] fetching latest blockhash...');
+      const { blockhash } = await connection.getLatestBlockhash();
+      console.log('[sendJitoBundleTransactionMWA] blockhash:', blockhash);
+
+      const txMessage = new TransactionMessage({
+        payerKey: userPubkey,
+        recentBlockhash: blockhash,
+        instructions,
+      }).compileToV0Message();
+
+      const transaction = new VersionedTransaction(txMessage);
+      console.log('[sendJitoBundleTransactionMWA] compiled transaction:', transaction);
+
+      // Use signTransactions instead of signAndSendTransactions
+      console.log('[sendJitoBundleTransactionMWA] signTransactions...');
+      const signedTxs = await mobileWallet.signTransactions({
+        transactions: [transaction],
+      });
+      console.log('[sendJitoBundleTransactionMWA] signTransactions returned signed transactions');
+
+      if (!signedTxs || !signedTxs.length) {
+        throw new Error('No signed transactions returned from signTransactions');
+      }
+      
+      // Now submit the signed transaction
+      const signedTx = signedTxs[0];
+      console.log('[sendJitoBundleTransactionMWA] Submitting signed transaction to network...');
+      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      console.log('[sendJitoBundleTransactionMWA] signature:', signature);
+
+      // confirm
+      console.log('[sendJitoBundleTransactionMWA] confirming on-chain...');
+      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+      console.log('[sendJitoBundleTransactionMWA] confirmation result:', confirmation.value);
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
+
+      console.log('[sendJitoBundleTransactionMWA] Transaction confirmed successfully!');
+      return signature;
+    } catch (error) {
+      console.log('[sendJitoBundleTransactionMWA] Caught error inside transact callback:', error);
+      throw error;
     }
-    // no transaction signatures yet
-    return bundleResponse.result;
-  }
-  throw new Error(
-    '[sendJitoBundleTransaction] Jito bundling failed or no result',
-  );
+  });
 }
