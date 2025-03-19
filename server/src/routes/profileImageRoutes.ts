@@ -120,6 +120,8 @@ profileImageRouter.get('/', async (req: any, res: any) => {
     }
 
     // Return the user's data, including the attachment_data field.
+
+    console.log(user , "user.attachment_data");
     return res.json({
       success: true,
       url: user.profile_picture_url,
