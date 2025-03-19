@@ -1,5 +1,5 @@
 // File: src/components/Profile/profile.tsx
-import React, {useEffect, useState, useCallback, useMemo} from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   SafeAreaView,
@@ -15,18 +15,18 @@ import {
   TextInput,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import {setStatusBarStyle} from 'expo-status-bar';
-import {useAppSelector, useAppDispatch} from '../../hooks/useReduxHooks';
+import { setStatusBarStyle } from 'expo-status-bar';
+import { useAppSelector, useAppDispatch } from '../../hooks/useReduxHooks';
 import {
   fetchUserProfile,
   updateProfilePic,
   updateUsername,
 } from '../../state/auth/reducer';
-import {fetchAllPosts} from '../../state/thread/reducer';
-import {ThreadPost} from '../thread/thread.types';
-import {NftItem, useFetchNFTs} from '../../hooks/useFetchNFTs';
+import { fetchAllPosts } from '../../state/thread/reducer';
+import { ThreadPost } from '../thread/thread.types';
+import { NftItem, useFetchNFTs } from '../../hooks/useFetchNFTs';
 
-import ProfileView, {UserProfileData} from './ProfileView';
+import ProfileView, { UserProfileData } from './ProfileView';
 import {
   styles,
   modalStyles,
@@ -34,9 +34,9 @@ import {
   inlineConfirmStyles,
   editNameModalStyles,
 } from './profile.style';
-import {flattenPosts} from '../thread/thread.utils';
-import {useAppNavigation} from '../../hooks/useAppNavigation';
-import {followUser, unfollowUser} from '../../state/users/reducer';
+import { flattenPosts } from '../thread/thread.utils';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { followUser, unfollowUser } from '../../state/users/reducer';
 
 import {
   uploadProfileAvatar,
@@ -110,29 +110,29 @@ export default function Profile({
   // --- Fetch Actions ---
   useEffect(() => {
     if (!userWallet) return;
-  
+
     let isCancelled = false;
     setLoadingActions(true);
     setFetchActionsError(null);
-  
+
     const fetchActions = async () => {
       try {
         console.log('Fetching actions for wallet:', userWallet);
         const heliusUrl = `https://api.helius.xyz/v0/addresses/${userWallet}/transactions?api-key=${HELIUS_API_KEY}&limit=20`;
-        
+
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
-        
+
         const res = await fetch(heliusUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
-  
+
         if (!res.ok) {
           throw new Error(`Helius fetch failed with status ${res.status}`);
         }
-  
+
         const data = await res.json();
         console.log('Data received, items:', data?.length || 0);
-  
+
         if (!isCancelled) {
           setMyActions(data || []);
         }
@@ -147,13 +147,13 @@ export default function Profile({
         }
       }
     };
-  
+
     fetchActions();
     return () => {
       isCancelled = true;
     };
   }, [userWallet]);
-  
+
   // --- Fetch user profile if needed ---
   useEffect(() => {
     if (!userWallet) return;
@@ -167,14 +167,14 @@ export default function Profile({
         console.error('Failed to fetch user profile:', err);
       });
   }, [userWallet, dispatch]);
-  
+
   // --- Followers/Following logic ---
   useEffect(() => {
     if (!userWallet || !isOwnProfile) return;
     fetchFollowers(userWallet).then(list => setFollowersList(list));
     fetchFollowing(userWallet).then(list => setFollowingList(list));
   }, [userWallet, isOwnProfile]);
-  
+
   useEffect(() => {
     if (!userWallet || isOwnProfile) return;
     fetchFollowers(userWallet).then(followers => {
@@ -194,7 +194,7 @@ export default function Profile({
       });
     }
   }, [userWallet, isOwnProfile, myWallet]);
-  
+
   // --- Fetch posts if not provided ---
   useEffect(() => {
     if (!posts || posts.length === 0) {
@@ -203,7 +203,7 @@ export default function Profile({
       });
     }
   }, [posts, dispatch]);
-  
+
   // --- Flatten & filter user posts ---
   const myPosts = useMemo(() => {
     if (!userWallet) return [];
@@ -215,7 +215,7 @@ export default function Profile({
     userAll.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
     return userAll;
   }, [userWallet, posts, allReduxPosts]);
-  
+
   // --- Follow / Unfollow handlers ---
   const handleFollow = useCallback(async () => {
     if (!myWallet || !userWallet) {
@@ -224,14 +224,14 @@ export default function Profile({
     }
     try {
       await dispatch(
-        followUser({followerId: myWallet, followingId: userWallet}),
+        followUser({ followerId: myWallet, followingId: userWallet }),
       ).unwrap();
       setAmIFollowing(true);
       setFollowersList(prev => {
         if (!prev.some(u => u.id === myWallet)) {
           return [
             ...prev,
-            {id: myWallet, username: 'Me', profile_picture_url: ''},
+            { id: myWallet, username: 'Me', profile_picture_url: '' },
           ];
         }
         return prev;
@@ -240,7 +240,7 @@ export default function Profile({
       Alert.alert('Follow Error', err.message);
     }
   }, [dispatch, myWallet, userWallet]);
-  
+
   const handleUnfollow = useCallback(async () => {
     if (!myWallet || !userWallet) {
       Alert.alert('Cannot Unfollow', 'Missing user or my address');
@@ -248,7 +248,7 @@ export default function Profile({
     }
     try {
       await dispatch(
-        unfollowUser({followerId: myWallet, followingId: userWallet}),
+        unfollowUser({ followerId: myWallet, followingId: userWallet }),
       ).unwrap();
       setAmIFollowing(false);
       setFollowersList(prev => prev.filter(u => u.id !== myWallet));
@@ -256,7 +256,7 @@ export default function Profile({
       Alert.alert('Unfollow Error', err.message);
     }
   }, [dispatch, myWallet, userWallet]);
-  
+
   // --- Avatar selection, modals, editing name logic (unchanged) ---
   const [avatarOptionModalVisible, setAvatarOptionModalVisible] =
     useState(false);
@@ -266,16 +266,16 @@ export default function Profile({
   const [nftsModalVisible, setNftsModalVisible] = useState(false);
   const [editNameModalVisible, setEditNameModalVisible] = useState(false);
   const [tempName, setTempName] = useState(localUsername || '');
-  
+
   useEffect(() => {
     setStatusBarStyle('dark');
   }, []);
-  
+
   const handleAvatarPress = useCallback(() => {
     if (!isOwnProfile) return;
     setAvatarOptionModalVisible(true);
   }, [isOwnProfile]);
-  
+
   const handlePickProfilePicture = useCallback(async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -292,19 +292,19 @@ export default function Profile({
       Alert.alert('Error picking image', error.message);
     }
   }, []);
-  
+
   const handleSelectNftOption = useCallback(() => {
     setAvatarOptionModalVisible(false);
     setNftsModalVisible(true);
   }, []);
-  
+
   const handleSelectNftAsAvatar = useCallback((nft: NftItem) => {
     setLocalFileUri(nft.image);
     setSelectedSource('nft');
     setNftsModalVisible(false);
     setConfirmModalVisible(true);
   }, []);
-  
+
   const handleConfirmUpload = useCallback(async () => {
     if (!isOwnProfile) {
       Alert.alert('Permission Denied', 'Cannot change avatar for other user');
@@ -320,7 +320,7 @@ export default function Profile({
       setSelectedSource(null);
       return;
     }
-  
+
     try {
       const newUrl = await uploadProfileAvatar(userWallet, localFileUri);
       dispatch(updateProfilePic(newUrl));
@@ -334,19 +334,19 @@ export default function Profile({
       setSelectedSource(null);
     }
   }, [dispatch, userWallet, localFileUri, isOwnProfile]);
-  
+
   const handleCancelUpload = useCallback(() => {
     setConfirmModalVisible(false);
     setLocalFileUri(null);
     setSelectedSource(null);
   }, []);
-  
+
   const handleOpenEditModal = useCallback(() => {
     if (!isOwnProfile) return;
     setTempName(localUsername || '');
     setEditNameModalVisible(true);
   }, [isOwnProfile, localUsername]);
-  
+
   const handleSaveName = useCallback(async () => {
     if (!isOwnProfile || !userWallet || !tempName.trim()) {
       setEditNameModalVisible(false);
@@ -354,7 +354,7 @@ export default function Profile({
     }
     try {
       await dispatch(
-        updateUsername({userId: userWallet, newUsername: tempName.trim()}),
+        updateUsername({ userId: userWallet, newUsername: tempName.trim() }),
       ).unwrap();
       setLocalUsername(tempName.trim());
     } catch (err: any) {
@@ -363,7 +363,7 @@ export default function Profile({
       setEditNameModalVisible(false);
     }
   }, [dispatch, tempName, isOwnProfile, userWallet]);
-  
+
   const handlePressFollowers = useCallback(() => {
     if (followersList.length === 0) {
       Alert.alert('No Followers', 'This user has no followers yet.');
@@ -375,7 +375,7 @@ export default function Profile({
       userList: followersList,
     } as never);
   }, [followersList, navigation, userWallet]);
-  
+
   const handlePressFollowing = useCallback(() => {
     if (followingList.length === 0) {
       Alert.alert('No Following', 'This user is not following anyone yet.');
@@ -387,17 +387,17 @@ export default function Profile({
       userList: followingList,
     } as never);
   }, [followingList, navigation, userWallet]);
-  
+
   const resolvedUser: UserProfileData = useMemo(
     () => ({
       address: userWallet || '',
       profilePicUrl,
       username: localUsername,
-      attachmentData: user.attachmentData,
+      attachmentData: user.attachmentData || {},
     }),
     [userWallet, profilePicUrl, localUsername, user.attachmentData],
   );
-  
+
   return (
     <SafeAreaView
       style={[
@@ -423,14 +423,14 @@ export default function Profile({
         onPressFollowers={handlePressFollowers}
         onPressFollowing={handlePressFollowing}
         onPressPost={post => {
-          navigation.navigate('PostThread', {postId: post.id});
+          navigation.navigate('PostThread', { postId: post.id });
         }}
         containerStyle={containerStyle}
         myActions={myActions}
         loadingActions={loadingActions}
         fetchActionsError={fetchActionsError}
       />
-  
+
       {/* (A) Avatar Option Modal */}
       {isOwnProfile && (
         <Modal
@@ -452,7 +452,7 @@ export default function Profile({
                 <Text style={modalStyles.optionButtonText}>My NFTs</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[modalStyles.optionButton, {backgroundColor: 'gray'}]}
+                style={[modalStyles.optionButton, { backgroundColor: 'gray' }]}
                 onPress={() => setAvatarOptionModalVisible(false)}>
                 <Text style={modalStyles.optionButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -460,7 +460,7 @@ export default function Profile({
           </View>
         </Modal>
       )}
-  
+
       {/* (B) NFT Selection Modal */}
       {isOwnProfile && (
         <Modal
@@ -472,9 +472,9 @@ export default function Profile({
             <View style={modalStyles.nftContainer}>
               <Text style={modalStyles.nftTitle}>Select an NFT</Text>
               {resolvedLoadingNfts ? (
-                <View style={{marginTop: 20}}>
+                <View style={{ marginTop: 20 }}>
                   <ActivityIndicator size="large" color="#1d9bf0" />
-                  <Text style={{marginTop: 8, color: '#666', textAlign: 'center'}}>
+                  <Text style={{ marginTop: 8, color: '#666', textAlign: 'center' }}>
                     Loading your NFTs...
                   </Text>
                 </View>
@@ -487,24 +487,24 @@ export default function Profile({
                     item.mint ||
                     `random-${Math.random().toString(36).substr(2, 9)}`
                   }
-                  style={{marginVertical: 10}}
-                  renderItem={({item}) => (
+                  style={{ marginVertical: 10 }}
+                  renderItem={({ item }) => (
                     <TouchableOpacity
                       style={modalStyles.nftItem}
                       onPress={() => handleSelectNftAsAvatar(item)}>
                       <View style={modalStyles.nftImageContainer}>
                         {item.image ? (
                           <Image
-                            source={{uri: item.image}}
+                            source={{ uri: item.image }}
                             style={modalStyles.nftImage}
                           />
                         ) : (
                           <View style={modalStyles.nftPlaceholder}>
-                            <Text style={{color: '#666'}}>No Image</Text>
+                            <Text style={{ color: '#666' }}>No Image</Text>
                           </View>
                         )}
                       </View>
-                      <View style={{flex: 1, marginLeft: 12}}>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
                         <Text style={modalStyles.nftName} numberOfLines={1}>
                           {item.name}
                         </Text>
@@ -529,7 +529,7 @@ export default function Profile({
                 />
               )}
               <TouchableOpacity
-                style={[modalStyles.closeButton, {marginTop: 10}]}
+                style={[modalStyles.closeButton, { marginTop: 10 }]}
                 onPress={() => setNftsModalVisible(false)}>
                 <Text style={modalStyles.closeButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -537,7 +537,7 @@ export default function Profile({
           </View>
         </Modal>
       )}
-  
+
       {/* (C) Confirm Modal if source = 'nft' or library */}
       {isOwnProfile && selectedSource === 'nft' && confirmModalVisible && (
         <Modal
@@ -552,7 +552,7 @@ export default function Profile({
               </Text>
               {localFileUri ? (
                 <Image
-                  source={{uri: localFileUri}}
+                  source={{ uri: localFileUri }}
                   style={confirmModalStyles.preview}
                   onError={err => {
                     Alert.alert(
@@ -562,7 +562,7 @@ export default function Profile({
                   }}
                 />
               ) : (
-                <Text style={{marginVertical: 20, color: '#666'}}>
+                <Text style={{ marginVertical: 20, color: '#666' }}>
                   No pending image
                 </Text>
               )}
@@ -570,7 +570,7 @@ export default function Profile({
                 <TouchableOpacity
                   style={[
                     confirmModalStyles.modalButton,
-                    {backgroundColor: '#aaa'},
+                    { backgroundColor: '#aaa' },
                   ]}
                   onPress={handleCancelUpload}>
                   <Text style={confirmModalStyles.buttonText}>Cancel</Text>
@@ -578,7 +578,7 @@ export default function Profile({
                 <TouchableOpacity
                   style={[
                     confirmModalStyles.modalButton,
-                    {backgroundColor: '#1d9bf0'},
+                    { backgroundColor: '#1d9bf0' },
                   ]}
                   onPress={handleConfirmUpload}>
                   <Text style={confirmModalStyles.buttonText}>Confirm</Text>
@@ -588,13 +588,13 @@ export default function Profile({
           </View>
         </Modal>
       )}
-  
+
       {/* For library selection => inline confirm row at the bottom */}
       {isOwnProfile && selectedSource === 'library' && localFileUri && (
         <View style={inlineConfirmStyles.container}>
           <Text style={inlineConfirmStyles.title}>Confirm Profile Picture</Text>
           <Image
-            source={{uri: localFileUri}}
+            source={{ uri: localFileUri }}
             style={inlineConfirmStyles.preview}
             onError={err => {
               Alert.alert('Image Load Error', JSON.stringify(err.nativeEvent));
@@ -602,19 +602,19 @@ export default function Profile({
           />
           <View style={inlineConfirmStyles.buttonRow}>
             <TouchableOpacity
-              style={[inlineConfirmStyles.button, {backgroundColor: '#aaa'}]}
+              style={[inlineConfirmStyles.button, { backgroundColor: '#aaa' }]}
               onPress={handleCancelUpload}>
               <Text style={inlineConfirmStyles.buttonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[inlineConfirmStyles.button, {backgroundColor: '#1d9bf0'}]}
+              style={[inlineConfirmStyles.button, { backgroundColor: '#1d9bf0' }]}
               onPress={handleConfirmUpload}>
               <Text style={inlineConfirmStyles.buttonText}>Confirm</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
-  
+
       {/* (E) Edit Name Modal */}
       {isOwnProfile && (
         <Modal
@@ -635,7 +635,7 @@ export default function Profile({
                 <TouchableOpacity
                   style={[
                     editNameModalStyles.button,
-                    {backgroundColor: 'gray'},
+                    { backgroundColor: 'gray' },
                   ]}
                   onPress={() => setEditNameModalVisible(false)}>
                   <Text style={editNameModalStyles.btnText}>Cancel</Text>
@@ -643,7 +643,7 @@ export default function Profile({
                 <TouchableOpacity
                   style={[
                     editNameModalStyles.button,
-                    {backgroundColor: '#1d9bf0'},
+                    { backgroundColor: '#1d9bf0' },
                   ]}
                   onPress={handleSaveName}>
                   <Text style={editNameModalStyles.btnText}>Save</Text>

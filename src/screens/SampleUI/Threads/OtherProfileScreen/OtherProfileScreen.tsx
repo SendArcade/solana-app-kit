@@ -1,29 +1,31 @@
 // File: src/screens/SampleUI/Threads/OtherProfileScreen/OtherProfileScreen.tsx
-import React, {useEffect, useState, useMemo} from 'react';
-import {View, StyleSheet, Platform} from 'react-native';
-import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
-import {RootStackParamList} from '../../../../navigation/RootNavigator';
-import {useAppDispatch, useAppSelector} from '../../../../hooks/useReduxHooks';
-import {fetchUserProfile} from '../../../../state/auth/reducer';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, StyleSheet, Platform } from 'react-native';
+import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
+import { RootStackParamList } from '../../../../navigation/RootNavigator';
+import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks';
+import { fetchUserProfile } from '../../../../state/auth/reducer';
 import Profile from '../../../../components/Profile/profile';
-import {ThreadPost} from '../../../../components/thread/thread.types';
-import {fetchAllPosts} from '../../../../state/thread/reducer';
-import {NftItem, useFetchNFTs} from '../../../../hooks/useFetchNFTs';
+import { ThreadPost } from '../../../../components/thread/thread.types';
+import { fetchAllPosts } from '../../../../state/thread/reducer';
+import { NftItem, useFetchNFTs } from '../../../../hooks/useFetchNFTs';
 import COLORS from '../../../../assets/colors';
 
 type OtherProfileRouteProp = RouteProp<RootStackParamList, 'OtherProfile'>;
 
 export default function OtherProfileScreen() {
   const route = useRoute<OtherProfileRouteProp>();
-  const {userId} = route.params; // The user's wallet address or ID from the route
+  const { userId } = route.params; // The user's wallet address or ID from the route
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
+
 
   // Data from Redux
   const allPosts = useAppSelector(state => state.thread.allPosts);
   const [myPosts, setMyPosts] = useState<ThreadPost[]>([]);
   const [username, setUsername] = useState('Loading...');
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
+  const [attachmentData, setAttachmentData] = useState<any>({});
 
   // Fetch user profile from server (like we do in ProfileScreen)
   useEffect(() => {
@@ -32,10 +34,14 @@ export default function OtherProfileScreen() {
       .unwrap()
       .then(value => {
         if (value.profilePicUrl) {
+          console.log('Fetched profilePicUrl:', value);
           setProfilePicUrl(value.profilePicUrl);
         }
         if (value.username) {
           setUsername(value.username);
+        }
+        if(value.attachmentData) {
+          setAttachmentData(value.attachmentData);
         }
       })
       .catch(err => {
@@ -65,7 +71,7 @@ export default function OtherProfileScreen() {
   }, [allPosts, userId]);
 
   // Also fetch NFTs using the custom hook
-  const {nfts, loading: loadingNfts, error: nftsError} = useFetchNFTs(userId);
+  const { nfts, loading: loadingNfts, error: nftsError } = useFetchNFTs(userId);
 
   return (
     <View
@@ -79,6 +85,7 @@ export default function OtherProfileScreen() {
           address: userId,
           profilePicUrl: profilePicUrl || '',
           username: username,
+          attachmentData: attachmentData,
         }}
         posts={myPosts}
         nfts={nfts}

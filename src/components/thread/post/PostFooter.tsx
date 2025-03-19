@@ -1,4 +1,4 @@
-// FILE: src/components/thread/postPostFooter.tsx
+// FILE: src/components/thread/post/PostFooter.tsx
 
 import React, {useState, useRef, useEffect} from 'react';
 import {
