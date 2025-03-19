@@ -42,30 +42,22 @@ export default function LoginScreen() {
 
   const handleWalletConnected = (info: {provider: string; address: string}) => {
     console.log('Wallet connected:', info);
-    
     try {
-      // Ensure provider is one of the allowed types
-      const validProvider = info.provider === 'mwa' ? 'privy' : info.provider;
-      
-      // Dispatch the login success action to update Redux state
       dispatch(
         loginSuccess({
-          provider: validProvider as 'privy' | 'dynamic' | 'turnkey', 
-          address: info.address
+          provider: info.provider as 'privy' | 'dynamic' | 'turnkey' | 'mwa',
+          address: info.address,
         }),
       );
-      
-      // Navigate to the home screen or your next screen
       navigation.navigate('Home');
     } catch (error) {
-      console.error("Error handling wallet connection:", error);
+      console.error('Error handling wallet connection:', error);
       Alert.alert(
-        "Connection Error", 
-        "Successfully connected to wallet but encountered an error proceeding to the app."
+        'Connection Error',
+        'Successfully connected to wallet but encountered an error proceeding to the app.',
       );
     }
   };
-  
 
   return (
     <View style={styles.container}>
@@ -100,7 +92,7 @@ export default function LoginScreen() {
       </View>
 
       <EmbeddedWalletAuth onWalletConnected={handleWalletConnected} />
-      
+
       <Text style={styles.agreementText}>
         by continuing, you agree to t&amp;c and privacy policy
       </Text>
