@@ -51,29 +51,34 @@ export async function sendPriorityTransaction(
   const transaction = new VersionedTransaction(messageV0);
   console.log('[sendPriorityTransaction] Compiled transaction (embedded)', transaction);
 
-  console.log('[sendPriorityTransaction] About to signAndSendTransaction via provider...');
-  const { signature } = await provider.request({
-    method: 'signAndSendTransaction',
-    params: {
-      transaction,
-      connection,
-    },
-  });
+  try {
+    console.log('[sendPriorityTransaction] About to signAndSendTransaction via provider...');
+    const { signature } = await provider.request({
+      method: 'signAndSendTransaction',
+      params: {
+        transaction,
+        connection,
+      },
+    });
 
-  console.log('[sendPriorityTransaction] signAndSendTransaction returned:', signature);
-  if (!signature) {
-    throw new Error('No signature returned from signAndSendTransaction');
+    console.log('[sendPriorityTransaction] signAndSendTransaction returned:', signature);
+    if (!signature) {
+      throw new Error('No signature returned from signAndSendTransaction');
+    }
+
+    // confirm on-chain
+    console.log('[sendPriorityTransaction] Confirming transaction...');
+    const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+    console.log('[sendPriorityTransaction] Confirmation result:', confirmation.value);
+    if (confirmation.value.err) {
+      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+    }
+
+    return signature;
+  } catch (error) {
+    console.error('[sendPriorityTransaction] Error during transaction:', error);
+    throw error;
   }
-
-  // confirm on-chain
-  console.log('[sendPriorityTransaction] Confirming transaction...');
-  const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-  console.log('[sendPriorityTransaction] Confirmation result:', confirmation.value);
-  if (confirmation.value.err) {
-    throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-  }
-
-  return signature;
 }
 
 /**

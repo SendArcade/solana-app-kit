@@ -34,27 +34,32 @@ export async function sendJitoBundleTransaction(
   const transaction = new VersionedTransaction(messageV0);
   console.log('[sendJitoBundleTransaction] Compiled transaction (embedded)', transaction);
 
-  console.log('[sendJitoBundleTransaction] signAndSendTransaction...');
-  const {signature} = await provider.request({
-    method: 'signAndSendTransaction',
-    params: {
-      transaction,
-      connection,
-    },
-  });
-  console.log('[sendJitoBundleTransaction] signAndSendTransaction returned signature:', signature);
-  if (!signature) {
-    throw new Error('No signature from signAndSendTransaction');
-  }
+  try {
+    console.log('[sendJitoBundleTransaction] signAndSendTransaction...');
+    const {signature} = await provider.request({
+      method: 'signAndSendTransaction',
+      params: {
+        transaction,
+        connection,
+      },
+    });
+    console.log('[sendJitoBundleTransaction] signAndSendTransaction returned signature:', signature);
+    if (!signature) {
+      throw new Error('No signature from signAndSendTransaction');
+    }
 
-  // confirm
-  console.log('[sendJitoBundleTransaction] Confirming transaction...');
-  const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-  console.log('[sendJitoBundleTransaction] Confirmation result:', confirmation.value);
-  if (confirmation.value.err) {
-    throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+    // confirm
+    console.log('[sendJitoBundleTransaction] Confirming transaction...');
+    const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+    console.log('[sendJitoBundleTransaction] Confirmation result:', confirmation.value);
+    if (confirmation.value.err) {
+      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+    }
+    return signature;
+  } catch (error) {
+    console.error('[sendJitoBundleTransaction] Error during transaction:', error);
+    throw error;
   }
-  return signature;
 }
 
 export async function sendJitoBundleTransactionMWA(

@@ -100,9 +100,7 @@ export function useTradeTransaction() {
         }),
       ];
 
-      const selectedFeeTier = useSelector(
-        (state: RootState) => state.transaction.selectedFeeTier,
-      );
+      const selectedFeeTier = transactionConfig.defaultFeeTier || 'low';
       const provider = await solanaWallet.getProvider!();
       let txSignature: string;
 
@@ -110,7 +108,7 @@ export function useTradeTransaction() {
         console.log('[useTradeTransaction] Calling sendPriorityTransaction...');
         txSignature = await sendPriorityTransaction(
           provider,
-          selectedFeeTier,
+          selectedFeeTier as 'low' | 'medium' | 'high' | 'very-high',
           instructions,
           connection,
           senderPubKey,
@@ -120,7 +118,7 @@ export function useTradeTransaction() {
         console.log('[useTradeTransaction] Calling sendJitoBundleTransaction...');
         txSignature = await sendJitoBundleTransaction(
           provider,
-          selectedFeeTier,
+          selectedFeeTier as 'low' | 'medium' | 'high' | 'very-high',
           instructions,
           senderPubKey,
           connection,
