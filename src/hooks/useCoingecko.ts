@@ -1,6 +1,6 @@
 // FILE: src/hooks/useCoingecko.ts
 
-import {useState, useEffect, useCallback} from 'react';
+import {useState, useEffect, useCallback, useRef} from 'react';
 import {
   getCoinList,
   getCoinMarkets,
@@ -110,8 +110,6 @@ export function useCoingecko() {
   const [timeframe, setTimeframe] = useState<Timeframe>('1D');
 
   // Market data
-  const [coinName, setCoinName] = useState('');
-  const [coinImage, setCoinImage] = useState('');
   const [marketCap, setMarketCap] = useState(0);
   const [fdv, setFdv] = useState(0);
   const [liquidityScore, setLiquidityScore] = useState(0);
@@ -138,8 +136,6 @@ export function useCoingecko() {
     setCoinError(null);
     try {
       const market = await getCoinMarkets(coinId);
-      setCoinName(market.name || '');
-      setCoinImage(market.image || '');
       setMarketCap(market.market_cap || 0);
       // FDV
       let computedFdv = market.fully_diluted_valuation;
@@ -166,7 +162,7 @@ export function useCoingecko() {
   }, []);
 
   /**
-   * Fetch OHLC data for the chosen coin/timeframe, then compute “price” & “change.”
+   * Fetch OHLC data for the chosen coin/timeframe, then compute "price" & "change."
    */
   const fetchOhlcData = useCallback(
     async (coinId: string, selectedTf: Timeframe) => {
@@ -207,6 +203,8 @@ export function useCoingecko() {
         // each item => [timestamp, open, high, low, close]
         const closeValues = rawData.map((arr: number[]) => arr[4]);
         const timeValues = rawData.map((arr: number[]) => arr[0]);
+
+        // Don't update state if the component unmounted or if the request was canceled
         setGraphData(closeValues);
         setTimestamps(timeValues);
 
@@ -219,7 +217,7 @@ export function useCoingecko() {
           setTimeframePrice(finalPrice);
           setTimeframeChangeUsd(absChange);
           setTimeframeChangePercent(pctChange);
-        } else {
+        } else if (closeValues.length === 1) {
           // Only 1 data point
           setTimeframePrice(closeValues[0] || 0);
           setTimeframeChangeUsd(0);
@@ -227,44 +225,114 @@ export function useCoingecko() {
         }
       } catch (err: any) {
         setCoinError(err.message || 'Error fetching OHLC data');
-        setGraphData([]);
-        setTimestamps([]);
+        // Don't reset graph data on error to prevent flickering
+        // Only reset if there was no previous data
+        if (graphData.length === 0) {
+          setGraphData([]);
+          setTimestamps([]);
+        }
       } finally {
         setLoadingOHLC(false);
       }
     },
-    [],
+    // Add graphData to the dependency array to prevent resetting on errors
+    [graphData],
   );
 
-  // Whenever selectedCoinId or timeframe changes => fetch data
+  // Add a debounce mechanism for selectedCoinId changes
+  const [debouncedCoinId, setDebouncedCoinId] = useState<string>('');
+
+  // Debounce the selectedCoinId changes to prevent rapid re-fetching
   useEffect(() => {
-    if (!selectedCoinId) {
-      // clear everything if no coin is chosen
-      setCoinName('');
-      setCoinImage('');
-      setMarketCap(0);
-      setFdv(0);
-      setLiquidityScore(0);
-      setGraphData([]);
-      setTimestamps([]);
-      setTimeframePrice(0);
-      setTimeframeChangeUsd(0);
-      setTimeframeChangePercent(0);
+    const timer = setTimeout(() => {
+      setDebouncedCoinId(selectedCoinId);
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timer);
+  }, [selectedCoinId]);
+
+  // Use a useRef to track if we've already set up the initial coin
+  const hasInitializedCoinRef = useRef(false);
+
+  // Whenever debouncedCoinId or timeframe changes => fetch data
+  useEffect(() => {
+    // Skip the effect if no coin ID or if we're already loading
+    if (!debouncedCoinId) {
       return;
     }
-    fetchMarketData(selectedCoinId);
-    fetchOhlcData(selectedCoinId, timeframe);
-  }, [selectedCoinId, timeframe, fetchMarketData, fetchOhlcData]);
+    
+    // Make sure we don't create a loop with loadingMarketData or loadingOHLC
+    if (loadingMarketData || loadingOHLC) {
+      return;
+    }
+    
+    // Don't run the effect again for the same coin ID and timeframe if we've already initialized
+    if (hasInitializedCoinRef.current && debouncedCoinId === selectedCoinId) {
+      return;
+    }
+    
+    // Mark as initialized
+    hasInitializedCoinRef.current = true;
+    
+    // Create a cancellation flag
+    let isCancelled = false;
+    
+    const fetchData = async () => {
+      try {
+        await fetchMarketData(debouncedCoinId);
+        if (!isCancelled) {
+          await fetchOhlcData(debouncedCoinId, timeframe);
+        }
+      } catch (error) {
+        console.error("Failed to fetch coin data:", error);
+      }
+    };
+    
+    fetchData();
+    
+    return () => {
+      isCancelled = true;
+    };
+  }, [debouncedCoinId, timeframe, fetchMarketData, fetchOhlcData, loadingMarketData, loadingOHLC, selectedCoinId]);
 
   /**
-   * For manually refreshing the single coin’s data
+   * For manually refreshing the single coin's data
    */
   const refreshCoinData = useCallback(async () => {
-    if (!selectedCoinId) return;
+    if (!debouncedCoinId) return;
+    
+    // Set loading states without triggering re-renders that cause loops
+    let loadingMarketDataWasSet = false;
+    let loadingOHLCWasSet = false;
+    
+    if (!loadingMarketData) {
+      loadingMarketDataWasSet = true;
+      setLoadingMarketData(true);
+    }
+    
     setCoinError(null);
-    await fetchMarketData(selectedCoinId);
-    await fetchOhlcData(selectedCoinId, timeframe);
-  }, [fetchMarketData, fetchOhlcData, selectedCoinId, timeframe]);
+    
+    try {
+      await fetchMarketData(debouncedCoinId);
+      
+      if (!loadingOHLC) {
+        loadingOHLCWasSet = true;
+        setLoadingOHLC(true);
+      }
+      
+      await fetchOhlcData(debouncedCoinId, timeframe);
+    } catch (error) {
+      console.error("Failed to refresh coin data:", error);
+    } finally {
+      // Only reset loading states if we set them
+      if (loadingMarketDataWasSet) {
+        setLoadingMarketData(false);
+      }
+      if (loadingOHLCWasSet) {
+        setLoadingOHLC(false);
+      }
+    }
+  }, [debouncedCoinId, timeframe, fetchMarketData, fetchOhlcData, loadingMarketData, loadingOHLC]);
 
   return {
     // (A) Coin list searching
@@ -283,8 +351,6 @@ export function useCoingecko() {
     setTimeframe,
 
     // Market data
-    coinName,
-    coinImage,
     marketCap,
     liquidityScore,
     fdv,
