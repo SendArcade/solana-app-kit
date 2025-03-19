@@ -14,3 +14,35 @@ description: "## Functions"
 ## Functions
 
 - [default](functions/default.mdx)
+
+# ThreadComposer Component
+
+The `ThreadComposer` component provides an interface for users to create new thread posts.
+
+## Import
+
+```tsx
+import { ThreadComposer } from 'path/to/components/thread';
+```
+
+## Usage
+
+```tsx
+<ThreadComposer 
+  onSubmit={handleSubmit}
+  // Additional props
+/>
+```
+
+## Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| onSubmit | function | Callback when a new thread is submitted |
+| // Add other props based on the actual component |
+
+## Features
+
+- Text composition
+- Media attachment support
+- NFT listing capabilities through NftListingModal
