@@ -46,7 +46,7 @@ export async function uploadProfileAvatar(
 
 /**
  * Fetch a user's followers from the server.
- * @param userId The user’s wallet address or ID
+ * @param userId The user's wallet address or ID
  * @returns An array of follower objects
  */
 export async function fetchFollowers(userId: string): Promise<any[]> {
@@ -71,7 +71,7 @@ export async function fetchFollowers(userId: string): Promise<any[]> {
 
 /**
  * Fetch a user's following list from the server.
- * @param userId The user’s wallet address or ID
+ * @param userId The user's wallet address or ID
  * @returns An array of following objects
  */
 export async function fetchFollowing(userId: string): Promise<any[]> {
@@ -97,7 +97,7 @@ export async function fetchFollowing(userId: string): Promise<any[]> {
 /**
  * Checks if a target user is in *my* followers list => do they follow me?
  * @param myWallet  My own wallet ID
- * @param userWallet The target user’s ID
+ * @param userWallet The target user's ID
  * @returns boolean (true => they follow me)
  */
 export async function checkIfUserFollowsMe(
@@ -124,3 +124,20 @@ export async function checkIfUserFollowsMe(
     return false;
   }
 }
+
+export const fetchUserProfile = async (userId: string) => {
+  try {
+    const response = await fetch(`YOUR_API_URL/profile?userId=${userId}`);
+    if (!response.ok) throw new Error('Failed to fetch profile');
+    const data = await response.json();
+    
+    return {
+      url: data.url,
+      username: data.username,
+      attachmentData: data.attachmentData || {},
+    };
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    throw error;
+  }
+};
