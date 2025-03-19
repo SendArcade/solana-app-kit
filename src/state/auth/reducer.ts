@@ -6,7 +6,15 @@ export interface AuthState {
   address: string | null;
   isLoggedIn: boolean;
   profilePicUrl: string | null;
-  username: string | null; // new for storing user’s chosen display name
+  username: string | null; // storing user’s chosen display name
+  // NEW: attachmentData object to hold any attached profile data (e.g., coin)
+  attachmentData?: {
+    coin?: {
+      mint: string;
+      symbol?: string;
+      name?: string;
+    };
+  };
 }
 
 const initialState: AuthState = {
@@ -15,12 +23,14 @@ const initialState: AuthState = {
   isLoggedIn: false,
   profilePicUrl: null,
   username: null,
+  attachmentData: {},
 };
 
 const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 
 /**
- * Fetch the user's profile from the server, including profile pic URL & username.
+ * Fetch the user's profile from the server, including profile pic URL, username,
+ * and attachment data.
  */
 export const fetchUserProfile = createAsyncThunk(
   'auth/fetchUserProfile',
@@ -30,7 +40,11 @@ export const fetchUserProfile = createAsyncThunk(
     );
     const data = await response.json();
     if (data.success) {
-      return {profilePicUrl: data.url, username: data.username};
+      return {
+        profilePicUrl: data.url,
+        username: data.username,
+        attachmentData: data.attachmentData || {},
+      };
     } else {
       return thunkAPI.rejectWithValue(
         data.error || 'Failed to fetch user profile',
@@ -72,6 +86,49 @@ export const updateUsername = createAsyncThunk(
   },
 );
 
+/**
+ * Attach or update a coin on the user's profile.
+ * Now accepts: { userId, attachmentData } where attachmentData = { coin: { mint, symbol, name } }
+ */
+export const attachCoinToProfile = createAsyncThunk(
+  'auth/attachCoinToProfile',
+  async (
+    {
+      userId,
+      attachmentData,
+    }: {
+      userId: string;
+      attachmentData: {coin: {mint: string; symbol?: string; name?: string}};
+    },
+    thunkAPI,
+  ) => {
+    try {
+      const response = await fetch(
+        `${SERVER_BASE_URL}/api/profile/attachCoin`,
+        {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            userId,
+            attachmentData,
+          }),
+        },
+      );
+      const data = await response.json();
+      if (!data.success) {
+        return thunkAPI.rejectWithValue(data.error || 'Failed to attach coin');
+      }
+      return data.attachmentData as {
+        coin: {mint: string; symbol?: string; name?: string};
+      };
+    } catch (err: any) {
+      return thunkAPI.rejectWithValue(
+        err.message || 'Attach coin request failed.',
+      );
+    }
+  },
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -97,31 +154,40 @@ const authSlice = createSlice({
       state.isLoggedIn = false;
       state.profilePicUrl = null;
       state.username = null;
+      state.attachmentData = {};
     },
     updateProfilePic(state, action: PayloadAction<string>) {
       state.profilePicUrl = action.payload;
     },
   },
   extraReducers: builder => {
-    // When user profile fetch completes, only overwrite our Redux state
-    // if the fetched userId is the same as the current user’s address.
     builder.addCase(fetchUserProfile.fulfilled, (state, action) => {
-      const {profilePicUrl, username} = action.payload;
+      const {
+        profilePicUrl: fetchedProfilePicUrl,
+        username: fetchedUsername,
+        attachmentData,
+      } = action.payload as any;
+
       const requestedUserId = action.meta.arg;
-      // Only set global profilePicUrl and username if this is the same user:
       if (
         requestedUserId &&
         state.address &&
         requestedUserId.toLowerCase() === state.address.toLowerCase()
       ) {
-        state.profilePicUrl = profilePicUrl;
-        state.username = username;
+        state.profilePicUrl = fetchedProfilePicUrl || null;
+        state.username = fetchedUsername || null;
+        state.attachmentData = attachmentData || {};
       }
     });
 
-    // updateUsername
     builder.addCase(updateUsername.fulfilled, (state, action) => {
-      state.username = action.payload; // the updated name from server
+      state.username = action.payload;
+    });
+
+    builder.addCase(attachCoinToProfile.fulfilled, (state, action) => {
+      if (state.address) {
+        state.attachmentData = {coin: action.payload.coin};
+      }
     });
   },
 });

@@ -52,6 +52,7 @@ export interface ProfileProps {
     address: string;
     profilePicUrl?: string;
     username?: string;
+    attachmentData?: any;
   };
   posts?: ThreadPost[];
   nfts?: NftItem[];
@@ -392,8 +393,9 @@ export default function Profile({
       address: userWallet || '',
       profilePicUrl,
       username: localUsername,
+      attachmentData: user.attachmentData,
     }),
-    [userWallet, profilePicUrl, localUsername],
+    [userWallet, profilePicUrl, localUsername, user.attachmentData],
   );
   
   return (
