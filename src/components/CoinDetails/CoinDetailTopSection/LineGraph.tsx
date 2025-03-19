@@ -68,38 +68,12 @@ const LineGraph: React.FC<LineGraphProps> = ({
     const previousData = [...currentData.current];
     currentData.current = data;
 
-    // Check setup and log important info
-    console.log('✅ SETUP CHECK:');
-    console.log('- timestamps available:', !!timestamps);
-    console.log('- timestamps length:', timestamps?.length);
-    console.log('- data length:', data?.length);
-    console.log(
-      '- timestamps.length === data.length:',
-      timestamps?.length === data?.length,
-    );
-    console.log('- executionTimestamp available:', !!executionTimestamp);
-
     const parsedExecTimestamp = getTimestampInMs(executionTimestamp);
-    console.log('- executionTimestamp value:', executionTimestamp);
-    console.log('- parsed executionTimestamp:', parsedExecTimestamp);
-    console.log('- executionPrice available:', !!executionPrice);
-    console.log('- executionPrice value:', executionPrice);
 
-    console.log('Current date:', new Date().toISOString());
     if (timestamps && timestamps.length > 0) {
-      console.log(
-        'Chart timestamps (first):',
-        new Date(timestamps[0]).toISOString(),
-      );
-      console.log(
-        'Chart timestamps (last):',
-        new Date(timestamps[timestamps.length - 1]).toISOString(),
-      );
 
-      // Check sorting order
       const sortOrder =
         timestamps[1] > timestamps[0] ? 'ascending' : 'descending';
-      console.log('Chart data sorting order:', sortOrder);
     }
 
     // Animate to new data
@@ -155,15 +129,9 @@ const LineGraph: React.FC<LineGraphProps> = ({
       timestamps.length === data.length &&
       executionTimestamp
     ) {
-      console.log('Using time-based positioning logic');
-      console.log('Execution timestamp:', executionTimestamp);
-
       // Handle different timestamp formats
       const parsedExecTimestamp = getTimestampInMs(executionTimestamp);
       if (!parsedExecTimestamp) {
-        console.log(
-          '❌ Failed to parse execution timestamp, falling back to price-based',
-        );
         return findNearestPriceIndex();
       }
 
@@ -171,36 +139,22 @@ const LineGraph: React.FC<LineGraphProps> = ({
       const execTime = parsedExecTimestamp;
       const lastTime = Number(timestamps[timestamps.length - 1]);
 
-      console.log('Execution time (number):', execTime);
-      console.log('Last chart time (number):', lastTime);
-      console.log('Is execution after last point?', execTime > lastTime);
-
       // IMPORTANT: Set a tolerance for "very close" timestamps
       // If execution is within 1 minute of the last data point, consider it at the end
       const ONE_MINUTE = 60 * 1000;
       if (Math.abs(execTime - lastTime) < ONE_MINUTE || execTime > lastTime) {
-        console.log(
-          'Execution timestamp is at or after chart range - placing at end',
-        );
-        console.log('Using index:', data.length - 1);
         return data.length - 1; // Last data point in the chart
       }
 
       // [ADDED NEW FALLBACK CHECK]
       // If for any reason the execution time is still beyond the lastTime, also place on the last data point
       if (execTime > lastTime) {
-        console.log(
-          'ADDED: Forcing last data point for trade well after lastTime',
-        );
         return data.length - 1;
       }
 
       // If execution is BEFORE the chart range - place at start of chart
       const firstTime = Number(timestamps[0]);
       if (execTime < firstTime) {
-        console.log(
-          'Execution timestamp is before chart range - placing at start',
-        );
         return 0; // First data point in the chart
       }
 
