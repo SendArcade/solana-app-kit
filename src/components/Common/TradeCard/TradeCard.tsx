@@ -48,7 +48,7 @@ async function fetchJupiterTokenData(mint: string) {
 
 export interface TradeCardProps {
   tradeData: TradeData;
-  /** Called when the user taps “Trade Now” (optional) */
+  /** Called when the user taps "Trade Now" (optional) */
   onTrade?: () => void;
   /** If true => show a chart for the output token */
   showGraphForOutputToken?: boolean;
@@ -105,8 +105,6 @@ function TradeCard({
     coinError,
     refreshCoinData,
     loadingOHLC,
-    coinName,
-    coinImage,
     setSelectedCoinId,
   } = useCoingecko();
 
@@ -157,7 +155,11 @@ function TradeCard({
   // When the user specifically requests a chart for the output token,
   // we set the coingecko ID (once outputTokenMeta is available).
   useEffect(() => {
-    if (showGraphForOutputToken && coingeckoIdOutput) {
+    // Only set the coin ID if we haven't already done so to prevent loop
+    if (showGraphForOutputToken && 
+        coingeckoIdOutput && 
+        !didInitialFetchRef.current) {
+      didInitialFetchRef.current = true;
       setSelectedCoinId(coingeckoIdOutput.toLowerCase());
     }
   }, [showGraphForOutputToken, coingeckoIdOutput, setSelectedCoinId]);
@@ -166,31 +168,42 @@ function TradeCard({
   // Force refresh from parent
   // -----------
   useEffect(() => {
+    // Only refresh if we have a significant change in externalRefreshTrigger
+    // and we're showing a graph and have a coinId
     if (
-      externalRefreshTrigger &&
-      showGraphForOutputToken &&
-      coingeckoIdOutput
+      externalRefreshTrigger && 
+      showGraphForOutputToken && 
+      coingeckoIdOutput && 
+      didInitialFetchRef.current
     ) {
       refreshCoinData();
     }
   }, [
-    externalRefreshTrigger,
-    coingeckoIdOutput,
-    showGraphForOutputToken,
+    externalRefreshTrigger, // only care about changes to this value
     refreshCoinData,
   ]);
 
   // -----------
-  // Timeframe changes => refresh if we’re in chart mode
+  // Timeframe changes => refresh if we're in chart mode
+  // But make sure we're not creating an infinite loop
   // -----------
+  const prevTimeframeRef = useRef<Timeframe>(timeframe);
+
   useEffect(() => {
-    if (!showGraphForOutputToken || !coingeckoIdOutput) return;
+    // Skip if conditions aren't met or if timeframe hasn't changed
+    if (!showGraphForOutputToken || !coingeckoIdOutput || timeframe === prevTimeframeRef.current) return;
+    
+    // Update the previous timeframe reference
+    prevTimeframeRef.current = timeframe;
+    
+    // If this is the first time, just mark as initialized but don't refresh
     if (!didInitialFetchRef.current) {
       didInitialFetchRef.current = true;
-      refreshCoinData();
+      // The refreshCoinData will be triggered by the setSelectedCoinId from the other effect
       return;
     }
-    // Otherwise, a changed timeframe => refetch
+    
+    // Otherwise, a genuine timeframe change should trigger refresh
     refreshCoinData();
   }, [timeframe, coingeckoIdOutput, showGraphForOutputToken, refreshCoinData]);
 
@@ -236,9 +249,7 @@ function TradeCard({
           <View style={styles.tradeCardLeftSide}>
             <Image
               source={
-                coinImage
-                  ? {uri: coinImage}
-                  : fallbackOutLogo
+                fallbackOutLogo
                   ? {uri: fallbackOutLogo}
                   : require('../../../assets/images/SENDlogo.png')
               }
@@ -246,7 +257,7 @@ function TradeCard({
             />
             <View style={styles.tradeCardNamePriceContainer}>
               <Text style={styles.tradeCardTokenName}>
-                {coinName || fallbackOutName}
+                {fallbackOutName}
               </Text>
               <Text style={styles.tradeCardTokenPrice}>
                 {timeframePrice ? `$${timeframePrice.toFixed(4)}` : '$0.00'}
@@ -376,7 +387,7 @@ function TradeCard({
   }
 
   // ---------------------------------------
-  // If not chart mode => standard “swap” view
+  // If not chart mode => standard "swap" view
   // ---------------------------------------
   const isLoading = loadingMeta;
   return (
