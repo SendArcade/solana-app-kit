@@ -11,7 +11,7 @@ description: "Upload a profile avatar image for a specific user"
 
 # Function: uploadProfileAvatar()
 
-> **uploadProfileAvatar**(`userWallet`: string, `localFileUri`: string): `Promise`<string>
+> **uploadProfileAvatar**(`userWallet`: string, `localFileUri`: string): `Promise<string>`
 
 Defined in: [src/services/profileService.ts:14](https://github.com/SendArcade/solana-app-kit/blob/main/src/services/profileService.ts#L14)
 
@@ -19,18 +19,18 @@ Uploads a profile avatar image for a given user to the server. This function han
 request required for file uploads and returns the remote URL where the avatar can be accessed.
 
 ## Parameters
-
+```
 | Parameter | Type | Description |
 | :------ | :------ | :------ |
 | `userWallet` | `string` | The user's wallet address (unique ID) |
 | `localFileUri` | `string` | Local file URI of the image to upload |
-
+```
 ## Returns
-
+```
 | Type | Description |
 | :------ | :------ |
-| `Promise`<string> | The remote URL where the uploaded avatar can be accessed |
-
+| `Promise<string>` | The remote URL where the uploaded avatar can be accessed |
+```
 ## Errors
 
 - Throws error if any required parameters are missing
@@ -68,4 +68,4 @@ async function selectAndUploadAvatar(userWalletAddress: string) {
     throw error;
   }
 }
-``` 
+```

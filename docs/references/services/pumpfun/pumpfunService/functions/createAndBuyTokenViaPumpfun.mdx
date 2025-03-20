@@ -1,3 +1,4 @@
+
 ---
 title: "Function: createAndBuyTokenViaPumpfun()"
 description: "Create a new token and immediately purchase it on Pump.fun"
@@ -11,7 +12,7 @@ description: "Create a new token and immediately purchase it on Pump.fun"
 
 # Function: createAndBuyTokenViaPumpfun()
 
-> **createAndBuyTokenViaPumpfun**(`params`): `Promise`<{ `success`: `boolean`; `txId`: `string`; `mintPublicKey`: `string` }>
+> **createAndBuyTokenViaPumpfun**(`params`): `Promise<{ success: boolean; txId: string; mintPublicKey: string }>`
 
 Defined in: [src/services/pumpfun/pumpfunService.ts:35](https://github.com/SendArcade/solana-app-kit/blob/main/src/services/pumpfun/pumpfunService.ts#L35)
 
@@ -22,7 +23,7 @@ This function handles both token creation and initial liquidity provision:
 3. Optionally buys the token to establish initial price
 
 ## Parameters
-
+```
 | Parameter | Type | Description |
 | :------ | :------ | :------ |
 | `params` | `Object` | Parameters for token creation and purchase |
@@ -37,13 +38,13 @@ This function handles both token creation and initial liquidity provision:
 | `params.solAmount` | `number` | Amount of SOL to spend in initial buy |
 | `params.slippageBasisPoints?` | `bigint` | Optional slippage tolerance (default 500 = 5%) |
 | `params.solanaWallet` | `any` | Privy wallet instance for signing transactions |
-
+```
 ## Returns
-
+```
 | Type | Description |
 | :------ | :------ |
-| `Promise`<{ `success`: `boolean`; `txId`: `string`; `mintPublicKey`: `string` }> | Transaction result with signature and new token mint address |
-
+| `Promise<{ success: boolean; txId: string; mintPublicKey: string }>` | Transaction result with signature and new token mint address |
+```
 ## Example
 
 ```typescript

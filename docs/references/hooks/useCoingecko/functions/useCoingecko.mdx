@@ -11,7 +11,7 @@ description: "A unified hook that fetches and manages cryptocurrency data from C
 
 # Function: useCoingecko()
 
-> **useCoingecko**(): { 
+> **useCoingecko**(): `{
 >   coinList: Array<{ id: string; symbol: string; name: string }>;
 >   loadingCoinList: boolean;
 >   coinListError: string | null;
@@ -34,7 +34,7 @@ description: "A unified hook that fetches and manages cryptocurrency data from C
 >   loadingOHLC: boolean;
 >   coinError: string | null;
 >   refreshCoinData: () => Promise<void>;
-> }
+> }`
 
 Defined in: [src/hooks/useCoingecko.ts:21](https://github.com/SendArcade/solana-app-kit/blob/main/src/hooks/useCoingecko.ts#L21)
 

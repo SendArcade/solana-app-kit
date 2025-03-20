@@ -11,7 +11,7 @@ description: "Fetch the list of users a specific user is following"
 
 # Function: fetchFollowing()
 
-> **fetchFollowing**(`userId`: string): `Promise`<any[]>
+> **fetchFollowing**(`userId`: string): `Promise<any[]>`
 
 Defined in: [src/services/profileService.ts:66](https://github.com/SendArcade/solana-app-kit/blob/main/src/services/profileService.ts#L66)
 
@@ -19,17 +19,17 @@ Fetches a list of users that the specified user is following. This function retr
 data from the server, allowing applications to display a user's social network and connections.
 
 ## Parameters
-
+```
 | Parameter | Type | Description |
 | :------ | :------ | :------ |
 | `userId` | `string` | The user's wallet address or unique ID |
-
+```
 ## Returns
-
+```
 | Type | Description |
 | :------ | :------ |
-| `Promise`<any[]> | Array of user objects that the specified user is following |
-
+| `Promise<any[]>` | Array of user objects that the specified user is following |
+```
 ## Behavior
 
 - Returns an empty array if the server URL is not configured
@@ -56,4 +56,5 @@ async function displayUserFollowing(walletAddress: string) {
     console.warn('Error retrieving following list:', error);
     return [];
   }
-} 
+}
+```
