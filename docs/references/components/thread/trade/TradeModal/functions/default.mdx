@@ -13,35 +13,44 @@ description: "> **default**(`__namedParameters`): `Element`"
 
 > **default**(`__namedParameters`): `Element`
 
-Defined in: [src/components/thread/TradeModal.tsx:84](https://github.com/SendArcade/solana-app-kit/blob/bd4b3556b8f469c27ebb06f4df65b3a36b43ba3b/src/components/thread/TradeModal.tsx#L84)
+Defined in: [src/components/thread/trade/TradeModal.tsx:71](https://github.com/SendArcade/solana-app-kit/blob/main/src/components/thread/trade/TradeModal.tsx#L71)
 
-A modal component for executing token trades and sharing them on the feed
+A modal component for executing token trades and sharing them on the feed.
 
 ## Parameters
 
 ### \_\_namedParameters
 
-`TradeModalProps`
+`TradeModalProps`: 
+- `visible`: Whether the modal is visible
+- `onClose`: Callback fired when the modal is closed
+- `currentUser`: Current user information
+- `onPostCreated`: Callback fired when a trade post is created
+- `initialInputToken`: Initial input token for the trade
+- `initialOutputToken`: Initial output token for the trade
+- `disableTabs`: Whether to disable tab switching
 
 ## Returns
 
 `Element`
 
-## Component
-
 ## Description
 
 TradeModal provides a user interface for executing token swaps using Jupiter aggregator
-and sharing the trade details on the social feed. It supports token selection, amount input,
-and automatic post creation after successful trades.
+and sharing the trade details on the social feed. 
+
+The component handles two main flows:
+1. Swap & Share (posts a trade summary on success)
+2. Pick an existing Tx signature & share it
 
 Features:
-- Token selection for input and output
-- Real-time price quotes
-- Trade execution via Jupiter aggregator
-- Automatic trade post creation
-- USD value calculation
-- Customizable appearance
+- Token selection via integrated SelectTokenModal
+- Real-time price quotes from Jupiter API
+- Trade execution with wallet integration
+- Custom confirmation UI for sharing trades
+- Multiple tab interfaces
+- Detailed error handling and loading states
+- Responsive design with keyboard-avoiding behavior
 
 ## Example
 
@@ -49,9 +58,22 @@ Features:
 <TradeModal
   visible={showTradeModal}
   onClose={() => setShowTradeModal(false)}
-  currentUser={user}
+  currentUser={userProfile}
   onPostCreated={() => refetchPosts()}
-  initialInputToken={solToken}
-  initialOutputToken={usdcToken}
+  initialInputToken={{
+    address: 'So11111111111111111111111111111111111111112',
+    symbol: 'SOL',
+    name: 'Solana',
+    decimals: 9,
+    logoURI: 'https://...'
+  }}
+  initialOutputToken={{
+    address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    symbol: 'USDC',
+    name: 'USD Coin',
+    decimals: 6,
+    logoURI: 'https://...'
+  }}
+  disableTabs={false}
 />
 ```
