@@ -43,6 +43,7 @@ export interface AuthProviderConfig {
 
 /** Transaction config (unchanged) */
 export interface TransactionProviderConfig {
+  defaultFeeTier: string;
   defaultMode: 'priority' | 'jito';
   feeTiers: {
     low: number;

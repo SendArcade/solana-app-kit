@@ -11,26 +11,46 @@ Users can post various content:
 - Images and media
 - Interactive polls
 - Trade information
-- NFT listings
+- NFT listings (including **Collection Floor** listings)
+- **Retweet/Quote Retweet** support
 
 ### 🧩 Component Structure
 Built from modular components:
-- `Thread.tsx` - Container for multiple posts
-- `ThreadItem.tsx` - Individual post rendering
-- Post section components:
+- `Thread.tsx` - Container for multiple posts (root-level)
+- `ThreadItem.tsx` - Renders a single post with optional replies
+- `ThreadComposer.tsx` - For composing new posts or replies
+- `ThreadEditModal.tsx` - In-line editing of text-only post sections
+- Post sub-components:
   - `PostHeader`
   - `PostBody`
   - `PostFooter`
   - `PostCTA`
+- Retweet sub-components:
+  - `RetweetModal.tsx` (modal to quote-retweet or retweet a post)
+  - `RetweetPreview.tsx` (inline preview of a retweeted post)
 
 ### 🔄 State Management
 Utilizes Redux for state handling:
 - Async thunks for data fetching
-- Post creation operations
-- Reply management
-- Content updates
+- Post creation and reply creation
+- Retweet flow (server or local fallback)
+- Edit and delete operations
+- Reaction additions and local fallback
 
 ### 🎨 Customization
 - Theme customization via `thread.theme.ts`
 - Styling utilities in `thread.styles.ts`
 - Type definitions in `thread.types.ts`
+- Optional callbacks for advanced usage:
+  - `onPressPost`
+  - `onPressUser`
+  - `ctaButtons`
+  - `onRefresh`
+  - and more...
+
+### 🆕 Highlights / New Additions
+- **Disable Replies**: `disableReplies` prop for `Thread` or `ThreadItem` to hide nested replies.
+- **onPressUser**: callback when a user’s avatar or name is tapped.
+- **NFT Collection Listing**: Post can represent an entire collection floor buy.
+- **TradeModal** `disableTabs` option: lock users into a single tab (e.g. “Swap & Share”).
+- **ThreadEditModal**: A straightforward modal that lets owners edit text sections of their post.

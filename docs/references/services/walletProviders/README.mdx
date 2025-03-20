@@ -1,6 +1,6 @@
 ---
 title: "services/walletProviders"
-description: "## References"
+description: "Wallet integration services for various providers"
 ---
 
 [**solana-social-kit**](../../README.mdx)
@@ -10,6 +10,24 @@ description: "## References"
 [solana-social-kit](../../README.mdx) / services/walletProviders
 
 # services/walletProviders
+
+This module provides adapters and services for different wallet providers, allowing a unified interface for interacting with different wallet technologies. Currently supported providers include:
+
+## Modules
+
+- [dynamic](dynamic/README.mdx) - Integration with Dynamic wallet adapter
+- [privy](privy/README.mdx) - Integration with Privy embedded wallet
+- [turnkey](turnkey/README.mdx) - Integration with Turnkey wallet infrastructure
+
+## Overview
+
+Each wallet provider implementation follows a similar pattern, offering functions for:
+- User authentication (login/logout)
+- Wallet creation and management
+- Transaction signing
+- Provider-specific features
+
+Applications can switch between different wallet implementations by using the configuration system and `useAuth` hook which delegates to the appropriate provider.
 
 ## References
 

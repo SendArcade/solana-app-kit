@@ -15,29 +15,34 @@ export type ThreadSectionType =
   | 'NFT_LISTING';
 
 export interface NftListingData {
-  mint: string;
+  mint?: string;  // Now optional since we might only have collection data
   owner: string | null;
   name?: string;
   image?: string;
   priceSol?: number;
-  collId?: string;
+  collId?: string;  // Collection ID for floor buying
+  isCollection?: boolean; // Flag to indicate if this is a collection listing
+  collectionName?: string;
+  collectionImage?: string;
+  collectionDescription?: string;
 }
 
 export interface TradeData {
-  // Mints for reference
   inputMint: string;
   outputMint: string;
   aggregator?: string;
+  inputSymbol: string;
+  inputQuantity: string;
+  inputUsdValue?: string;
+  outputSymbol: string;
+  outputQuantity: string;
+  outputUsdValue?: string;
 
-  // Final trade details
-  inputSymbol: string; // e.g. "SOL"
-  inputQuantity: string; // e.g. "1.5"
-  inputUsdValue: string; // e.g. "$30.00"
-
-  outputSymbol: string; // e.g. "USDC"
-  outputQuantity: string; // e.g. "120"
-  outputUsdValue: string; // e.g. "$120.00"
+  // (Add the two lines below if missing)
+  inputAmountLamports?: string; // <--- ADD THIS
+  outputAmountLamports?: string; // <--- ADD THIS
 }
+
 
 export interface PollData {
   question: string;

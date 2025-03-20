@@ -1,60 +1,44 @@
 // File: src/components/wallet/EmbeddedWallet.tsx
 import React, {useEffect} from 'react';
-import {View, Text, TouchableOpacity, Alert} from 'react-native';
+import {View, Text, TouchableOpacity, Alert, Platform} from 'react-native';
 import Icons from '../../assets/svgs';
 import {useAuth} from '../../hooks/useAuth';
 import styles from '../../screens/Common/LoginScreen/LoginScreen.styles';
 
-/**
- * Props for the EmbeddedWalletAuth component
- * @interface EmbeddedWalletAuthProps
- */
+import type {Web3MobileWallet} from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
+import type { PublicKey as SolanaPublicKey } from '@solana/web3.js';
+
+type TransactFunction = <T>(
+  callback: (wallet: Web3MobileWallet) => Promise<T>
+) => Promise<T>;
+
+let transact: TransactFunction | undefined;
+let PublicKey: typeof SolanaPublicKey | undefined;
+let Buffer: { from: (data: string, encoding: string) => Uint8Array } | undefined;
+
+if (Platform.OS === 'android') {
+  const mwaModule = require('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
+  transact = mwaModule.transact as TransactFunction;
+
+  const web3Module = require('@solana/web3.js');
+  PublicKey = web3Module.PublicKey;
+
+  const bufferModule = require('buffer');
+  Buffer = bufferModule.Buffer;
+}
+
 export interface EmbeddedWalletAuthProps {
-  /** Callback function that receives wallet connection information */
   onWalletConnected: (info: {
-    /** The authentication provider used */
-    provider: 'privy' | 'dynamic' | 'turnkey';
-    /** The connected wallet's public key */
+    provider: 'privy' | 'dynamic' | 'turnkey' | 'mwa';
     address: string;
   }) => void;
-  /** The authentication mode to use (defaults to 'login') */
   authMode?: 'login' | 'signup';
 }
 
-/**
- * A component that provides embedded wallet authentication functionality
- * 
- * @component
- * @description
- * EmbeddedWalletAuth is a component that handles wallet authentication through
- * various providers (Google, Apple, Email) and manages the connection state.
- * It provides a user interface for authentication and handles wallet connection
- * callbacks.
- * 
- * Features:
- * - Multiple authentication methods:
- *   - Google Sign-In
- *   - Apple Sign-In
- *   - Email Sign-In
- * - Automatic wallet connection handling
- * - Error handling and user feedback
- * - Provider-specific wallet management
- * 
- * @example
- * ```tsx
- * <EmbeddedWalletAuth
- *   onWalletConnected={({provider, address}) => {
- *     console.log(`Connected with ${provider}: ${address}`);
- *   }}
- *   authMode="login"
- * />
- * ```
- */
 const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
   onWalletConnected,
   authMode = 'login',
 }) => {
-  // Use the updated hook (no provider parameter)
   const {
     status,
     loginWithGoogle,
@@ -64,12 +48,52 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
     solanaWallet,
   } = useAuth();
 
-  /**
-   * Effect hook to handle wallet connection and callback
-   * Triggers when user, wallet, or callback changes
-   */
+  const loginWithMWA = async () => {
+    if (Platform.OS !== 'android') {
+      Alert.alert('Not Supported', 'Mobile Wallet Adapter is only available on Android devices');
+      return;
+    }
+    if (!transact || !PublicKey || !Buffer) {
+      Alert.alert('Error', 'Required modules for MWA not available');
+      return;
+    }
+
+    const APP_IDENTITY = {
+      name: 'React Native dApp',
+      uri: 'https://yourdapp.com',
+      icon: 'favicon.ico',
+    };
+
+    try {
+      const authorizationResult = await transact(async (wallet: Web3MobileWallet) => {
+        return await wallet.authorize({
+          cluster: 'devnet',
+          identity: APP_IDENTITY,
+        });
+      });
+
+      if (authorizationResult?.accounts?.length) {
+        // Convert base64 pubkey to a Solana PublicKey
+        const encodedPublicKey = authorizationResult.accounts[0].address;
+        const publicKeyBuffer = Buffer.from(encodedPublicKey, 'base64');
+        const publicKey = new PublicKey(publicKeyBuffer);
+        const base58Address = publicKey.toBase58();
+
+        onWalletConnected({
+          provider: 'mwa',
+          address: base58Address,
+        });
+      } else {
+        Alert.alert('Connection Error', 'No accounts found in wallet');
+      }
+    } catch (error) {
+      console.error('MWA connection error:', error);
+      Alert.alert('Connection Error', 'Failed to connect to wallet');
+    }
+  };
+
   useEffect(() => {
-    console.log(solanaWallet, 'solanaWallet');
+    // If user + solanaWallet are present, it implies a Privy login
     if (user && solanaWallet && onWalletConnected) {
       const walletPublicKey =
         solanaWallet.wallets && solanaWallet.wallets.length > 0
@@ -79,21 +103,29 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
         Alert.alert('Wallet Error', 'Wallet not connected');
         return;
       }
-      // In this example we assume "privy" as the provider (the default from customization)
       onWalletConnected({provider: 'privy', address: walletPublicKey});
     }
   }, [user, onWalletConnected, solanaWallet]);
 
   return (
     <View style={styles.bottomButtonsContainer}>
+      {Platform.OS === 'android' && (
+        <TouchableOpacity style={styles.loginButton} onPress={loginWithMWA}>
+          <Icons.Google width={24} height={24} />
+          <Text style={styles.buttonText}>Continue with MWA</Text>
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity style={styles.loginButton} onPress={loginWithGoogle}>
         <Icons.Google width={24} height={24} />
         <Text style={styles.buttonText}>Continue with Google</Text>
       </TouchableOpacity>
+
       <TouchableOpacity style={styles.loginButton} onPress={loginWithApple}>
         <Icons.Apple width={24} height={24} />
         <Text style={styles.buttonText}>Continue with Apple</Text>
       </TouchableOpacity>
+
       <TouchableOpacity style={[styles.loginButton]} onPress={loginWithEmail}>
         <Icons.Device width={24} height={24} />
         <Text style={[styles.buttonText]}>Continue with Email</Text>

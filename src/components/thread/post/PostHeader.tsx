@@ -1,4 +1,4 @@
-// FILE: src/components/thread/PostHeader.tsx
+// FILE: src/components/thread/post/PostHeader.tsx
 
 import React, { useState, useRef } from 'react';
 import {

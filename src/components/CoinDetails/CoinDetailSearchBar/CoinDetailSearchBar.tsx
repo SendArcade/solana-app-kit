@@ -1,3 +1,5 @@
+// FILE: src/components/CoinDetails/CoinDetailSearchBar/CoinDetailSearchBar.tsx
+
 import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
@@ -9,10 +11,16 @@ import {
   Image,
   ImageStyle,
 } from 'react-native';
-import {useCoinList, CoinListItem} from '../../../hooks/useCoinList';
+import {COINGECKO_API_KEY} from '@env'; // <--  to supply the API key for images
+import {useCoingecko} from '../../../hooks/useCoingecko';
 import {searchBarStyles} from './CoinDetailSearchBar.style';
 import Icons from '../../../assets/svgs/index';
-import {COINGECKO_API_KEY} from '@env';
+
+export type CoinListItem = {
+  id: string;
+  symbol: string;
+  name: string;
+};
 
 export interface CoinDetailSearchBarCustomStyles {
   container?: StyleProp<ViewStyle>;
@@ -37,16 +45,18 @@ export const CoinDetailSearchBar: React.FC<CoinDetailSearchBarProps> = ({
   onSelectCoinId,
   customStyles = {},
 }) => {
-  const {searchCoins, loading} = useCoinList();
+  // Use unified Coingecko hook
+  const {searchCoins, loadingCoinList, searchResults} = useCoingecko();
+
   const [query, setQuery] = useState('');
   const [filteredCoins, setFilteredCoins] = useState<CoinListItem[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
-  // For storing coin images keyed by ID
+  // Local cache of fetched coin images keyed by ID
   const [coinImages, setCoinImages] = useState<Record<string, string>>({});
 
-  // Handler for text input changes
+  // Handle text changes => triggers search
   const handleChangeText = useCallback(
     (text: string) => {
       setQuery(text);
@@ -55,15 +65,23 @@ export const CoinDetailSearchBar: React.FC<CoinDetailSearchBarProps> = ({
         setShowDropdown(false);
         return;
       }
-      // Show top 7 results
-      const results = searchCoins(text).slice(0, 7);
-      setFilteredCoins(results);
+      // Kick off search in useCoingecko
+      searchCoins(text);
       setShowDropdown(true);
     },
     [searchCoins],
   );
 
-  // Handler for user selecting a coin from dropdown
+  // Whenever global `searchResults` changes => local top-7
+  useEffect(() => {
+    if (searchResults.length > 0) {
+      setFilteredCoins(searchResults.slice(0, 7));
+    } else {
+      setFilteredCoins([]);
+    }
+  }, [searchResults]);
+
+  // Clear everything on user "select coin" or "X" button
   const handleSelectCoin = (coinId: string) => {
     setQuery('');
     setFilteredCoins([]);
@@ -71,14 +89,13 @@ export const CoinDetailSearchBar: React.FC<CoinDetailSearchBarProps> = ({
     onSelectCoinId(coinId);
   };
 
-  // Clear query text
   const handleClear = () => {
     setQuery('');
     setFilteredCoins([]);
     setShowDropdown(false);
   };
 
-  // Hide dropdown if no query
+  // Hide dropdown if blank
   useEffect(() => {
     if (!query.trim()) {
       setShowDropdown(false);
@@ -86,7 +103,8 @@ export const CoinDetailSearchBar: React.FC<CoinDetailSearchBarProps> = ({
   }, [query]);
 
   /**
-   * Fetch the icons of the filtered coins using CoinGecko 'coins/markets' endpoint.
+   * Fetch icons for the currently displayed `filteredCoins`.
+   * This replicates the logic from the old code, including an API key header.
    */
   useEffect(() => {
     if (filteredCoins.length === 0) {
@@ -95,7 +113,6 @@ export const CoinDetailSearchBar: React.FC<CoinDetailSearchBarProps> = ({
     }
     (async () => {
       try {
-        // Build a comma-separated list of coin IDs
         const idsParam = filteredCoins.map(c => c.id).join(',');
         const url = `https://pro-api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${idsParam}`;
         const response = await fetch(url, {
@@ -152,7 +169,9 @@ export const CoinDetailSearchBar: React.FC<CoinDetailSearchBarProps> = ({
         )}
       </View>
 
-      {loading && <Text style={styles.loadingText}>Loading coins...</Text>}
+      {loadingCoinList && (
+        <Text style={styles.loadingText}>Loading coins...</Text>
+      )}
 
       {/* Dropdown with filtered coins */}
       {showDropdown && filteredCoins.length > 0 && (

@@ -1,4 +1,4 @@
-// FILE: src/components/thread/RetweetModal.tsx
+// FILE: src/components/thread/retweet/RetweetModal.tsx
 import React, {useState} from 'react';
 import {
   Modal,

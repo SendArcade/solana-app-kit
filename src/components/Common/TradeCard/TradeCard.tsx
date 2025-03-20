@@ -1,21 +1,22 @@
-// File: src/components/TradeCard/TradeCard.tsx
-import React, {useEffect, useState} from 'react';
+// FILE: src/components/Common/TradeCard/TradeCard.tsx
+
+import React, {useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
   Image,
   TouchableOpacity,
   ActivityIndicator,
+  Dimensions,
+  StyleProp,
+  ViewStyle,
+  ImageSourcePropType,
 } from 'react-native';
-import {createThreadStyles, getMergedTheme} from '../../thread/thread.styles';
 import Icon from '../../../assets/svgs/index';
+import {getMergedTheme} from '../../thread/thread.styles';
 import styles from './TradeCard.style';
-
-interface FetchedTokenData {
-  avatar: string;
-  name: string;
-  currentPriceUsd: number; // Changed to number for calculations
-}
+import {useCoingecko, Timeframe} from '../../../hooks/useCoingecko';
+import LineGraph from '../../CoinDetails/CoinDetailTopSection/LineGraph';
 
 export interface TradeData {
   inputMint: string;
@@ -23,196 +24,243 @@ export interface TradeData {
   inputAmountLamports?: string;
   outputAmountLamports?: string;
   aggregator?: string;
-
-  // Fields stored at trade time:
   inputSymbol: string;
-  inputQuantity: string; // e.g. "1.5"
-  inputUsdValue?: string; // Optional now as we'll calculate it
+  inputQuantity: string;
+  inputUsdValue?: string;
   outputSymbol: string;
-  outputQuantity: string; // e.g. "120"
-  outputUsdValue?: string; // Optional now as we'll calculate it
+  outputQuantity: string;
+  outputUsdValue?: string;
+  executionTimestamp?: any;
+}
+
+async function fetchJupiterTokenData(mint: string) {
+  try {
+    const response = await fetch(`https://api.jup.ag/tokens/v1/token/${mint}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch token data for ${mint}`);
+    }
+    return await response.json();
+  } catch (err) {
+    console.error('Jupiter token fetch error:', err);
+    return null;
+  }
 }
 
 export interface TradeCardProps {
   tradeData: TradeData;
+  /** Called when the user taps "Trade Now" (optional) */
   onTrade?: () => void;
-  /** Optional theme overrides for styling */
+  /** If true => show a chart for the output token */
+  showGraphForOutputToken?: boolean;
+  /** Theming overrides */
   themeOverrides?: Partial<Record<string, any>>;
-  /** Optional style overrides for specific elements */
+  /** Style overrides for specific keys in the default style. */
   styleOverrides?: {[key: string]: object};
-  /** Optional user-defined stylesheet */
+  /** For user-provided custom stylesheet merges */
   userStyleSheet?: {[key: string]: object};
+  /** An optional user avatar to show on the chart for execution marker */
+  userAvatar?: ImageSourcePropType;
+
+  /**
+   * A numeric (or string) value that changes when the parent wants to force a refresh.
+   * E.g. you can pass a `refreshCounter` that increments each time
+   * the user pulls to refresh in the Profile screen.
+   */
+  externalRefreshTrigger?: number;
 }
 
-async function fetchTokenRealtimeData(mint: string): Promise<FetchedTokenData> {
-  try {
-    // Real API call to the Jupiter Token API.
-    const response = await fetch(`https://api.jup.ag/tokens/v1/token/${mint}`);
-    if (!response.ok) {
-      throw new Error(
-        `Failed to fetch token data for ${mint}: ${response.status}`,
-      );
-    }
-    const data = await response.json();
-
-    // Default price value if no price is available.
-    let currentPriceUsd = 0;
-    if (data.extensions && data.extensions.coingeckoId) {
-      const cgId = data.extensions.coingeckoId;
-      try {
-        // Fetch current price from Coingecko.
-        const priceResponse = await fetch(
-          `https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd`,
-        );
-        if (priceResponse.ok) {
-          const priceData = await priceResponse.json();
-          if (priceData[cgId] && priceData[cgId].usd !== undefined) {
-            currentPriceUsd = priceData[cgId].usd;
-          }
-        }
-      } catch (e) {
-        console.error('Failed to fetch price from Coingecko', e);
-      }
-    }
-    return {
-      avatar: data.logoURI,
-      name: data.name,
-      currentPriceUsd,
-    };
-  } catch (error) {
-    console.error('Error fetching token realtime data from trade card', error);
-    return {
-      avatar: 'https://example.com/default.png',
-      name: 'Unknown Token',
-      currentPriceUsd: 0,
-    };
-  }
-}
-
-// Helper function to format currency
-function formatUSD(amount: number): string {
-  return `$${amount.toFixed(2)}`;
-}
-
-export default function TradeCard({
+/**
+ * A card displaying trade info, with optional chart for the output token.
+ */
+function TradeCard({
   tradeData,
   onTrade,
+  showGraphForOutputToken,
   themeOverrides,
   styleOverrides,
   userStyleSheet,
+  userAvatar,
+  externalRefreshTrigger,
 }: TradeCardProps) {
   const mergedTheme = getMergedTheme(themeOverrides);
-  const [inputTokenData, setInputTokenData] = useState<FetchedTokenData | null>(
-    null,
-  );
-  const [outputTokenData, setOutputTokenData] =
-    useState<FetchedTokenData | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  // New state for real-time calculated values
-  const [inputUsdValue, setInputUsdValue] = useState<string | undefined>(
-    tradeData.inputUsdValue,
-  );
-  const [outputUsdValue, setOutputUsdValue] = useState<string | undefined>(
-    tradeData.outputUsdValue,
-  );
+  // For Jupiter metadata about input & output tokens
+  const [inputTokenMeta, setInputTokenMeta] = useState<any>(null);
+  const [outputTokenMeta, setOutputTokenMeta] = useState<any>(null);
+  const [loadingMeta, setLoadingMeta] = useState(false);
 
+  // We store the last minted pair so we only fetch again if changed:
+  const prevMintPairRef = useRef<{inputMint: string; outputMint: string}>({
+    inputMint: '',
+    outputMint: '',
+  });
+
+  // The Coingecko hook
+  const {
+    timeframe,
+    setTimeframe,
+    graphData,
+    timestamps,
+    timeframePrice,
+    coinError,
+    refreshCoinData,
+    loadingOHLC,
+    setSelectedCoinId,
+  } = useCoingecko();
+
+  // We only want to fetch coingecko data on initial load, timeframe changes, or manual refresh
+  const didInitialFetchRef = useRef(false);
+
+  const coingeckoIdOutput = outputTokenMeta?.extensions?.coingeckoId || '';
+
+  // --------------------------
+  // Jupiter metadata fetch
+  // --------------------------
   useEffect(() => {
-    async function loadTokenData() {
-      setLoading(true);
-      try {
-        const inputData = await fetchTokenRealtimeData(tradeData.inputMint);
-        const outputData = await fetchTokenRealtimeData(tradeData.outputMint);
-
-        setInputTokenData(inputData);
-        setOutputTokenData(outputData);
-
-        // Calculate USD values based on current prices
-        const inputQty = parseFloat(tradeData.inputQuantity);
-        const outputQty = parseFloat(tradeData.outputQuantity);
-
-        if (!isNaN(inputQty) && inputData.currentPriceUsd > 0) {
-          const calculatedInputUSD = inputQty * inputData.currentPriceUsd;
-          setInputUsdValue(formatUSD(calculatedInputUSD));
-        }
-
-        if (!isNaN(outputQty) && outputData.currentPriceUsd > 0) {
-          const calculatedOutputUSD = outputQty * outputData.currentPriceUsd;
-          setOutputUsdValue(formatUSD(calculatedOutputUSD));
-        }
-      } catch (error) {
-        console.error('Failed to fetch token data', error);
-      } finally {
-        setLoading(false);
-      }
+    // If same inputMint + outputMint => skip
+    if (
+      prevMintPairRef.current.inputMint === tradeData.inputMint &&
+      prevMintPairRef.current.outputMint === tradeData.outputMint
+    ) {
+      return;
     }
-    loadTokenData();
+    // otherwise fetch
+    let canceled = false;
+    setLoadingMeta(true);
+    (async () => {
+      try {
+        const [outMeta] = await Promise.all([
+          // fetchJupiterTokenData(tradeData.inputMint),
+          fetchJupiterTokenData(tradeData.outputMint),
+        ]);
+        if (!canceled) {
+          // setInputTokenMeta(inMeta);
+          setOutputTokenMeta(outMeta);
+          prevMintPairRef.current = {
+            inputMint: tradeData.inputMint,
+            outputMint: tradeData.outputMint,
+          };
+        }
+      } catch (err) {
+        console.error('TradeCard: jupiter token fetch error', err);
+      } finally {
+        if (!canceled) setLoadingMeta(false);
+      }
+    })();
+    return () => {
+      canceled = true;
+    };
+  }, [tradeData.inputMint, tradeData.outputMint]);
+
+  // When the user specifically requests a chart for the output token,
+  // we set the coingecko ID (once outputTokenMeta is available).
+  useEffect(() => {
+    // Only set the coin ID if we haven't already done so to prevent loop
+    if (showGraphForOutputToken && 
+        coingeckoIdOutput && 
+        !didInitialFetchRef.current) {
+      didInitialFetchRef.current = true;
+      setSelectedCoinId(coingeckoIdOutput.toLowerCase());
+    }
+  }, [showGraphForOutputToken, coingeckoIdOutput, setSelectedCoinId]);
+
+  // -----------
+  // Force refresh from parent
+  // -----------
+  useEffect(() => {
+    // Only refresh if we have a significant change in externalRefreshTrigger
+    // and we're showing a graph and have a coinId
+    if (
+      externalRefreshTrigger && 
+      showGraphForOutputToken && 
+      coingeckoIdOutput && 
+      didInitialFetchRef.current
+    ) {
+      refreshCoinData();
+    }
   }, [
-    tradeData.inputMint,
-    tradeData.outputMint,
-    tradeData.inputQuantity,
-    tradeData.outputQuantity,
+    externalRefreshTrigger, // only care about changes to this value
+    refreshCoinData,
   ]);
 
-  if (loading || !inputTokenData || !outputTokenData) {
-    return (
-      <View
-        style={[
-          styles.tradeCardContainer,
-          {alignItems: 'center', justifyContent: 'center'},
-        ]}>
-        <ActivityIndicator size="small" color="#1d9bf0" />
-      </View>
-    );
+  // -----------
+  // Timeframe changes => refresh if we're in chart mode
+  // But make sure we're not creating an infinite loop
+  // -----------
+  const prevTimeframeRef = useRef<Timeframe>(timeframe);
+
+  useEffect(() => {
+    // Skip if conditions aren't met or if timeframe hasn't changed
+    if (!showGraphForOutputToken || !coingeckoIdOutput || timeframe === prevTimeframeRef.current) return;
+    
+    // Update the previous timeframe reference
+    prevTimeframeRef.current = timeframe;
+    
+    // If this is the first time, just mark as initialized but don't refresh
+    if (!didInitialFetchRef.current) {
+      didInitialFetchRef.current = true;
+      // The refreshCoinData will be triggered by the setSelectedCoinId from the other effect
+      return;
+    }
+    
+    // Otherwise, a genuine timeframe change should trigger refresh
+    refreshCoinData();
+  }, [timeframe, coingeckoIdOutput, showGraphForOutputToken, refreshCoinData]);
+
+  // Fallback name/logo from Jupiter metadata
+  const fallbackInName = inputTokenMeta?.name ?? tradeData.inputSymbol;
+  const fallbackInLogo = inputTokenMeta?.logoURI ?? '';
+  const fallbackOutName = outputTokenMeta?.name ?? tradeData.outputSymbol;
+  const fallbackOutLogo = outputTokenMeta?.logoURI ?? '';
+
+  const isOutputChartMode = !!showGraphForOutputToken;
+
+  function calculateExecutionInfo() {
+    let executionPrice: number | undefined;
+    if (tradeData.inputAmountLamports && tradeData.outputAmountLamports) {
+      const inputLamports = parseFloat(tradeData.inputAmountLamports);
+      const outputLamports = parseFloat(tradeData.outputAmountLamports);
+      if (inputLamports > 0 && outputLamports > 0) {
+        executionPrice = inputLamports / outputLamports;
+      }
+    } else if (tradeData.inputQuantity && tradeData.outputQuantity) {
+      const inputQty = parseFloat(tradeData.inputQuantity);
+      const outputQty = parseFloat(tradeData.outputQuantity);
+      if (inputQty > 0 && outputQty > 0) {
+        executionPrice = inputQty / outputQty;
+      }
+    }
+    return {
+      executionPrice,
+      executionTimestamp: tradeData.executionTimestamp,
+    };
   }
+  const {executionPrice, executionTimestamp} = calculateExecutionInfo();
 
-  return (
-    <View style={styles.tradeCardContainer}>
-      <View style={{position: 'relative'}}>
-        {/* First block: Input (traded) token info */}
+  // ---------------------------------------
+  // If in "chart mode" => show chart
+  // ---------------------------------------
+  if (isOutputChartMode) {
+    const isLoading = loadingMeta || loadingOHLC;
+    return (
+      <View style={styles.tradeCardContainer}>
+        {/* Output token details row */}
         <View style={styles.tradeCardCombinedSides}>
           <View style={styles.tradeCardLeftSide}>
             <Image
-              source={{uri: inputTokenData.avatar}}
+              source={
+                fallbackOutLogo
+                  ? {uri: fallbackOutLogo}
+                  : require('../../../assets/images/SENDlogo.png')
+              }
               style={styles.tradeCardTokenImage}
             />
             <View style={styles.tradeCardNamePriceContainer}>
               <Text style={styles.tradeCardTokenName}>
-                {inputTokenData.name}
+                {fallbackOutName}
               </Text>
               <Text style={styles.tradeCardTokenPrice}>
-                {formatUSD(inputTokenData.currentPriceUsd)}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.tradeCardRightSide}>
-            <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
-              {tradeData.inputQuantity} {tradeData.inputSymbol}
-            </Text>
-            <Text style={styles.tradeCardUsdPrice}>
-              {inputUsdValue || 'Calculating...'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Swap icon */}
-        <View style={styles.tradeCardSwapIcon}>
-          <Icon.SwapIcon />
-        </View>
-
-        {/* Second block: Output (received) token info */}
-        <View style={styles.tradeCardCombinedSides}>
-          <View style={styles.tradeCardLeftSide}>
-            <Image
-              source={{uri: outputTokenData.avatar}}
-              style={styles.tradeCardTokenImage}
-            />
-            <View style={styles.tradeCardNamePriceContainer}>
-              <Text style={styles.tradeCardTokenName}>
-                {outputTokenData.name}
-              </Text>
-              <Text style={styles.tradeCardTokenPrice}>
-                {formatUSD(outputTokenData.currentPriceUsd)}
+                {timeframePrice ? `$${timeframePrice.toFixed(4)}` : '$0.00'}
               </Text>
             </View>
           </View>
@@ -221,24 +269,246 @@ export default function TradeCard({
               {tradeData.outputQuantity} {tradeData.outputSymbol}
             </Text>
             <Text style={styles.tradeCardUsdPrice}>
-              {outputUsdValue || 'Calculating...'}
+              {tradeData.outputUsdValue ?? ''}
             </Text>
           </View>
         </View>
-      </View>
-      {/* {onTrade && (
-        <TouchableOpacity
+
+        {/* Timeframe Row + Refresh Button */}
+        <View
           style={{
-            marginTop: 10,
-            backgroundColor: '#1d9bf0',
-            padding: 10,
-            borderRadius: 5,
+            flexDirection: 'row',
             alignItems: 'center',
-          }}
-          onPress={onTrade}>
-          <Text style={{color: '#fff', fontWeight: 'bold'}}>Trade Now</Text>
-        </TouchableOpacity>
-      )} */}
+            justifyContent: 'center',
+            marginVertical: 8,
+          }}>
+          {(['1H', '1D', '1W', '1M', 'All'] as Timeframe[]).map(tf => (
+            <TouchableOpacity
+              key={tf}
+              style={{
+                marginHorizontal: 4,
+                padding: 6,
+                borderRadius: 6,
+                backgroundColor: timeframe === tf ? '#D6FDFF' : 'transparent',
+              }}
+              onPress={() => setTimeframe(tf)}>
+              <Text
+                style={{
+                  color: timeframe === tf ? '#32D4DE' : '#666666',
+                  fontWeight: timeframe === tf ? '600' : '400',
+                }}>
+                {tf}
+              </Text>
+            </TouchableOpacity>
+          ))}
+          {/* Refresh icon => re-fetch coin data */}
+          <TouchableOpacity
+            style={{marginLeft: 16, flexDirection: 'row', alignItems: 'center'}}
+            onPress={refreshCoinData}
+            accessibilityLabel="Refresh Chart">
+            <Icon.SwapIcon width={20} height={20} />
+            <Text style={{color: '#1d9bf0', marginLeft: 4}}>Refresh</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Chart container */}
+        <View
+          style={[
+            {
+              width: '100%',
+              height: 220,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#FFFFFF',
+            } as StyleProp<ViewStyle>,
+          ]}>
+          {isLoading ? (
+            <ActivityIndicator size="large" color="#1d9bf0" />
+          ) : graphData.length > 0 ? (
+            <>
+              <LineGraph
+                data={graphData}
+                width={Dimensions.get('window').width - 70}
+                executionPrice={executionPrice}
+                executionTimestamp={executionTimestamp}
+                timestamps={timestamps}
+                userAvatar={userAvatar}
+              />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  marginTop: 5,
+                  opacity: 0.7,
+                }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginRight: 12,
+                  }}>
+                  <View
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: '#318EF8',
+                      marginRight: 4,
+                    }}
+                  />
+                  <Text style={{fontSize: 10}}>Current</Text>
+                </View>
+                <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                  <View
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: '#FF5722',
+                      marginRight: 4,
+                    }}
+                  />
+                  <Text style={{fontSize: 10}}>Trade Execution</Text>
+                </View>
+              </View>
+            </>
+          ) : coinError ? (
+            <Text style={{color: 'red', marginTop: 6}}>
+              Error: {coinError.toString()}
+            </Text>
+          ) : (
+            <Text style={{color: '#999', marginTop: 6}}>
+              No chart data found. Try a different timeframe or refresh.
+            </Text>
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  // ---------------------------------------
+  // If not chart mode => standard "swap" view
+  // ---------------------------------------
+  const isLoading = loadingMeta;
+  return (
+    <View style={styles.tradeCardContainer}>
+      {isLoading ? (
+        <View style={{alignItems: 'center', justifyContent: 'center'}}>
+          <ActivityIndicator size="small" color="#1d9bf0" />
+        </View>
+      ) : (
+        <>
+          <View style={{position: 'relative'}}>
+            {/* Input token info */}
+            <View style={styles.tradeCardCombinedSides}>
+              <View style={styles.tradeCardLeftSide}>
+                <Image
+                  source={
+                    fallbackInLogo
+                      ? {uri: fallbackInLogo}
+                      : require('../../../assets/images/SENDlogo.png')
+                  }
+                  style={styles.tradeCardTokenImage}
+                />
+                <View style={styles.tradeCardNamePriceContainer}>
+                  <Text style={styles.tradeCardTokenName}>
+                    {fallbackInName}
+                  </Text>
+                  <Text style={styles.tradeCardTokenPrice}>
+                    {tradeData.inputUsdValue ?? ''}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.tradeCardRightSide}>
+                <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
+                  {tradeData.inputQuantity} {tradeData.inputSymbol}
+                </Text>
+                <Text style={styles.tradeCardUsdPrice}>
+                  {tradeData.inputUsdValue ?? ''}
+                </Text>
+              </View>
+            </View>
+
+            {/* Center swap icon */}
+            <View style={styles.tradeCardSwapIcon}>
+              <Icon.SwapIcon />
+            </View>
+
+            {/* Output token info */}
+            <View style={styles.tradeCardCombinedSides}>
+              <View style={styles.tradeCardLeftSide}>
+                <Image
+                  source={
+                    fallbackOutLogo
+                      ? {uri: fallbackOutLogo}
+                      : require('../../../assets/images/SENDlogo.png')
+                  }
+                  style={styles.tradeCardTokenImage}
+                />
+                <View style={styles.tradeCardNamePriceContainer}>
+                  <Text style={styles.tradeCardTokenName}>
+                    {fallbackOutName}
+                  </Text>
+                  <Text style={styles.tradeCardTokenPrice}>
+                    {tradeData.outputUsdValue ?? ''}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.tradeCardRightSide}>
+                <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
+                  {tradeData.outputQuantity} {tradeData.outputSymbol}
+                </Text>
+                <Text style={styles.tradeCardUsdPrice}>
+                  {tradeData.outputUsdValue ?? ''}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Optional CTA button */}
+          {onTrade && (
+            <TouchableOpacity
+              style={{
+                marginTop: 10,
+                backgroundColor: '#1d9bf0',
+                padding: 10,
+                borderRadius: 5,
+                alignItems: 'center',
+              }}
+              onPress={onTrade}>
+              <Text style={{color: '#fff', fontWeight: 'bold'}}>Trade Now</Text>
+            </TouchableOpacity>
+          )}
+        </>
+      )}
     </View>
   );
 }
+
+// Memo comparison to skip unnecessary re-renders
+function arePropsEqual(prev: TradeCardProps, next: TradeCardProps) {
+  if (prev.showGraphForOutputToken !== next.showGraphForOutputToken)
+    return false;
+  if (prev.externalRefreshTrigger !== next.externalRefreshTrigger) return false;
+
+  const p = prev.tradeData;
+  const n = next.tradeData;
+  if (
+    p.inputMint !== n.inputMint ||
+    p.outputMint !== n.outputMint ||
+    p.inputQuantity !== n.inputQuantity ||
+    p.outputQuantity !== n.outputQuantity ||
+    p.inputSymbol !== n.inputSymbol ||
+    p.outputSymbol !== n.outputSymbol ||
+    p.inputUsdValue !== n.inputUsdValue ||
+    p.outputUsdValue !== n.outputUsdValue ||
+    p.aggregator !== n.aggregator ||
+    p.inputAmountLamports !== n.inputAmountLamports ||
+    p.outputAmountLamports !== n.outputAmountLamports
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export default React.memo(TradeCard, arePropsEqual);

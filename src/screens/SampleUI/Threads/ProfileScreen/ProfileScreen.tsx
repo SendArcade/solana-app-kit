@@ -10,6 +10,7 @@ export default function ProfileScreen() {
   const userWallet = useAppSelector(state => state.auth.address);
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
   const storedUsername = useAppSelector(state => state.auth.username);
+  const attachmentData = useAppSelector(state => state.auth.attachmentData || {});
 
   // Get all posts from Redux
   const allPosts = useAppSelector(state => state.thread.allPosts);
@@ -31,8 +32,10 @@ export default function ProfileScreen() {
     address: userWallet || '',
     profilePicUrl: storedProfilePic || '',
     username: storedUsername || 'Unknown User',
+    attachmentData,
   };
-
+  console.log('user', user);
+  console.log('attachmentData from Redux:', attachmentData);
   return (
     <View style={{flex: 1}}>
       <Profile

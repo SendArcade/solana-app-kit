@@ -1,5 +1,11 @@
 export function fixImageUrl(url: string): string {
   if (!url) return '';
+
+  // Handle Helius CDN URLs with double slashes
+  if (url.includes('cdn.helius-rpc.com') && url.includes('//https://')) {
+    return url.replace('//https://', '/https://');
+  }
+
   if (url.startsWith('ipfs://')) {
     return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
   }

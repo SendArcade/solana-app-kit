@@ -1,3 +1,4 @@
+// FILE: src/components/thread/post/PostBody.tsx
 import React from 'react';
 import {View} from 'react-native';
 import {createThreadStyles, getMergedTheme} from '../thread.styles';
@@ -20,64 +21,22 @@ interface PostBodyProps {
   themeOverrides?: Partial<Record<string, any>>;
   /** Style overrides for specific components */
   styleOverrides?: {[key: string]: object};
-}
-
-/**
- * A component that renders the body content of a post in a thread
- * 
- * @component
- * @description
- * PostBody handles the rendering of different types of content sections in a post,
- * including text, images, videos, polls, trades, and NFT listings. It supports
- * multiple sections per post and delegates rendering to specialized section components.
- * 
- * Features:
- * - Multiple content section support
- * - Section type-specific rendering
- * - Customizable styling
- * - Responsive layout
- * 
- * Supported Section Types:
- * - TEXT_ONLY: Plain text content
- * - TEXT_IMAGE: Text with an image
- * - TEXT_VIDEO: Text with a video
- * - TEXT_TRADE: Trade information
- * - POLL: Poll data
- * - NFT_LISTING: NFT listing details
- * 
- * @example
- * ```tsx
- * <PostBody
- *   post={postData}
- *   themeOverrides={{ '--primary-color': '#1D9BF0' }}
- * />
- * ```
- */
-export default function PostBody({
-  post,
-  themeOverrides,
-  styleOverrides,
-}: PostBodyProps) {
-  const mergedTheme = getMergedTheme(themeOverrides);
-  const styles = createThreadStyles(mergedTheme, styleOverrides);
-
-  return (
-    <View style={{marginTop: 8, padding: 0}}>
-      {post.sections.map(section => (
-        <View key={section.id} style={styles.extraContentContainer}>
-          <View style={{width: '84%'}}>{renderSection(section)}</View>
-        </View>
-      ))}
-    </View>
-  );
+  /**
+   * A numeric value used to refresh the trade chart in SectionTrade,
+   * if it’s included in the post's sections.
+   */
+  externalRefreshTrigger?: number;
 }
 
 /**
  * Renders a single post section by delegating to the appropriate section component
- * @param {ThreadPost['sections'][number]} section - The section to render
- * @returns {JSX.Element | null} The rendered section component or null if type is unsupported
  */
-function renderSection(section: ThreadPost['sections'][number]) {
+function renderSection(
+  section: ThreadPost['sections'][number],
+  user: ThreadPost['user'],
+  createdAt: string,
+  externalRefreshTrigger?: number,
+) {
   switch (section.type) {
     case 'TEXT_ONLY':
       return <SectionTextOnly text={section.text} />;
@@ -93,7 +52,15 @@ function renderSection(section: ThreadPost['sections'][number]) {
       );
 
     case 'TEXT_TRADE':
-      return <SectionTrade text={section.text} tradeData={section.tradeData} />;
+      return (
+        <SectionTrade
+          text={section.text}
+          tradeData={section.tradeData}
+          user={user}
+          createdAt={createdAt}
+          externalRefreshTrigger={externalRefreshTrigger}
+        />
+      );
 
     case 'POLL':
       return <SectionPoll pollData={section.pollData} />;
@@ -105,3 +72,60 @@ function renderSection(section: ThreadPost['sections'][number]) {
       return null;
   }
 }
+
+function PostBody({
+  post,
+  themeOverrides,
+  styleOverrides,
+  externalRefreshTrigger,
+}: PostBodyProps) {
+  const mergedTheme = getMergedTheme(themeOverrides);
+  const styles = createThreadStyles(mergedTheme, styleOverrides);
+  const {user, createdAt} = post;
+
+  return (
+    <View style={{marginTop: 8, padding: 0}}>
+      {post.sections.map(section => (
+        <View key={section.id} style={styles.extraContentContainer}>
+          <View style={{width: '84%'}}>
+            {renderSection(section, user, createdAt, externalRefreshTrigger)}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Memo comparison to skip re-renders unless `post` or style props actually change.
+ */
+function arePropsEqual(prev: PostBodyProps, next: PostBodyProps): boolean {
+  // Compare post IDs
+  if (prev.post.id !== next.post.id) return false;
+
+  // Compare number of sections
+  const prevSections = prev.post.sections || [];
+  const nextSections = next.post.sections || [];
+  if (prevSections.length !== nextSections.length) return false;
+
+  // Compare each section by id & type
+  for (let i = 0; i < prevSections.length; i++) {
+    if (
+      prevSections[i].id !== nextSections[i].id ||
+      prevSections[i].type !== nextSections[i].type
+    ) {
+      return false;
+    }
+  }
+
+  // Compare theme/style references
+  if (prev.themeOverrides !== next.themeOverrides) return false;
+  if (prev.styleOverrides !== next.styleOverrides) return false;
+
+  // Compare externalRefreshTrigger
+  if (prev.externalRefreshTrigger !== next.externalRefreshTrigger) return false;
+
+  return true;
+}
+
+export default React.memo(PostBody, arePropsEqual);

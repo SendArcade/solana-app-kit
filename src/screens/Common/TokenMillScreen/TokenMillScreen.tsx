@@ -16,18 +16,22 @@ import StakingCard from '../../../components/tokenMill/StakingCard';
 import VestingCard from '../../../components/tokenMill/VestingCard';
 import { ENDPOINTS } from '../../../config/constants';
 import { CLUSTER } from '@env';
+import { useAppSelector } from '../../../hooks/useReduxHooks';
 
 export default function TokenMillScreen() {
   // 1) Auth & Connection
-  const {solanaWallet} = useAuth();
-  if (!solanaWallet?.wallets?.length) {
+  const {solanaWallet} : any = useAuth();
+  const myWallet = useAppSelector(state => state.auth.address);
+  
+
+  if (!solanaWallet?.wallets?.length && !myWallet) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <Text style={styles.errorText}>Wallet not connected</Text>
       </SafeAreaView>
     );
   }
-  const publicKey = solanaWallet.wallets[0].publicKey;
+  const publicKey = myWallet || solanaWallet.wallets[0].publicKey ;
   const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
   const connection = new Connection(rpcUrl, 'confirmed');
 

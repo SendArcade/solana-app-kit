@@ -7,6 +7,12 @@ export default StyleSheet.create({
     backgroundColor: '#F9F9F9',
     borderRadius: 8,
   },
+  collectionDescription: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    marginBottom: 4,
+  },
   card: {
     flexDirection: 'column',
     backgroundColor: '#FFFFFF',

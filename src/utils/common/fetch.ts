@@ -2,6 +2,8 @@
 
 import {CLUSTER, HELIUS_API_KEY} from '@env';
 
+
+
 export async function fetchWithRetries(
   url: string,
   options: RequestInit = {},
@@ -106,7 +108,6 @@ export async function fetchTokenAccounts(
       return [];
     }
 
-    // data.result.value is an array of { account, pubkey }
     const rawAccounts = data.result.value;
     const tokenEntries: TokenEntry[] = [];
 

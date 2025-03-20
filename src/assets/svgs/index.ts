@@ -41,6 +41,10 @@ import BookmarkActive from './bookmark-active.svg'
 import SendIdle from './send-idle.svg';
 import CryptoIcon from './crypto-icon.svg';
 import MagnifyingGlass from './magnifying-glass.svg';
+import tensor from './Vector.svg';
+import listedNft from './Vector (1).svg';
+import cross from "./Close.svg"
+import arrowRIght from "./Back.svg"
 
 export default {
   SolanaDot,
@@ -86,4 +90,8 @@ export default {
   SendIdle,
   CryptoIcon,
   MagnifyingGlass,
+  tensor,
+  listedNft,
+  cross,
+  arrowRIght
 };

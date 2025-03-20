@@ -27,15 +27,55 @@ allprojects {
     repositories {
         maven {
             // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
-            url(new File(['node', '--print', "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim(), '../android'))
+            url(new File(['node', '--print', "require.resolve('react-native/package.json')"]
+              .execute(null, rootDir).text.trim(), '../android'))
         }
         maven {
             // Android JSC is installed from npm
-            url(new File(['node', '--print', "require.resolve('jsc-android/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim(), '../dist'))
+            url(new File(['node', '--print', "require.resolve('jsc-android/package.json', { paths: [require.resolve('react-native/package.json')] })"]
+              .execute(null, rootDir).text.trim(), '../dist'))
         }
 
         google()
         mavenCentral()
         maven { url 'https://www.jitpack.io' }
+    }
+}
+
+/**
+ * This block ensures that *all* subprojects – including libraries like react-native-passkeys –
+ * compile Java and Kotlin to the same JVM target (17), without using afterEvaluate.
+ */
+subprojects {
+    // 1) If it's an Android application project
+    plugins.withId("com.android.application") {
+        def androidExt = extensions.findByType(com.android.build.gradle.AppExtension)
+        if (androidExt != null) {
+            androidExt.compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
+            }
+        }
+        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
+    }
+
+    // 2) If it's an Android library project
+    plugins.withId("com.android.library") {
+        def androidExt = extensions.findByType(com.android.build.gradle.LibraryExtension)
+        if (androidExt != null) {
+            androidExt.compileOptions {
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
+            }
+        }
+        tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
     }
 }

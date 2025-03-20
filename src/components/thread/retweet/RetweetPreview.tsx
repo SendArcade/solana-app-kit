@@ -1,4 +1,4 @@
-// FILE: src/components/thread/RetweetPreview.tsx
+// FILE: src/components/thread/retweet/RetweetPreview.tsx
 
 import React, { useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
