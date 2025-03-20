@@ -1,6 +1,6 @@
 ---
 title: "Function: usePrivyWalletLogic()"
-description: "> **usePrivyWalletLogic**(): `object`"
+description: "Hook for integrating with Privy's embedded Solana wallet"
 ---
 
 [**solana-social-kit**](../../../../README.mdx)
@@ -11,108 +11,109 @@ description: "> **usePrivyWalletLogic**(): `object`"
 
 # Function: usePrivyWalletLogic()
 
-> **usePrivyWalletLogic**(): `object`
+> **usePrivyWalletLogic**(): { user: null | PrivyUser; isReady: boolean; solanaWallet: EmbeddedSolanaWalletState; handlePrivyLogin: (options: LoginOptions) => Promise<void>; handlePrivyLogout: (setStatusMessage?: (msg: string) => void) => Promise<void>; monitorSolanaWallet: (options: MonitorOptions) => Promise<void>; handleWalletRecovery: (options: RecoveryOptions) => Promise<void> }
 
-Defined in: [src/services/walletProviders/privy.ts:13](https://github.com/SendArcade/solana-app-kit/blob/bd4b3556b8f469c27ebb06f4df65b3a36b43ba3b/src/services/walletProviders/privy.ts#L13)
+Defined in: [src/services/walletProviders/privy.ts:13](https://github.com/SendArcade/solana-app-kit/blob/main/src/services/walletProviders/privy.ts#L13)
+
+A hook that provides a complete wallet logic implementation using Privy's embedded wallets.
+This includes user authentication, embedded wallet creation/recovery, and connection monitoring.
 
 ## Returns
 
-`object`
+An object containing:
 
-### handlePrivyLogin()
+### User Data
 
-> **handlePrivyLogin**: (`__namedParameters`) => `Promise`\<`void`\>
+| Property | Type | Description |
+| :------ | :------ | :------ |
+| `user` | `null \| PrivyUser` | Current authenticated user (or null if not logged in) |
+| `isReady` | `boolean` | Whether the Privy SDK is initialized and ready |
+| `solanaWallet` | `EmbeddedSolanaWalletState` | State of the embedded Solana wallet |
 
-#### Parameters
+### Authentication Methods
 
-##### \_\_namedParameters
+#### handlePrivyLogin()
 
-###### loginMethod?
+> **handlePrivyLogin**(`options: LoginOptions`): `Promise<void>`
 
-`"email"` \| `"sms"` \| `"google"` \| `"apple"` = `'email'`
+Initiates the Privy login flow with the specified login method.
 
-###### setStatusMessage?
+##### Parameters
 
-(`msg`) => `void`
+| Parameter | Type | Description |
+| :------ | :------ | :------ |
+| `options` | `Object` | Login configuration |
+| `options.loginMethod` | `'email' \| 'sms' \| 'apple' \| 'google'` | Authentication method to use (defaults to 'email') |
+| `options.setStatusMessage?` | `(msg: string) => void` | Optional callback for status updates |
 
-#### Returns
+#### handlePrivyLogout()
 
-`Promise`\<`void`\>
+> **handlePrivyLogout**(`setStatusMessage?: (msg: string) => void`): `Promise<void>`
 
-### handlePrivyLogout()
+Logs out the current user from Privy.
 
-> **handlePrivyLogout**: (`setStatusMessage`?) => `Promise`\<`void`\>
+##### Parameters
 
-#### Parameters
+| Parameter | Type | Description |
+| :------ | :------ | :------ |
+| `setStatusMessage?` | `(msg: string) => void` | Optional callback for status updates |
 
-##### setStatusMessage?
+### Wallet Management Methods
 
-(`msg`) => `void`
+#### monitorSolanaWallet()
 
-#### Returns
+> **monitorSolanaWallet**(`options: MonitorOptions`): `Promise<void>`
 
-`Promise`\<`void`\>
+Monitors the state of the embedded Solana wallet, handling initial setup.
 
-### handleWalletRecovery()
+##### Parameters
 
-> **handleWalletRecovery**: (`__namedParameters`) => `Promise`\<`void`\>
+| Parameter | Type | Description |
+| :------ | :------ | :------ |
+| `options` | `Object` | Monitor options |
+| `options.selectedProvider` | `string` | The selected wallet provider (e.g. 'privy') |
+| `options.setStatusMessage?` | `(msg: string) => void` | Optional callback for status updates |
+| `options.onWalletConnected?` | `(info: {provider: 'privy', address: string}) => void` | Callback when wallet connects |
 
-#### Parameters
+#### handleWalletRecovery()
 
-##### \_\_namedParameters
+> **handleWalletRecovery**(`options: RecoveryOptions`): `Promise<void>`
 
-###### onWalletRecovered?
+Initiates wallet recovery using the specified method.
 
-(`info`) => `void`
+##### Parameters
 
-###### password
+| Parameter | Type | Description |
+| :------ | :------ | :------ |
+| `options` | `Object` | Recovery options |
+| `options.recoveryMethod` | `'user-passcode' \| 'google-drive' \| 'icloud'` | Recovery method to use |
+| `options.password` | `string` | Recovery password |
+| `options.setStatusMessage?` | `(msg: string) => void` | Optional callback for status updates |
+| `options.onWalletRecovered?` | `(info: {provider: 'privy', address: string}) => void` | Callback when wallet is recovered |
 
-`string`
+## Example
 
-###### recoveryMethod
+```typescript
+const { 
+  user, 
+  isReady, 
+  solanaWallet, 
+  handlePrivyLogin, 
+  monitorSolanaWallet 
+} = usePrivyWalletLogic();
 
-`"user-passcode"` \| `"google-drive"` \| `"icloud"`
+// Login with email
+await handlePrivyLogin({ 
+  loginMethod: 'email', 
+  setStatusMessage: (msg) => setStatus(msg) 
+});
 
-###### setStatusMessage?
-
-(`msg`) => `void`
-
-#### Returns
-
-`Promise`\<`void`\>
-
-### isReady
-
-> **isReady**: `boolean`
-
-### monitorSolanaWallet()
-
-> **monitorSolanaWallet**: (`__namedParameters`) => `Promise`\<`void`\>
-
-#### Parameters
-
-##### \_\_namedParameters
-
-###### onWalletConnected?
-
-(`info`) => `void`
-
-###### selectedProvider
-
-`string`
-
-###### setStatusMessage?
-
-(`msg`) => `void`
-
-#### Returns
-
-`Promise`\<`void`\>
-
-### solanaWallet
-
-> **solanaWallet**: `EmbeddedSolanaWalletState`
-
-### user
-
-> **user**: `null` \| `PrivyUser`
+// Monitor wallet after login
+await monitorSolanaWallet({
+  selectedProvider: 'privy',
+  setStatusMessage: (msg) => setStatus(msg),
+  onWalletConnected: (info) => {
+    dispatch(setAddress(info.address));
+  }
+});
+```

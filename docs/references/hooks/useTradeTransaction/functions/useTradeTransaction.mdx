@@ -1,6 +1,6 @@
 ---
 title: "Function: useTradeTransaction()"
-description: "> **useTradeTransaction**(): `object`"
+description: "Hook to handle Solana trade transactions for both Privy & MWA wallets"
 ---
 
 [**solana-social-kit**](../../../README.mdx)
@@ -11,88 +11,58 @@ description: "> **useTradeTransaction**(): `object`"
 
 # Function: useTradeTransaction()
 
-> **useTradeTransaction**(): `object`
+> **useTradeTransaction**(): { sendTrade: (mode: 'priority' | 'jito', recipient: string, amountSol: number) => Promise<void>; replicateJupiterTrade: (tradeData: TradeData, mode: 'priority' | 'jito') => Promise<void> }
 
-Defined in: [src/hooks/useTradeTransaction.ts:23](https://github.com/SendArcade/solana-app-kit/blob/bd4b3556b8f469c27ebb06f4df65b3a36b43ba3b/src/hooks/useTradeTransaction.ts#L23)
+Defined in: [src/hooks/useTradeTransaction.ts:33](https://github.com/SendArcade/solana-app-kit/blob/main/src/hooks/useTradeTransaction.ts#L33)
+
+Hook to handle trade transactions for both Privy & Mobile Wallet Adapter (MWA). Provides functions to:
+1. Send direct SOL transfers with priority or Jito bundle transactions
+2. Replicate Jupiter swap trades with provided trade data
 
 ## Returns
 
-`object`
-
-### replicateJupiterTrade()
-
-> **replicateJupiterTrade**: (`tradeData`, `mode`) => `Promise`\<`void`\>
-
-#### Parameters
-
-##### tradeData
-
-###### aggregator?
-
-`string`
-
-###### inputAmountLamports?
-
-`string`
-
-###### inputMint?
-
-`string`
-
-###### outputAmountLamports?
-
-`string`
-
-###### outputMint?
-
-`string`
-
-###### token1Avatar?
-
-`any`
-
-###### token1Name?
-
-`string`
-
-###### token1PriceUsd?
-
-`string`
-
-###### token2Avatar?
-
-`any`
-
-###### token2Name?
-
-`string`
-
-###### token2PriceSol?
-
-`string`
-
-###### token2PriceUsd?
-
-`string`
-
-##### mode
-
-`"jito"` | `"priority"`
-
-#### Returns
-
-`Promise`\<`void`\>
+Object with the following methods:
 
 ### sendTrade()
 
-> **sendTrade**: (`mode`) => `Promise`\<`void`\>
+> **sendTrade**: (mode: 'priority' | 'jito', recipient: string, amountSol: number) => Promise<void>
+
+Sends a SOL transfer transaction using either priority fee or Jito bundle transaction.
 
 #### Parameters
 
-##### mode
+| Parameter | Type | Description |
+| :------ | :------ | :------ |
+| `mode` | `'priority'` \| `'jito'` | Transaction mode (priority fee or Jito bundle) |
+| `recipient` | `string` | Recipient wallet address |
+| `amountSol` | `number` | Amount of SOL to send |
 
-`"jito"` | `"priority"`
+### replicateJupiterTrade()
 
-#### Returns
+> **replicateJupiterTrade**: (tradeData: TradeData, mode: 'priority' | 'jito') => Promise<void>
 
-`Promise`\<`void`\>
+Replicates a Jupiter swap with the given trade data.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| :------ | :------ | :------ |
+| `tradeData` | `TradeData` | Object containing trade parameters |
+| `mode` | `'priority'` \| `'jito'` | Transaction mode (priority fee or Jito bundle) |
+
+##### TradeData Properties
+
+| Property | Type | Description |
+| :------ | :------ | :------ |
+| `inputMint?` | `string` | Input token mint address |
+| `outputMint?` | `string` | Output token mint address |
+| `inputAmountLamports?` | `string` | Input amount in lamports |
+| `outputAmountLamports?` | `string` | Output amount in lamports |
+| `token1Avatar?` | `any` | Input token avatar |
+| `token1Name?` | `string` | Input token name |
+| `token1PriceUsd?` | `string` | Input token price in USD |
+| `token2Avatar?` | `any` | Output token avatar |
+| `token2Name?` | `string` | Output token name |
+| `token2PriceUsd?` | `string` | Output token price in USD |
+| `token2PriceSol?` | `string` | Output token price in SOL |
+| `aggregator?` | `string` | Aggregator used for the swap |
