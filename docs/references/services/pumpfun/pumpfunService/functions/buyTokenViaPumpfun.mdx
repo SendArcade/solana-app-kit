@@ -1,6 +1,6 @@
 ---
 title: "Function: buyTokenViaPumpfun()"
-description: "> **buyTokenViaPumpfun**(`__namedParameters`): `Promise`\<\{ `success`: `boolean`; `txId`: `string`; \}\>"
+description: "Purchase tokens via Pump.fun or Raydium based on token availability"
 ---
 
 [**solana-social-kit**](../../../../README.mdx)
@@ -11,32 +11,37 @@ description: "> **buyTokenViaPumpfun**(`__namedParameters`): `Promise`\<\{ `succ
 
 # Function: buyTokenViaPumpfun()
 
-> **buyTokenViaPumpfun**(`__namedParameters`): `Promise`\<\{ `success`: `boolean`; `txId`: `string`; \}\>
+> **buyTokenViaPumpfun**(`params`): `Promise`<{ `success`: `boolean`; `txId`: `string` }>
 
-Defined in: [src/services/pumpfun/pumpfunService.ts:181](https://github.com/SendArcade/solana-app-kit/blob/bd4b3556b8f469c27ebb06f4df65b3a36b43ba3b/src/services/pumpfun/pumpfunService.ts#L181)
+Defined in: [src/services/pumpfun/pumpfunService.ts:181](https://github.com/SendArcade/solana-app-kit/blob/main/src/services/pumpfun/pumpfunService.ts#L181)
 
-BUY via Pumpfun or Raydium
+Buys tokens using either Pump.fun or Raydium DEX automatically.
+This function first checks if the token is available on Raydium, and if so, uses Raydium's swap API.
+Otherwise, it falls back to using Pump.fun's bonding curve.
 
 ## Parameters
 
-### \_\_namedParameters
-
-#### buyerPublicKey
-
-`string`
-
-#### solAmount
-
-`number`
-
-#### solanaWallet
-
-`any`
-
-#### tokenAddress
-
-`string`
+| Parameter | Type | Description |
+| :------ | :------ | :------ |
+| `params` | `Object` | Parameters for token purchase |
+| `params.buyerPublicKey` | `string` | Public key of the buyer wallet |
+| `params.tokenAddress` | `string` | Mint address of the token to buy |
+| `params.solAmount` | `number` | Amount of SOL to spend |
+| `params.solanaWallet` | `any` | Privy wallet instance for signing transactions |
 
 ## Returns
 
-`Promise`\<\{ `success`: `boolean`; `txId`: `string`; \}\>
+| Type | Description |
+| :------ | :------ |
+| `Promise`<{ `success`: `boolean`; `txId`: `string` }> | Transaction result with signature |
+
+## Example
+
+```typescript
+const { txId, success } = await buyTokenViaPumpfun({
+  buyerPublicKey: wallet.publicKey,
+  tokenAddress: "5tMi5XcfuLBzxjPZ5RzPUgbcbGNnUQnBkRoqP9DP5gGF",
+  solAmount: 0.1,
+  solanaWallet: wallet
+});
+```
