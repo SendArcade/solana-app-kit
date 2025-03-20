@@ -11,7 +11,7 @@ description: "Fetch market data for a specific coin from CoinGecko API"
 
 # Function: getCoinMarkets()
 
-> **getCoinMarkets**(`coinId`: string): `Promise`<any>
+> **getCoinMarkets**(`coinId`: string): `Promise<any>`
 
 Defined in: [src/services/coingeckoService.ts:41](https://github.com/SendArcade/solana-app-kit/blob/main/src/services/coingeckoService.ts#L41)
 
@@ -32,7 +32,7 @@ cryptocurrency is needed.
 
 | Type | Description |
 | :------ | :------ |
-| `Promise`<any> | Object containing market data for the requested coin |
+| `Promise<any>` | Object containing market data for the requested coin |
 
 ### Return Object Properties
 
@@ -67,4 +67,4 @@ async function fetchSolanaMarketData() {
     console.error('Failed to fetch Solana market data:', error);
   }
 }
-``` 
+```

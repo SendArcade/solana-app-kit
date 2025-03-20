@@ -11,7 +11,7 @@ description: "Sell tokens via Pump.fun or Raydium based on token availability"
 
 # Function: sellTokenViaPumpfun()
 
-> **sellTokenViaPumpfun**(`params`): `Promise`<{ `success`: `boolean`; `txId`: `string` }>
+> **sellTokenViaPumpfun**(`params`): `Promise<{ success: boolean; txId: string }>`
 
 Defined in: [src/services/pumpfun/pumpfunService.ts:264](https://github.com/SendArcade/solana-app-kit/blob/main/src/services/pumpfun/pumpfunService.ts#L264)
 
@@ -20,7 +20,7 @@ This function first checks if the token is available on Raydium, and if so, uses
 Otherwise, it falls back to using Pump.fun's bonding curve for the sale.
 
 ## Parameters
-
+```
 | Parameter | Type | Description |
 | :------ | :------ | :------ |
 | `params` | `Object` | Parameters for token sale |
@@ -28,13 +28,13 @@ Otherwise, it falls back to using Pump.fun's bonding curve for the sale.
 | `params.tokenAddress` | `string` | Mint address of the token to sell |
 | `params.tokenAmount` | `number` | Amount of tokens to sell |
 | `params.solanaWallet` | `any` | Privy wallet instance for signing transactions |
-
+```
 ## Returns
-
+```
 | Type | Description |
 | :------ | :------ |
-| `Promise`<{ `success`: `boolean`; `txId`: `string` }> | Transaction result with signature |
-
+| `Promise<{ success: boolean; txId: string }>` | Transaction result with signature |
+```
 ## Example
 
 ```typescript

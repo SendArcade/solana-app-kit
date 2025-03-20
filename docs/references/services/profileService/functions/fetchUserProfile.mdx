@@ -11,7 +11,7 @@ description: "Fetch a user's complete profile information"
 
 # Function: fetchUserProfile()
 
-> **fetchUserProfile**(`userId`: string): `Promise`<{ url: string; username: string; attachmentData: any }>
+> **fetchUserProfile**(`userId`: string): `Promise<{ url: string; username: string; attachmentData: any }>`
 
 Defined in: [src/services/profileService.ts:114](https://github.com/SendArcade/solana-app-kit/blob/main/src/services/profileService.ts#L114)
 
@@ -19,16 +19,16 @@ Retrieves a user's complete profile information from the server. This function f
 including profile image URL, username, and any additional attachment data associated with the user.
 
 ## Parameters
-
+```
 | Parameter | Type | Description |
 | :------ | :------ | :------ |
 | `userId` | `string` | The user's wallet address or unique ID |
-
+```
 ## Returns
 
 | Type | Description |
 | :------ | :------ |
-| `Promise`<{ url: string; username: string; attachmentData: any }> | Object containing the user's profile information |
+| `Promise<{ url: string; username: string; attachmentData: any }>` | Object containing the user's profile information |
 
 ### Return Object Properties
 
@@ -67,4 +67,4 @@ async function loadAndDisplayUserProfile(walletAddress: string) {
     // Handle the error or show a default profile
   }
 }
-``` 
+```
