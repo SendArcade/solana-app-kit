@@ -7,7 +7,7 @@ import process from 'process';
 global.process = process;
 
 import 'react-native-gesture-handler';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Provider as ReduxProvider } from 'react-redux';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -25,23 +25,35 @@ import { DefaultCustomizationConfig } from './src/config';
 
 export default function App() {
   const config = DefaultCustomizationConfig;
+  const [dynamicInitialized, setDynamicInitialized] = useState(false);
 
   useEffect(() => {
     if (config.auth.provider === 'dynamic') {
-      initDynamicClient(
-        config.auth.dynamic.environmentId,
-        config.auth.dynamic.appName,
-        config.auth.dynamic.appLogoUrl
-      );
+      try {
+        initDynamicClient(
+          config.auth.dynamic.environmentId,
+          config.auth.dynamic.appName,
+          config.auth.dynamic.appLogoUrl
+        );
+        setDynamicInitialized(true);
+      } catch (error) {
+        console.error("Failed to initialize Dynamic client:", error);
+      }
     }
   }, [config.auth.provider]);
 
-  let dynamicClient: any;
-  try {
-    dynamicClient = getDynamicClient();
-  } catch {
-    dynamicClient = null;
-  }
+  // Get Dynamic client after initialization is complete
+  const getDynamicWebView = () => {
+    if (!dynamicInitialized) return null;
+    
+    try {
+      const client = getDynamicClient();
+      return client?.reactNative?.WebView ? <client.reactNative.WebView /> : null;
+    } catch (error) {
+      console.error("Error getting Dynamic WebView:", error);
+      return null;
+    }
+  };
 
   return (
     <CustomizationProvider config={config}>
@@ -62,13 +74,13 @@ export default function App() {
               <NavigationContainer ref={navigationRef}>
                 <RootNavigator />
               </NavigationContainer>
-              {dynamicClient?.reactNative && <dynamicClient.reactNative.WebView />}
+              {getDynamicWebView()}
               <PrivyElements />
             </PrivyProvider>
           ) : (
             <NavigationContainer ref={navigationRef}>
               <RootNavigator />
-              {dynamicClient?.reactNative && <dynamicClient.reactNative.WebView />}
+              {getDynamicWebView()}
             </NavigationContainer>
           )}
         </ReduxProvider>

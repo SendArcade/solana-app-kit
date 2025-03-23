@@ -9,6 +9,7 @@ import {
   Connection,
 } from '@solana/web3.js';
 import type {TransactionInstruction} from '@solana/web3.js';
+import { CLUSTER } from '@env';
 
 export async function sendPriorityTransaction(
   provider: any,
@@ -114,7 +115,7 @@ export async function sendPriorityTransactionMWA(
       
       // Use the correct cluster format with 'solana:' prefix
       const authResult = await wallet.authorize({
-        cluster: 'devnet', // Changed from 'solana:devnet' to 'devnet'
+        cluster: CLUSTER, // Changed from 'solana:devnet' to 'devnet'
         identity: {
           name: 'React Native dApp',
           uri: 'https://yourdapp.com',
