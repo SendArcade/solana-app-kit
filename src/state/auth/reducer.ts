@@ -136,7 +136,7 @@ const authSlice = createSlice({
     loginSuccess(
       state,
       action: PayloadAction<{
-        provider: 'privy' | 'dynamic' | 'turnkey';
+        provider: 'privy' | 'dynamic' | 'turnkey' | 'mwa';
         address: string;
         profilePicUrl?: string;
         username?: string;

@@ -11,37 +11,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import {FontAwesome5} from '@expo/vector-icons';
-
-export interface Action {
-  signature?: string;
-  slot?: number | string;
-  transactionType?: string;
-  type?: string;
-  instructions?: any[];
-  description?: string;
-  fee?: number;
-  timestamp?: number;
-  feePayer?: string;
-  source?: string;
-  events?: any;
-  tokenTransfers?: Array<{
-    fromUserAccount: string;
-    toUserAccount: string;
-    tokenAmount: number;
-    mint: string;
-    symbol?: string;
-  }>;
-  nativeTransfers?: Array<{
-    fromUserAccount: string;
-    toUserAccount: string;
-    amount: number;
-  }>;
-  accountData?: Array<{
-    account: string;
-    nativeBalanceChange: number;
-    tokenBalanceChanges: any[];
-  }>;
-}
+import { Action } from '../../../services/profileActions';
 
 export interface ActionDetailModalProps {
   visible: boolean;
@@ -105,16 +75,14 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
 
   if (!action) return null;
 
-  // Determine the action label.
-  let actionType = action.transactionType || action.type || 'Transaction';
-  if (action.description) {
-    if (action.description.includes('transferred')) {
-      actionType = 'Transfer';
-    } else if (action.description.includes('swap')) {
-      actionType = 'Swap';
-    }
-  }
-
+  // Determine the action label using enriched type if available
+  let actionType = action.enrichedType || action.transactionType || action.type || 'Transaction';
+  
+  // Prettier action type name for display
+  if (actionType === 'SWAP') actionType = 'Swap';
+  if (actionType === 'TRANSFER') actionType = 'Transfer';
+  if (actionType === 'TOKEN_TRANSFER') actionType = 'Token Transfer';
+  
   const accentColor = getActionColor(actionType);
   const signature = action.signature || '';
   const truncatedSignature = truncateAddress(signature);
@@ -122,80 +90,118 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   const date = action.timestamp ? formatDate(action.timestamp) : '—';
   const solscanURL = `https://solscan.io/tx/${signature}`;
 
-  // Get from/to information for transfers
+  // Get transaction details - prefer enriched data if available
   let fromAddress = '';
   let toAddress = '';
   let amount = '';
   let symbol = 'SOL';
   let direction = 'neutral';
-
-  // Get transaction details
-  if (action.nativeTransfers && action.nativeTransfers.length > 0) {
-    const transfer = action.nativeTransfers[0];
-    fromAddress = truncateAddress(transfer.fromUserAccount);
-    toAddress = truncateAddress(transfer.toUserAccount);
-    amount = formatSolAmount(transfer.amount);
-    symbol = 'SOL';
-    
-    if (walletAddress) {
-      if (transfer.fromUserAccount === walletAddress) {
-        direction = 'out';
-      } else if (transfer.toUserAccount === walletAddress) {
-        direction = 'in';
-      }
-    }
-  } else if (action.tokenTransfers && action.tokenTransfers.length > 0) {
-    const transfer = action.tokenTransfers[0];
-    fromAddress = truncateAddress(transfer.fromUserAccount);
-    toAddress = truncateAddress(transfer.toUserAccount);
-    amount = transfer.tokenAmount.toString();
-    symbol = transfer.symbol || truncateAddress(transfer.mint);
-    
-    if (walletAddress) {
-      if (transfer.fromUserAccount === walletAddress) {
-        direction = 'out';
-      } else if (transfer.toUserAccount === walletAddress) {
-        direction = 'in';
-      }
-    }
-  }
-
-  // For swaps, get input and output details
   let swapDetails = null;
-  if (action.events?.swap) {
-    const swap = action.events.swap;
-    let inputAmount = '';
-    let inputSymbol = '';
-    let outputAmount = '';
-    let outputSymbol = '';
-    
-    if (swap.nativeInput) {
-      inputAmount = formatSolAmount(parseInt(swap.nativeInput.amount, 10));
-      inputSymbol = 'SOL';
-    } else if (swap.tokenInputs && swap.tokenInputs.length > 0) {
-      const input = swap.tokenInputs[0];
-      const decimals = parseInt(input.rawTokenAmount.decimals, 10);
-      inputAmount = (parseFloat(input.rawTokenAmount.tokenAmount) / Math.pow(10, decimals)).toFixed(4);
-      inputSymbol = truncateAddress(input.mint);
-    }
-    
-    if (swap.nativeOutput) {
-      outputAmount = formatSolAmount(parseInt(swap.nativeOutput.amount, 10));
-      outputSymbol = 'SOL';
-    } else if (swap.tokenOutputs && swap.tokenOutputs.length > 0) {
-      const output = swap.tokenOutputs[0];
-      const decimals = parseInt(output.rawTokenAmount.decimals, 10);
-      outputAmount = (parseFloat(output.rawTokenAmount.tokenAmount) / Math.pow(10, decimals)).toFixed(4);
-      outputSymbol = truncateAddress(output.mint);
-    }
-    
-    if (inputAmount && outputAmount) {
+
+  if (action.enrichedData) {
+    // Get details from enriched data
+    if (action.enrichedType === 'SWAP') {
+      const { swapType, inputSymbol, outputSymbol, inputAmount, outputAmount, direction: enrichedDirection } = action.enrichedData;
+      
       swapDetails = {
-        inputAmount,
-        inputSymbol,
-        outputAmount,
-        outputSymbol,
+        inputAmount: inputAmount?.toFixed(4) || '?',
+        inputSymbol: inputSymbol || '?',
+        outputAmount: outputAmount?.toFixed(4) || '?',
+        outputSymbol: outputSymbol || '?',
+        direction: enrichedDirection || 'neutral'
       };
+      
+      direction = enrichedDirection || 'neutral';
+    } 
+    else if (action.enrichedType === 'TRANSFER' || action.enrichedType === 'TOKEN_TRANSFER') {
+      const { transferType, amount: txAmount, tokenSymbol, counterparty, direction: enrichedDirection } = action.enrichedData;
+      
+      // For display in the transaction detail view
+      amount = txAmount ? 
+        (transferType === 'SOL' ? txAmount.toFixed(4) : txAmount.toString()) : 
+        '?';
+      symbol = transferType === 'SOL' ? 'SOL' : (tokenSymbol || 'tokens');
+      direction = enrichedDirection || 'neutral';
+      
+      // Set from/to based on direction
+      if (enrichedDirection === 'OUT' && walletAddress) {
+        fromAddress = truncateAddress(walletAddress);
+        toAddress = counterparty || '?';
+      } else if (enrichedDirection === 'IN' && walletAddress) {
+        toAddress = truncateAddress(walletAddress);
+        fromAddress = counterparty || '?';
+      }
+    }
+  } 
+  // Fall back to original implementation for non-enriched data
+  else {
+    if (action.nativeTransfers && action.nativeTransfers.length > 0) {
+      const transfer = action.nativeTransfers[0];
+      fromAddress = truncateAddress(transfer.fromUserAccount);
+      toAddress = truncateAddress(transfer.toUserAccount);
+      amount = formatSolAmount(transfer.amount);
+      symbol = 'SOL';
+      
+      if (walletAddress) {
+        if (transfer.fromUserAccount === walletAddress) {
+          direction = 'out';
+        } else if (transfer.toUserAccount === walletAddress) {
+          direction = 'in';
+        }
+      }
+    } else if (action.tokenTransfers && action.tokenTransfers.length > 0) {
+      const transfer = action.tokenTransfers[0];
+      fromAddress = truncateAddress(transfer.fromUserAccount);
+      toAddress = truncateAddress(transfer.toUserAccount);
+      amount = transfer.tokenAmount.toString();
+      symbol = transfer.symbol || truncateAddress(transfer.mint);
+      
+      if (walletAddress) {
+        if (transfer.fromUserAccount === walletAddress) {
+          direction = 'out';
+        } else if (transfer.toUserAccount === walletAddress) {
+          direction = 'in';
+        }
+      }
+    }
+
+    // For swaps, get input and output details
+    if (action.events?.swap) {
+      const swap = action.events.swap;
+      let inputAmount = '';
+      let inputSymbol = '';
+      let outputAmount = '';
+      let outputSymbol = '';
+      
+      if (swap.nativeInput) {
+        inputAmount = formatSolAmount(parseInt(String(swap.nativeInput.amount), 10));
+        inputSymbol = 'SOL';
+      } else if (swap.tokenInputs && swap.tokenInputs.length > 0) {
+        const input = swap.tokenInputs[0];
+        const decimals = parseInt(String(input.rawTokenAmount.decimals), 10);
+        inputAmount = (parseFloat(input.rawTokenAmount.tokenAmount) / Math.pow(10, decimals)).toFixed(4);
+        inputSymbol = truncateAddress(input.mint);
+      }
+      
+      if (swap.nativeOutput) {
+        outputAmount = formatSolAmount(parseInt(String(swap.nativeOutput.amount), 10));
+        outputSymbol = 'SOL';
+      } else if (swap.tokenOutputs && swap.tokenOutputs.length > 0) {
+        const output = swap.tokenOutputs[0];
+        const decimals = parseInt(String(output.rawTokenAmount.decimals), 10);
+        outputAmount = (parseFloat(output.rawTokenAmount.tokenAmount) / Math.pow(10, decimals)).toFixed(4);
+        outputSymbol = truncateAddress(output.mint);
+      }
+      
+      if (inputAmount && outputAmount) {
+        swapDetails = {
+          inputAmount,
+          inputSymbol,
+          outputAmount,
+          outputSymbol,
+          direction: 'neutral'
+        };
+      }
     }
   }
 
@@ -212,6 +218,14 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
       console.error('Failed to open Solscan:', err),
     );
   };
+
+  // Format direction for display
+  const directionDisplay = direction === 'IN' || direction === 'in' ? 'Received' : 
+                          direction === 'OUT' || direction === 'out' ? 'Sent' : '';
+  
+  // Set color based on direction
+  const amountColor = direction === 'IN' || direction === 'in' ? '#14F195' : 
+                     direction === 'OUT' || direction === 'out' ? '#F43860' : '#333';
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -259,10 +273,15 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
               <View style={modalStyles.amountContainer}>
                 <Text style={[
                   modalStyles.amountText, 
-                  {color: direction === 'in' ? '#4caf50' : '#f44336'}
+                  {color: amountColor}
                 ]}>
-                  {direction === 'in' ? '+ ' : '- '}{amount} {symbol}
+                  {direction === 'IN' || direction === 'in' ? '+ ' : direction === 'OUT' || direction === 'out' ? '- ' : ''}{amount} {symbol}
                 </Text>
+                {directionDisplay && (
+                  <Text style={modalStyles.directionLabel}>
+                    {directionDisplay}
+                  </Text>
+                )}
               </View>
             )}
             
@@ -588,6 +607,11 @@ const modalStyles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     fontFamily: 'monospace',
+  },
+  directionLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
   },
 });
 

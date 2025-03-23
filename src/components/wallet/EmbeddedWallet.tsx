@@ -1,13 +1,15 @@
 // File: src/components/wallet/EmbeddedWallet.tsx
-import React, {useEffect} from 'react';
-import {View, Text, TouchableOpacity, Alert, Platform} from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity, Alert, Platform } from 'react-native';
 import Icons from '../../assets/svgs';
-import {useAuth} from '../../hooks/useAuth';
+import { useAuth } from '../../hooks/useAuth';
 import styles from '../../screens/Common/LoginScreen/LoginScreen.styles';
-import {useCustomization} from '../../CustomizationProvider';
-import {useAppNavigation} from '../../hooks/useAppNavigation';
+import { useCustomization } from '../../CustomizationProvider';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { useAppDispatch } from '../../hooks/useReduxHooks';
+import { loginSuccess } from '../../state/auth/reducer';
 
-import type {Web3MobileWallet} from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
+import type { Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import type { PublicKey as SolanaPublicKey } from '@solana/web3.js';
 
 type TransactFunction = <T>(
@@ -49,20 +51,21 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
     user,
     solanaWallet,
   } = useAuth();
-  
-  const {auth: authConfig} = useCustomization();
+
+  const { auth: authConfig } = useCustomization();
   const navigation = useAppNavigation();
+  const dispatch = useAppDispatch();
 
   // For Dynamic, if user is already authenticated, trigger onWalletConnected immediately
   useEffect(() => {
     if (authConfig.provider === 'dynamic' && status === 'authenticated' && user?.id) {
       console.log('User already authenticated with Dynamic, triggering callback and navigating');
-      onWalletConnected({provider: 'dynamic', address: user.id});
-      
+      onWalletConnected({ provider: 'dynamic', address: user.id });
+
       // Navigate to PlatformSelectionScreen after a short delay
       // The delay ensures the onWalletConnected callback has time to complete
       setTimeout(() => {
-        navigation.navigate('PlatformSelection' as never);
+        navigation.navigate('MainTabs' as never);
       }, 100);
     }
   }, [authConfig.provider, status, user, onWalletConnected, navigation]);
@@ -98,10 +101,27 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
         const publicKey = new PublicKey(publicKeyBuffer);
         const base58Address = publicKey.toBase58();
 
+        console.log('MWA connection successful, address:', base58Address);
+
+        // First dispatch the loginSuccess action directly
+        // This ensures the address is immediately available in the Redux store
+        dispatch(
+          loginSuccess({
+            provider: 'mwa',
+            address: base58Address,
+          })
+        );
+
+        // Then call the onWalletConnected callback
         onWalletConnected({
           provider: 'mwa',
           address: base58Address,
         });
+
+        // Navigate to MainTabs after a short delay
+        setTimeout(() => {
+          navigation.navigate('MainTabs' as never);
+        }, 100);
       } else {
         Alert.alert('Connection Error', 'No accounts found in wallet');
       }
@@ -122,7 +142,7 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
         Alert.alert('Wallet Error', 'Wallet not connected');
         return;
       }
-      onWalletConnected({provider: 'privy', address: walletPublicKey});
+      onWalletConnected({ provider: 'privy', address: walletPublicKey });
     }
   }, [user, onWalletConnected, solanaWallet, authConfig.provider]);
 
