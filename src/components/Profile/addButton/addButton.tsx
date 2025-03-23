@@ -47,6 +47,7 @@ const AddButton: React.FC<AddButtonProps> = ({
     'low' | 'medium' | 'high' | 'very-high'
   >('low');
   const [amountSol, setAmountSol] = useState('');
+  const [transactionStatus, setTransactionStatus] = useState<string | null>(null);
 
   // Add a ref to modal components with initial null value
   const modalRef = useRef<View | null>(null);
@@ -57,13 +58,13 @@ const AddButton: React.FC<AddButtonProps> = ({
 
   // Use the wallet from useWallet - now it will work correctly with MWA
   const { wallet, address, isMWA } = useWallet();
-  console.log('Wallet:', wallet);
 
   // Initialize modal state with Redux state when opened
   useEffect(() => {
     if (sendModalVisible) {
       setSelectedMode(transactionState.transactionMode);
       setSelectedFeeTier(transactionState.selectedFeeTier);
+      setTransactionStatus(null);
     }
   }, [sendModalVisible, transactionState]);
 
@@ -129,62 +130,39 @@ const AddButton: React.FC<AddButtonProps> = ({
       // Create connection to Solana
       const connection = new Connection(clusterApiUrl(CLUSTER as Cluster), 'confirmed');
 
-      // For MWA we need to handle transactions differently
-      if (isMWA()) {
-        Alert.alert(
-          'Send Transaction',
-          `This will open your external wallet app to send ${parsedAmount} SOL to ${recipientAddress.slice(0, 6)}...${recipientAddress.slice(-4)}`,
-          [
-            {
-              text: 'Cancel',
-              style: 'cancel'
-            },
-            {
-              text: 'Continue',
-              onPress: async () => {
-                try {
-                  // Here we'd normally integrate with MWA transaction signing
-                  // For this example, just show how we'd do it
-                  console.log(`Would send ${parsedAmount} SOL from ${address} to ${recipientAddress}`);
+      // Set initial status
+      setTransactionStatus('Preparing transaction...');
 
-                  // Close the modal
-                  setSendModalVisible(false);
-                  setSelectedMode(null);
-                  setAmountSol('');
-
-                  Alert.alert(
-                    'External Transaction',
-                    'Please complete the transaction in your wallet app'
-                  );
-                } catch (err: any) {
-                  console.error('Error preparing MWA transaction:', err);
-                  Alert.alert('Transaction Preparation Failed', err.message || String(err));
-                }
-              }
-            }
-          ]
-        );
-        return;
-      }
-
-      // Use our centralized sendSOL function for non-MWA wallets
+      // Use our centralized sendSOL function for both MWA and non-MWA wallets
+      // The function now handles the MWA case internally
       const signature = await sendSOL({
         wallet,
         recipientAddress,
         amountSol: parsedAmount,
         connection,
-        onStatusUpdate: (status) => console.log(`[AddButton] ${status}`),
+        onStatusUpdate: (status) => {
+          console.log(`[AddButton] ${status}`);
+          setTransactionStatus(status);
+        },
       });
 
-      Alert.alert('Success', 'Transaction sent!');
-      setSendModalVisible(false);
-      setSelectedMode(null);
-      setAmountSol('');
+      // Success, transaction was sent and confirmed
+      setTransactionStatus(`Transaction successful! Signature: ${signature.slice(0, 8)}...`);
+      setTimeout(() => {
+        setSendModalVisible(false);
+        setSelectedMode(null);
+        setAmountSol('');
+        setTransactionStatus(null);
+        Alert.alert('Success', 'Transaction completed!');
+      }, 2000);
     } catch (err: any) {
       console.error('Error sending transaction:', err);
-      Alert.alert('Transaction Failed', err.message || String(err));
-      // Close the modal on error too
-      setSendModalVisible(false);
+      setTransactionStatus(`Error: ${err.message || 'Unknown error'}`);
+      setTimeout(() => {
+        Alert.alert('Transaction Failed', err.message || String(err));
+        setSendModalVisible(false);
+        setTransactionStatus(null);
+      }, 2000);
     }
   };
 
@@ -298,16 +276,28 @@ const AddButton: React.FC<AddButtonProps> = ({
               />
             </View>
 
+            {transactionStatus && (
+              <View style={modalOverlayStyles.statusContainer}>
+                <Text style={modalOverlayStyles.statusText}>{transactionStatus}</Text>
+              </View>
+            )}
+
             <View style={modalOverlayStyles.buttonRow}>
               <TouchableOpacity
                 style={[modalOverlayStyles.modalButton, { backgroundColor: '#ccc' }]}
                 onPress={() => setSendModalVisible(false)}
+                disabled={!!transactionStatus && !transactionStatus.includes('Error')}
               >
                 <Text style={modalOverlayStyles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[modalOverlayStyles.modalButton, { backgroundColor: '#1d9bf0' }]}
+                style={[
+                  modalOverlayStyles.modalButton,
+                  { backgroundColor: '#1d9bf0' },
+                  !!transactionStatus && { opacity: 0.5 }
+                ]}
                 onPress={handleSendTransaction}
+                disabled={!!transactionStatus}
               >
                 <Text style={modalOverlayStyles.modalButtonText}>Send</Text>
               </TouchableOpacity>
@@ -382,6 +372,18 @@ const modalOverlayStyles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: 16,
+  },
+  statusContainer: {
+    backgroundColor: '#f8f8f8',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 16,
+  },
+  statusText: {
+    color: '#333',
+    fontSize: 14,
+    textAlign: 'center',
   },
   label: {
     fontWeight: '500',

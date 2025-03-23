@@ -15,6 +15,7 @@ import {Buffer} from 'buffer';
 import { TransactionService } from '../../services/transaction/transactionService';
 import { store } from '../../state/store';
 import { StandardWallet } from '../../hooks/useAuth';
+import { Platform } from 'react-native';
 
 /**
  * Fee tier to microLamports mapping for priority transactions
@@ -69,6 +70,137 @@ export const createPriorityFeeInstructions = (
   
   return [computeUnitLimitIx, computeUnitPriceIx];
 };
+
+/**
+ * Send a transaction directly using MWA (Mobile Wallet Adapter) with priority fees
+ */
+export async function sendPriorityTransactionMWA(
+  connection: Connection,
+  recipient: string,
+  lamports: number,
+  feeMapping: Record<string, number> = DEFAULT_FEE_MAPPING,
+  onStatusUpdate?: (status: string) => void,
+): Promise<string> {
+  onStatusUpdate?.('[sendPriorityTransactionMWA] Starting MWA priority tx');
+  console.log(
+    '[sendPriorityTransactionMWA] Starting MWA priority tx, recipient=',
+    recipient,
+    'lamports=',
+    lamports
+  );
+
+  if (Platform.OS !== 'android') {
+    throw new Error('MWA is only supported on Android');
+  }
+
+  const mwaModule = require('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
+  const {transact} = mwaModule;
+  const feeTier = getCurrentFeeTier();
+  const microLamports = feeMapping[feeTier] || DEFAULT_FEE_MAPPING.low;
+
+  console.log('[sendPriorityTransactionMWA] microLamports from feeMapping:', microLamports);
+  onStatusUpdate?.(`Using ${feeTier} priority fee (${microLamports} microLamports)`);
+
+  return await transact(async (wallet: any) => {
+    try {
+      console.log('[sendPriorityTransactionMWA] Inside transact callback...');
+      onStatusUpdate?.('Authorizing with wallet...');
+      
+      // Use the correct cluster format with 'solana:' prefix
+      const authResult = await wallet.authorize({
+        cluster: 'devnet', // Changed from 'solana:devnet' to 'devnet'
+        identity: {
+          name: 'React Native dApp',
+          uri: 'https://yourdapp.com',
+          icon: 'favicon.ico',
+        },
+      });
+      console.log('[sendPriorityTransactionMWA] Authorization result:', authResult);
+
+      const {Buffer} = require('buffer');
+      const userEncodedPubkey = authResult.accounts[0].address;
+      const userPubkeyBytes = Buffer.from(userEncodedPubkey, 'base64');
+      const userPubkey = new PublicKey(userPubkeyBytes);
+      console.log('[sendPriorityTransactionMWA] userPubkey:', userPubkey.toBase58());
+      onStatusUpdate?.(`User public key: ${userPubkey.toBase58().slice(0, 6)}...${userPubkey.toBase58().slice(-4)}`);
+
+      // 2) Build instructions
+      console.log('[sendPriorityTransactionMWA] Building instructions...');
+      onStatusUpdate?.('Building transaction...');
+      const toPublicKey = new PublicKey(recipient);
+      const transferIx = SystemProgram.transfer({
+        fromPubkey: userPubkey,
+        toPubkey: toPublicKey,
+        lamports,
+      });
+
+      const computeUnitLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
+        units: 2_000_000,
+      });
+      const computeUnitPriceIx = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports,
+      });
+
+      const instructions: TransactionInstruction[] = [
+        computeUnitLimitIx,
+        computeUnitPriceIx,
+        transferIx,
+      ];
+      console.log('[sendPriorityTransactionMWA] Instructions created:', instructions.length);
+
+      // 3) Build transaction
+      console.log('[sendPriorityTransactionMWA] Fetching latest blockhash...');
+      const { blockhash } = await connection.getLatestBlockhash();
+      console.log('[sendPriorityTransactionMWA] blockhash:', blockhash);
+
+      const messageV0 = new TransactionMessage({
+        payerKey: userPubkey,
+        recentBlockhash: blockhash,
+        instructions,
+      }).compileToV0Message();
+
+      const transaction = new VersionedTransaction(messageV0);
+      console.log('[sendPriorityTransactionMWA] Compiled transaction (MWA)', transaction);
+
+      // Try using signTransactions first, then manually submit
+      console.log('[sendPriorityTransactionMWA] Calling wallet.signTransactions()...');
+      onStatusUpdate?.('Requesting signature from wallet...');
+      const signedTransactions = await wallet.signTransactions({
+        transactions: [transaction],
+      });
+      console.log('[sendPriorityTransactionMWA] signTransactions returned signed transactions');
+
+      if (!signedTransactions?.length) {
+        throw new Error('No signed transactions returned from signTransactions');
+      }
+      
+      // Now submit the signed transaction
+      const signedTx = signedTransactions[0];
+      console.log('[sendPriorityTransactionMWA] Submitting signed transaction to network...');
+      onStatusUpdate?.('Submitting transaction to network...');
+      const signature = await connection.sendRawTransaction(signedTx.serialize());
+      console.log('[sendPriorityTransactionMWA] Got signature:', signature);
+
+      // 5) confirm
+      console.log('[sendPriorityTransactionMWA] Confirming transaction on-chain...');
+      onStatusUpdate?.(`Transaction submitted (${signature.slice(0, 8)}...)`);
+      onStatusUpdate?.('Confirming transaction...');
+      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+      console.log('[sendPriorityTransactionMWA] Confirmation result:', confirmation.value);
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      }
+
+      console.log('[sendPriorityTransactionMWA] Transaction confirmed successfully!');
+      onStatusUpdate?.('Transaction confirmed successfully!');
+      return signature;
+    } catch (error: any) {
+      console.log('[sendPriorityTransactionMWA] Caught error inside transact callback:', error);
+      onStatusUpdate?.(`Error: ${error.message || 'Unknown error'}`);
+      throw error;
+    }
+  });
+}
 
 /**
  * Sends a transaction with the current priority fee settings
@@ -173,6 +305,20 @@ export async function sendSOL({
     
     // Convert to lamports
     const lamports = Math.floor(parsedAmount * LAMPORTS_PER_SOL);
+    
+    // Check if this is an MWA wallet
+    if (wallet.provider === 'mwa' && Platform.OS === 'android') {
+      onStatusUpdate?.(`Using Mobile Wallet Adapter to send ${amountSol} SOL to ${recipientAddress}`);
+      
+      // For MWA we use a different flow that uses the external wallet for signing
+      return await sendPriorityTransactionMWA(
+        connection,
+        recipientAddress, 
+        lamports,
+        DEFAULT_FEE_MAPPING,
+        onStatusUpdate,
+      );
+    }
     
     // Get wallet public key
     let walletPublicKey: PublicKey;
