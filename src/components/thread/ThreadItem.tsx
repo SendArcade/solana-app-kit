@@ -32,7 +32,7 @@ interface ThreadItemProps {
   /** A user-provided stylesheet that merges with internal styles. */
   userStyleSheet?: {[key: string]: object};
   /**
-   * Invoked if the user’s avatar/username is pressed (e.g., to open a profile).
+   * Invoked if the user's avatar/username is pressed (e.g., to open a profile).
    */
   onPressUser?: (user: ThreadUser) => void;
   /**
@@ -108,7 +108,17 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
           onEditPost={handleEditPost}
           themeOverrides={themeOverrides}
           styleOverrides={styleOverrides}
-          onPressUser={onPressUser}
+          onPressUser={user => {
+            // Add error handling for user press navigation
+            try {
+              if (onPressUser && user && user.id) {
+                onPressUser(user);
+              }
+            } catch (err) {
+              console.error('Error navigating to user profile:', err);
+              Alert.alert('Navigation Error', 'Could not open user profile');
+            }
+          }}
         />
 
         <PostBody
@@ -140,7 +150,7 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
           post={post}
           /**
            * Previously, we toggled local replies here.
-           * Now we simply open the same “onPressPost” navigation:
+           * Now we simply open the same "onPressPost" navigation:
            */
           onPressComment={() => onPressPost?.(post)}
           themeOverrides={themeOverrides}
@@ -148,7 +158,7 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
         />
       </TouchableOpacity>
 
-      {/* “Edit Post” Modal */}
+      {/* "Edit Post" Modal */}
       {showEditModal && (
         <ThreadEditModal
           post={post}

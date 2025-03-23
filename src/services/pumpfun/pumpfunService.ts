@@ -24,10 +24,11 @@ import {
 
 import {calculateWithSlippageBuy} from 'pumpdotfun-sdk';
 import {SERVER_URL} from '@env';
+import { TransactionService } from '../../services/transaction/transactionService';
 import {
   signAndSendWithPrivy,
   signAndSendBase64Tx,
-} from '../../utils/transactions/transactionUtils';
+} from '../../utils/transactions/transactionCompatUtils';
 
 /**
  * Create and immediately buy tokens
@@ -149,34 +150,37 @@ export async function createAndBuyTokenViaPumpfun({
       buyTx.instructions.forEach(ix => combinedTx.add(ix));
     }
 
-    // partial sign with new mint keypair
-    const {blockhash} = await connection.getLatestBlockhash();
-    combinedTx.feePayer = creatorPubkey;
-    combinedTx.recentBlockhash = blockhash;
+    // Sign it with the mint keypair
     combinedTx.partialSign(mintKeypair);
 
-    // Now sign & send via privy
-    const walletProvider = await solanaWallet.getProvider();
-    const txSignature = await signAndSendWithPrivy(
-      combinedTx,
-      connection,
-      walletProvider,
+    // Get blockhash
+    const blockhash = await provider.connection.getLatestBlockhash();
+    combinedTx.recentBlockhash = blockhash.blockhash;
+    combinedTx.feePayer = creatorPubkey;
+
+    // Use the new transaction service
+    const txSignature = await TransactionService.signAndSendTransaction(
+      { type: 'transaction', transaction: combinedTx },
+      solanaWallet, // Pass wallet directly - TransactionService will handle it
+      { connection }
     );
 
-    console.log('[createAndBuy] => TxSignature:', txSignature);
+    if (!txSignature) {
+      throw new Error('Transaction failed.');
+    }
+
     return {
-      success: true,
-      txId: txSignature,
-      mintPublicKey: mintKeypair.publicKey.toBase58(),
+      mint: mintKeypair.publicKey.toString(),
+      txSignature,
     };
   } catch (err: any) {
-    console.error('[createAndBuyTokenViaPumpfun] Error =>', err.message);
+    console.error('createAndBuyTokenViaPumpfun error:', err);
     throw err;
   }
 }
 
 /**
- * BUY via Pumpfun or Raydium
+ * buyTokenViaPumpfun
  */
 export async function buyTokenViaPumpfun({
   buyerPublicKey,
@@ -189,60 +193,91 @@ export async function buyTokenViaPumpfun({
   solAmount: number;
   solanaWallet: any;
 }) {
+  if (!solanaWallet) {
+    throw new Error(
+      'No Solana wallet found. Please connect your wallet first.',
+    );
+  }
+
+  const provider = getProvider();
+  const connection = provider.connection;
+  const sdk = new PumpFunSDK(provider);
+
   console.log('[buyTokenViaPumpfun] =>', {
     buyerPublicKey,
     tokenAddress,
     solAmount,
   });
 
-  if (!solanaWallet) {
-    throw new Error(
-      '[buyTokenViaPumpfun] No Solana wallet found. Please connect your wallet first.',
-    );
-  }
+  try {
+    // 1. Check if the token is available on Raydium
+    const isOnRaydium = await checkIfTokenIsOnRaydium(tokenAddress);
+    console.log('isOnRaydium =>', isOnRaydium);
+    
+    // If on Raydium, we should use their API
+    if (isOnRaydium) {
+      console.log('[buyTokenViaPumpfun] Token is on Raydium, using swap API...');
+      
+      // 2. Get quote first (exact output: I want X tokens, how much SOL?)
+      const lamportsIn = Math.floor(solAmount * LAMPORTS_PER_SOL);
+      const quote = await getSwapQuote(
+        RAYDIUM_SOL_MINT, // input = SOL
+        tokenAddress, // output = Token
+        lamportsIn, // amount in (SOL lamports)
+      );
 
-  const provider = getProvider();
-  const connection = provider.connection;
-  const buyerPubkey = new PublicKey(buyerPublicKey);
+      console.log('quote =>', quote)
+      
+      if (!quote || !quote.data) {
+        throw new Error('Failed to get swap quote from Raydium');
+      }
 
-  console.log('[buyTokenViaPumpfun] Checking if token is on Raydium...');
-  const isRaydium = await checkIfTokenIsOnRaydium(tokenAddress);
+      const swapFee = await getSwapFee();
 
-  let txId: string = '';
-  const walletProvider = await solanaWallet.getProvider();
+      // 3. Get swap transaction
+      const swapTxResp = await getSwapTransaction({
+        swapResponse: quote,
+        computeUnitPriceMicroLamports: swapFee,
+        userPubkey: buyerPublicKey,
+        unwrapSol: false,
+        wrapSol: true,
+      });
 
-  if (isRaydium) {
-    // Raydium path -> we get a base64 from server, then sign+send
-    console.log('[buyTokenViaPumpfun] Using Raydium path...');
-    const lamportsIn = Math.floor(solAmount * LAMPORTS_PER_SOL);
-    const swapResponse = await getSwapQuote(
-      RAYDIUM_SOL_MINT,
-      tokenAddress,
-      lamportsIn,
-    );
-    const computeUnitPrice = await getSwapFee();
-    const raydiumResult = await getSwapTransaction({
-      swapResponse,
-      computeUnitPriceMicroLamports: computeUnitPrice,
-      userPubkey: buyerPublicKey,
-      unwrapSol: false,
-      wrapSol: true,
-    });
-
-    const base64Tx = raydiumResult?.data?.[0]?.transaction;
-    if (!base64Tx) {
-      throw new Error('[Raydium] No transaction found in swap response');
+      console.log("swapTxResp =>", swapTxResp);
+      
+      const base64Tx = swapTxResp?.data?.[0]?.transaction;
+      if (!base64Tx) {
+        throw new Error('No swap transaction returned from Raydium');
+      }
+      
+      // 4. Sign and send transaction
+      try {
+        console.log('[buyTokenViaPumpfun] Attempting to sign and send base64 transaction');
+        
+        let txId = await TransactionService.signAndSendTransaction(
+          { type: 'base64', data: base64Tx },
+          solanaWallet, // Pass wallet directly - TransactionService will handle it
+          { connection }
+        );
+        
+        return {
+          txSignature: txId,
+          usedRaydium: true,
+        };
+      } catch (txError) {
+        console.error('[buyTokenViaPumpfun] Transaction signing error:', txError);
+        throw txError;
+      }
     }
-    // sign+send using new transactionUtils
-    txId = await signAndSendBase64Tx(base64Tx, connection, walletProvider);
-    console.log('[buyTokenViaPumpfun] => Raydium txId:', txId);
-  } else {
-    // Pumpfun path -> local building
-    console.log('[buyTokenViaPumpfun] Using PumpFun path...');
-    const sdk = new PumpFunSDK(provider);
+    
+    // If not on Raydium, use Pump.fun
+    console.log('[buyTokenViaPumpfun] Token not on Raydium, using Pump.fun...');
+    
+    // Build transaction
+    const buyerPubkey = new PublicKey(buyerPublicKey);
     const tokenMint = new PublicKey(tokenAddress);
     const lamportsToBuy = BigInt(Math.floor(solAmount * LAMPORTS_PER_SOL));
-
+    
     const transaction = await buildPumpFunBuyTransaction({
       payerPubkey: buyerPubkey,
       tokenMint,
@@ -250,16 +285,26 @@ export async function buyTokenViaPumpfun({
       sdk,
       connection,
     });
-
-    txId = await signAndSendWithPrivy(transaction, connection, walletProvider);
-    console.log('[buyTokenViaPumpfun] => Pumpfun txId:', txId);
+    
+    // Sign transaction
+    const txId = await TransactionService.signAndSendTransaction(
+      { type: 'transaction', transaction },
+      solanaWallet, // Pass wallet directly - TransactionService will handle it
+      { connection }
+    );
+    
+    return {
+      txSignature: txId,
+      usedRaydium: false,
+    };
+  } catch (err: any) {
+    console.error('buyTokenViaPumpfun error:', err);
+    throw err;
   }
-
-  return {txId, success: true};
 }
 
 /**
- * SELL via Pumpfun or Raydium
+ * sellTokenViaPumpfun
  */
 export async function sellTokenViaPumpfun({
   sellerPublicKey,
@@ -272,72 +317,96 @@ export async function sellTokenViaPumpfun({
   tokenAmount: number;
   solanaWallet: any;
 }) {
+  if (!solanaWallet) {
+    throw new Error(
+      'No Solana wallet found. Please connect your wallet first.',
+    );
+  }
+
+  const provider = getProvider();
+  const connection = provider.connection;
+  const sdk = new PumpFunSDK(provider);
+
   console.log('[sellTokenViaPumpfun] =>', {
     sellerPublicKey,
     tokenAddress,
     tokenAmount,
   });
 
-  if (!solanaWallet) {
-    throw new Error(
-      '[sellTokenViaPumpfun] No Solana wallet found. Please connect your wallet first.',
-    );
-  }
+  try {
+    // 1. Check if the token is available on Raydium
+    const isOnRaydium = await checkIfTokenIsOnRaydium(tokenAddress);
 
-  const provider = getProvider();
-  const connection = provider.connection;
-  const sellerPubkey = new PublicKey(sellerPublicKey);
-  const walletProvider = await solanaWallet.getProvider();
-
-  console.log('[sellTokenViaPumpfun] Checking if token is on Raydium...');
-  const isRaydium = await checkIfTokenIsOnRaydium(tokenAddress);
-
-  let txId: string = '';
-
-  if (isRaydium) {
-    // Raydium path -> base64 transaction
-    console.log('[sellTokenViaPumpfun] Using Raydium path...');
-    const supplyResult = await connection.getTokenSupply(
-      new PublicKey(tokenAddress),
-    );
-    const decimals = supplyResult.value.decimals;
-    const lamportsIn = Math.floor(tokenAmount * 10 ** decimals);
-
-    const userTokenATA = await getAssociatedTokenAddress(
-      new PublicKey(tokenAddress),
-      sellerPubkey,
-    );
-    const swapResponse = await getSwapQuote(
-      tokenAddress,
-      RAYDIUM_SOL_MINT,
-      lamportsIn,
-    );
-    const computeUnitPrice = await getSwapFee();
-    const raydiumResult = await getSwapTransaction({
-      swapResponse,
-      computeUnitPriceMicroLamports: computeUnitPrice,
-      userPubkey: sellerPublicKey,
-      unwrapSol: true,
-      wrapSol: false,
-      inputAccount: userTokenATA.toBase58(),
-    });
-
-    const base64Tx = raydiumResult?.data?.[0]?.transaction;
-    if (!base64Tx) {
-      throw new Error('[Raydium] No transaction found in swap response');
+    // If on Raydium, we should use their API
+    if (isOnRaydium) {
+      console.log('[sellTokenViaPumpfun] Token is on Raydium, using swap API...');
+      
+      // Get swap fee (compute unit price)
+      const swapFee = await getSwapFee();
+      
+      // Get holder token account
+      const tokenMint = new PublicKey(tokenAddress);
+      const walletPubkey = new PublicKey(sellerPublicKey);
+      const tokenAccount = await getAssociatedTokenAddress(
+        tokenMint,
+        walletPubkey,
+      );
+      
+      // 2. Get quote (exact input: I have X tokens, how much SOL?)
+      const swapAmountIn = Math.floor(tokenAmount * 1_000_000); // 6 decimals
+      const quote = await getSwapQuote(
+        tokenAddress,      // input = Token
+        RAYDIUM_SOL_MINT,  // output = SOL
+        swapAmountIn,      // amount in (token)
+      );
+      
+      if (!quote || !quote.data) {
+        throw new Error('Failed to get swap quote from Raydium');
+      }
+      
+      // 3. Get swap transaction
+      const swapTxResp = await getSwapTransaction({
+        swapResponse: quote,
+        computeUnitPriceMicroLamports: swapFee,
+        userPubkey: sellerPublicKey,
+        unwrapSol: true,
+        wrapSol: false,
+        inputAccount: tokenAccount.toString(),
+      });
+      console.log("swapTxResp =>", swapTxResp);
+      const base64Tx = swapTxResp?.data?.[0]?.transaction;
+      if (!base64Tx) {
+        throw new Error('No swap transaction returned from Raydium');
+      }
+      
+      // 4. Sign and send transaction
+      try {
+        console.log('[sellTokenViaPumpfun] Attempting to sign and send base64 transaction');
+        
+        let txId = await TransactionService.signAndSendTransaction(
+          { type: 'base64', data: base64Tx },
+          solanaWallet, // Pass wallet directly - TransactionService will handle it
+          { connection }
+        );
+        
+        return {
+          txSignature: txId,
+          usedRaydium: true,
+        };
+      } catch (txError) {
+        console.error('[sellTokenViaPumpfun] Transaction signing error:', txError);
+        throw txError;
+      }
     }
-
-    txId = await signAndSendBase64Tx(base64Tx, connection, walletProvider);
-    console.log('[sellTokenViaPumpfun] => success, Raydium txId:', txId);
-  } else {
-    // Pumpfun path
-    console.log('[sellTokenViaPumpfun] Using PumpFun path...');
-    const sdk = new PumpFunSDK(provider);
+    
+    // If not on Raydium, use Pump.fun
+    console.log('[sellTokenViaPumpfun] Token not on Raydium, using Pump.fun...');
+    
+    // Build transaction
+    const sellerPubkey = new PublicKey(sellerPublicKey);
     const tokenMint = new PublicKey(tokenAddress);
-    const supplyResult = await connection.getTokenSupply(tokenMint);
-    const decimals = supplyResult.value.decimals;
-    const lamportsToSell = BigInt(Math.floor(tokenAmount * 10 ** decimals));
-
+    const lamportsToSell = BigInt(Math.floor(tokenAmount * 1_000_000));
+    
     const transaction = await buildPumpFunSellTransaction({
       sellerPubkey,
       tokenMint,
@@ -345,10 +414,20 @@ export async function sellTokenViaPumpfun({
       sdk,
       connection,
     });
-
-    txId = await signAndSendWithPrivy(transaction, connection, walletProvider);
-    console.log('[sellTokenViaPumpfun] => success, Pumpfun txId:', txId);
+    
+    // Sign transaction
+    const txId = await TransactionService.signAndSendTransaction(
+      { type: 'transaction', transaction },
+      solanaWallet, // Pass wallet directly - TransactionService will handle it
+      { connection }
+    );
+    
+    return {
+      txSignature: txId,
+      usedRaydium: false,
+    };
+  } catch (err: any) {
+    console.error('sellTokenViaPumpfun error:', err);
+    throw err;
   }
-
-  return {txId, success: true};
 }

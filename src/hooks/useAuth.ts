@@ -5,6 +5,37 @@ import {loginSuccess, logoutSuccess} from '../state/auth/reducer';
 import {usePrivyWalletLogic} from '../services/walletProviders/privy';
 import {useDynamicWalletLogic} from './useDynamicWalletLogic';
 import {useCustomization} from '../CustomizationProvider';
+import {useAppNavigation} from './useAppNavigation';
+import {getDynamicClient} from '../services/walletProviders/dynamic';
+import {useAppSelector} from './useReduxHooks';
+import {VersionedTransaction, PublicKey} from '@solana/web3.js';
+
+/**
+ * Interface for a standardized wallet object returned by useAuth
+ * This ensures that regardless of provider, components get a consistent interface
+ */
+export interface StandardWallet {
+  provider: 'privy' | 'dynamic' | 'turnkey' | string;
+  address: string | null;
+  publicKey: string | null;
+  /**
+   * The raw provider-specific wallet object.
+   * This is useful if you need to access provider-specific features.
+   */
+  rawWallet: any;
+  /**
+   * Get the provider instance for this wallet
+   * This is used for signing transactions
+   */
+  getProvider: () => Promise<any>;
+  /**
+   * Get wallet identifier info for debugging
+   */
+  getWalletInfo: () => { 
+    walletType: string;
+    address: string | null;
+  };
+}
 
 /**
  * Summarized usage:
@@ -17,6 +48,8 @@ export function useAuth() {
   const {auth: authConfig} = useCustomization();
   const selectedProvider = authConfig.provider;
   const dispatch = useDispatch();
+  const navigation = useAppNavigation();
+  const authState = useAppSelector(state => state.auth);
 
   /** PRIVY CASE */
   if (selectedProvider === 'privy') {
@@ -28,6 +61,24 @@ export function useAuth() {
       solanaWallet,
     } = usePrivyWalletLogic();
 
+    // Create a standardized wallet object for Privy
+    const standardWallet: StandardWallet | null = solanaWallet?.wallets?.[0] ? {
+      provider: 'privy',
+      address: solanaWallet.wallets[0].publicKey,
+      publicKey: solanaWallet.wallets[0].publicKey,
+      rawWallet: solanaWallet.wallets[0],
+      getWalletInfo: () => ({
+        walletType: 'Privy',
+        address: solanaWallet.wallets?.[0]?.publicKey || null,
+      }),
+      getProvider: async () => {
+        if (solanaWallet?.getProvider) {
+          return solanaWallet.getProvider();
+        }
+        throw new Error('Privy wallet provider not available');
+      },
+    } : null;
+
     const loginWithGoogle = useCallback(async () => {
       await handlePrivyLogin({
         loginMethod: 'google',
@@ -38,9 +89,10 @@ export function useAuth() {
         setStatusMessage: () => {},
         onWalletConnected: info => {
           dispatch(loginSuccess({provider: 'privy', address: info.address}));
+          navigation.navigate('PlatformSelection');
         },
       });
-    }, [handlePrivyLogin, monitorSolanaWallet, dispatch]);
+    }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
 
     const loginWithApple = useCallback(async () => {
       await handlePrivyLogin({
@@ -52,9 +104,10 @@ export function useAuth() {
         setStatusMessage: () => {},
         onWalletConnected: info => {
           dispatch(loginSuccess({provider: 'privy', address: info.address}));
+          navigation.navigate('PlatformSelection');
         },
       });
-    }, [handlePrivyLogin, monitorSolanaWallet, dispatch]);
+    }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
 
     const loginWithEmail = useCallback(async () => {
       await handlePrivyLogin({
@@ -66,9 +119,10 @@ export function useAuth() {
         setStatusMessage: () => {},
         onWalletConnected: info => {
           dispatch(loginSuccess({provider: 'privy', address: info.address}));
+          navigation.navigate('PlatformSelection');
         },
       });
-    }, [handlePrivyLogin, monitorSolanaWallet, dispatch]);
+    }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
 
     const logout = useCallback(async () => {
       await handlePrivyLogout(() => {});
@@ -82,7 +136,8 @@ export function useAuth() {
       loginWithEmail,
       logout,
       user,
-      solanaWallet,
+      solanaWallet, // Keep for backward compatibility
+      wallet: standardWallet, // Add standardized wallet
     };
   } else if (selectedProvider === 'dynamic') {
     /** DYNAMIC CASE */
@@ -91,51 +146,342 @@ export function useAuth() {
       handleDynamicLogout,
       walletAddress,
       user,
+      isAuthenticated,
       monitorDynamicWallet,
     } = useDynamicWalletLogic();
+
+    // Create a standardized wallet object for Dynamic
+    let standardWallet: StandardWallet | null = null;
+    
+    try {
+      // Try to get the Dynamic client and user wallets
+      const dynamicClient = getDynamicClient();
+      if (dynamicClient?.wallets?.userWallets?.length > 0) {
+        const wallet = dynamicClient.wallets.userWallets[0];
+        standardWallet = {
+          provider: 'dynamic',
+          address: wallet.address,
+          publicKey: wallet.address,
+          rawWallet: wallet,
+          getWalletInfo: () => ({
+            walletType: 'Dynamic',
+            address: wallet.address,
+          }),
+          getProvider: async () => {
+            try {
+              // Use the proper Dynamic SDK method to get a signer if available
+              if (dynamicClient.solana && typeof dynamicClient.solana.getSigner === 'function') {
+                // Get the signer
+                const signer = await dynamicClient.solana.getSigner({ wallet });
+                
+                // Create a custom provider that uses signTransaction + manual send
+                // instead of signAndSendTransaction (which shows UI)
+                return {
+                  _dynamicSdk: true, // Marker to help identify this as a Dynamic provider
+                  wallet: wallet,
+                  address: wallet.address,
+                  _signer: signer, // Store original signer for reference
+                  request: async ({ method, params }: any) => {
+                    if (method === 'signAndSendTransaction') {
+                      const { transaction, connection } = params;
+                      
+                      console.log('Dynamic custom provider: signAndSendTransaction called');
+                      
+                      try {
+                        // Try to use the direct signAndSendTransaction method from Dynamic SDK
+                        console.log('Using Dynamic Solana extension signAndSendTransaction directly');
+                        const result = await signer.signAndSendTransaction(transaction, {
+                          skipPreflight: false,
+                          preflightCommitment: 'confirmed',
+                          maxRetries: 3
+                        });
+                        
+                        console.log('Dynamic custom provider: Transaction sent with signature:', result.signature);
+                        return { signature: result.signature };
+                      } catch (directSignError) {
+                        console.error('Direct signAndSendTransaction failed, falling back to manual flow:', directSignError);
+                        
+                        // 1. Sign the transaction without sending
+                        // Only sign if not already signed
+                        let signedTx = transaction;
+                        const isAlreadySigned = transaction instanceof VersionedTransaction 
+                          ? transaction.signatures.length > 0 && transaction.signatures.some((sig: Uint8Array) => sig.length > 0)
+                          : transaction.signatures.length > 0 && transaction.signatures.some((sig: any) => sig.signature !== null);
+                            
+                        if (!isAlreadySigned) {
+                          console.log('Dynamic custom provider: Transaction not signed, signing now');
+                          try {
+                            // Make sure legacy transactions have blockhash and feePayer
+                            if (!(transaction instanceof VersionedTransaction)) {
+                              console.log('Signing legacy transaction');
+                              // Make sure feePayer is set correctly
+                              if (!transaction.feePayer) {
+                                transaction.feePayer = new PublicKey(wallet.address);
+                              }
+                              
+                              // Make sure recent blockhash is set
+                              if (!transaction.recentBlockhash) {
+                                const { blockhash } = await connection.getLatestBlockhash('confirmed');
+                                transaction.recentBlockhash = blockhash;
+                              }
+                            } else {
+                              console.log('Signing versioned transaction');
+                            }
+                            
+                            signedTx = await signer.signTransaction(transaction);
+                            console.log('Transaction signed successfully');
+                          } catch (signError: any) {
+                            console.error('Dynamic custom provider: Error during transaction signing:', signError);
+                            throw signError;
+                          }
+                        } else {
+                          console.log('Transaction already signed, using as is');
+                        }
+                        
+                        // 2. Send the signed transaction ourselves
+                        console.log('Dynamic custom provider: Sending signed transaction');
+                        try {
+                          // Serialize the transaction
+                          const rawTransaction = signedTx instanceof VersionedTransaction 
+                            ? signedTx.serialize()
+                            : signedTx.serialize();
+                            
+                          // 3. Send the signed transaction with explicit options
+                          const signature = await connection.sendRawTransaction(rawTransaction, {
+                            skipPreflight: false, 
+                            preflightCommitment: 'confirmed',
+                            maxRetries: 3
+                          });
+                          
+                          console.log('Dynamic custom provider: Transaction sent with signature:', signature);
+                          return { signature };
+                        } catch (sendError: any) {
+                          console.error('Dynamic custom provider: Error sending transaction:', sendError);
+                          if (sendError.logs) {
+                            console.error('Transaction logs:', sendError.logs);
+                          }
+                          throw sendError;
+                        }
+                      }
+                    }
+                    throw new Error(`Method ${method} not supported by Dynamic signer`);
+                  }
+                };
+              }
+              
+              // Fallback to wallet's own getProvider if available
+              if (wallet.getProvider && typeof wallet.getProvider === 'function') {
+                return wallet.getProvider();
+              }
+              
+              throw new Error('Dynamic wallet provider not available');
+            } catch (error) {
+              console.error('Error getting Dynamic wallet provider:', error);
+              throw error;
+            }
+          }
+        };
+      } else if (walletAddress) {
+        // Fallback if we have walletAddress but can't access userWallets directly
+        standardWallet = {
+          provider: 'dynamic',
+          address: walletAddress,
+          publicKey: walletAddress,
+          rawWallet: {
+            address: walletAddress
+          },
+          getWalletInfo: () => ({
+            walletType: 'Dynamic',
+            address: walletAddress,
+          }),
+          getProvider: async () => {
+            try {
+              const client = getDynamicClient();
+              if (!client) throw new Error('Dynamic client not initialized');
+              
+              // First try to find the wallet in userWallets
+              const wallets = client.wallets?.userWallets || [];
+              const wallet = wallets.find((w: any) => w.address === walletAddress);
+              
+              if (wallet) {
+                // Use the proper Dynamic SDK method to get a signer if available
+                if (client.solana && typeof client.solana.getSigner === 'function') {
+                  const signer = await client.solana.getSigner({ wallet });
+                  return {
+                    _dynamicSdk: true, // Marker to help identify this as a Dynamic provider
+                    wallet: wallet,
+                    address: wallet.address,
+                    _signer: signer, // Store original signer for reference
+                    request: async ({ method, params }: any) => {
+                      if (method === 'signAndSendTransaction') {
+                        const { transaction, connection } = params;
+                        
+                        console.log('Dynamic custom provider: signAndSendTransaction called');
+                        
+                        try {
+                          // Try to use the direct signAndSendTransaction method from Dynamic SDK
+                          console.log('Using Dynamic Solana extension signAndSendTransaction directly');
+                          const result = await signer.signAndSendTransaction(transaction, {
+                            skipPreflight: false,
+                            preflightCommitment: 'confirmed',
+                            maxRetries: 3
+                          });
+                          
+                          console.log('Dynamic custom provider: Transaction sent with signature:', result.signature);
+                          return { signature: result.signature };
+                        } catch (directSignError) {
+                          console.error('Direct signAndSendTransaction failed, falling back to manual flow:', directSignError);
+                          
+                          // 1. Sign the transaction without sending
+                          // Only sign if not already signed
+                          let signedTx = transaction;
+                          const isAlreadySigned = transaction instanceof VersionedTransaction 
+                            ? transaction.signatures.length > 0 && transaction.signatures.some((sig: Uint8Array) => sig.length > 0)
+                            : transaction.signatures.length > 0 && transaction.signatures.some((sig: any) => sig.signature !== null);
+                            
+                          if (!isAlreadySigned) {
+                            console.log('Dynamic custom provider: Transaction not signed, signing now');
+                            try {
+                              // Make sure legacy transactions have blockhash and feePayer
+                              if (!(transaction instanceof VersionedTransaction)) {
+                                console.log('Signing legacy transaction');
+                                // Make sure feePayer is set correctly
+                                if (!transaction.feePayer) {
+                                  transaction.feePayer = new PublicKey(wallet.address);
+                                }
+                                
+                                // Make sure recent blockhash is set
+                                if (!transaction.recentBlockhash) {
+                                  const { blockhash } = await connection.getLatestBlockhash('confirmed');
+                                  transaction.recentBlockhash = blockhash;
+                                }
+                              } else {
+                                console.log('Signing versioned transaction');
+                              }
+                              
+                              signedTx = await signer.signTransaction(transaction);
+                              console.log('Transaction signed successfully');
+                            } catch (signError: any) {
+                              console.error('Dynamic custom provider: Error during transaction signing:', signError);
+                              throw signError;
+                            }
+                          } else {
+                            console.log('Transaction already signed, using as is');
+                          }
+                          
+                          // 2. Send the signed transaction ourselves
+                          console.log('Dynamic custom provider: Sending signed transaction');
+                          try {
+                            // Serialize the transaction
+                            const rawTransaction = signedTx instanceof VersionedTransaction 
+                              ? signedTx.serialize()
+                              : signedTx.serialize();
+                              
+                            // 3. Send the signed transaction with explicit options
+                            const signature = await connection.sendRawTransaction(rawTransaction, {
+                              skipPreflight: false, 
+                              preflightCommitment: 'confirmed',
+                              maxRetries: 3
+                            });
+                            
+                            console.log('Dynamic custom provider: Transaction sent with signature:', signature);
+                            return { signature };
+                          } catch (sendError: any) {
+                            console.error('Dynamic custom provider: Error sending transaction:', sendError);
+                            if (sendError.logs) {
+                              console.error('Transaction logs:', sendError.logs);
+                            }
+                            throw sendError;
+                          }
+                        }
+                      }
+                      throw new Error(`Method ${method} not supported by Dynamic signer`);
+                    }
+                  };
+                }
+                
+                // Fallback to wallet's own getProvider if available
+                if (wallet.getProvider && typeof wallet.getProvider === 'function') {
+                  return wallet.getProvider();
+                }
+              }
+              
+              throw new Error('No wallet found with this address or provider not available');
+            } catch (error) {
+              console.error('Error getting Dynamic wallet provider:', error);
+              throw error;
+            }
+          }
+        };
+      }
+    } catch (e) {
+      // Don't throw here, just return null for wallet
+      console.warn('Failed to initialize Dynamic wallet:', e);
+    }
+
+    const handleSuccessfulLogin = useCallback((info: {provider: 'dynamic', address: string}) => {
+      dispatch(loginSuccess({provider: 'dynamic', address: info.address}));
+      navigation.navigate('PlatformSelection');
+    }, [dispatch, navigation]);
 
     const loginWithEmail = useCallback(async () => {
       await handleDynamicLogin({
         loginMethod: 'email',
         setStatusMessage: () => {},
+        onSuccess: handleSuccessfulLogin,
       });
-      if (walletAddress) {
-        dispatch(loginSuccess({provider: 'dynamic', address: walletAddress}));
-      }
-    }, [handleDynamicLogin, dispatch, walletAddress]);
+    }, [handleDynamicLogin, handleSuccessfulLogin]);
 
     const loginWithSMS = useCallback(async () => {
       await handleDynamicLogin({
         loginMethod: 'sms',
         setStatusMessage: () => {},
+        onSuccess: handleSuccessfulLogin,
       });
-      if (walletAddress) {
-        dispatch(loginSuccess({provider: 'dynamic', address: walletAddress}));
-      }
-    }, [handleDynamicLogin, dispatch, walletAddress]);
+    }, [handleDynamicLogin, handleSuccessfulLogin]);
 
     const loginWithGoogle = useCallback(async () => {
       await handleDynamicLogin({
         loginMethod: 'google',
         setStatusMessage: () => {},
+        onSuccess: handleSuccessfulLogin,
+        navigation,
       });
-      if (walletAddress) {
-        dispatch(loginSuccess({provider: 'dynamic', address: walletAddress}));
-      }
-    }, [handleDynamicLogin, dispatch, walletAddress]);
+    }, [handleDynamicLogin, handleSuccessfulLogin, navigation]);
+
+    const loginWithApple = useCallback(async () => {
+      await handleDynamicLogin({
+        loginMethod: 'apple',
+        setStatusMessage: () => {},
+        onSuccess: handleSuccessfulLogin,
+        navigation,
+      });
+    }, [handleDynamicLogin, handleSuccessfulLogin, navigation]);
 
     const logout = useCallback(async () => {
       await handleDynamicLogout(() => {});
       dispatch(logoutSuccess());
     }, [handleDynamicLogout, dispatch]);
 
+    // Create a solanaWallet object that mimics the Privy structure for compatibility
+    const solanaWallet = standardWallet ? {
+      wallets: [{
+        publicKey: standardWallet.address,
+        address: standardWallet.address
+      }],
+      getProvider: standardWallet.getProvider
+    } : null;
+
     return {
-      status: '',
+      status: isAuthenticated ? 'authenticated' : '',
       loginWithEmail,
       loginWithSMS,
       loginWithGoogle,
+      loginWithApple,
       logout,
       user: walletAddress ? {id: walletAddress} : user,
+      solanaWallet, // Add compatibility object
+      wallet: standardWallet, // Add standardized wallet
     };
   } else if (selectedProvider === 'turnkey') {
     /** TURNKEY CASE */
@@ -152,9 +498,16 @@ export function useAuth() {
       },
       logout,
       user: null,
+      solanaWallet: null,
+      wallet: null,
     };
   }
 
   // If no recognized provider, just return empties
-  return {status: '', logout: async () => {}};
+  return {
+    status: '', 
+    logout: async () => {},
+    solanaWallet: null,
+    wallet: null
+  };
 }

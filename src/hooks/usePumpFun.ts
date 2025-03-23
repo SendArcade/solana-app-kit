@@ -3,6 +3,7 @@
 import {useCallback} from 'react';
 import {Alert} from 'react-native';
 import {useAuth} from './useAuth';
+import {useWallet} from './useWallet';
 import {
   buyTokenViaPumpfun,
   sellTokenViaPumpfun,
@@ -13,7 +14,17 @@ import {
  * usePumpfun hook: centralizes buy, sell, and launch logic for Pumpfun tokens.
  */
 export function usePumpFun() {
-  const {solanaWallet} = useAuth();
+  const {wallet, solanaWallet} = useAuth();
+  // Also use the new useWallet hook which provides standard transaction methods
+  const {publicKey, address, connected} = useWallet();
+  
+  console.log("[usePumpFun] Wallet:", {
+    hasWallet: !!wallet,
+    hasLegacyWallet: !!solanaWallet,
+    walletType: wallet?.provider || 'none',
+    publicKey: wallet?.publicKey || solanaWallet?.wallets?.[0]?.publicKey || 'none',
+    connected
+  });
 
   /**
    * BUY
@@ -26,7 +37,10 @@ export function usePumpFun() {
       tokenAddress: string;
       solAmount: number;
     }) => {
-      if (!solanaWallet) {
+      // Use the best available wallet - prefer StandardWallet
+      const availableWallet = wallet || solanaWallet;
+      
+      if (!availableWallet) {
         Alert.alert('Error', 'No Solana wallet found. Please connect first.');
         return;
       }
@@ -34,12 +48,14 @@ export function usePumpFun() {
         console.log('[usePumpfun.buyToken] Attempting to buy token:', {
           tokenAddress,
           solAmount,
+          walletProvider: wallet?.provider || 'privy' // Default to privy for legacy wallet
         });
         await buyTokenViaPumpfun({
-          buyerPublicKey: solanaWallet.wallets?.[0]?.publicKey || '',
+          // Use the best available address
+          buyerPublicKey: address || solanaWallet?.wallets?.[0]?.publicKey || '',
           tokenAddress,
           solAmount,
-          solanaWallet,
+          solanaWallet: availableWallet,
         });
         Alert.alert('Success', `Bought token: ${tokenAddress}`);
       } catch (error: any) {
@@ -47,7 +63,7 @@ export function usePumpFun() {
         Alert.alert('Error Buying Token', error?.message || String(error));
       }
     },
-    [solanaWallet],
+    [wallet, solanaWallet, address],
   );
 
   /**
@@ -61,7 +77,10 @@ export function usePumpFun() {
       tokenAddress: string;
       tokenAmount: number;
     }) => {
-      if (!solanaWallet) {
+      // Use the best available wallet - prefer StandardWallet
+      const availableWallet = wallet || solanaWallet;
+      
+      if (!availableWallet) {
         Alert.alert('Error', 'No Solana wallet found. Please connect first.');
         return;
       }
@@ -69,12 +88,14 @@ export function usePumpFun() {
         console.log('[usePumpfun.sellToken] Attempting to sell token:', {
           tokenAddress,
           tokenAmount,
+          walletProvider: wallet?.provider || 'privy' // Default to privy for legacy wallet
         });
         await sellTokenViaPumpfun({
-          sellerPublicKey: solanaWallet.wallets?.[0]?.publicKey || '',
+          // Use the best available address
+          sellerPublicKey: address || solanaWallet?.wallets?.[0]?.publicKey || '',
           tokenAddress,
           tokenAmount,
-          solanaWallet,
+          solanaWallet: availableWallet,
         });
         Alert.alert('Success', `Sold ${tokenAmount} tokens: ${tokenAddress}`);
       } catch (error: any) {
@@ -82,7 +103,7 @@ export function usePumpFun() {
         Alert.alert('Error Selling Token', error?.message || String(error));
       }
     },
-    [solanaWallet],
+    [wallet, solanaWallet, address],
   );
 
   /**
@@ -109,11 +130,17 @@ export function usePumpFun() {
       imageUri: string;
       solAmount: number;
     }) => {
-      if (!solanaWallet) {
+      // Use the best available wallet - prefer StandardWallet
+      const availableWallet = wallet || solanaWallet;
+      
+      if (!availableWallet) {
         Alert.alert('Error', 'No Solana wallet found. Please connect first.');
         return;
       }
-      const userPublicKey = solanaWallet.wallets?.[0]?.publicKey || '';
+      
+      // Use the best available address
+      const userPublicKey = address || solanaWallet?.wallets?.[0]?.publicKey || '';
+      
       try {
         console.log('[usePumpfun.launchToken] Creating + Buying token:', {
           tokenName,
@@ -124,6 +151,7 @@ export function usePumpFun() {
           website,
           imageUri,
           solAmount,
+          walletProvider: wallet?.provider || 'privy' // Default to privy for legacy wallet
         });
         const result = await createAndBuyTokenViaPumpfun({
           userPublicKey,
@@ -135,12 +163,12 @@ export function usePumpFun() {
           website,
           imageUri,
           solAmount,
-          solanaWallet,
+          solanaWallet: availableWallet,
         });
-        if (result?.success) {
+        if (result) {
           Alert.alert(
             'Success',
-            `Launched token!\nMint: ${result.mintPublicKey}\nTx: ${result.txId}`,
+            `Launched token!\nMint: ${result.mint}\nTx: ${result.txSignature}`,
           );
         }
       } catch (error: any) {
@@ -148,7 +176,7 @@ export function usePumpFun() {
         Alert.alert('Error Launching Token', error?.message || String(error));
       }
     },
-    [solanaWallet],
+    [wallet, solanaWallet, address],
   );
 
   return {
