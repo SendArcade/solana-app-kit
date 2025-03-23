@@ -7,8 +7,10 @@ import {
   StyleSheet,
   ScrollView,
   Linking,
+  TouchableOpacity,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import {FontAwesome5} from '@expo/vector-icons';
 
 export interface Action {
   signature?: string;
@@ -21,13 +23,31 @@ export interface Action {
   timestamp?: number;
   feePayer?: string;
   source?: string;
-  events?: any[] | object;
+  events?: any;
+  tokenTransfers?: Array<{
+    fromUserAccount: string;
+    toUserAccount: string;
+    tokenAmount: number;
+    mint: string;
+    symbol?: string;
+  }>;
+  nativeTransfers?: Array<{
+    fromUserAccount: string;
+    toUserAccount: string;
+    amount: number;
+  }>;
+  accountData?: Array<{
+    account: string;
+    nativeBalanceChange: number;
+    tokenBalanceChanges: any[];
+  }>;
 }
 
 export interface ActionDetailModalProps {
   visible: boolean;
   action: Action | null;
   onClose: () => void;
+  walletAddress?: string;
 }
 
 /**
@@ -43,70 +63,148 @@ function getActionColor(actionLabel: string): string {
     return '#4caf50'; // Green for buys
   } else if (label.includes('sell')) {
     return '#f44336'; // Red for sells
+  } else if (label.includes('stake')) {
+    return '#ff9800'; // Orange for staking
+  } else if (label.includes('nft')) {
+    return '#673ab7'; // Deep purple for NFTs
   }
   return '#607d8b'; // Default blue-gray for unknown actions
+}
+
+/**
+ * Format lamports as SOL with appropriate decimal places.
+ */
+function formatSolAmount(lamports: number): string {
+  return (lamports / 1_000_000_000).toFixed(4);
+}
+
+/**
+ * Format date to a human-readable string.
+ */
+function formatDate(timestamp: number): string {
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+}
+
+/**
+ * Truncate address for display
+ */
+function truncateAddress(address: string): string {
+  if (!address || address.length < 10) return address;
+  return address.slice(0, 4) + '...' + address.slice(-4);
 }
 
 const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   visible,
   action,
   onClose,
+  walletAddress,
 }) => {
   const [showInstructions, setShowInstructions] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   if (!action) return null;
 
   // Determine the action label.
-  let actionLabel = action.transactionType || action.type || 'Unknown Action';
-  if (
-    (!actionLabel || actionLabel === 'Unknown Action') &&
-    action.instructions?.length
-  ) {
-    const firstInstruction = action.instructions[0];
-    if (
-      firstInstruction.program === 'system' &&
-      firstInstruction.parsed &&
-      firstInstruction.parsed.type === 'transfer'
-    ) {
-      actionLabel = 'Transfer';
-    } else if (
-      firstInstruction.program === 'token-mill' &&
-      firstInstruction.parsed &&
-      firstInstruction.parsed.type === 'buy'
-    ) {
-      actionLabel = 'Buy';
-    } else if (
-      firstInstruction.program === 'token-mill' &&
-      firstInstruction.parsed &&
-      firstInstruction.parsed.type === 'sell'
-    ) {
-      actionLabel = 'Sell';
+  let actionType = action.transactionType || action.type || 'Transaction';
+  if (action.description) {
+    if (action.description.includes('transferred')) {
+      actionType = 'Transfer';
+    } else if (action.description.includes('swap')) {
+      actionType = 'Swap';
     }
   }
 
-  const accentColor = getActionColor(actionLabel);
-  const signature = action.signature || 'UnknownSignature';
-  const truncatedSignature =
-    signature.length > 16
-      ? signature.slice(0, 8) + '...' + signature.slice(-6)
-      : signature;
-  const slot = action.slot || '—';
-  const description = action.description || 'No description available.';
-  const fee = action.fee !== undefined ? action.fee : 'N/A';
-
-  // Format timestamp into separate date and time strings.
-  let formattedDate = 'N/A';
-  let formattedTime = 'N/A';
-  if (action.timestamp) {
-    const d = new Date(action.timestamp * 1000);
-    formattedDate = d.toLocaleDateString();
-    formattedTime = d.toLocaleTimeString();
-  }
-
+  const accentColor = getActionColor(actionType);
+  const signature = action.signature || '';
+  const truncatedSignature = truncateAddress(signature);
+  const fee = action.fee !== undefined ? formatSolAmount(action.fee) : '—';
+  const date = action.timestamp ? formatDate(action.timestamp) : '—';
   const solscanURL = `https://solscan.io/tx/${signature}`;
 
-  const copySignature = () => {
-    Clipboard.setString(signature);
+  // Get from/to information for transfers
+  let fromAddress = '';
+  let toAddress = '';
+  let amount = '';
+  let symbol = 'SOL';
+  let direction = 'neutral';
+
+  // Get transaction details
+  if (action.nativeTransfers && action.nativeTransfers.length > 0) {
+    const transfer = action.nativeTransfers[0];
+    fromAddress = truncateAddress(transfer.fromUserAccount);
+    toAddress = truncateAddress(transfer.toUserAccount);
+    amount = formatSolAmount(transfer.amount);
+    symbol = 'SOL';
+    
+    if (walletAddress) {
+      if (transfer.fromUserAccount === walletAddress) {
+        direction = 'out';
+      } else if (transfer.toUserAccount === walletAddress) {
+        direction = 'in';
+      }
+    }
+  } else if (action.tokenTransfers && action.tokenTransfers.length > 0) {
+    const transfer = action.tokenTransfers[0];
+    fromAddress = truncateAddress(transfer.fromUserAccount);
+    toAddress = truncateAddress(transfer.toUserAccount);
+    amount = transfer.tokenAmount.toString();
+    symbol = transfer.symbol || truncateAddress(transfer.mint);
+    
+    if (walletAddress) {
+      if (transfer.fromUserAccount === walletAddress) {
+        direction = 'out';
+      } else if (transfer.toUserAccount === walletAddress) {
+        direction = 'in';
+      }
+    }
+  }
+
+  // For swaps, get input and output details
+  let swapDetails = null;
+  if (action.events?.swap) {
+    const swap = action.events.swap;
+    let inputAmount = '';
+    let inputSymbol = '';
+    let outputAmount = '';
+    let outputSymbol = '';
+    
+    if (swap.nativeInput) {
+      inputAmount = formatSolAmount(parseInt(swap.nativeInput.amount, 10));
+      inputSymbol = 'SOL';
+    } else if (swap.tokenInputs && swap.tokenInputs.length > 0) {
+      const input = swap.tokenInputs[0];
+      const decimals = parseInt(input.rawTokenAmount.decimals, 10);
+      inputAmount = (parseFloat(input.rawTokenAmount.tokenAmount) / Math.pow(10, decimals)).toFixed(4);
+      inputSymbol = truncateAddress(input.mint);
+    }
+    
+    if (swap.nativeOutput) {
+      outputAmount = formatSolAmount(parseInt(swap.nativeOutput.amount, 10));
+      outputSymbol = 'SOL';
+    } else if (swap.tokenOutputs && swap.tokenOutputs.length > 0) {
+      const output = swap.tokenOutputs[0];
+      const decimals = parseInt(output.rawTokenAmount.decimals, 10);
+      outputAmount = (parseFloat(output.rawTokenAmount.tokenAmount) / Math.pow(10, decimals)).toFixed(4);
+      outputSymbol = truncateAddress(output.mint);
+    }
+    
+    if (inputAmount && outputAmount) {
+      swapDetails = {
+        inputAmount,
+        inputSymbol,
+        outputAmount,
+        outputSymbol,
+      };
+    }
+  }
+
+  const copySignature = async () => {
+    if (signature) {
+      await Clipboard.setStringAsync(signature);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const openSolscan = () => {
@@ -121,100 +219,166 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
         <View style={modalStyles.modalContainer}>
           {/* Draggable Handle */}
           <View style={modalStyles.handleBar} />
+          
           {/* Header */}
           <View style={modalStyles.header}>
-            <Text style={modalStyles.headerTitle}>Transaction Details</Text>
-            <Pressable
+            <TouchableOpacity 
+              style={modalStyles.closeButton}
               onPress={onClose}
-              style={({pressed}) => [{opacity: pressed ? 0.7 : 1}]}>
-              <Text style={modalStyles.closeText}>✕</Text>
-            </Pressable>
+              activeOpacity={0.7}>
+              <FontAwesome5 name="times" size={18} color="#666" />
+            </TouchableOpacity>
+            <Text style={modalStyles.headerTitle}>Transaction Details</Text>
           </View>
+          
           <ScrollView
             style={modalStyles.content}
             showsVerticalScrollIndicator={false}>
-            {/* Basic Details */}
-            <View style={modalStyles.detailRow}>
-              <Text style={modalStyles.detailLabel}>Type:</Text>
-              <Text style={[modalStyles.detailValue, {color: accentColor}]}>
-                {actionLabel}
-              </Text>
+            
+            {/* Transaction Type Banner */}
+            <View style={[modalStyles.typeBanner, {backgroundColor: `${accentColor}10`}]}>
+              <View style={[modalStyles.iconContainer, {backgroundColor: `${accentColor}20`}]}>
+                <FontAwesome5 
+                  name={actionType.toLowerCase().includes('transfer') ? 'exchange-alt' 
+                       : actionType.toLowerCase().includes('swap') ? 'sync-alt'
+                       : 'receipt'} 
+                  size={16} 
+                  color={accentColor} 
+                />
+              </View>
+              <View style={modalStyles.typeInfo}>
+                <Text style={[modalStyles.typeTitle, {color: accentColor}]}>
+                  {actionType}
+                </Text>
+                <Text style={modalStyles.dateText}>{date}</Text>
+              </View>
             </View>
-            <View style={modalStyles.detailRow}>
-              <Text style={modalStyles.detailLabel}>Description:</Text>
-              <Text style={modalStyles.detailValue}>{description}</Text>
+            
+            {/* Transaction Amount for Transfers */}
+            {direction !== 'neutral' && amount && (
+              <View style={modalStyles.amountContainer}>
+                <Text style={[
+                  modalStyles.amountText, 
+                  {color: direction === 'in' ? '#4caf50' : '#f44336'}
+                ]}>
+                  {direction === 'in' ? '+ ' : '- '}{amount} {symbol}
+                </Text>
+              </View>
+            )}
+            
+            {/* Swap Details */}
+            {swapDetails && (
+              <View style={modalStyles.swapContainer}>
+                <View style={modalStyles.swapRow}>
+                  <View style={modalStyles.swapAmount}>
+                    <Text style={modalStyles.swapValue}>
+                      {swapDetails.inputAmount} {swapDetails.inputSymbol}
+                    </Text>
+                    <Text style={modalStyles.swapLabel}>Paid</Text>
+                  </View>
+                  <View style={modalStyles.swapArrow}>
+                    <FontAwesome5 name="arrow-right" size={14} color="#999" />
+                  </View>
+                  <View style={modalStyles.swapAmount}>
+                    <Text style={modalStyles.swapValue}>
+                      {swapDetails.outputAmount} {swapDetails.outputSymbol}
+                    </Text>
+                    <Text style={modalStyles.swapLabel}>Received</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+            
+            {/* Transaction Details */}
+            <View style={modalStyles.detailsSection}>
+              <Text style={modalStyles.sectionTitle}>Details</Text>
+              
+              {/* Fee */}
+              <View style={modalStyles.detailRow}>
+                <Text style={modalStyles.detailLabel}>Fee</Text>
+                <Text style={modalStyles.detailValue}>{fee} SOL</Text>
+              </View>
+              
+              {/* From / To for transfers */}
+              {fromAddress && (
+                <View style={modalStyles.detailRow}>
+                  <Text style={modalStyles.detailLabel}>From</Text>
+                  <Text style={modalStyles.detailValue}>{fromAddress}</Text>
+                </View>
+              )}
+              
+              {toAddress && (
+                <View style={modalStyles.detailRow}>
+                  <Text style={modalStyles.detailLabel}>To</Text>
+                  <Text style={modalStyles.detailValue}>{toAddress}</Text>
+                </View>
+              )}
+              
+              {/* Signature with copy button */}
+              <View style={modalStyles.detailRow}>
+                <Text style={modalStyles.detailLabel}>Signature</Text>
+                <View style={modalStyles.signatureContainer}>
+                  <Text style={modalStyles.detailValue}>{truncatedSignature}</Text>
+                  <TouchableOpacity 
+                    onPress={copySignature}
+                    style={modalStyles.copyButton}>
+                    <FontAwesome5 
+                      name={copied ? "check" : "copy"} 
+                      size={14} 
+                      color={copied ? "#4caf50" : "#1d9bf0"} 
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              
+              {/* Slot */}
+              {action.slot && (
+                <View style={modalStyles.detailRow}>
+                  <Text style={modalStyles.detailLabel}>Slot</Text>
+                  <Text style={modalStyles.detailValue}>{action.slot}</Text>
+                </View>
+              )}
             </View>
-            {/* Signature Row with copy functionality */}
-            <View style={modalStyles.detailRow}>
-              <Text style={modalStyles.detailLabel}>Signature:</Text>
-              <Pressable onPress={copySignature} style={modalStyles.copyButton}>
-                <Text style={modalStyles.copyButtonText}>Copy</Text>
-              </Pressable>
-              <Text style={modalStyles.detailValue}>{truncatedSignature}</Text>
-            </View>
-            {/* Solscan Button */}
-            <Pressable
+            
+            {/* View on Solscan Button */}
+            <TouchableOpacity
               onPress={openSolscan}
-              style={({pressed}) => [
-                modalStyles.solscanButton,
-                {opacity: pressed ? 0.8 : 1},
-              ]}>
-              <Text style={modalStyles.solscanButtonText}>View on Solscan</Text>
-            </Pressable>
-            <View style={modalStyles.detailRow}>
-              <Text style={modalStyles.detailLabel}>Slot:</Text>
-              <Text style={modalStyles.detailValue}>{slot}</Text>
-            </View>
-            <View style={modalStyles.detailRow}>
-              <Text style={modalStyles.detailLabel}>Fee:</Text>
-              <Text style={modalStyles.detailValue}>{fee}</Text>
-            </View>
-            <View style={modalStyles.detailRow}>
-              <Text style={modalStyles.detailLabel}>Date:</Text>
-              <Text style={modalStyles.detailValue}>{formattedDate}</Text>
-            </View>
-            <View style={modalStyles.detailRow}>
-              <Text style={modalStyles.detailLabel}>Time:</Text>
-              <Text style={modalStyles.detailValue}>{formattedTime}</Text>
-            </View>
-            {action.feePayer && (
-              <View style={modalStyles.detailRow}>
-                <Text style={modalStyles.detailLabel}>Fee Payer:</Text>
-                <Text style={modalStyles.detailValue}>{action.feePayer}</Text>
-              </View>
-            )}
-            {action.source && (
-              <View style={modalStyles.detailRow}>
-                <Text style={modalStyles.detailLabel}>Source:</Text>
-                <Text style={modalStyles.detailValue}>{action.source}</Text>
-              </View>
-            )}
-            {/* Instructions Dropdown */}
+              style={modalStyles.solscanButton}
+              activeOpacity={0.8}>
+              <FontAwesome5 name="external-link-alt" size={14} color="#1d9bf0" style={modalStyles.solscanIcon} />
+              <Text style={modalStyles.solscanText}>View on Solscan</Text>
+            </TouchableOpacity>
+            
+            {/* Instructions Section */}
             {action.instructions && action.instructions.length > 0 && (
               <View style={modalStyles.instructionsContainer}>
-                <Text style={modalStyles.sectionTitle}>Instructions</Text>
-                {showInstructions ? (
-                  action.instructions.map((instr, idx) => (
-                    <View key={idx} style={modalStyles.instructionBox}>
-                      <Text style={modalStyles.instructionText}>
-                        {JSON.stringify(instr, null, 2)}
-                      </Text>
-                    </View>
-                  ))
-                ) : (
-                  <View style={modalStyles.instructionBox}>
-                    <Text style={modalStyles.instructionText}>
-                      {JSON.stringify(action.instructions[0]).slice(0, 100)}...
+                <View style={modalStyles.instructionHeader}>
+                  <Text style={modalStyles.sectionTitle}>Instructions</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowInstructions(!showInstructions)}
+                    style={modalStyles.toggleButton}>
+                    <Text style={modalStyles.toggleButtonText}>
+                      {showInstructions ? 'Hide' : 'Show'}
                     </Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {showInstructions && (
+                  <View style={modalStyles.instructionsList}>
+                    {action.instructions.map((instr, idx) => (
+                      <View key={idx} style={modalStyles.instructionItem}>
+                        <Text style={modalStyles.instructionProgram}>
+                          Program: {instr.programId || instr.program || 'Unknown'}
+                        </Text>
+                        <View style={modalStyles.instructionData}>
+                          <Text style={modalStyles.instructionDataText}>
+                            {JSON.stringify(instr.data || instr, null, 2)}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
                   </View>
                 )}
-                <Pressable
-                  onPress={() => setShowInstructions(!showInstructions)}
-                  style={modalStyles.toggleButton}>
-                  <Text style={modalStyles.toggleButtonText}>
-                    {showInstructions ? 'Show Less' : 'Show More'}
-                  </Text>
-                </Pressable>
               </View>
             )}
           </ScrollView>
@@ -227,113 +391,203 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
 const modalStyles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '85%',
-    paddingBottom: 20,
+    maxHeight: '90%',
+    paddingBottom: 30,
   },
   handleBar: {
     width: 40,
     height: 5,
-    backgroundColor: '#ccc',
+    backgroundColor: '#e0e0e0',
     borderRadius: 3,
     alignSelf: 'center',
-    marginVertical: 10,
+    marginVertical: 8,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#f0f0f0',
+    position: 'relative',
+  },
+  closeButton: {
+    position: 'absolute',
+    left: 20,
+    padding: 5,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '600',
     color: '#333',
-  },
-  closeText: {
-    fontSize: 24,
-    color: '#888',
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 10,
+  },
+  typeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  typeInfo: {
+    marginLeft: 12,
+  },
+  typeTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  dateText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  amountContainer: {
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  amountText: {
+    fontSize: 24,
+    fontWeight: '600',
+  },
+  swapContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 16,
+  },
+  swapRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  swapAmount: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  swapValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  swapLabel: {
+    fontSize: 12,
+    color: '#888',
+  },
+  swapArrow: {
+    marginHorizontal: 8,
+  },
+  detailsSection: {
+    marginVertical: 16,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
   },
   detailRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   detailLabel: {
-    fontWeight: '600',
-    width: 100,
-    color: '#555',
+    fontSize: 14,
+    color: '#666',
   },
   detailValue: {
-    flex: 1,
-    color: '#333',
     fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  signatureContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   copyButton: {
-    marginRight: 8,
-    backgroundColor: '#f0f0f0',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  copyButtonText: {
-    fontSize: 12,
-    color: '#1d9bf0',
-    fontWeight: '600',
+    marginLeft: 8,
+    padding: 6,
   },
   solscanButton: {
-    backgroundColor: '#e8f4fd',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0f7ff',
+    paddingVertical: 12,
     borderRadius: 8,
-    alignSelf: 'flex-start',
-    marginVertical: 10,
+    marginVertical: 16,
   },
-  solscanButtonText: {
+  solscanIcon: {
+    marginRight: 8,
+  },
+  solscanText: {
     color: '#1d9bf0',
     fontWeight: '600',
     fontSize: 14,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#333',
   },
   instructionsContainer: {
     marginTop: 16,
+    marginBottom: 24,
   },
-  instructionBox: {
-    backgroundColor: '#f7f7f7',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 6,
-  },
-  instructionText: {
-    fontSize: 12,
-    color: '#555',
+  instructionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   toggleButton: {
-    alignSelf: 'flex-end',
-    marginTop: 4,
+    padding: 4,
   },
   toggleButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#1d9bf0',
+    fontWeight: '500',
+  },
+  instructionsList: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 12,
+  },
+  instructionItem: {
+    marginBottom: 12,
+  },
+  instructionProgram: {
+    fontSize: 13,
     fontWeight: '600',
+    color: '#555',
+    marginBottom: 4,
+  },
+  instructionData: {
+    backgroundColor: '#fff',
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  instructionDataText: {
+    fontSize: 12,
+    color: '#666',
+    fontFamily: 'monospace',
   },
 });
 
