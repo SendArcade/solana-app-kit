@@ -1,6 +1,6 @@
 // FILE: src/hooks/useCoingecko.ts
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   getCoinList,
   getCoinMarkets,
@@ -9,6 +9,18 @@ import {
 
 /** Timeframe type used for chart data */
 export type Timeframe = '1H' | '1D' | '1W' | '1M' | 'All';
+
+// Cache data for up to 5 minutes (in milliseconds)
+const CACHE_TTL = 5 * 60 * 1000;
+
+// Cache for coin data to avoid refetching
+interface CacheEntry {
+  timestamp: number;
+  data: any;
+}
+
+// Global cache to persist between hook instances
+const coinDataCache = new Map<string, CacheEntry>();
 
 export function useCoingecko() {
   // ------------------------------------------
@@ -39,13 +51,32 @@ export function useCoingecko() {
     'usd-coin',
   ]);
 
-  // Fetch full coin list once
+  // Track if mount is complete to avoid unnecessary fetches
+  const isMounted = useRef(false);
+
+  // Fetch full coin list once - with caching
   const fetchCoinList = useCallback(async () => {
+    // Check cache first
+    const cacheKey = 'coinList';
+    const cachedData = coinDataCache.get(cacheKey);
+    
+    if (cachedData && Date.now() - cachedData.timestamp < CACHE_TTL) {
+      setCoinList(cachedData.data);
+      return;
+    }
+    
     setLoadingCoinList(true);
     setCoinListError(null);
+    
     try {
       const data = await getCoinList();
       setCoinList(data);
+      
+      // Update cache
+      coinDataCache.set(cacheKey, {
+        timestamp: Date.now(),
+        data
+      });
     } catch (err: any) {
       setCoinListError(err.message || 'Unknown error fetching coin list');
     } finally {
@@ -54,10 +85,13 @@ export function useCoingecko() {
   }, []);
 
   useEffect(() => {
-    fetchCoinList();
+    if (!isMounted.current) {
+      fetchCoinList();
+      isMounted.current = true;
+    }
   }, [fetchCoinList]);
 
-  // Local search among coinList
+  // Local search among coinList - memoized to avoid recalculation
   const searchCoins = useCallback(
     (query: string) => {
       if (!query.trim()) {
@@ -107,41 +141,61 @@ export function useCoingecko() {
   const [loadingOHLC, setLoadingOHLC] = useState(false);
   const [coinError, setCoinError] = useState<string | null>(null);
 
+  // Track previous coin ID and timeframe to avoid duplicate fetches
+  const prevCoinIdRef = useRef<string>('');
+  const prevTimeframeRef = useRef<Timeframe>('1D');
+  
+  // Track if a fetch is in progress
+  const fetchingRef = useRef<boolean>(false);
+  
+  // Debounce timer
+  const timerRef = useRef<any>(null);
+
   // ------------------------------------------
-  // Fetch logic
+  // Fetch logic - with improved caching
   // ------------------------------------------
-  const fetchMarketData = useCallback(async (coinId: string) => {
+  const fetchMarketData = useCallback(async (coinId: string): Promise<any> => {
+    if (!coinId) return null;
+    
+    const cacheKey = `market:${coinId}`;
+    const cachedData = coinDataCache.get(cacheKey);
+    
+    if (cachedData && Date.now() - cachedData.timestamp < CACHE_TTL) {
+      return cachedData.data;
+    }
+    
     setLoadingMarketData(true);
     setCoinError(null);
+    
     try {
       const market = await getCoinMarkets(coinId);
-      setMarketCap(market.market_cap || 0);
-      let computedFdv = market.fully_diluted_valuation;
-      if (computedFdv == null) {
-        if (market.total_supply && market.current_price) {
-          computedFdv = market.total_supply * market.current_price;
-        } else {
-          computedFdv = market.market_cap;
-        }
-      }
-      setFdv(computedFdv || 0);
-
-      // Example liquidity = total_volume / market_cap * 100
-      if (market.market_cap && market.total_volume) {
-        const liquidity = (market.total_volume / market.market_cap) * 100;
-        setLiquidityScore(liquidity);
-      } else {
-        setLiquidityScore(0);
-      }
+      
+      // Update cache
+      coinDataCache.set(cacheKey, {
+        timestamp: Date.now(),
+        data: market
+      });
+      
+      return market;
     } catch (err: any) {
       setCoinError(err.message || 'Error fetching market data');
+      return null;
     } finally {
       setLoadingMarketData(false);
     }
   }, []);
 
   const fetchOhlcData = useCallback(
-    async (coinId: string, selectedTf: Timeframe) => {
+    async (coinId: string, selectedTf: Timeframe): Promise<any> => {
+      if (!coinId) return null;
+      
+      const cacheKey = `ohlc:${coinId}:${selectedTf}`;
+      const cachedData = coinDataCache.get(cacheKey);
+      
+      if (cachedData && Date.now() - cachedData.timestamp < CACHE_TTL) {
+        return cachedData.data;
+      }
+      
       setLoadingOHLC(true);
       setCoinError(null);
 
@@ -167,14 +221,59 @@ export function useCoingecko() {
 
       try {
         const rawData = await getCoinOHLC(coinId, days);
-        if (!rawData || rawData.length === 0) {
-          setGraphData([]);
-          setTimestamps([]);
-          setTimeframePrice(0);
-          setTimeframeChangeUsd(0);
-          setTimeframeChangePercent(0);
-          return;
+        
+        // Update cache
+        coinDataCache.set(cacheKey, {
+          timestamp: Date.now(),
+          data: rawData
+        });
+        
+        return rawData;
+      } catch (err: any) {
+        setCoinError(err.message || 'Error fetching OHLC data');
+        return null;
+      } finally {
+        setLoadingOHLC(false);
+      }
+    },
+    [],
+  );
+
+  // ------------------------------------------
+  // Combined fetch for market and OHLC data
+  // ------------------------------------------
+  const fetchCoinData = useCallback(async (coinId: string, tf: Timeframe) => {
+    if (!coinId || fetchingRef.current) return;
+    
+    fetchingRef.current = true;
+    setCoinError(null);
+    
+    try {
+      // Fetch market data
+      const market = await fetchMarketData(coinId);
+      if (market) {
+        setMarketCap(market.market_cap || 0);
+        let computedFdv = market.fully_diluted_valuation;
+        if (computedFdv == null) {
+          if (market.total_supply && market.current_price) {
+            computedFdv = market.total_supply * market.current_price;
+          } else {
+            computedFdv = market.market_cap;
+          }
         }
+        setFdv(computedFdv || 0);
+
+        if (market.market_cap && market.total_volume) {
+          const liquidity = (market.total_volume / market.market_cap) * 100;
+          setLiquidityScore(liquidity);
+        } else {
+          setLiquidityScore(0);
+        }
+      }
+      
+      // Fetch OHLC data
+      const rawData = await fetchOhlcData(coinId, tf);
+      if (rawData && rawData.length > 0) {
         const closeValues = rawData.map((arr: number[]) => arr[4]);
         const timeValues = rawData.map((arr: number[]) => arr[0]);
 
@@ -196,65 +295,81 @@ export function useCoingecko() {
           setTimeframeChangeUsd(0);
           setTimeframeChangePercent(0);
         }
-      } catch (err: any) {
-        setCoinError(err.message || 'Error fetching OHLC data');
-        // If we want to preserve old data on error, do nothing else here
-      } finally {
-        setLoadingOHLC(false);
+      } else {
+        // No data returned
+        setGraphData([]);
+        setTimestamps([]);
+        setTimeframePrice(0);
+        setTimeframeChangeUsd(0);
+        setTimeframeChangePercent(0);
       }
-    },
-    [],
-  );
+      
+      // Update refs for tracking changes
+      prevCoinIdRef.current = coinId;
+      prevTimeframeRef.current = tf;
+      
+    } catch (err) {
+      console.error('Error in fetchCoinData:', err);
+    } finally {
+      fetchingRef.current = false;
+    }
+  }, [fetchMarketData, fetchOhlcData]);
 
   // ------------------------------------------
-  // Debounce the selectedCoinId changes
-  // ------------------------------------------
-  const [debouncedCoinId, setDebouncedCoinId] = useState('');
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedCoinId(selectedCoinId);
-    }, 300); // 300ms
-
-    return () => clearTimeout(timer);
-  }, [selectedCoinId]);
-
-  // ------------------------------------------
-  // Automatic fetch on coin/timeframe changes
+  // Debounced coin ID handler
   // ------------------------------------------
   useEffect(() => {
-    if (!debouncedCoinId) return;
-
-    // We fetch market data & then OHLC data
-    let cancelled = false;
-    const fetchAll = async () => {
-      await fetchMarketData(debouncedCoinId);
-      if (!cancelled) {
-        await fetchOhlcData(debouncedCoinId, timeframe);
-      }
-    };
-    fetchAll();
-
+    if (!selectedCoinId) return;
+    
+    // Clear any existing timer
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    
+    // Skip fetch if coin ID and timeframe haven't changed
+    if (
+      selectedCoinId === prevCoinIdRef.current && 
+      timeframe === prevTimeframeRef.current
+    ) {
+      return;
+    }
+    
+    // Debounce the fetch - wait 300ms before fetching
+    timerRef.current = setTimeout(() => {
+      fetchCoinData(selectedCoinId, timeframe);
+    }, 300);
+    
     return () => {
-      cancelled = true;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
     };
-  }, [debouncedCoinId, timeframe, fetchMarketData, fetchOhlcData]);
+  }, [selectedCoinId, timeframe, fetchCoinData]);
 
   // ------------------------------------------
-  // Manual refresh
+  // Manual refresh - exposed to components
   // ------------------------------------------
   const refreshCoinData = useCallback(async () => {
-    if (!debouncedCoinId) return;
+    if (!selectedCoinId) return;
+    
+    // Skip debouncing for manual refresh
+    await fetchCoinData(selectedCoinId, timeframe);
+  }, [selectedCoinId, timeframe, fetchCoinData]);
 
-    try {
-      await fetchMarketData(debouncedCoinId);
-      await fetchOhlcData(debouncedCoinId, timeframe);
-    } catch (error) {
-      console.error('Failed to refresh coin data:', error);
+  // ------------------------------------------
+  // Clear data when coin ID changes completely
+  // ------------------------------------------
+  useEffect(() => {
+    // If switching to a completely different coin, clear data immediately
+    if (selectedCoinId && selectedCoinId !== prevCoinIdRef.current) {
+      setGraphData([]);
+      setTimestamps([]);
+      setTimeframePrice(0);
     }
-  }, [debouncedCoinId, timeframe, fetchMarketData, fetchOhlcData]);
+  }, [selectedCoinId]);
 
-  return {
+  // Memoized value to prevent rerenders on reference equality checks
+  const value = useMemo(() => ({
     // (A) Coin list searching
     coinList,
     loadingCoinList,
@@ -288,5 +403,28 @@ export function useCoingecko() {
 
     // Refresh
     refreshCoinData,
-  };
+  }), [
+    coinList, 
+    loadingCoinList, 
+    coinListError,
+    searchResults,
+    searchCoins,
+    fetchCoinList,
+    selectedCoinId,
+    timeframe,
+    marketCap,
+    liquidityScore,
+    fdv,
+    graphData,
+    timestamps,
+    timeframePrice,
+    timeframeChangeUsd,
+    timeframeChangePercent,
+    loadingMarketData,
+    loadingOHLC,
+    coinError,
+    refreshCoinData
+  ]);
+
+  return value;
 }
