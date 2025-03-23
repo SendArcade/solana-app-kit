@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import {styles} from './collectibles.style';
 import {AssetItem} from '../../../hooks/useFetchTokens';
-import {fixImageUrl} from '../../../utils/common/fixUrl';
+import {fixImageUrl} from '../../../hooks/useFetchTokens';
 
 /**
  * Represents a single NFT item
@@ -31,6 +31,7 @@ export interface PortfolioSectionProps {
   items: AssetItem[];
   onItemPress?: (item: AssetItem) => void;
   emptyMessage?: string;
+  displayAsList?: boolean;
 }
 
 /**
@@ -73,6 +74,71 @@ interface CollectiblesProps {
 
 const SOL_DECIMAL = 1000000000; // 1 SOL = 10^9 lamports
 
+// List renderer for token items
+const TokenListItem: React.FC<{
+  item: AssetItem;
+  onPress?: (item: AssetItem) => void;
+}> = ({ item, onPress }) => {
+  const imageUrl = item.image ? fixImageUrl(item.image) : '';
+  
+  const formattedBalance = item.token_info ? 
+    parseFloat(
+      (parseInt(item.token_info.balance) / Math.pow(10, item.token_info.decimals))
+        .toFixed(item.token_info.decimals)
+    ).toString() : '0';
+  
+  const tokenValue = item.token_info?.price_info?.total_price 
+    ? `$${item.token_info.price_info.total_price.toFixed(2)}`
+    : '';
+
+  return (
+    <TouchableOpacity 
+      style={portfolioStyles.tokenListItem}
+      onPress={() => onPress && onPress(item)}
+      activeOpacity={0.7}
+    >
+      {/* Token Logo */}
+      <View style={portfolioStyles.tokenLogoContainer}>
+        {imageUrl ? (
+          <Image
+            source={{ uri: imageUrl }}
+            style={portfolioStyles.tokenLogo}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={portfolioStyles.tokenLogoPlaceholder}>
+            <Text style={portfolioStyles.tokenLogoPlaceholderText}>
+              {item.symbol?.[0] || item.name?.[0] || '?'}
+            </Text>
+          </View>
+        )}
+      </View>
+      
+      {/* Token Details */}
+      <View style={portfolioStyles.tokenDetails}>
+        <Text style={portfolioStyles.tokenName} numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text style={portfolioStyles.tokenSymbol} numberOfLines={1}>
+          {item.token_info?.symbol || item.symbol || ''}
+        </Text>
+      </View>
+      
+      {/* Token Balance & Value */}
+      <View style={portfolioStyles.tokenBalanceContainer}>
+        <Text style={portfolioStyles.tokenBalance}>
+          {formattedBalance}
+        </Text>
+        {tokenValue ? (
+          <Text style={portfolioStyles.tokenValue}>
+            {tokenValue}
+          </Text>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+};
+
 /**
  * A component to display a group of assets of a specific type
  */
@@ -81,12 +147,17 @@ const PortfolioSection: React.FC<PortfolioSectionProps> = ({
   items,
   onItemPress,
   emptyMessage = 'No items to display',
+  displayAsList = false,
 }) => {
   const { width } = Dimensions.get('window');
-  const itemWidth = (width - 48) / 2; // 2 columns with some padding
+  const itemWidth = (width - 60) / 2; // 2 columns with some padding
 
   if (items.length === 0) {
-    return null;
+    return (
+      <View style={portfolioStyles.emptySection}>
+        <Text style={portfolioStyles.emptyText}>{emptyMessage}</Text>
+      </View>
+    );
   }
 
   // Custom image renderer that handles loading and errors
@@ -94,6 +165,7 @@ const PortfolioSection: React.FC<PortfolioSectionProps> = ({
     const imageUrl = item.image ? fixImageUrl(item.image) : '';
     
     if (!imageUrl) {
+      // If no image is available, display a placeholder with the token symbol/name
       return (
         <View style={portfolioStyles.placeholderImage}>
           <Text style={portfolioStyles.placeholderText}>
@@ -104,23 +176,47 @@ const PortfolioSection: React.FC<PortfolioSectionProps> = ({
     }
     
     return (
-      <ImageBackground
-        source={require('../../../assets/images/SENDlogo.png')}
-        style={portfolioStyles.image}
-        resizeMode="cover">
+      <View style={portfolioStyles.imageWrapper}>
         <Image
-          source={{uri: imageUrl}}
+          source={require('../../../assets/images/SENDlogo.png')}
+          style={portfolioStyles.fallbackImage}
+          resizeMode="cover"
+        />
+        <Image
+          source={{ uri: imageUrl }}
           style={portfolioStyles.image}
           resizeMode="cover"
         />
-      </ImageBackground>
+      </View>
     );
   };
 
+  // List format for tokens
+  if (displayAsList) {
+    return (
+      <View style={portfolioStyles.sectionContainer}>
+        <Text style={portfolioStyles.sectionTitle}>{sectionTitle}</Text>
+        <FlatList
+          key="list"
+          data={items}
+          keyExtractor={item => item.id || item.mint}
+          renderItem={({item}) => (
+            <TokenListItem item={item} onPress={onItemPress} />
+          )}
+          scrollEnabled={false}
+          contentContainerStyle={portfolioStyles.listContainer}
+          ItemSeparatorComponent={() => <View style={portfolioStyles.separator} />}
+        />
+      </View>
+    );
+  }
+
+  // Grid format for NFTs
   return (
     <View style={portfolioStyles.sectionContainer}>
       <Text style={portfolioStyles.sectionTitle}>{sectionTitle}</Text>
       <FlatList
+        key="grid"
         data={items}
         numColumns={2}
         keyExtractor={item => item.id || item.mint}
@@ -129,33 +225,46 @@ const PortfolioSection: React.FC<PortfolioSectionProps> = ({
           <TouchableOpacity 
             style={[portfolioStyles.itemContainer, {width: itemWidth}]}
             onPress={() => onItemPress && onItemPress(item)}
+            activeOpacity={0.7}
           >
             <View style={portfolioStyles.imageContainer}>
               {renderAssetImage(item)}
               
+              {/* Display badges for special asset types */}
               {item.compression?.compressed && (
                 <View style={portfolioStyles.compressedBadge}>
                   <Text style={portfolioStyles.compressedText}>C</Text>
                 </View>
               )}
+              
+              {/* Show token price if available */}
+              {item.token_info?.price_info?.price_per_token && (
+                <View style={portfolioStyles.priceBadge}>
+                  <Text style={portfolioStyles.priceText}>
+                    ${item.token_info.price_info.price_per_token.toFixed(2)}
+                  </Text>
+                </View>
+              )}
             </View>
             
-            <Text style={portfolioStyles.itemName} numberOfLines={1}>
-              {item.name}
-            </Text>
-            
-            {item.token_info ? (
-              <Text style={portfolioStyles.itemBalance}>
-                {parseFloat(
-                  (parseInt(item.token_info.balance) / Math.pow(10, item.token_info.decimals))
-                    .toFixed(item.token_info.decimals)
-                ).toString()} {item.token_info.symbol || item.symbol}
+            <View style={portfolioStyles.itemDetails}>
+              <Text style={portfolioStyles.itemName} numberOfLines={1}>
+                {item.name}
               </Text>
-            ) : item.collection?.name ? (
-              <Text style={portfolioStyles.itemCollection} numberOfLines={1}>
-                {item.collection.name}
-              </Text>
-            ) : null}
+              
+              {item.token_info ? (
+                <Text style={portfolioStyles.itemBalance}>
+                  {parseFloat(
+                    (parseInt(item.token_info.balance) / Math.pow(10, item.token_info.decimals))
+                      .toFixed(item.token_info.decimals)
+                  ).toString()} {item.token_info.symbol || item.symbol}
+                </Text>
+              ) : item.collection?.name ? (
+                <Text style={portfolioStyles.itemCollection} numberOfLines={1}>
+                  {item.collection.name}
+                </Text>
+              ) : null}
+            </View>
           </TouchableOpacity>
         )}
         scrollEnabled={false}
@@ -180,19 +289,29 @@ const Collectibles: React.FC<CollectiblesProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'tokens' | 'nfts' | 'cnfts'>('all');
   
+  // Show loading state while fetching data
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={portfolioStyles.loadingContainer}>
         <ActivityIndicator size="large" color="#1d9bf0" />
-        <Text style={styles.loadingText}>Loading portfolio...</Text>
+        <Text style={portfolioStyles.loadingText}>Loading your portfolio...</Text>
       </View>
     );
   }
   
+  // Show error state if there was a problem
   if (error) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>{error}</Text>
+      <View style={portfolioStyles.errorContainer}>
+        <Text style={portfolioStyles.errorText}>{error}</Text>
+        {onRefresh && (
+          <TouchableOpacity 
+            style={portfolioStyles.retryButton}
+            onPress={onRefresh}
+          >
+            <Text style={portfolioStyles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -207,28 +326,34 @@ const Collectibles: React.FC<CollectiblesProps> = ({
     interface: 'V1_NFT',
   } as AssetItem)) : []);
 
+  // Show empty state if no assets found
   if (items.length === 0 && !nativeBalance) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.emptyText}>No assets found in this wallet.</Text>
+      <View style={portfolioStyles.emptyContainer}>
+        <Text style={portfolioStyles.emptyText}>No assets found in this wallet.</Text>
+        {onRefresh && (
+          <TouchableOpacity 
+            style={portfolioStyles.retryButton}
+            onPress={onRefresh}
+          >
+            <Text style={portfolioStyles.retryText}>Refresh</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
 
   // Filter items by type
   const tokens = items.filter(item => 
-    item.interface === 'V1_TOKEN' || 
-    item.interface === 'FungibleToken' ||
-    (item.token_info && item.token_info.balance)
+    item.assetType === 'token'
   );
   
   const regularNfts = items.filter(item => 
-    (item.interface === 'V1_NFT' || item.interface === 'ProgrammableNFT') && 
-    (!item.compression || !item.compression.compressed)
+    item.assetType === 'nft'
   );
   
   const compressedNfts = items.filter(item => 
-    item.compression && item.compression.compressed
+    item.assetType === 'cnft'
   );
 
   const solBalance = nativeBalance ? (nativeBalance / SOL_DECIMAL).toFixed(4) : '0';
@@ -237,66 +362,108 @@ const Collectibles: React.FC<CollectiblesProps> = ({
   const renderItems = () => {
     switch (activeTab) {
       case 'tokens':
-        return (
-          <>
-            <PortfolioSection 
-              sectionTitle="Tokens" 
-              items={tokens} 
-              onItemPress={onItemPress}
-              emptyMessage="No tokens found" 
-            />
-          </>
+        return tokens.length > 0 ? (
+          <PortfolioSection 
+            sectionTitle="Tokens" 
+            items={tokens} 
+            onItemPress={onItemPress}
+            emptyMessage="No tokens found"
+            displayAsList={true}
+          />
+        ) : (
+          <View style={portfolioStyles.emptyTabContent}>
+            <Text style={portfolioStyles.emptyTabText}>No tokens found in this wallet</Text>
+          </View>
         );
+        
       case 'nfts':
-        return (
+        return regularNfts.length > 0 ? (
           <PortfolioSection 
             sectionTitle="NFTs" 
             items={regularNfts} 
             onItemPress={onItemPress}
             emptyMessage="No NFTs found" 
+            displayAsList={false}
           />
+        ) : (
+          <View style={portfolioStyles.emptyTabContent}>
+            <Text style={portfolioStyles.emptyTabText}>No NFTs found in this wallet</Text>
+          </View>
         );
+        
       case 'cnfts':
-        return (
+        return compressedNfts.length > 0 ? (
           <PortfolioSection 
             sectionTitle="Compressed NFTs" 
             items={compressedNfts} 
             onItemPress={onItemPress}
             emptyMessage="No compressed NFTs found" 
+            displayAsList={false}
           />
+        ) : (
+          <View style={portfolioStyles.emptyTabContent}>
+            <Text style={portfolioStyles.emptyTabText}>No compressed NFTs found in this wallet</Text>
+          </View>
         );
+        
       case 'all':
       default:
         return (
           <>
+            {/* SOL Balance Card */}
             <View style={portfolioStyles.solBalanceContainer}>
               <Text style={portfolioStyles.solBalanceLabel}>SOL Balance</Text>
               <Text style={portfolioStyles.solBalanceValue}>{solBalance} SOL</Text>
             </View>
             
+            {/* Tokens Section */}
             {tokens.length > 0 && (
               <PortfolioSection 
                 sectionTitle="Tokens" 
                 items={tokens.slice(0, 6)} 
                 onItemPress={onItemPress}
+                displayAsList={true}
               />
             )}
             
+            {/* NFTs Section */}
             {regularNfts.length > 0 && (
               <PortfolioSection 
                 sectionTitle="NFTs" 
-                items={regularNfts.slice(0, 6)} 
+                items={regularNfts.slice(0, 4)} 
                 onItemPress={onItemPress}
+                displayAsList={false}
               />
             )}
             
+            {/* Compressed NFTs Section */}
             {compressedNfts.length > 0 && (
               <PortfolioSection 
                 sectionTitle="Compressed NFTs" 
-                items={compressedNfts.slice(0, 6)} 
+                items={compressedNfts.slice(0, 4)} 
                 onItemPress={onItemPress}
+                displayAsList={false}
               />
             )}
+            
+            {/* Show a view all button if there are more items than shown */}
+            {tokens.length > 6 || regularNfts.length > 4 || compressedNfts.length > 4 ? (
+              <TouchableOpacity 
+                style={portfolioStyles.viewAllButton}
+                onPress={() => {
+                  // Navigate to the category with the most items
+                  if (tokens.length >= regularNfts.length && tokens.length >= compressedNfts.length) {
+                    setActiveTab('tokens');
+                  } else if (regularNfts.length >= compressedNfts.length) {
+                    setActiveTab('nfts');
+                  } else {
+                    setActiveTab('cnfts');
+                  }
+                }}
+              >
+                <Text style={portfolioStyles.viewAllText}>View All Assets</Text>
+              </TouchableOpacity>
+            ) : null}
           </>
         );
     }
@@ -307,9 +474,15 @@ const Collectibles: React.FC<CollectiblesProps> = ({
       style={portfolioStyles.scrollContainer}
       contentContainerStyle={portfolioStyles.scrollContent}
       refreshControl={
-        <RefreshControl refreshing={refreshing || false} onRefresh={onRefresh} />
+        <RefreshControl 
+          refreshing={refreshing || false} 
+          onRefresh={onRefresh}
+          colors={['#1d9bf0']} 
+          tintColor={'#1d9bf0'}
+        />
       }
     >
+      {/* Tabs for filtering different asset types */}
       <View style={portfolioStyles.tabContainer}>
         <TouchableOpacity
           style={[
@@ -395,18 +568,23 @@ const Collectibles: React.FC<CollectiblesProps> = ({
         </TouchableOpacity>
       </View>
 
+      {/* Render the appropriate content based on selected tab */}
       {renderItems()}
     </ScrollView>
   );
 };
 
 const portfolioStyles = StyleSheet.create({
+  // Main container styles
   scrollContainer: {
     flex: 1,
+    backgroundColor: '#fff',
   },
   scrollContent: {
     paddingBottom: 20,
   },
+  
+  // Tab styles
   tabContainer: {
     flexDirection: 'row',
     marginBottom: 16,
@@ -415,10 +593,15 @@ const portfolioStyles = StyleSheet.create({
     borderRadius: 20,
     marginHorizontal: 12,
     marginTop: 12,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   tab: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
@@ -448,14 +631,93 @@ const portfolioStyles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
   },
+  
+  // Token list styles
+  tokenListItem: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  tokenLogoContainer: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    overflow: 'hidden',
+    backgroundColor: '#f0f2f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tokenLogo: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+  },
+  tokenLogoPlaceholder: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#e1e8ed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tokenLogoPlaceholderText: {
+    color: '#657786',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  tokenDetails: {
+    flex: 1,
+    marginLeft: 14,
+  },
+  tokenName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#14171a',
+    marginBottom: 2,
+  },
+  tokenSymbol: {
+    fontSize: 13,
+    color: '#657786',
+  },
+  tokenBalanceContainer: {
+    alignItems: 'flex-end',
+  },
+  tokenBalance: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#14171a',
+  },
+  tokenValue: {
+    fontSize: 13,
+    color: '#1d9bf0',
+    marginTop: 2,
+  },
+  listContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    marginHorizontal: 12,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#f0f2f5',
+    marginLeft: 60,
+  },
+  
+  // Section styles
   sectionContainer: {
-    marginBottom: 16,
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     marginHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 12,
     color: '#14171a',
   },
   gridContainer: {
@@ -464,6 +726,8 @@ const portfolioStyles = StyleSheet.create({
   columnWrapper: {
     justifyContent: 'space-between',
   },
+  
+  // Item styles
   itemContainer: {
     marginBottom: 16,
     backgroundColor: 'white',
@@ -485,6 +749,17 @@ const portfolioStyles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#f0f2f5',
   },
+  imageWrapper: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  fallbackImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    opacity: 0.2,
+  },
   image: {
     width: '100%',
     height: '100%',
@@ -505,6 +780,8 @@ const portfolioStyles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#AAB8C2',
   },
+  
+  // Badges
   compressedBadge: {
     position: 'absolute',
     top: 8,
@@ -521,25 +798,41 @@ const portfolioStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  priceBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  priceText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  
+  // Item details
+  itemDetails: {
+    padding: 8,
+  },
   itemName: {
     fontSize: 14,
     fontWeight: '600',
-    padding: 8,
-    paddingBottom: 4,
     color: '#14171a',
+    marginBottom: 4,
   },
   itemBalance: {
     fontSize: 12,
     color: '#657786',
-    paddingHorizontal: 8,
-    paddingBottom: 8,
   },
   itemCollection: {
     fontSize: 12,
     color: '#657786',
-    paddingHorizontal: 8,
-    paddingBottom: 8,
   },
+  
+  // SOL Balance
   solBalanceContainer: {
     margin: 16,
     backgroundColor: '#f7fbfe',
@@ -547,6 +840,11 @@ const portfolioStyles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#e1e8ed',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   solBalanceLabel: {
     fontSize: 14,
@@ -557,6 +855,91 @@ const portfolioStyles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '600',
     color: '#14171a',
+  },
+  
+  // Loading state
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#657786',
+    textAlign: 'center',
+  },
+  
+  // Error state
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#e0245e',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  
+  // Empty states
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#657786',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  emptySection: {
+    padding: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTabContent: {
+    padding: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTabText: {
+    fontSize: 16,
+    color: '#657786',
+    textAlign: 'center',
+  },
+  
+  // Buttons
+  retryButton: {
+    backgroundColor: '#1d9bf0',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 10,
+  },
+  retryText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  viewAllButton: {
+    backgroundColor: '#f2f2f2',
+    padding: 12,
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1d9bf0',
   },
 });
 
