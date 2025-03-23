@@ -9,6 +9,7 @@ import {
   SystemProgram,
 } from '@solana/web3.js';
 import type {TransactionInstruction} from '@solana/web3.js';
+import { CLUSTER } from '@env';
 
 export async function sendJitoBundleTransaction(
   provider: any,
@@ -80,7 +81,7 @@ export async function sendJitoBundleTransactionMWA(
     try {
       console.log('[sendJitoBundleTransactionMWA] Inside transact callback, authorizing...');
       const authResult = await mobileWallet.authorize({
-        cluster: 'devnet',
+        cluster: CLUSTER,
         identity: {
           name: 'React Native dApp',
           uri: 'https://yourdapp.com',

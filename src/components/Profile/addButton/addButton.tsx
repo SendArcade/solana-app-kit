@@ -1,5 +1,5 @@
 // File: src/components/AddButton/AddButton.tsx
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,15 @@ import {
 } from 'react-native';
 import { styles } from './addButton.style';
 import Icons from '../../../assets/svgs/index';
-import { useTradeTransaction } from '../../../hooks/useTradeTransaction';
+import { useAppSelector, useAppDispatch } from '../../../hooks/useReduxHooks';
+import { Cluster, Connection, clusterApiUrl } from '@solana/web3.js';
+import { sendSOL } from '../../../utils/transactions/transactionUtils';
+import { useAuth } from '../../../hooks/useAuth';
+import { 
+  setSelectedFeeTier as setFeeTier, 
+  setTransactionMode as setMode 
+} from '../../../state/transaction/reducer';
+import { CLUSTER } from '@env';
 
 export interface AddButtonProps {
   amIFollowing: boolean;
@@ -30,6 +38,7 @@ const AddButton: React.FC<AddButtonProps> = ({
   onSendToWallet,
   recipientAddress,
 }) => {
+  const dispatch = useAppDispatch();
   const [sendModalVisible, setSendModalVisible] = useState(false);
   const [selectedMode, setSelectedMode] = useState<'jito' | 'priority' | null>(
     null,
@@ -38,8 +47,24 @@ const AddButton: React.FC<AddButtonProps> = ({
     'low' | 'medium' | 'high' | 'very-high'
   >('low');
   const [amountSol, setAmountSol] = useState('');
+  
+  // Add a ref to modal components with initial null value
+  const modalRef = useRef<View | null>(null);
+  
+  // Get the current auth state and transaction settings
+  const currentProvider = useAppSelector(state => state.auth.provider);
+  const transactionState = useAppSelector(state => state.transaction);
 
-  const { sendTrade } = useTradeTransaction();
+  // Use the wallet from useAuth
+  const { wallet } = useAuth();
+  
+  // Initialize modal state with Redux state when opened
+  useEffect(() => {
+    if (sendModalVisible) {
+      setSelectedMode(transactionState.transactionMode);
+      setSelectedFeeTier(transactionState.selectedFeeTier);
+    }
+  }, [sendModalVisible, transactionState]);
 
   let followLabel = 'Follow';
   if (amIFollowing) {
@@ -57,7 +82,16 @@ const AddButton: React.FC<AddButtonProps> = ({
   };
 
   const handlePressSendToWallet = () => {
-    onSendToWallet?.();
+    // Only show the modal if we have a valid recipient address
+    if (!recipientAddress) {
+      Alert.alert('Error', 'No recipient address available');
+      return;
+    }
+    
+    if (onSendToWallet) {
+      onSendToWallet();
+    }
+    
     setSendModalVisible(true);
   };
 
@@ -77,18 +111,46 @@ const AddButton: React.FC<AddButtonProps> = ({
         return;
       }
 
-      await sendTrade(selectedMode, recipientAddress.trim(), parsedAmount);
+      if (!wallet) {
+        Alert.alert('Error', 'Wallet not connected');
+        return;
+      }
+
+      // Update the Redux state with the selections from the modal
+      if (selectedMode) {
+        dispatch(setMode(selectedMode));
+        
+        if (selectedMode === 'priority' && selectedFeeTier) {
+          dispatch(setFeeTier(selectedFeeTier));
+        }
+      }
+
+      // Create connection to Solana
+      const connection = new Connection(clusterApiUrl(CLUSTER as Cluster), 'confirmed');
+      
+      // Use our centralized sendSOL function
+      const signature = await sendSOL({
+        wallet,
+        recipientAddress,
+        amountSol: parsedAmount,
+        connection,
+        onStatusUpdate: (status) => console.log(`[AddButton] ${status}`),
+      });
 
       Alert.alert('Success', 'Transaction sent!');
       setSendModalVisible(false);
       setSelectedMode(null);
-      setSelectedFeeTier('low');
       setAmountSol('');
     } catch (err: any) {
       console.error('Error sending transaction:', err);
       Alert.alert('Transaction Failed', err.message || String(err));
+      // Close the modal on error too
+      setSendModalVisible(false);
     }
   };
+
+  // Only render the send to wallet button if provider supports it
+  const showSendToWalletButton = currentProvider === 'privy' || currentProvider === 'dynamic';
 
   return (
     <View style={styles.container}>
@@ -96,9 +158,11 @@ const AddButton: React.FC<AddButtonProps> = ({
         <Text style={styles.text}>{followLabel}</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.btn} onPress={handlePressSendToWallet}>
-        <Text style={styles.text}>Send to Wallet</Text>
-      </TouchableOpacity>
+      {showSendToWalletButton && (
+        <TouchableOpacity style={styles.btn} onPress={handlePressSendToWallet}>
+          <Text style={styles.text}>Send to Wallet</Text>
+        </TouchableOpacity>
+      )}
 
       <Modal
         animationType="slide"
@@ -106,7 +170,10 @@ const AddButton: React.FC<AddButtonProps> = ({
         visible={sendModalVisible}
         onRequestClose={() => setSendModalVisible(false)}
       >
-        <View style={modalOverlayStyles.overlay}>
+        <View 
+          style={modalOverlayStyles.overlay}
+          ref={modalRef}
+        >
           <View style={modalOverlayStyles.container}>
             <Text style={modalOverlayStyles.title}>Send SOL</Text>
 

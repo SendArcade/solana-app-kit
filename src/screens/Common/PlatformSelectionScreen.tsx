@@ -70,7 +70,7 @@ export default function PlatformSelectionScreen() {
     if (platformId === 'chats') {
       navigation.navigate('ChatScreen' as never);
     } else {
-      navigation.navigate('MainTabs');
+      navigation.navigate('MainTabs', {screen: 'Feed'} as never);
     }
   };
 

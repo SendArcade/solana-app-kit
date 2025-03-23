@@ -13,6 +13,8 @@ import {
   FlatList,
   StyleSheet,
   TextInput,
+  ScrollView,
+  Dimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { setStatusBarStyle } from 'expo-status-bar';
@@ -25,6 +27,20 @@ import {
 import { fetchAllPosts } from '../../state/thread/reducer';
 import { ThreadPost } from '../thread/thread.types';
 import { NftItem, useFetchNFTs } from '../../hooks/useFetchNFTs';
+import { useWallet } from '../../hooks/useWallet';
+import {
+  uploadProfileAvatar,
+  fetchFollowers,
+  fetchFollowing,
+  checkIfUserFollowsMe,
+} from '../../services/profileService';
+import { HELIUS_API_KEY } from '@env';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import * as Clipboard from 'expo-clipboard';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { followUser, unfollowUser } from '../../state/users/reducer';
+import { useFetchPortfolio, AssetItem } from '../../hooks/useFetchTokens';
 
 import ProfileView, { UserProfileData } from './ProfileView';
 import {
@@ -35,16 +51,7 @@ import {
   editNameModalStyles,
 } from './profile.style';
 import { flattenPosts } from '../thread/thread.utils';
-import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { followUser, unfollowUser } from '../../state/users/reducer';
-
-import {
-  uploadProfileAvatar,
-  fetchFollowers,
-  fetchFollowing,
-  checkIfUserFollowsMe,
-} from '../../services/profileService';
-import { HELIUS_API_KEY } from '@env';
+import { useAppNavigation as useAppNavigationHook } from '../../hooks/useAppNavigation';
 
 export interface ProfileProps {
   isOwnProfile?: boolean;
@@ -72,18 +79,18 @@ export default function Profile({
 }: ProfileProps) {
   const dispatch = useAppDispatch();
   const allReduxPosts = useAppSelector(state => state.thread.allPosts);
-  const navigation = useAppNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { address: currentWalletAddress } = useWallet();
+  const { width } = Dimensions.get('window');
+  const itemWidth = (width - 60) / 2;
 
-  const myWallet = useAppSelector(state => state.auth.address);
-  const userWallet = user?.address || null;
+  const userWallet = user?.address || '';
+  const storedProfilePic = user?.profilePicUrl || '';
+  const customizationData = user?.attachmentData || {};
 
   // Local states for profile picture and username
-  const [profilePicUrl, setProfilePicUrl] = useState<string>(
-    user?.profilePicUrl || '',
-  );
-  const [localUsername, setLocalUsername] = useState<string>(
-    user?.username || 'Anonymous',
-  );
+  const [profilePicUrl, setProfilePicUrl] = useState<string>(storedProfilePic);
+  const [localUsername, setLocalUsername] = useState<string>(user?.username || 'Anonymous');
 
   // Followers/following state
   const [followersList, setFollowersList] = useState<any[]>([]);
@@ -96,12 +103,52 @@ export default function Profile({
   const [loadingActions, setLoadingActions] = useState<boolean>(false);
   const [fetchActionsError, setFetchActionsError] = useState<string | null>(null);
 
-  // NFT fetch hook
+  // NFT fetch hook - use it only when nfts are not provided via props
   const {
     nfts: fetchedNfts,
     loading: defaultNftLoading,
     error: defaultNftError,
   } = useFetchNFTs(userWallet || undefined);
+
+  // Portfolio fetch hook - fetch the complete portfolio including tokens, NFTs, and compressed NFTs
+  const {
+    portfolio,
+    loading: loadingPortfolio,
+    error: portfolioError,
+  } = useFetchPortfolio(userWallet || undefined);
+
+  // For refreshing the portfolio data
+  const [refreshingPortfolio, setRefreshingPortfolio] = useState(false);
+  
+  const handleRefreshPortfolio = useCallback(async () => {
+    if (!userWallet) return;
+    
+    setRefreshingPortfolio(true);
+    try {
+      // Re-fetch portfolio (in a real app, you would implement a refresh method in the hook)
+      // For now, we'll just simulate a refresh with a delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (err) {
+      console.error('Error refreshing portfolio:', err);
+    } finally {
+      setRefreshingPortfolio(false);
+    }
+  }, [userWallet]);
+
+  // Handle asset press
+  const handleAssetPress = useCallback((asset: AssetItem) => {
+    // You can implement what happens when an asset is pressed
+    console.log('Asset pressed:', asset);
+    
+    // For NFTs, you might want to show a detail view
+    if (asset.interface === 'V1_NFT' || asset.interface === 'ProgrammableNFT') {
+      // Example: navigation.navigate('NFTDetail', { asset });
+    }
+    // For tokens, you might want to show a transaction history or trade modal
+    else if (asset.interface === 'V1_TOKEN' || asset.token_info) {
+      // Example: navigation.navigate('TokenDetail', { asset });
+    }
+  }, []);
 
   const resolvedNfts = nfts.length > 0 ? nfts : fetchedNfts;
   const resolvedLoadingNfts = loadingNfts || defaultNftLoading;
@@ -179,7 +226,7 @@ export default function Profile({
     if (!userWallet || isOwnProfile) return;
     fetchFollowers(userWallet).then(followers => {
       setFollowersList(followers);
-      if (myWallet && followers.findIndex((x: any) => x.id === myWallet) >= 0) {
+      if (currentWalletAddress && followers.findIndex((x: any) => x.id === currentWalletAddress) >= 0) {
         setAmIFollowing(true);
       } else {
         setAmIFollowing(false);
@@ -188,12 +235,12 @@ export default function Profile({
     fetchFollowing(userWallet).then(following => {
       setFollowingList(following);
     });
-    if (myWallet) {
-      checkIfUserFollowsMe(myWallet, userWallet).then(result => {
+    if (currentWalletAddress) {
+      checkIfUserFollowsMe(currentWalletAddress, userWallet).then(result => {
         setAreTheyFollowingMe(result);
       });
     }
-  }, [userWallet, isOwnProfile, myWallet]);
+  }, [userWallet, isOwnProfile, currentWalletAddress]);
 
   // --- Fetch posts if not provided ---
   useEffect(() => {
@@ -218,20 +265,20 @@ export default function Profile({
 
   // --- Follow / Unfollow handlers ---
   const handleFollow = useCallback(async () => {
-    if (!myWallet || !userWallet) {
+    if (!currentWalletAddress || !userWallet) {
       Alert.alert('Cannot Follow', 'Missing user or my address');
       return;
     }
     try {
       await dispatch(
-        followUser({ followerId: myWallet, followingId: userWallet }),
+        followUser({ followerId: currentWalletAddress, followingId: userWallet }),
       ).unwrap();
       setAmIFollowing(true);
       setFollowersList(prev => {
-        if (!prev.some(u => u.id === myWallet)) {
+        if (!prev.some(u => u.id === currentWalletAddress)) {
           return [
             ...prev,
-            { id: myWallet, username: 'Me', profile_picture_url: '' },
+            { id: currentWalletAddress, username: 'Me', profile_picture_url: '' },
           ];
         }
         return prev;
@@ -239,23 +286,23 @@ export default function Profile({
     } catch (err: any) {
       Alert.alert('Follow Error', err.message);
     }
-  }, [dispatch, myWallet, userWallet]);
+  }, [dispatch, currentWalletAddress, userWallet]);
 
   const handleUnfollow = useCallback(async () => {
-    if (!myWallet || !userWallet) {
+    if (!currentWalletAddress || !userWallet) {
       Alert.alert('Cannot Unfollow', 'Missing user or my address');
       return;
     }
     try {
       await dispatch(
-        unfollowUser({ followerId: myWallet, followingId: userWallet }),
+        unfollowUser({ followerId: currentWalletAddress, followingId: userWallet }),
       ).unwrap();
       setAmIFollowing(false);
-      setFollowersList(prev => prev.filter(u => u.id !== myWallet));
+      setFollowersList(prev => prev.filter(u => u.id !== currentWalletAddress));
     } catch (err: any) {
       Alert.alert('Unfollow Error', err.message);
     }
-  }, [dispatch, myWallet, userWallet]);
+  }, [dispatch, currentWalletAddress, userWallet]);
 
   // --- Avatar selection, modals, editing name logic (unchanged) ---
   const [avatarOptionModalVisible, setAvatarOptionModalVisible] =
@@ -393,9 +440,9 @@ export default function Profile({
       address: userWallet || '',
       profilePicUrl,
       username: localUsername,
-      attachmentData: user.attachmentData || {},
+      attachmentData: customizationData,
     }),
-    [userWallet, profilePicUrl, localUsername, user.attachmentData],
+    [userWallet, profilePicUrl, localUsername, customizationData],
   );
 
   return (
@@ -429,6 +476,11 @@ export default function Profile({
         myActions={myActions}
         loadingActions={loadingActions}
         fetchActionsError={fetchActionsError}
+        // Add portfolio data
+        portfolioData={portfolio}
+        onRefreshPortfolio={handleRefreshPortfolio}
+        refreshingPortfolio={refreshingPortfolio}
+        onAssetPress={handleAssetPress}
       />
 
       {/* (A) Avatar Option Modal */}

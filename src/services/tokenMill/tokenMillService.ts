@@ -11,10 +11,11 @@ import {Buffer} from 'buffer';
 import {SERVER_URL} from '@env';
 import {createSyncNativeInstruction} from '@solana/spl-token';
 import * as spl from '@solana/spl-token';
+import { useTransactionService, TransactionService } from '../../services/transaction/transactionService';
 import {
   signAndSendBase64Tx,
   signAndSendWithPrivy,
-} from '../../utils/transactions/transactionUtils';
+} from '../../utils/transactions/transactionCompatUtils';
 import { PUBLIC_KEYS } from '../../config/constants';
 
 /**
@@ -62,10 +63,11 @@ export async function fundUserWithWSOL({
   tx.recentBlockhash = blockhash;
   tx.feePayer = userPubkey;
 
-  // sign & send
-  const signature = await signAndSendWithPrivy(tx, connection, provider);
-  await connection.confirmTransaction(signature);
-  return signature;
+  return TransactionService.signAndSendTransaction(
+    { type: 'transaction', transaction: tx },
+    provider,
+    { connection }
+  );
 }
 
 /**
@@ -116,11 +118,10 @@ export async function createMarket({
     throw new Error(json.error || 'Market creation failed');
   }
 
-  // Just sign & send the returned transaction (base64)
-  const txSignature = await signAndSendBase64Tx(
-    json.transaction,
-    connection,
+  const txSignature = await TransactionService.signAndSendTransaction(
+    { type: 'base64', data: json.transaction },
     provider,
+    { connection }
   );
 
   return {
@@ -160,8 +161,11 @@ export async function stakeTokens({
     throw new Error(json.error || 'Stake failed');
   }
 
-  // sign + send the returned base64Tx
-  return signAndSendBase64Tx(json.data, connection, provider);
+  return TransactionService.signAndSendTransaction(
+    { type: 'base64', data: json.data },
+    provider,
+    { connection }
+  );
 }
 
 /**
@@ -201,10 +205,10 @@ export async function createVesting({
     throw new Error(data.error || 'Vesting creation failed');
   }
 
-  const txSignature = await signAndSendBase64Tx(
-    data.data.transaction,
-    connection,
+  const txSignature = await TransactionService.signAndSendTransaction(
+    { type: 'base64', data: data.data.transaction },
     provider,
+    { connection }
   );
 
   return {
@@ -246,7 +250,11 @@ export async function releaseVesting({
     throw new Error(data.error || 'Release vesting failed');
   }
 
-  return signAndSendBase64Tx(data.data, connection, provider);
+  return TransactionService.signAndSendTransaction(
+    { type: 'base64', data: data.data },
+    provider,
+    { connection }
+  );
 }
 
 /**
@@ -285,7 +293,11 @@ export async function swapTokens({
     throw new Error(data.error || 'Swap failed');
   }
 
-  return signAndSendBase64Tx(data.transaction, connection, provider);
+  return TransactionService.signAndSendTransaction(
+    { type: 'base64', data: data.transaction },
+    provider,
+    { connection }
+  );
 }
 
 /**
@@ -339,8 +351,11 @@ export async function fundMarket({
   tx.recentBlockhash = blockhash;
   tx.feePayer = new PublicKey(userPublicKey);
 
-  const txSignature = await signAndSendWithPrivy(tx, connection, provider);
-  return txSignature;
+  return TransactionService.signAndSendTransaction(
+    { type: 'transaction', transaction: tx },
+    provider,
+    { connection }
+  );
 }
 
 /**
@@ -378,5 +393,9 @@ export async function setBondingCurve({
     throw new Error(json.error || 'Set curve failed');
   }
 
-  return signAndSendBase64Tx(json.transaction, connection, provider);
+  return TransactionService.signAndSendTransaction(
+    { type: 'base64', data: json.transaction },
+    provider,
+    { connection }
+  );
 }
