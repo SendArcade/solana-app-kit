@@ -15,17 +15,16 @@ import {
 } from 'react-native';
 import { NftItem } from '../../hooks/useFetchNFTs';
 import Icons from '../../assets/svgs';
-// import { TENSOR_API_KEY } from '@env';
-import { Cluster, clusterApiUrl, Connection, Transaction, VersionedTransaction } from '@solana/web3.js';
-import { CLUSTER, HELIUS_RPC_URL, TENSOR_API_KEY } from '@env';
-import { DEFAULT_IMAGES, ENDPOINTS } from '../../config/constants';
+import { TENSOR_API_KEY } from '@env';
+import { DEFAULT_IMAGES } from '../../config/constants';
 import { useAuth } from '../../hooks/useAuth';
 import { useAppDispatch, useAppSelector } from '../../hooks/useReduxHooks';
 import { createRootPostAsync, addPostLocally } from '../../state/thread/reducer';
 import { ThreadSection, ThreadSectionType, ThreadUser } from './thread.types';
 
 // Constants
-const SOL_TO_LAMPORTS = 1_000_000_000;
+const { width } = Dimensions.get('window');
+const ITEM_WIDTH = (width * 0.9 - 30) / 3; // Added more padding
 
 interface NftListingModalProps {
     visible: boolean;
@@ -37,22 +36,11 @@ interface NftListingModalProps {
     styles?: any; // Pass styles from parent component
 }
 
-// Get screen width to calculate image size (3 per row)
-const { width } = Dimensions.get('window');
-// Reduce size to avoid right column getting cut off
-const ITEM_WIDTH = (width * 0.9 - 30) / 3; // Added more padding
-
 interface CollectionResult {
     collId: string;
     name: string;
     description?: string;
     imageUri?: string;
-}
-
-interface FloorNFT {
-    mint: string;
-    owner: string;
-    maxPrice: number;
 }
 
 /** Helper to fix IPFS/Arweave URLs */
@@ -77,14 +65,11 @@ const NftListingModal = ({
     fetchNftsError,
     styles,
 }: NftListingModalProps) => {
-    // Get wallet information for buy functionality
+    // Get wallet information
     const { solanaWallet } = useAuth();
-  const myWallet = useAppSelector(state => state.auth.address);
-
+    const myWallet = useAppSelector(state => state.auth.address);
     const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || myWallet || null;
-    const userWallet: any = solanaWallet;
     const dispatch = useAppDispatch();
-
 
     // Default to option 2 so that the current content shows up by default.
     const [selectedOption, setSelectedOption] = useState<number>(2);
@@ -94,18 +79,16 @@ const NftListingModal = ({
     const [searchResults, setSearchResults] = useState<CollectionResult[]>([]);
     const [loadingSearch, setLoadingSearch] = useState(false);
 
-    // Buy floor state
+    // Share NFT state
     const [selectedCollection, setSelectedCollection] = useState<CollectionResult | null>(null);
-    const [showBuyModal, setShowBuyModal] = useState(false);
-    const [floorNFT, setFloorNFT] = useState<FloorNFT | null>(null);
-    const [loadingFloorNFT, setLoadingFloorNFT] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
     const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
     const userName = useAppSelector(state => state.auth.username);
 
     // Use provided styles or fallback to default styles
     const modalStyles = defaultStyles;
 
-    // Search collections functionality from BuySection.tsx
+    // Search collections functionality
     const handleSearchCollections = async () => {
         if (!collectionName.trim()) return;
         setLoadingSearch(true);
@@ -147,220 +130,84 @@ const NftListingModal = ({
         }
     };
 
-    // Fetch floor NFT details for a collection - from BuySection.tsx
-    const fetchFloorNFTForCollection = async (
-        collId: string,
-    ): Promise<FloorNFT | null> => {
-        try {
-            console.log(`Fetching floor NFT details for collection ${collId}...`);
-            setLoadingFloorNFT(true);
-            const options = {
-                method: 'GET',
-                headers: {
-                    accept: 'application/json',
-                    'x-tensor-api-key': TENSOR_API_KEY,
-                },
-            };
-            const url = `https://api.mainnet.tensordev.io/api/v1/mint/collection?collId=${encodeURIComponent(
-                collId,
-            )}&sortBy=ListingPriceAsc&limit=1`;
-            const resp = await fetch(url, options);
-            console.log('Response from floor NFT API:', resp);
-            if (!resp.ok) {
-                throw new Error(`Failed to fetch collection mints: ${resp.status}`);
-            }
-            const data = await resp.json();
-            console.log('Floor NFT data:', data);
-            if (data.mints && data.mints.length > 0) {
-                const floor = data.mints[0];
-                if (floor && floor.mint && floor.listing) {
-                    const owner = floor.listing.seller;
-                    const maxPrice = parseFloat(floor.listing.price) / SOL_TO_LAMPORTS;
-                    console.log(
-                        `Floor NFT: mint=${floor.mint}, owner=${owner}, maxPrice=${maxPrice}`,
-                    );
-                    setFloorNFT({ mint: floor.mint, owner, maxPrice });
-                    return { mint: floor.mint, owner, maxPrice };
-                }
-            }
-            Alert.alert('Info', 'No tokens found for the collection floor.');
-            return null;
-        } catch (err: any) {
-            console.error('Error fetching floor NFT:', err);
-            Alert.alert('Error', err.message || 'Failed to fetch floor NFT');
-            return null;
-        } finally {
-            setLoadingFloorNFT(false);
+    // Share NFT collection to feed
+    const shareNftCollection = async (collection: CollectionResult) => {
+        if (!userPublicKey) {
+            Alert.alert('Error', 'Cannot share: Wallet not connected');
+            return;
         }
-    };
 
-// Modify the shareNftPurchase function to share collection data
-const shareNftPurchase = async (
-    floorNft: FloorNFT,
-    collection: CollectionResult
-) => {
-    if (!userPublicKey) {
-        Alert.alert('Error', 'Cannot share: Wallet not connected');
-        return;
-    }
+        try {
+            // Create the NFT listing section with collection data
+            const sections: ThreadSection[] = [
+                {
+                    id: 'section-' + Math.random().toString(36).substr(2, 9),
+                    type: 'NFT_LISTING' as ThreadSectionType,
+                    listingData: {
+                        collId: collection.collId,
+                        owner: userPublicKey,
+                        name: collection.name,
+                        image: fixImageUrl(collection.imageUri),
+                        isCollection: true,
+                        collectionName: collection.name,
+                        collectionImage: fixImageUrl(collection.imageUri),
+                        collectionDescription: collection.description
+                    },
+                }
+            ];
 
-    try {
-        // Create the NFT listing section with collection data
-        const sections: ThreadSection[] = [
-            {
+            // Add a text section about the collection
+            sections.push({
                 id: 'section-' + Math.random().toString(36).substr(2, 9),
-                type: 'NFT_LISTING' as ThreadSectionType,
-                listingData: {
-                    collId: collection.collId, // Important for buying floor
-                    owner: userPublicKey,
-                    name: collection.name,
-                    image: fixImageUrl(collection.imageUri),
-                    isCollection: true, // Flag this as a collection
-                    collectionName: collection.name,
-                    collectionImage: fixImageUrl(collection.imageUri),
-                    collectionDescription: collection.description
-                },
-            }
-        ];
-
-        // Add a text section about the purchase
-        sections.push({
-            id: 'section-' + Math.random().toString(36).substr(2, 9),
-            type: 'TEXT_ONLY' as ThreadSectionType,
-            text: `I just purchased from ${collection.name} collection for ${floorNft.maxPrice.toFixed(5)} SOL! Check out this collection! 🎉`
-        });
-
-        // Create a proper user object that satisfies ThreadUser
-        const user: ThreadUser = {
-            id: userPublicKey,
-            username: userName || 'Anonymous',
-            handle: userPublicKey
-                ? '@' + userPublicKey.slice(0, 6) + '...' + userPublicKey.slice(-4)
-                : '@anonymous',
-            verified: true,
-            avatar: storedProfilePic ? { uri: storedProfilePic } : DEFAULT_IMAGES.user,
-        };
-
-        // Create a fallback post with proper typing
-        const fallbackPost = {
-            id: 'local-' + Math.random().toString(36).substr(2, 9),
-            userId: userPublicKey,
-            user,
-            sections,
-            createdAt: new Date().toISOString(),
-            replies: [],
-            reactionCount: 0,
-            retweetCount: 0,
-            quoteCount: 0,
-        };
-
-        try {
-            // Create a root post with the NFT listing
-            await dispatch(
-                createRootPostAsync({
-                    userId: userPublicKey,
-                    sections,
-                })
-            ).unwrap();
-
-            Alert.alert('Success', 'Your collection purchase has been shared!');
-        } catch (error: any) {
-            console.warn('Network request failed, adding post locally:', error.message);
-            dispatch(addPostLocally(fallbackPost));
-            Alert.alert('Limited Connectivity', 'Your post was saved locally.');
-        }
-    } catch (err: any) {
-        console.error('Error sharing collection purchase:', err);
-        Alert.alert('Error', 'Failed to share your purchase. Please try again.');
-    }
-};
-
-
-    // Handle buy floor functionality - from BuySection.tsx
-    const handleBuyFloor = async (coll: CollectionResult) => {
-        console.log('Confirm Buy clicked for collection:', coll);
-        if (!coll) return;
-        const collId = coll.collId;
-        // Use the floorNFT from state if available.
-        const floorDetails = floorNFT
-            ? floorNFT
-            : await fetchFloorNFTForCollection(collId);
-        if (!floorDetails) {
-            console.log('No floor NFT to buy. Aborting.');
-            return;
-        }
-        console.log('Proceeding to buy with floor NFT:', floorDetails);
-        if (!userPublicKey || !userWallet) {
-            Alert.alert('Error', 'Wallet not connected.');
-            return;
-        }
-        try {
-            const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
-            const connection = new Connection(rpcUrl, 'confirmed');
-            const { blockhash } = await connection.getRecentBlockhash();
-            const maxPriceInLamports = floorDetails.maxPrice * SOL_TO_LAMPORTS;
-            console.log('Obtained blockhash:', blockhash);
-            const buyUrl = `https://api.mainnet.tensordev.io/api/v1/tx/buy?buyer=${userPublicKey}&mint=${floorDetails.mint}&owner=${floorDetails.owner}&maxPrice=${maxPriceInLamports}&blockhash=${blockhash}`;
-            console.log('Buy URL:', buyUrl);
-            const resp = await fetch(buyUrl, {
-                headers: { 'x-tensor-api-key': TENSOR_API_KEY },
+                type: 'TEXT_ONLY' as ThreadSectionType,
+                text: `Check out this awesome collection: ${collection.name}! 🔥`
             });
-            const rawText = await resp.text();
-            console.log('Raw response from buy endpoint:', rawText);
-            let data: any;
+
+            // Create a proper user object that satisfies ThreadUser
+            const user: ThreadUser = {
+                id: userPublicKey,
+                username: userName || 'Anonymous',
+                handle: userPublicKey
+                    ? '@' + userPublicKey.slice(0, 6) + '...' + userPublicKey.slice(-4)
+                    : '@anonymous',
+                verified: true,
+                avatar: storedProfilePic ? { uri: storedProfilePic } : DEFAULT_IMAGES.user,
+            };
+
+            // Create a fallback post with proper typing
+            const fallbackPost = {
+                id: 'local-' + Math.random().toString(36).substr(2, 9),
+                userId: userPublicKey,
+                user,
+                sections,
+                createdAt: new Date().toISOString(),
+                replies: [],
+                reactionCount: 0,
+                retweetCount: 0,
+                quoteCount: 0,
+            };
+
             try {
-                data = JSON.parse(rawText);
-            } catch (parseErr) {
-                throw new Error(
-                    'Tensor returned non-JSON response. Check console for details.',
-                );
+                // Create a root post with the NFT listing
+                await dispatch(
+                    createRootPostAsync({
+                        userId: userPublicKey,
+                        sections,
+                    })
+                ).unwrap();
+
+                Alert.alert('Success', 'Collection has been shared to your feed!');
+            } catch (error: any) {
+                console.warn('Network request failed, adding post locally:', error.message);
+                dispatch(addPostLocally(fallbackPost));
+                Alert.alert('Limited Connectivity', 'Your post was saved locally.');
             }
-            if (!data.txs || data.txs.length === 0) {
-                throw new Error('No transactions returned from Tensor API for buying.');
-            }
-            console.log('Transactions received:', data.txs);
-            for (let i = 0; i < data.txs.length; i++) {
-                const txObj = data.txs[i];
-                let transaction: Transaction | VersionedTransaction;
-                if (txObj.txV0) {
-                    const txBuffer = Buffer.from(txObj.txV0.data, 'base64');
-                    transaction = VersionedTransaction.deserialize(txBuffer);
-                    console.log(`Deserialized versioned transaction #${i + 1}`);
-                } else if (txObj.tx) {
-                    const txBuffer = Buffer.from(txObj.tx.data, 'base64');
-                    transaction = Transaction.from(txBuffer);
-                    console.log(`Deserialized legacy transaction #${i + 1}`);
-                } else {
-                    throw new Error(`Transaction #${i + 1} is in an unknown format.`);
-                }
-                const provider = await userWallet.getProvider();
-                const { signature } = await provider.request({
-                    method: 'signAndSendTransaction',
-                    params: { transaction, connection },
-                });
-                console.log(`Transaction #${i + 1} signature: ${signature}`);
-            }
-            Alert.alert(
-                'Success',
-                'Floor NFT purchased successfully!',
-                [
-                    {
-                        text: 'Share Purchase',
-                        onPress: () => shareNftPurchase(floorDetails, coll)
-                    },
-                    {
-                        text: 'Close',
-                        style: 'cancel'
-                    },
-                ]
-            );
         } catch (err: any) {
-            console.error('Error during buy transaction:', err);
-            Alert.alert('Error', err.message || 'Failed to buy floor NFT.');
+            console.error('Error sharing collection:', err);
+            Alert.alert('Error', 'Failed to share the collection. Please try again.');
         } finally {
-            setShowBuyModal(false);
+            setShowShareModal(false);
             setSelectedCollection(null);
-            setFloorNFT(null);
         }
     };
 
@@ -369,12 +216,10 @@ const shareNftPurchase = async (
         return (
             <TouchableOpacity
                 style={modalStyles.gridItem}
-                onPress={async () => {
+                onPress={() => {
                     console.log('Collection selected:', item);
                     setSelectedCollection(item);
-                    // Immediately fetch floor NFT details and store in state
-                    await fetchFloorNFTForCollection(item.collId);
-                    setShowBuyModal(true);
+                    setShowShareModal(true);
                 }}>
                 <Image
                     source={{ uri: fixImageUrl(item.imageUri) }}
@@ -385,49 +230,45 @@ const shareNftPurchase = async (
         );
     };
 
-    // Buy Modal UI - from BuySection.tsx
-    const renderBuyModal = () => {
+    // Share Modal UI
+    const renderShareModal = () => {
         if (!selectedCollection) return null;
         return (
             <Modal
-                visible={showBuyModal}
+                visible={showShareModal}
                 transparent
                 animationType="slide"
                 onRequestClose={() => {
-                    setShowBuyModal(false);
+                    setShowShareModal(false);
                     setSelectedCollection(null);
-                    setFloorNFT(null);
                 }}>
                 <Pressable
-                    style={modalStyles.buyModalOverlay}
+                    style={modalStyles.shareModalOverlay}
                     onPress={() => {
-                        setShowBuyModal(false);
+                        setShowShareModal(false);
                         setSelectedCollection(null);
-                        setFloorNFT(null);
                     }}>
                     <Pressable
-                        style={modalStyles.buyModalContent}
+                        style={modalStyles.shareModalContent}
                         onPress={e => e.stopPropagation()}>
-                        <Text style={modalStyles.buyModalTitle}>Confirm Purchase</Text>
-                        <Text style={modalStyles.buyModalText}>
+                        <Text style={modalStyles.shareModalTitle}>Share Collection</Text>
+                        <Text style={modalStyles.shareModalText}>
                             Collection: {selectedCollection.name}
                         </Text>
-                        {loadingFloorNFT ? (
-                            <ActivityIndicator size="small" color="#32D4DE" />
-                        ) : floorNFT ? (
-                            <Text style={modalStyles.buyModalText}>
-                                Price: {floorNFT.maxPrice.toFixed(5)} SOL
-                            </Text>
-                        ) : (
-                            <Text style={modalStyles.buyModalText}>Price: Loading...</Text>
-                        )}
+                        <Image
+                            source={{ uri: fixImageUrl(selectedCollection.imageUri) }}
+                            style={modalStyles.shareModalImage}
+                            resizeMode="cover"
+                        />
+                        <Text style={modalStyles.shareModalDescription} numberOfLines={3}>
+                            {selectedCollection.description || "No description available"}
+                        </Text>
                         <TouchableOpacity
-                            style={modalStyles.confirmButton}
+                            style={modalStyles.shareButton}
                             onPress={() => {
-                                console.log('Confirm Buy clicked');
-                                handleBuyFloor(selectedCollection);
+                                shareNftCollection(selectedCollection);
                             }}>
-                            <Text style={modalStyles.confirmButtonText}>Confirm Buy</Text>
+                            <Text style={modalStyles.shareButtonText}>Share to Feed</Text>
                         </TouchableOpacity>
                     </Pressable>
                 </Pressable>
@@ -567,8 +408,8 @@ const shareNftPurchase = async (
                         </View>
                     )}
 
-                    {/* Footer with two options */}
-                    <View style={modalStyles.footer}>
+                  {/* Footer with two options */}
+                  <View style={modalStyles.footer}>
                         <TouchableOpacity
                             style={[
                                 modalStyles.optionButton,
@@ -590,8 +431,8 @@ const shareNftPurchase = async (
                 </View>
             </View>
 
-            {/* Buy confirmation modal */}
-            {renderBuyModal()}
+            {/* Share confirmation modal */}
+            {renderShareModal()}
         </Modal>
     );
 };
@@ -741,38 +582,51 @@ const defaultStyles = StyleSheet.create({
         paddingVertical: 8,
         fontSize: 14,
     },
-    // Buy modal styles
-    buyModalOverlay: {
+    // Share modal styles
+    shareModalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    buyModalContent: {
+    shareModalContent: {
         width: '80%',
         backgroundColor: 'white',
         borderRadius: 10,
         padding: 20,
         alignItems: 'center',
     },
-    buyModalTitle: {
+    shareModalTitle: {
         fontSize: 18,
         fontWeight: 'bold',
         marginBottom: 15,
     },
-    buyModalText: {
+    shareModalText: {
         fontSize: 16,
         marginVertical: 5,
         textAlign: 'center',
     },
-    confirmButton: {
+    shareModalImage: {
+        width: 150,
+        height: 150,
+        borderRadius: 8,
+        marginVertical: 10,
+    },
+    shareModalDescription: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        marginVertical: 5,
+        paddingHorizontal: 10,
+    },
+    shareButton: {
         marginTop: 20,
         paddingVertical: 10,
         paddingHorizontal: 20,
         backgroundColor: '#32D4DE',
         borderRadius: 20,
     },
-    confirmButtonText: {
+    shareButtonText: {
         color: 'white',
         fontWeight: 'bold',
         fontSize: 16,
@@ -780,4 +634,3 @@ const defaultStyles = StyleSheet.create({
 });
 
 export default NftListingModal;
-
