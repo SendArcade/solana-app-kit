@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Platform, TouchableOpacity, View, StyleSheet, Animated, Dimensions, Image, Text } from 'react-native';
 import HomeScreen from '../screens/SampleUI/Threads/HomeScreen';
@@ -37,6 +37,7 @@ export default function MainTabs() {
   const [expandedMenu, setExpandedMenu] = useState(false);
   const [currentPlatform, setCurrentPlatform] = useState<'threads' | 'insta' | 'chats'>('threads');
   const [showTooltip, setShowTooltip] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0); // Add a refresh key to force re-render
   const menuAnimation = useRef(new Animated.Value(0)).current;
   const tooltipAnimation = useRef(new Animated.Value(0)).current;
 
@@ -64,7 +65,9 @@ export default function MainTabs() {
 
   // Function to toggle platform selection menu
   const togglePlatformMenu = () => {
+    // Only toggle menu visibility, don't touch anything related to rendering
     setExpandedMenu(!expandedMenu);
+
     // Hide tooltip if it's still visible when user activates the menu
     if (showTooltip) {
       setShowTooltip(false);
@@ -74,6 +77,7 @@ export default function MainTabs() {
         useNativeDriver: true,
       }).start();
     }
+
     Animated.spring(menuAnimation, {
       toValue: expandedMenu ? 0 : 1,
       friction: 8,
@@ -84,7 +88,14 @@ export default function MainTabs() {
 
   // Function to select a platform and close menu with smoother animation
   const selectPlatform = (platform: 'threads' | 'insta' | 'chats') => {
-    setCurrentPlatform(platform);
+    // Only update if platform changed
+    if (platform !== currentPlatform) {
+      setCurrentPlatform(platform);
+      // Force a refresh by incrementing the key
+      setRefreshKey(prevKey => prevKey + 1);
+    }
+
+    // Close the menu
     setExpandedMenu(false);
     Animated.spring(menuAnimation, {
       toValue: 0,
@@ -94,35 +105,25 @@ export default function MainTabs() {
     }).start();
   };
 
-  // Replace this function
-  // Get the appropriate component for the Feed tab based on selected platform
-  const getFeedComponent = () => {
-    switch (currentPlatform) {
-      case 'threads':
-        return FeedScreen;
-      case 'insta':
-        return FeedScreen; // You can replace with Instagram-themed screen
-      case 'chats':
-        return ChatScreen;
-      default:
-        return FeedScreen;
-    }
-  };
+  // Create a stable component that doesn't rerender on menu toggle
+  const StableFeedComponent = React.useMemo(() => {
+    // This component is created once and captured in useMemo
+    // It will only update when platformSwitchKey changes
+    const Component = () => {
+      switch (currentPlatform) {
+        case 'threads':
+          return <FeedScreen key={`threads-${refreshKey}`} />;
+        case 'insta':
+          return <FeedScreen key={`insta-${refreshKey}`} />;
+        case 'chats':
+          return <ChatScreen key={`chats-${refreshKey}`} />;
+        default:
+          return <FeedScreen key={`threads-${refreshKey}`} />;
+      }
+    };
 
-  // With a component function that takes navigation props
-  const FeedTabComponent = (props: any) => {
-    // Use the current platform to determine which component to render
-    switch (currentPlatform) {
-      case 'threads':
-        return <FeedScreen {...props} />;
-      case 'insta':
-        return <FeedScreen {...props} />; // You can replace with Instagram-themed screen
-      case 'chats':
-        return <ChatScreen {...props} />;
-      default:
-        return <FeedScreen {...props} />;
-    }
-  };
+    return Component;
+  }, [currentPlatform, refreshKey]);
 
   // Calculate transformations for the menu with smoother curves
   const menuTranslateY = menuAnimation.interpolate({
@@ -294,11 +295,23 @@ export default function MainTabs() {
         />
         <Tab.Screen
           name="Feed"
-          component={FeedTabComponent}
+          component={StableFeedComponent}
           listeners={{
             tabLongPress: () => {
               togglePlatformMenu();
-              return true; // Prevents default behavior
+              return true;
+            },
+            tabPress: (e) => {
+              if (expandedMenu) {
+                e.preventDefault();
+                setExpandedMenu(false);
+                Animated.spring(menuAnimation, {
+                  toValue: 0,
+                  friction: 8,
+                  tension: 40,
+                  useNativeDriver: true,
+                }).start();
+              }
             }
           }}
           options={{

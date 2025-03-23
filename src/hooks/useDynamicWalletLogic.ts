@@ -286,7 +286,7 @@ export function useDynamicWalletLogic() {
               // Navigate to PlatformSelectionScreen if navigation is provided
               if (navigation) {
                 console.log('Auth success, navigating to PlatformSelectionScreen');
-                navigation.navigate('PlatformSelection');
+                navigation.navigate('MainTabs');
               }
             },
           });
