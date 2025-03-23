@@ -1,6 +1,6 @@
 // FILE: src/components/Common/TradeCard/TradeCard.tsx
 
-import React, {useEffect, useRef, useState} from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,9 @@ import {
   ImageSourcePropType,
 } from 'react-native';
 import Icon from '../../../assets/svgs/index';
-import {getMergedTheme} from '../../thread/thread.styles';
+import { getMergedTheme } from '../../thread/thread.styles';
 import styles from './TradeCard.style';
-import {useCoingecko, Timeframe} from '../../../hooks/useCoingecko';
+import { useCoingecko, Timeframe } from '../../../hooks/useCoingecko';
 import LineGraph from '../../CoinDetails/CoinDetailTopSection/LineGraph';
 
 export interface TradeData {
@@ -55,9 +55,9 @@ export interface TradeCardProps {
   /** Theming overrides */
   themeOverrides?: Partial<Record<string, any>>;
   /** Style overrides for specific keys in the default style. */
-  styleOverrides?: {[key: string]: object};
+  styleOverrides?: { [key: string]: object };
   /** For user-provided custom stylesheet merges */
-  userStyleSheet?: {[key: string]: object};
+  userStyleSheet?: { [key: string]: object };
   /** An optional user avatar to show on the chart for execution marker */
   userAvatar?: ImageSourcePropType;
 
@@ -84,18 +84,22 @@ function TradeCard({
 }: TradeCardProps) {
   const mergedTheme = getMergedTheme(themeOverrides);
 
-  // For Jupiter metadata about input & output tokens
+  // --------------------------------------------------
+  // Jupiter metadata about input & output tokens
+  // --------------------------------------------------
   const [inputTokenMeta, setInputTokenMeta] = useState<any>(null);
   const [outputTokenMeta, setOutputTokenMeta] = useState<any>(null);
   const [loadingMeta, setLoadingMeta] = useState(false);
 
-  // We store the last minted pair so we only fetch again if changed:
-  const prevMintPairRef = useRef<{inputMint: string; outputMint: string}>({
+  // For preventing duplicate fetch calls
+  const prevMintPairRef = useRef<{ inputMint: string; outputMint: string }>({
     inputMint: '',
     outputMint: '',
   });
 
-  // The Coingecko hook
+  // --------------------------------------------------
+  // Coingecko hook
+  // --------------------------------------------------
   const {
     timeframe,
     setTimeframe,
@@ -108,38 +112,45 @@ function TradeCard({
     setSelectedCoinId,
   } = useCoingecko();
 
-  // We only want to fetch coingecko data on initial load, timeframe changes, or manual refresh
-  const didInitialFetchRef = useRef(false);
+  // Keep track of timeframe changes
+  const prevTimeframeRef = useRef<Timeframe>(timeframe);
 
-  const coingeckoIdOutput = outputTokenMeta?.extensions?.coingeckoId || '';
+  // Keep track of external refresh changes
+  const prevRefreshTriggerRef = useRef(externalRefreshTrigger);
 
-  // --------------------------
-  // Jupiter metadata fetch
-  // --------------------------
+  // --------------------------------------------------
+  // 1) Fetch Jupiter output token metadata
+  // --------------------------------------------------
   useEffect(() => {
-    // If same inputMint + outputMint => skip
     if (
       prevMintPairRef.current.inputMint === tradeData.inputMint &&
       prevMintPairRef.current.outputMint === tradeData.outputMint
     ) {
       return;
     }
-    // otherwise fetch
     let canceled = false;
     setLoadingMeta(true);
+
     (async () => {
       try {
+        // Only output token fetch. If you also need input meta, do fetchJupiterTokenData(tradeData.inputMint).
         const [outMeta] = await Promise.all([
-          // fetchJupiterTokenData(tradeData.inputMint),
           fetchJupiterTokenData(tradeData.outputMint),
         ]);
+
         if (!canceled) {
-          // setInputTokenMeta(inMeta);
           setOutputTokenMeta(outMeta);
           prevMintPairRef.current = {
             inputMint: tradeData.inputMint,
             outputMint: tradeData.outputMint,
           };
+
+          // If user wants a chart & there's a coingeckoId => set it & fetch data immediately
+          if (showGraphForOutputToken && outMeta?.extensions?.coingeckoId) {
+            setSelectedCoinId(outMeta.extensions.coingeckoId.toLowerCase());
+            // Force an immediate fetch so the chart is populated on first render
+            refreshCoinData();
+          }
         }
       } catch (err) {
         console.error('TradeCard: jupiter token fetch error', err);
@@ -147,74 +158,54 @@ function TradeCard({
         if (!canceled) setLoadingMeta(false);
       }
     })();
+
     return () => {
       canceled = true;
     };
-  }, [tradeData.inputMint, tradeData.outputMint]);
-
-  // When the user specifically requests a chart for the output token,
-  // we set the coingecko ID (once outputTokenMeta is available).
-  useEffect(() => {
-    // Only set the coin ID if we haven't already done so to prevent loop
-    if (showGraphForOutputToken && 
-        coingeckoIdOutput && 
-        !didInitialFetchRef.current) {
-      didInitialFetchRef.current = true;
-      setSelectedCoinId(coingeckoIdOutput.toLowerCase());
-    }
-  }, [showGraphForOutputToken, coingeckoIdOutput, setSelectedCoinId]);
-
-  // -----------
-  // Force refresh from parent
-  // -----------
-  useEffect(() => {
-    // Only refresh if we have a significant change in externalRefreshTrigger
-    // and we're showing a graph and have a coinId
-    if (
-      externalRefreshTrigger && 
-      showGraphForOutputToken && 
-      coingeckoIdOutput && 
-      didInitialFetchRef.current
-    ) {
-      refreshCoinData();
-    }
   }, [
-    externalRefreshTrigger, // only care about changes to this value
+    tradeData.inputMint,
+    tradeData.outputMint,
+    showGraphForOutputToken,
+    setSelectedCoinId,
     refreshCoinData,
   ]);
 
-  // -----------
-  // Timeframe changes => refresh if we're in chart mode
-  // But make sure we're not creating an infinite loop
-  // -----------
-  const prevTimeframeRef = useRef<Timeframe>(timeframe);
-
+  // --------------------------------------------------
+  // 2) Timeframe changes => refresh if in chart mode
+  // --------------------------------------------------
   useEffect(() => {
-    // Skip if conditions aren't met or if timeframe hasn't changed
-    if (!showGraphForOutputToken || !coingeckoIdOutput || timeframe === prevTimeframeRef.current) return;
-    
-    // Update the previous timeframe reference
-    prevTimeframeRef.current = timeframe;
-    
-    // If this is the first time, just mark as initialized but don't refresh
-    if (!didInitialFetchRef.current) {
-      didInitialFetchRef.current = true;
-      // The refreshCoinData will be triggered by the setSelectedCoinId from the other effect
-      return;
+    if (!showGraphForOutputToken) return;
+    const coinId = outputTokenMeta?.extensions?.coingeckoId;
+    if (!coinId) return;
+
+    if (timeframe !== prevTimeframeRef.current) {
+      prevTimeframeRef.current = timeframe;
+      refreshCoinData();
     }
-    
-    // Otherwise, a genuine timeframe change should trigger refresh
-    refreshCoinData();
-  }, [timeframe, coingeckoIdOutput, showGraphForOutputToken, refreshCoinData]);
+  }, [timeframe, showGraphForOutputToken, outputTokenMeta, refreshCoinData]);
 
-  // Fallback name/logo from Jupiter metadata
-  const fallbackInName = inputTokenMeta?.name ?? tradeData.inputSymbol;
-  const fallbackInLogo = inputTokenMeta?.logoURI ?? '';
-  const fallbackOutName = outputTokenMeta?.name ?? tradeData.outputSymbol;
-  const fallbackOutLogo = outputTokenMeta?.logoURI ?? '';
+  // --------------------------------------------------
+  // 3) External refresh => call refreshCoinData
+  // --------------------------------------------------
+  useEffect(() => {
+    if (!showGraphForOutputToken) return;
+    const coinId = outputTokenMeta?.extensions?.coingeckoId;
+    if (!coinId) return;
 
-  const isOutputChartMode = !!showGraphForOutputToken;
+    if (externalRefreshTrigger !== prevRefreshTriggerRef.current) {
+      prevRefreshTriggerRef.current = externalRefreshTrigger;
+      refreshCoinData();
+    }
+  }, [
+    externalRefreshTrigger,
+    showGraphForOutputToken,
+    outputTokenMeta,
+    refreshCoinData,
+  ]);
 
+  // --------------------------------------------------
+  // Compute the execution price from tradeData
+  // --------------------------------------------------
   function calculateExecutionInfo() {
     let executionPrice: number | undefined;
     if (tradeData.inputAmountLamports && tradeData.outputAmountLamports) {
@@ -235,13 +226,23 @@ function TradeCard({
       executionTimestamp: tradeData.executionTimestamp,
     };
   }
-  const {executionPrice, executionTimestamp} = calculateExecutionInfo();
+  const { executionPrice, executionTimestamp } = calculateExecutionInfo();
 
-  // ---------------------------------------
-  // If in "chart mode" => show chart
-  // ---------------------------------------
+  // --------------------------------------------------
+  // Fallback name/logo from Jupiter metadata
+  // --------------------------------------------------
+  const fallbackInName = inputTokenMeta?.name ?? tradeData.inputSymbol;
+  const fallbackInLogo = inputTokenMeta?.logoURI ?? '';
+  const fallbackOutName = outputTokenMeta?.name ?? tradeData.outputSymbol;
+  const fallbackOutLogo = outputTokenMeta?.logoURI ?? '';
+
+  // --------------------------------------------------
+  // Render: Chart Mode
+  // --------------------------------------------------
+  const isOutputChartMode = !!showGraphForOutputToken;
+  const isLoading = loadingMeta || loadingOHLC;
+
   if (isOutputChartMode) {
-    const isLoading = loadingMeta || loadingOHLC;
     return (
       <View style={styles.tradeCardContainer}>
         {/* Output token details row */}
@@ -250,22 +251,20 @@ function TradeCard({
             <Image
               source={
                 fallbackOutLogo
-                  ? {uri: fallbackOutLogo}
+                  ? { uri: fallbackOutLogo }
                   : require('../../../assets/images/SENDlogo.png')
               }
               style={styles.tradeCardTokenImage}
             />
             <View style={styles.tradeCardNamePriceContainer}>
-              <Text style={styles.tradeCardTokenName}>
-                {fallbackOutName}
-              </Text>
+              <Text style={styles.tradeCardTokenName}>{fallbackOutName}</Text>
               <Text style={styles.tradeCardTokenPrice}>
                 {timeframePrice ? `$${timeframePrice.toFixed(4)}` : '$0.00'}
               </Text>
             </View>
           </View>
           <View style={styles.tradeCardRightSide}>
-            <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
+            <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
               {tradeData.outputQuantity} {tradeData.outputSymbol}
             </Text>
             <Text style={styles.tradeCardUsdPrice}>
@@ -281,7 +280,8 @@ function TradeCard({
             alignItems: 'center',
             justifyContent: 'center',
             marginVertical: 8,
-          }}>
+          }}
+        >
           {(['1H', '1D', '1W', '1M', 'All'] as Timeframe[]).map(tf => (
             <TouchableOpacity
               key={tf}
@@ -291,23 +291,27 @@ function TradeCard({
                 borderRadius: 6,
                 backgroundColor: timeframe === tf ? '#D6FDFF' : 'transparent',
               }}
-              onPress={() => setTimeframe(tf)}>
+              onPress={() => setTimeframe(tf)}
+            >
               <Text
                 style={{
                   color: timeframe === tf ? '#32D4DE' : '#666666',
                   fontWeight: timeframe === tf ? '600' : '400',
-                }}>
+                }}
+              >
                 {tf}
               </Text>
             </TouchableOpacity>
           ))}
+
           {/* Refresh icon => re-fetch coin data */}
           <TouchableOpacity
-            style={{marginLeft: 16, flexDirection: 'row', alignItems: 'center'}}
+            style={{ marginLeft: 16, flexDirection: 'row', alignItems: 'center' }}
             onPress={refreshCoinData}
-            accessibilityLabel="Refresh Chart">
+            accessibilityLabel="Refresh Chart"
+          >
             <Icon.SwapIcon width={20} height={20} />
-            <Text style={{color: '#1d9bf0', marginLeft: 4}}>Refresh</Text>
+            <Text style={{ color: '#1d9bf0', marginLeft: 4 }}>Refresh</Text>
           </TouchableOpacity>
         </View>
 
@@ -321,7 +325,8 @@ function TradeCard({
               justifyContent: 'center',
               backgroundColor: '#FFFFFF',
             } as StyleProp<ViewStyle>,
-          ]}>
+          ]}
+        >
           {isLoading ? (
             <ActivityIndicator size="large" color="#1d9bf0" />
           ) : graphData.length > 0 ? (
@@ -340,13 +345,15 @@ function TradeCard({
                   justifyContent: 'center',
                   marginTop: 5,
                   opacity: 0.7,
-                }}>
+                }}
+              >
                 <View
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
                     marginRight: 12,
-                  }}>
+                  }}
+                >
                   <View
                     style={{
                       width: 8,
@@ -356,9 +363,9 @@ function TradeCard({
                       marginRight: 4,
                     }}
                   />
-                  <Text style={{fontSize: 10}}>Current</Text>
+                  <Text style={{ fontSize: 10 }}>Current</Text>
                 </View>
-                <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <View
                     style={{
                       width: 8,
@@ -368,16 +375,16 @@ function TradeCard({
                       marginRight: 4,
                     }}
                   />
-                  <Text style={{fontSize: 10}}>Trade Execution</Text>
+                  <Text style={{ fontSize: 10 }}>Trade Execution</Text>
                 </View>
               </View>
             </>
           ) : coinError ? (
-            <Text style={{color: 'red', marginTop: 6}}>
+            <Text style={{ color: 'red', marginTop: 6 }}>
               Error: {coinError.toString()}
             </Text>
           ) : (
-            <Text style={{color: '#999', marginTop: 6}}>
+            <Text style={{ color: '#999', marginTop: 6 }}>
               No chart data found. Try a different timeframe or refresh.
             </Text>
           )}
@@ -386,26 +393,25 @@ function TradeCard({
     );
   }
 
-  // ---------------------------------------
-  // If not chart mode => standard "swap" view
-  // ---------------------------------------
-  const isLoading = loadingMeta;
+  // --------------------------------------------------
+  // Non-chart mode => standard "swap" view
+  // --------------------------------------------------
   return (
     <View style={styles.tradeCardContainer}>
-      {isLoading ? (
-        <View style={{alignItems: 'center', justifyContent: 'center'}}>
+      {loadingMeta ? (
+        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="small" color="#1d9bf0" />
         </View>
       ) : (
         <>
-          <View style={{position: 'relative'}}>
+          <View style={{ position: 'relative' }}>
             {/* Input token info */}
             <View style={styles.tradeCardCombinedSides}>
               <View style={styles.tradeCardLeftSide}>
                 <Image
                   source={
                     fallbackInLogo
-                      ? {uri: fallbackInLogo}
+                      ? { uri: fallbackInLogo }
                       : require('../../../assets/images/SENDlogo.png')
                   }
                   style={styles.tradeCardTokenImage}
@@ -420,7 +426,7 @@ function TradeCard({
                 </View>
               </View>
               <View style={styles.tradeCardRightSide}>
-                <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
+                <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
                   {tradeData.inputQuantity} {tradeData.inputSymbol}
                 </Text>
                 <Text style={styles.tradeCardUsdPrice}>
@@ -440,7 +446,7 @@ function TradeCard({
                 <Image
                   source={
                     fallbackOutLogo
-                      ? {uri: fallbackOutLogo}
+                      ? { uri: fallbackOutLogo }
                       : require('../../../assets/images/SENDlogo.png')
                   }
                   style={styles.tradeCardTokenImage}
@@ -455,7 +461,7 @@ function TradeCard({
                 </View>
               </View>
               <View style={styles.tradeCardRightSide}>
-                <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
+                <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
                   {tradeData.outputQuantity} {tradeData.outputSymbol}
                 </Text>
                 <Text style={styles.tradeCardUsdPrice}>
@@ -475,8 +481,9 @@ function TradeCard({
                 borderRadius: 5,
                 alignItems: 'center',
               }}
-              onPress={onTrade}>
-              <Text style={{color: '#fff', fontWeight: 'bold'}}>Trade Now</Text>
+              onPress={onTrade}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Trade Now</Text>
             </TouchableOpacity>
           )}
         </>
@@ -487,8 +494,7 @@ function TradeCard({
 
 // Memo comparison to skip unnecessary re-renders
 function arePropsEqual(prev: TradeCardProps, next: TradeCardProps) {
-  if (prev.showGraphForOutputToken !== next.showGraphForOutputToken)
-    return false;
+  if (prev.showGraphForOutputToken !== next.showGraphForOutputToken) return false;
   if (prev.externalRefreshTrigger !== next.externalRefreshTrigger) return false;
 
   const p = prev.tradeData;
