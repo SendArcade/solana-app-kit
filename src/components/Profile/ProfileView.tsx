@@ -7,6 +7,7 @@ import SwipeTabs from './slider/slider';
 import {styles as profileStyles} from './profile.style';
 import {ThreadPost} from '../thread/thread.types';
 import {NftItem} from '../../hooks/useFetchNFTs';
+import {AssetItem, PortfolioData} from '../../hooks/useFetchTokens';
 
 export interface UserProfileData {
   address: string;
@@ -44,6 +45,11 @@ export interface ProfileViewProps {
   myActions: any[];
   loadingActions: boolean;
   fetchActionsError: string | null;
+  // Portfolio related props
+  portfolioData?: PortfolioData;
+  onRefreshPortfolio?: () => void;
+  refreshingPortfolio?: boolean;
+  onAssetPress?: (asset: AssetItem) => void;
 }
 
 function ProfileViewComponent({
@@ -68,6 +74,11 @@ function ProfileViewComponent({
   myActions,
   loadingActions,
   fetchActionsError,
+  // Portfolio related props
+  portfolioData,
+  onRefreshPortfolio,
+  refreshingPortfolio,
+  onAssetPress,
 }: ProfileViewProps) {
   // Instead of extracting separate coin fields, now use the attachmentData object.
   const attachmentData = user.attachmentData || {};
@@ -103,6 +114,10 @@ function ProfileViewComponent({
           myActions={myActions}
           loadingActions={loadingActions}
           fetchActionsError={fetchActionsError}
+          portfolioData={portfolioData}
+          onRefreshPortfolio={onRefreshPortfolio}
+          refreshingPortfolio={refreshingPortfolio}
+          onAssetPress={onAssetPress}
         />
       </View>
     </View>
@@ -127,6 +142,12 @@ function arePropsEqual(prev: ProfileViewProps, next: ProfileViewProps) {
   if (prev.myActions !== next.myActions) return false;
   if (prev.loadingActions !== next.loadingActions) return false;
   if (prev.fetchActionsError !== next.fetchActionsError) return false;
+
+  if (prev.portfolioData !== next.portfolioData) return false;
+  if (prev.onRefreshPortfolio !== next.onRefreshPortfolio) return false;
+  if (prev.refreshingPortfolio !== next.refreshingPortfolio) return false;
+  if (prev.onAssetPress !== next.onAssetPress) return false;
+
   return true;
 }
 

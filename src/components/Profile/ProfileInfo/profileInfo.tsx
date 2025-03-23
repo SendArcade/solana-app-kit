@@ -9,6 +9,7 @@ import {
   TextInput,
   FlatList,
   ActivityIndicator,
+  ImageBackground,
 } from 'react-native';
 import {findMentioned} from '../../../utils/common/findMentioned';
 import AddButton from '../addButton/addButton';
@@ -20,7 +21,7 @@ import {useAppDispatch, useAppSelector} from '../../../hooks/useReduxHooks';
 import {attachCoinToProfile} from '../../../state/auth/reducer';
 import {HELIUS_API_KEY} from '@env';
 import {tokenModalStyles} from './profileInfoTokenModal.style';
-import {fixImageUrl} from '../../../utils/common/fixUrl'; // <-- We ensure to fix the image URL
+import {fixImageUrl, extractAssetImage} from '../../../utils/common/fixUrl'; // <-- We use our improved functions
 
 /**
  * Represents the props for the ProfileInfo component.
@@ -176,11 +177,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
           ownerAddress: userWallet,
           page: 1,
           limit: 100,
-          sortBy: {sortBy: 'created', sortDirection: 'asc'},
-          options: {
-            showUnverifiedCollections: true,
-            showCollectionMetadata: true,
-            showGrandTotal: false,
+          displayOptions: {
             showFungible: true, // get BOTH fungible tokens & NFTs
             showNativeBalance: false,
             showInscription: false,
@@ -240,15 +237,21 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
       if (item.id) {
         try {
           // Group to show fungibles first, then NFTs
-          const isFungible = item.token_info?.symbol || false;
+          const isFungible = 
+            item.interface === 'FungibleToken' || 
+            item.token_info?.symbol || 
+            false;
           const groupOrder = isFungible ? 0 : 1;
+
+          // Extract the best available image
+          const imageUrl = extractAssetImage(item);
 
           mappedTokens.push({
             mintPubkey: item.id,
-            name: item.content.metadata.name || item.token_info?.symbol || 'Unknown',
-            symbol: item.token_info?.symbol,
+            name: item.content?.metadata?.name || item.token_info?.symbol || 'Unknown',
+            symbol: item.token_info?.symbol || item.content?.metadata?.symbol,
             decimals: item.token_info?.decimals,
-            imageUrl: item.content?.links?.image || item.content?.metadata?.image || '',
+            imageUrl: imageUrl,
             tokenAmount: item.token_info ? parseFloat(item.token_info.balance) / 10 ** (item.token_info.decimals || 0) : 1,
             groupOrder,
           });
@@ -316,6 +319,49 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
     } finally {
       setShowAttachDetailsModal(false);
     }
+  };
+  
+  // Custom image renderer for tokens in the selection modal
+  const renderTokenImage = (imageUrl: string) => {
+    if (!imageUrl) {
+      return (
+        <View
+          style={[
+            tokenModalStyles.tokenItemImage,
+            {
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: '#eee',
+            },
+          ]}>
+          <Text style={{fontSize: 10, color: '#999'}}>
+            No Img
+          </Text>
+        </View>
+      );
+    }
+    
+    const fixedUrl = fixImageUrl(imageUrl);
+    
+    return (
+      <ImageBackground
+        source={require('../../../assets/images/SENDlogo.png')}
+        style={tokenModalStyles.tokenItemImage}>
+        <Image
+          source={{uri: fixedUrl}}
+          style={tokenModalStyles.tokenItemImage}
+          resizeMode="cover"
+          onError={e =>
+            console.log(
+              'Image load error:',
+              e.nativeEvent.error,
+              'for URL:',
+              fixedUrl,
+            )
+          }
+        />
+      </ImageBackground>
+    );
   };
 
   return (
@@ -499,35 +545,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
                       onPress={() => handleSelectToken(item)}>
                       <View
                         style={{flexDirection: 'row', alignItems: 'center'}}>
-                        {item.imageUrl ? (
-                          <Image
-                            source={{uri: item.imageUrl}}
-                            style={tokenModalStyles.tokenItemImage}
-                            resizeMode="cover"
-                            onError={e =>
-                              console.log(
-                                'Image load error:',
-                                e.nativeEvent.error,
-                                'for URL:',
-                                item.imageUrl,
-                              )
-                            }
-                          />
-                        ) : (
-                          <View
-                            style={[
-                              tokenModalStyles.tokenItemImage,
-                              {
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                backgroundColor: '#eee',
-                              },
-                            ]}>
-                            <Text style={{fontSize: 10, color: '#999'}}>
-                              No Img
-                            </Text>
-                          </View>
-                        )}
+                        {renderTokenImage(item.imageUrl || '')}
 
                         <View style={tokenModalStyles.tokenInfo}>
                           <Text style={tokenModalStyles.tokenName}>

@@ -14,10 +14,10 @@ import type {ThreadPost, ThreadUser} from '../thread.types';
 import {createThreadStyles, getMergedTheme} from '../thread.styles';
 import {useSelector} from 'react-redux';
 import {RootState} from '../../../state/store';
-import {Cluster, clusterApiUrl, Connection, Transaction, VersionedTransaction} from '@solana/web3.js';
+import {Cluster, clusterApiUrl, Connection, Transaction, VersionedTransaction, PublicKey} from '@solana/web3.js';
 import {Buffer} from 'buffer';
 import {TENSOR_API_KEY, HELIUS_RPC_URL, CLUSTER} from '@env';
-import {useAuth} from '../../../hooks/useAuth';
+import {useWallet} from '../../../hooks/useWallet';
 import TradeModal from '../trade/TradeModal';
 import {useAppSelector} from '../../../hooks/useReduxHooks';
 import { DEFAULT_IMAGES, ENDPOINTS } from '../../../config/constants';
@@ -121,9 +121,6 @@ export default function PostCTA({
   const [loadingFloor, setLoadingFloor] = useState(false);
   const userName = useAppSelector(state => state.auth.username);
 
-  
-
-
   // For NFT buying spinner
   const [nftLoading, setNftLoading] = useState(false);
   const [nftStatusMsg, setNftStatusMsg] = useState('');
@@ -135,11 +132,12 @@ export default function PostCTA({
   const selectedFeeTier = useSelector(
     (state: RootState) => state.transaction.selectedFeeTier,
   );
-  const {solanaWallet} = useAuth();
-
-  // For simplicity, using the first connected wallet
-  const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
-  const userWallet = solanaWallet?.wallets?.[0] || null;
+  
+  // Use the useWallet hook instead of direct useAuth
+  const { wallet, address, publicKey, sendTransaction } = useWallet();
+  
+  // Get the wallet address as a string
+  const userPublicKey = address || null;
 
   const currentUser: ThreadUser = {
     id: userPublicKey || 'anonymous-user',
@@ -239,7 +237,7 @@ export default function PostCTA({
   };
 
   /**
-   * Handles the NFT purchase process
+   * Handles the NFT purchase process using the new wallet functionality
    * @returns {Promise<void>}
    */
   const handleBuyListedNft = async () => {
@@ -250,7 +248,7 @@ export default function PostCTA({
       Alert.alert('Error', 'No NFT listing data found in this post.');
       return;
     }
-    if (!userPublicKey) {
+    if (!publicKey) {
       Alert.alert('Error', 'Wallet not connected.');
       return;
     }
@@ -302,18 +300,19 @@ export default function PostCTA({
           throw new Error(`Unknown transaction format in item #${i + 1}`);
         }
 
-        if (!userWallet) {
-          throw new Error('Wallet not connected.');
-        }
-        const provider = await userWallet.getProvider();
-        const {signature} = await provider.request({
-          method: 'signAndSendTransaction',
-          params: {transaction, connection},
-        });
+        // Use the new transaction signing method
+        setNftStatusMsg(`Sending transaction #${i + 1}...`);
+        const signature = await sendTransaction(
+          transaction,
+          connection,
+          {
+            confirmTransaction: true,
+            statusCallback: (status) => setNftStatusMsg(`TX #${i + 1}: ${status}`)
+          }
+        );
+
         if (!signature) {
-          throw new Error(
-            'Failed to sign transaction or no signature returned.',
-          );
+          throw new Error('Failed to sign transaction or no signature returned.');
         }
 
         setNftStatusMsg(`TX #${i + 1} signature: ${signature}`);
@@ -335,7 +334,7 @@ export default function PostCTA({
       return;
     }
     
-    if (!userPublicKey) {
+    if (!publicKey) {
       Alert.alert('Error', 'Wallet not connected.');
       return;
     }
@@ -393,20 +392,19 @@ export default function PostCTA({
           throw new Error(`Unknown transaction format in item #${i + 1}`);
         }
 
-        if (!userWallet) {
-          throw new Error('Wallet not connected.');
-        }
-        
-        const provider = await userWallet.getProvider();
-        const {signature} = await provider.request({
-          method: 'signAndSendTransaction',
-          params: {transaction, connection},
-        });
-        
+        // Use the new transaction signing method
+        setNftStatusMsg(`Sending transaction #${i + 1}...`);
+        const signature = await sendTransaction(
+          transaction,
+          connection,
+          {
+            confirmTransaction: true,
+            statusCallback: (status) => setNftStatusMsg(`TX #${i + 1}: ${status}`)
+          }
+        );
+
         if (!signature) {
-          throw new Error(
-            'Failed to sign transaction or no signature returned.',
-          );
+          throw new Error('Failed to sign transaction or no signature returned.');
         }
 
         setNftStatusMsg(`TX #${i + 1} signature: ${signature}`);
