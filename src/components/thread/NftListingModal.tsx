@@ -18,9 +18,11 @@ import Icons from '../../assets/svgs';
 import { TENSOR_API_KEY } from '@env';
 import { DEFAULT_IMAGES } from '../../config/constants';
 import { useAuth } from '../../hooks/useAuth';
+import { useWallet } from '../../hooks/useWallet';
 import { useAppDispatch, useAppSelector } from '../../hooks/useReduxHooks';
 import { createRootPostAsync, addPostLocally } from '../../state/thread/reducer';
 import { ThreadSection, ThreadSectionType, ThreadUser } from './thread.types';
+import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 
 // Constants
 const { width } = Dimensions.get('window');
@@ -65,10 +67,9 @@ const NftListingModal = ({
     fetchNftsError,
     styles,
 }: NftListingModalProps) => {
-    // Get wallet information
-    const { solanaWallet } = useAuth();
-    const myWallet = useAppSelector(state => state.auth.address);
-    const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || myWallet || null;
+    // Use the wallet hook instead of directly using useAuth
+    const { wallet, address, publicKey, sendTransaction } = useWallet();
+    const userPublicKey = address || null;
     const dispatch = useAppDispatch();
 
     // Default to option 2 so that the current content shows up by default.
@@ -78,6 +79,7 @@ const NftListingModal = ({
     const [collectionName, setCollectionName] = useState('');
     const [searchResults, setSearchResults] = useState<CollectionResult[]>([]);
     const [loadingSearch, setLoadingSearch] = useState(false);
+    const [isSendingTransaction, setIsSendingTransaction] = useState(false);
 
     // Share NFT state
     const [selectedCollection, setSelectedCollection] = useState<CollectionResult | null>(null);
@@ -127,6 +129,54 @@ const NftListingModal = ({
             setSearchResults([]);
         } finally {
             setLoadingSearch(false);
+        }
+    };
+
+    // Function to send a transaction for NFT operations (example)
+    const handleNftTransaction = async (nftItem: NftItem) => {
+        if (!publicKey) {
+            Alert.alert('Error', 'Wallet not connected');
+            return;
+        }
+
+        try {
+            setIsSendingTransaction(true);
+
+            // Example transaction - this would be replaced with actual NFT transaction logic
+            // For example: transferring NFT, listing NFT for sale, etc.
+            const connection = new Connection('https://api.mainnet-beta.solana.com');
+            const transaction = new Transaction();
+            
+            // Here you would add the appropriate instructions for NFT operations
+            // For example:
+            // transaction.add(
+            //   createTransferInstruction(
+            //     new PublicKey(nftItem.mint),
+            //     publicKey,
+            //     new PublicKey(recipientAddress),
+            //     publicKey,
+            //     1
+            //   )
+            // );
+
+            // Using the new wallet transaction method
+            const signature = await sendTransaction(
+                transaction,
+                connection,
+                { 
+                    confirmTransaction: true,
+                    statusCallback: (status) => console.log(`Transaction status: ${status}`)
+                }
+            );
+
+            console.log('Transaction sent with signature:', signature);
+            Alert.alert('Success', 'Transaction completed successfully!');
+            
+        } catch (error: any) {
+            console.error('Error sending transaction:', error);
+            Alert.alert('Error', `Transaction failed: ${error.message}`);
+        } finally {
+            setIsSendingTransaction(false);
         }
     };
 
@@ -276,6 +326,48 @@ const NftListingModal = ({
         );
     };
 
+    // Modified render for NFT listing items to include transaction option
+    const renderNftItem = ({ item }: { item: NftItem }) => (
+        <TouchableOpacity
+            style={modalStyles.listingCard}
+            onPress={() => onSelectListing(item)}>
+            {/* Add a container with relative positioning to hold the image and badge */}
+            <View style={modalStyles.imageContainer}>
+                <Image
+                    source={{ uri: item.image }}
+                    style={modalStyles.listingImage}
+                />
+                {/* Add the compressed NFT badge if applicable */}
+                {item.isCompressed && (
+                    <View style={modalStyles.compressedBadge}>
+                        <Text style={modalStyles.compressedBadgeText}>
+                            cNFT
+                        </Text>
+                    </View>
+                )}
+            </View>
+            <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text
+                    style={modalStyles.listingName}
+                    numberOfLines={1}>
+                    {item.name}
+                </Text>
+            </View>
+            
+            {/* Transaction button for NFT operations */}
+            <TouchableOpacity 
+                style={modalStyles.actionButton}
+                onPress={() => handleNftTransaction(item)}
+                disabled={isSendingTransaction}>
+                {isSendingTransaction ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                    <Text style={modalStyles.actionButtonText}>Transfer</Text>
+                )}
+            </TouchableOpacity>
+        </TouchableOpacity>
+    );
+
     return (
         <Modal
             animationType="slide"
@@ -344,34 +436,7 @@ const NftListingModal = ({
                                     <FlatList
                                         data={listingItems}
                                         keyExtractor={item => item.mint}
-                                        renderItem={({ item }) => (
-                                            <TouchableOpacity
-                                                style={modalStyles.listingCard}
-                                                onPress={() => onSelectListing(item)}>
-                                                {/* Add a container with relative positioning to hold the image and badge */}
-                                                <View style={modalStyles.imageContainer}>
-                                                    <Image
-                                                        source={{ uri: item.image }}
-                                                        style={modalStyles.listingImage}
-                                                    />
-                                                    {/* Add the compressed NFT badge if applicable */}
-                                                    {item.isCompressed && (
-                                                        <View style={modalStyles.compressedBadge}>
-                                                            <Text style={modalStyles.compressedBadgeText}>
-                                                                cNFT
-                                                            </Text>
-                                                        </View>
-                                                    )}
-                                                </View>
-                                                <View style={{ flex: 1, marginLeft: 10 }}>
-                                                    <Text
-                                                        style={modalStyles.listingName}
-                                                        numberOfLines={1}>
-                                                        {item.name}
-                                                    </Text>
-                                                </View>
-                                            </TouchableOpacity>
-                                        )}
+                                        renderItem={renderNftItem}
                                         style={{ marginTop: 10, width: '100%' }}
                                     />
                                     <Text style={modalStyles.disclaimerText}>
@@ -630,6 +695,21 @@ const defaultStyles = StyleSheet.create({
         color: 'white',
         fontWeight: 'bold',
         fontSize: 16,
+    },
+    // Add styles for the new action button
+    actionButton: {
+        backgroundColor: '#32D4DE',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 16,
+        marginLeft: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    actionButtonText: {
+        color: 'white',
+        fontSize: 12,
+        fontWeight: '600',
     },
 });
 

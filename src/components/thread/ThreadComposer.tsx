@@ -25,7 +25,7 @@ import {
   launchImageLibrary,
 } from 'react-native-image-picker';
 import { TENSOR_API_KEY } from '@env';
-import { useAuth } from '../../hooks/useAuth';
+import { useWallet } from '../../hooks/useWallet';
 import TradeModal from './/trade/TradeModal';
 import { DEFAULT_IMAGES } from '../../config/constants';
 import { NftItem, useFetchNFTs } from '../../hooks/useFetchNFTs';
@@ -87,10 +87,12 @@ export default function ThreadComposer({
 }: ThreadComposerProps) {
   const dispatch = useAppDispatch();
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
-  const { solanaWallet } = useAuth();
-  const myWallet = useAppSelector(state => state.auth.address);
+  
+  // Use wallet hook instead of useAuth directly
+  const { wallet, address } = useWallet();
 
-  const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || myWallet ||  null;
+  // Use the wallet address from useWallet
+  const userPublicKey = address || null;
 
   // Basic composer state
   const [textValue, setTextValue] = useState('');
@@ -108,7 +110,6 @@ export default function ThreadComposer({
   // Show/hide the TradeModal
   const [showTradeModal, setShowTradeModal] = useState(false);
   const SOL_TO_LAMPORTS = 1_000_000_000;
-
 
   // Merged theme
   const mergedTheme = getMergedTheme(themeOverrides);
@@ -186,9 +187,6 @@ export default function ThreadComposer({
       setLoadingActiveListings(false);
     }
   }, [userPublicKey]);
-
-
-
 
   /**
    * Post creation logic
