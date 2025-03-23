@@ -6,6 +6,8 @@ import { useAuth } from '../../hooks/useAuth';
 import styles from '../../screens/Common/LoginScreen/LoginScreen.styles';
 import { useCustomization } from '../../CustomizationProvider';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { useAppDispatch } from '../../hooks/useReduxHooks';
+import { loginSuccess } from '../../state/auth/reducer';
 
 import type { Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import type { PublicKey as SolanaPublicKey } from '@solana/web3.js';
@@ -52,6 +54,7 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
 
   const { auth: authConfig } = useCustomization();
   const navigation = useAppNavigation();
+  const dispatch = useAppDispatch();
 
   // For Dynamic, if user is already authenticated, trigger onWalletConnected immediately
   useEffect(() => {
@@ -98,10 +101,27 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
         const publicKey = new PublicKey(publicKeyBuffer);
         const base58Address = publicKey.toBase58();
 
+        console.log('MWA connection successful, address:', base58Address);
+
+        // First dispatch the loginSuccess action directly
+        // This ensures the address is immediately available in the Redux store
+        dispatch(
+          loginSuccess({
+            provider: 'mwa',
+            address: base58Address,
+          })
+        );
+
+        // Then call the onWalletConnected callback
         onWalletConnected({
           provider: 'mwa',
           address: base58Address,
         });
+
+        // Navigate to MainTabs after a short delay
+        setTimeout(() => {
+          navigation.navigate('MainTabs' as never);
+        }, 100);
       } else {
         Alert.alert('Connection Error', 'No accounts found in wallet');
       }

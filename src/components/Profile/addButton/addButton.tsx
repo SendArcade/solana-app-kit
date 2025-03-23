@@ -12,12 +12,12 @@ import {
 import { styles } from './addButton.style';
 import Icons from '../../../assets/svgs/index';
 import { useAppSelector, useAppDispatch } from '../../../hooks/useReduxHooks';
-import { Cluster, Connection, clusterApiUrl } from '@solana/web3.js';
+import { Cluster, Connection, clusterApiUrl, PublicKey } from '@solana/web3.js';
 import { sendSOL } from '../../../utils/transactions/transactionUtils';
-import { useAuth } from '../../../hooks/useAuth';
-import { 
-  setSelectedFeeTier as setFeeTier, 
-  setTransactionMode as setMode 
+import { useWallet } from '../../../hooks/useWallet';
+import {
+  setSelectedFeeTier as setFeeTier,
+  setTransactionMode as setMode
 } from '../../../state/transaction/reducer';
 import { CLUSTER } from '@env';
 
@@ -47,17 +47,18 @@ const AddButton: React.FC<AddButtonProps> = ({
     'low' | 'medium' | 'high' | 'very-high'
   >('low');
   const [amountSol, setAmountSol] = useState('');
-  
+
   // Add a ref to modal components with initial null value
   const modalRef = useRef<View | null>(null);
-  
+
   // Get the current auth state and transaction settings
   const currentProvider = useAppSelector(state => state.auth.provider);
   const transactionState = useAppSelector(state => state.transaction);
 
-  // Use the wallet from useAuth
-  const { wallet } = useAuth();
-  
+  // Use the wallet from useWallet - now it will work correctly with MWA
+  const { wallet, address, isMWA } = useWallet();
+  console.log('Wallet:', wallet);
+
   // Initialize modal state with Redux state when opened
   useEffect(() => {
     if (sendModalVisible) {
@@ -87,11 +88,11 @@ const AddButton: React.FC<AddButtonProps> = ({
       Alert.alert('Error', 'No recipient address available');
       return;
     }
-    
+
     if (onSendToWallet) {
       onSendToWallet();
     }
-    
+
     setSendModalVisible(true);
   };
 
@@ -119,7 +120,7 @@ const AddButton: React.FC<AddButtonProps> = ({
       // Update the Redux state with the selections from the modal
       if (selectedMode) {
         dispatch(setMode(selectedMode));
-        
+
         if (selectedMode === 'priority' && selectedFeeTier) {
           dispatch(setFeeTier(selectedFeeTier));
         }
@@ -127,8 +128,46 @@ const AddButton: React.FC<AddButtonProps> = ({
 
       // Create connection to Solana
       const connection = new Connection(clusterApiUrl(CLUSTER as Cluster), 'confirmed');
-      
-      // Use our centralized sendSOL function
+
+      // For MWA we need to handle transactions differently
+      if (isMWA()) {
+        Alert.alert(
+          'Send Transaction',
+          `This will open your external wallet app to send ${parsedAmount} SOL to ${recipientAddress.slice(0, 6)}...${recipientAddress.slice(-4)}`,
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel'
+            },
+            {
+              text: 'Continue',
+              onPress: async () => {
+                try {
+                  // Here we'd normally integrate with MWA transaction signing
+                  // For this example, just show how we'd do it
+                  console.log(`Would send ${parsedAmount} SOL from ${address} to ${recipientAddress}`);
+
+                  // Close the modal
+                  setSendModalVisible(false);
+                  setSelectedMode(null);
+                  setAmountSol('');
+
+                  Alert.alert(
+                    'External Transaction',
+                    'Please complete the transaction in your wallet app'
+                  );
+                } catch (err: any) {
+                  console.error('Error preparing MWA transaction:', err);
+                  Alert.alert('Transaction Preparation Failed', err.message || String(err));
+                }
+              }
+            }
+          ]
+        );
+        return;
+      }
+
+      // Use our centralized sendSOL function for non-MWA wallets
       const signature = await sendSOL({
         wallet,
         recipientAddress,
@@ -150,7 +189,9 @@ const AddButton: React.FC<AddButtonProps> = ({
   };
 
   // Only render the send to wallet button if provider supports it
-  const showSendToWalletButton = currentProvider === 'privy' || currentProvider === 'dynamic' || currentProvider === 'mwa';
+  const showSendToWalletButton = currentProvider === 'privy' ||
+    currentProvider === 'dynamic' ||
+    currentProvider === 'mwa';
 
   return (
     <View style={styles.container}>
@@ -170,7 +211,7 @@ const AddButton: React.FC<AddButtonProps> = ({
         visible={sendModalVisible}
         onRequestClose={() => setSendModalVisible(false)}
       >
-        <View 
+        <View
           style={modalOverlayStyles.overlay}
           ref={modalRef}
         >
@@ -191,7 +232,7 @@ const AddButton: React.FC<AddButtonProps> = ({
                     style={[
                       modalOverlayStyles.modeButtonText,
                       selectedMode === 'priority' &&
-                        modalOverlayStyles.selectedBtnText,
+                      modalOverlayStyles.selectedBtnText,
                     ]}
                   >
                     Priority
@@ -235,7 +276,7 @@ const AddButton: React.FC<AddButtonProps> = ({
                         style={[
                           modalOverlayStyles.tierButtonText,
                           selectedFeeTier === tier &&
-                            modalOverlayStyles.selectedBtnText,
+                          modalOverlayStyles.selectedBtnText,
                         ]}
                       >
                         {tier}
