@@ -89,7 +89,7 @@ export function useAuth() {
         setStatusMessage: () => {},
         onWalletConnected: info => {
           dispatch(loginSuccess({provider: 'privy', address: info.address}));
-          navigation.navigate('PlatformSelection');
+          navigation.navigate('MainTabs');
         },
       });
     }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
@@ -104,7 +104,7 @@ export function useAuth() {
         setStatusMessage: () => {},
         onWalletConnected: info => {
           dispatch(loginSuccess({provider: 'privy', address: info.address}));
-          navigation.navigate('PlatformSelection');
+          navigation.navigate('MainTabs');
         },
       });
     }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
@@ -119,7 +119,7 @@ export function useAuth() {
         setStatusMessage: () => {},
         onWalletConnected: info => {
           dispatch(loginSuccess({provider: 'privy', address: info.address}));
-          navigation.navigate('PlatformSelection');
+          navigation.navigate('MainTabs');
         },
       });
     }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
@@ -421,7 +421,7 @@ export function useAuth() {
 
     const handleSuccessfulLogin = useCallback((info: {provider: 'dynamic', address: string}) => {
       dispatch(loginSuccess({provider: 'dynamic', address: info.address}));
-      navigation.navigate('PlatformSelection');
+      navigation.navigate('MainTabs');
     }, [dispatch, navigation]);
 
     const loginWithEmail = useCallback(async () => {
