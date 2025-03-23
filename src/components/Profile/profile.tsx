@@ -81,14 +81,16 @@ export default function Profile({
   const allReduxPosts = useAppSelector(state => state.thread.allPosts);
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { address: currentWalletAddress } = useWallet();
+  const myWallet = useAppSelector(state => state.auth.address);
+
+  const currentUserWallet = currentWalletAddress || myWallet;
   const { width } = Dimensions.get('window');
   const itemWidth = (width - 60) / 2;
 
   const userWallet = user?.address || '';
   const storedProfilePic = user?.profilePicUrl || '';
   const customizationData = user?.attachmentData || {};
-  const myWallet = useAppSelector(state => state.auth.address);
-const currentUserWallet = currentWalletAddress || myWallet;
+
 
   // Local states for profile picture and username
   const [profilePicUrl, setProfilePicUrl] = useState<string>(storedProfilePic);
@@ -121,10 +123,10 @@ const currentUserWallet = currentWalletAddress || myWallet;
 
   // For refreshing the portfolio data
   const [refreshingPortfolio, setRefreshingPortfolio] = useState(false);
-  
+
   const handleRefreshPortfolio = useCallback(async () => {
     if (!userWallet) return;
-    
+
     setRefreshingPortfolio(true);
     try {
       // Re-fetch portfolio (in a real app, you would implement a refresh method in the hook)
@@ -141,7 +143,7 @@ const currentUserWallet = currentWalletAddress || myWallet;
   const handleAssetPress = useCallback((asset: AssetItem) => {
     // You can implement what happens when an asset is pressed
     console.log('Asset pressed:', asset);
-    
+
     // For NFTs, you might want to show a detail view
     if (asset.interface === 'V1_NFT' || asset.interface === 'ProgrammableNFT') {
       // Example: navigation.navigate('NFTDetail', { asset });

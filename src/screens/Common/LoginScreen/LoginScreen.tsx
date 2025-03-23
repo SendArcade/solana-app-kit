@@ -53,7 +53,7 @@ export default function LoginScreen() {
     try {
       dispatch(
         loginSuccess({
-          provider: info.provider as 'privy' | 'dynamic' | 'turnkey',
+          provider: info.provider as 'privy' | 'dynamic' | 'turnkey' | 'mwa',
           address: info.address,
         }),
       );
