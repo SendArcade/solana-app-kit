@@ -1,7 +1,7 @@
 import React from 'react';
 import {View, Text, StyleSheet, SafeAreaView, TouchableOpacity} from 'react-native';
-import Tweet from '../../../components/tweet/tweet';
-import UserListing from '../../../components/userListing/userListing';
+// import Tweet from '../../../components/tweet/tweet';
+// import UserListing from '../../../components/userListing/userListing';
 import SuggestionsCard from '../../../components/CoinDetails/suggestionsCard/suggestionsCard';
 import { tweetsData } from '../../../mocks/tweets';
 import {RootStackParamList} from '../../../navigation/RootNavigator';

@@ -1,4 +1,4 @@
-import React, {useEffect, useRef} from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,11 @@ import {
   Image,
   Platform,
 } from 'react-native';
-import {LinearGradient} from 'expo-linear-gradient';
-import {useAppNavigation} from '../../hooks/useAppNavigation';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 import COLORS from '../../assets/colors';
 
-const {width} = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 export default function PlatformSelectionScreen() {
   const navigation = useAppNavigation();
@@ -70,7 +70,7 @@ export default function PlatformSelectionScreen() {
     if (platformId === 'chats') {
       navigation.navigate('ChatScreen' as never);
     } else {
-      navigation.navigate('MainTabs', {screen: 'Feed'});
+      navigation.navigate('MainTabs');
     }
   };
 
@@ -102,10 +102,10 @@ export default function PlatformSelectionScreen() {
             styles.header,
             Platform.OS === 'android' && styles.androidHeader,
           ]}>
-          <Animated.Text style={[styles.title, {opacity: fadeAnim}]}>
+          <Animated.Text style={[styles.title, { opacity: fadeAnim }]}>
             Choose Your Platform
           </Animated.Text>
-          <Animated.Text style={[styles.subtitle, {opacity: fadeAnim}]}>
+          <Animated.Text style={[styles.subtitle, { opacity: fadeAnim }]}>
             Select how you want to connect
           </Animated.Text>
         </View>
@@ -120,8 +120,8 @@ export default function PlatformSelectionScreen() {
                 {
                   opacity: fadeAnim,
                   transform: [
-                    {translateY: slideAnim[index]},
-                    {scale: scaleAnim[index]},
+                    { translateY: slideAnim[index] },
+                    { scale: scaleAnim[index] },
                   ],
                 },
               ]}>
@@ -133,7 +133,7 @@ export default function PlatformSelectionScreen() {
                 onPressOut={() => handlePressOut(index)}>
                 <View style={styles.platformContent}>
                   <Image
-                    source={{uri: platform.icon}}
+                    source={{ uri: platform.icon }}
                     style={styles.platformIcon}
                     defaultSource={{
                       uri: 'https://img.icons8.com/ios-filled/50/cccccc/image.png',
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     // Shadow for iOS
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 5},
+    shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.12,
     shadowRadius: 10,
     // Elevation for Android
