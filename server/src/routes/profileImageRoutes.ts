@@ -372,4 +372,32 @@ profileImageRouter.post('/attachCoin', async (req: any, res: any) => {
   }
 });
 
+profileImageRouter.get('/search', async (req: any, res: any) => {
+  try {
+    const searchQuery = req.query.q;
+    let users;
+
+    if (searchQuery) {
+      // Search by username if query parameter is provided
+      users = await knex('users')
+        .where('username', 'ilike', `%${searchQuery}%`)
+        .select('id', 'username', 'profile_picture_url')
+        .orderBy('username', 'asc');
+    } else {
+      // Return all users if no query parameter
+      users = await knex('users')
+        .select('id', 'username', 'profile_picture_url')
+        .orderBy('username', 'asc');
+    }
+
+    return res.json({
+      success: true,
+      users,
+    });
+  } catch (error: any) {
+    console.error('[User search error]', error);
+    return res.status(500).json({success: false, error: error.message});
+  }
+});
+
 export default profileImageRouter;
