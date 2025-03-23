@@ -87,57 +87,122 @@ export type TokenEntry = {
   decimals: number;
 };
 
-// Fetch user's tokens
+// Fetch user's assets via Helius DAS API (includes tokens, NFTs, and cNFTs)
+export async function fetchUserAssets(walletAddress: string) {
+  try {
+    const url = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+    const response = await fetchWithRetries(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'portfolio-fetch',
+        method: 'getAssetsByOwner',
+        params: {
+          ownerAddress: walletAddress,
+          page: 1,
+          limit: 1000,
+          displayOptions: {
+            showFungible: true,
+            showNativeBalance: true,
+            showInscription: true,
+          },
+        },
+      }),
+    });
+    
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.error.message || 'Failed to fetch assets');
+    }
+    
+    return data.result;
+  } catch (err) {
+    console.error('Error fetching user assets:', err);
+    throw err;
+  }
+}
+
+// Legacy fetch token accounts (for backward compatibility)
 export async function fetchTokenAccounts(
   userPublicKey: string,
 ): Promise<TokenEntry[]> {
   try {
-    const url = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
-    const body = {
-      jsonrpc: '2.0',
-      id: 'get-tkn-accs-1',
-      method: 'getTokenAccountsByOwner',
-      params: [
-        userPublicKey,
-        {programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'},
-        {encoding: 'jsonParsed'},
-      ],
-    };
-
-    const res = await fetchWithRetries(url, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(body),
+    // Try to use the Helius DAS API first
+    const assets = await fetchUserAssets(userPublicKey);
+    const tokenItems = assets.items.filter(
+      (item: any) => 
+        item.interface === 'V1_TOKEN' || 
+        item.interface === 'FungibleToken' ||
+        (item.token_info && item.token_info.balance)
+    );
+    
+    // Convert to the legacy TokenEntry format
+    return tokenItems.map((item: any) => {
+      const decimals = item.token_info?.decimals || 0;
+      const balance = item.token_info?.balance || '0';
+      
+      return {
+        accountPubkey: item.token_info?.associated_token_address || '',
+        mintPubkey: item.id || item.mint,
+        uiAmount: parseInt(balance) / Math.pow(10, decimals),
+        decimals,
+      };
     });
-    const data = await res.json();
-
-    if (!data?.result?.value) {
-      console.warn('No token accounts found for user');
-      return [];
-    }
-
-    const rawAccounts = data.result.value;
-    const tokenEntries: TokenEntry[] = [];
-
-    for (const acct of rawAccounts) {
-      const accountPubkey = acct.pubkey;
-      const mintPubkey = acct?.account?.data?.parsed?.info?.mint || '';
-
-      // Now fetch each token account's balance
-      const balObj = await fetchTokenAccountBalance(accountPubkey);
-      if (balObj.uiAmount && balObj.uiAmount > 0) {
-        tokenEntries.push({
-          accountPubkey,
-          mintPubkey,
-          uiAmount: balObj.uiAmount,
-          decimals: balObj.decimals,
-        });
-      }
-    }
-    return tokenEntries;
   } catch (err) {
     console.error('Error in fetchTokenAccounts:', err);
-    return [];
+    
+    // Fall back to legacy method if Helius fails
+    try {
+      const url = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+      const body = {
+        jsonrpc: '2.0',
+        id: 'get-tkn-accs-1',
+        method: 'getTokenAccountsByOwner',
+        params: [
+          userPublicKey,
+          {programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'},
+          {encoding: 'jsonParsed'},
+        ],
+      };
+
+      const res = await fetchWithRetries(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+
+      if (!data?.result?.value) {
+        console.warn('No token accounts found for user');
+        return [];
+      }
+
+      const rawAccounts = data.result.value;
+      const tokenEntries: TokenEntry[] = [];
+
+      for (const acct of rawAccounts) {
+        const accountPubkey = acct.pubkey;
+        const mintPubkey = acct?.account?.data?.parsed?.info?.mint || '';
+
+        // Now fetch each token account's balance
+        const balObj = await fetchTokenAccountBalance(accountPubkey);
+        if (balObj.uiAmount && balObj.uiAmount > 0) {
+          tokenEntries.push({
+            accountPubkey,
+            mintPubkey,
+            uiAmount: balObj.uiAmount,
+            decimals: balObj.decimals,
+          });
+        }
+      }
+      return tokenEntries;
+    } catch (fallbackErr) {
+      console.error('Fallback method also failed:', fallbackErr);
+      return [];
+    }
   }
 }
 
