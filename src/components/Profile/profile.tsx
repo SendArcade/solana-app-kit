@@ -87,6 +87,8 @@ export default function Profile({
   const userWallet = user?.address || '';
   const storedProfilePic = user?.profilePicUrl || '';
   const customizationData = user?.attachmentData || {};
+  const myWallet = useAppSelector(state => state.auth.address);
+const currentUserWallet = currentWalletAddress || myWallet;
 
   // Local states for profile picture and username
   const [profilePicUrl, setProfilePicUrl] = useState<string>(storedProfilePic);
@@ -226,7 +228,7 @@ export default function Profile({
     if (!userWallet || isOwnProfile) return;
     fetchFollowers(userWallet).then(followers => {
       setFollowersList(followers);
-      if (currentWalletAddress && followers.findIndex((x: any) => x.id === currentWalletAddress) >= 0) {
+      if (currentUserWallet && followers.findIndex((x: any) => x.id === currentUserWallet) >= 0) {
         setAmIFollowing(true);
       } else {
         setAmIFollowing(false);
@@ -235,12 +237,12 @@ export default function Profile({
     fetchFollowing(userWallet).then(following => {
       setFollowingList(following);
     });
-    if (currentWalletAddress) {
-      checkIfUserFollowsMe(currentWalletAddress, userWallet).then(result => {
+    if (currentUserWallet) {
+      checkIfUserFollowsMe(currentUserWallet, userWallet).then(result => {
         setAreTheyFollowingMe(result);
       });
     }
-  }, [userWallet, isOwnProfile, currentWalletAddress]);
+  }, [userWallet, isOwnProfile, currentUserWallet]);
 
   // --- Fetch posts if not provided ---
   useEffect(() => {
@@ -265,20 +267,20 @@ export default function Profile({
 
   // --- Follow / Unfollow handlers ---
   const handleFollow = useCallback(async () => {
-    if (!currentWalletAddress || !userWallet) {
+    if (!currentUserWallet || !userWallet) {
       Alert.alert('Cannot Follow', 'Missing user or my address');
       return;
     }
     try {
       await dispatch(
-        followUser({ followerId: currentWalletAddress, followingId: userWallet }),
+        followUser({ followerId: currentUserWallet, followingId: userWallet }),
       ).unwrap();
       setAmIFollowing(true);
       setFollowersList(prev => {
-        if (!prev.some(u => u.id === currentWalletAddress)) {
+        if (!prev.some(u => u.id === currentUserWallet)) {
           return [
             ...prev,
-            { id: currentWalletAddress, username: 'Me', profile_picture_url: '' },
+            { id: currentUserWallet, username: 'Me', profile_picture_url: '' },
           ];
         }
         return prev;
@@ -286,23 +288,23 @@ export default function Profile({
     } catch (err: any) {
       Alert.alert('Follow Error', err.message);
     }
-  }, [dispatch, currentWalletAddress, userWallet]);
+  }, [dispatch, currentUserWallet, userWallet]);
 
   const handleUnfollow = useCallback(async () => {
-    if (!currentWalletAddress || !userWallet) {
+    if (!currentUserWallet || !userWallet) {
       Alert.alert('Cannot Unfollow', 'Missing user or my address');
       return;
     }
     try {
       await dispatch(
-        unfollowUser({ followerId: currentWalletAddress, followingId: userWallet }),
+        unfollowUser({ followerId: currentUserWallet, followingId: userWallet }),
       ).unwrap();
       setAmIFollowing(false);
-      setFollowersList(prev => prev.filter(u => u.id !== currentWalletAddress));
+      setFollowersList(prev => prev.filter(u => u.id !== currentUserWallet));
     } catch (err: any) {
       Alert.alert('Unfollow Error', err.message);
     }
-  }, [dispatch, currentWalletAddress, userWallet]);
+  }, [dispatch, currentUserWallet, userWallet]);
 
   // --- Avatar selection, modals, editing name logic (unchanged) ---
   const [avatarOptionModalVisible, setAvatarOptionModalVisible] =
