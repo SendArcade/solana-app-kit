@@ -115,8 +115,8 @@ function MyApp() {
 }
 ```
 
-### 6. State Management Extension
-Extend the Redux slices or add new ones:
+### 6. State Management Integration
+Extend the Redux store with our pre-built slices:
 
 ```javascript
 import { combineReducers } from '@reduxjs/toolkit';
@@ -138,4 +138,22 @@ const store = configureStore({
 });
 ```
 
-The library's slices offer typical patterns for storing user data, thread posts, transaction configurations, and other state management needs.
+### 7. Authentication State Management
+
+The auth reducer provides several functions for managing user authentication:
+
+```javascript
+import { loginSuccess, logoutSuccess, updateUsername, updateProfilePic } from 'solana-app-kit';
+
+// Handle login success
+dispatch(loginSuccess(userData));
+
+// Update user profile
+dispatch(updateUsername({ userId: 'user123', newUsername: 'newName' }));
+dispatch(updateProfilePic('https://example.com/new-profile-pic.jpg'));
+
+// Handle logout
+dispatch(logoutSuccess());
+```
+
+The library's state management modules offer typical patterns for storing user data, thread posts, transaction configurations, and other state management needs.
