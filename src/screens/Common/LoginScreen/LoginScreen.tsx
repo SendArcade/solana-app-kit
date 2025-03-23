@@ -1,17 +1,17 @@
 // File: src/screens/LoginScreen/LoginScreen.tsx
-import React, {useEffect, useRef} from 'react';
-import {View, Animated, Text, Dimensions, Alert} from 'react-native';
-import Svg, {Defs, LinearGradient, Stop, Rect} from 'react-native-svg';
+import React, { useEffect, useRef } from 'react';
+import { View, Animated, Text, Dimensions, Alert } from 'react-native';
+import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import Icons from '../../../assets/svgs/index';
 import styles from './LoginScreen.styles';
-import {useDispatch, useSelector} from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useAppNavigation } from '../../../hooks/useAppNavigation';
 import COLORS from '../../../assets/colors';
 import EmbeddedWalletAuth from '../../../components/wallet/EmbeddedWallet';
 import { loginSuccess } from '../../../state/auth/reducer';
-import {RootState} from '../../../state/store';
+import { RootState } from '../../../state/store';
 
-const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const navigation = useAppNavigation();
@@ -44,16 +44,16 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (isLoggedIn) {
-      navigation.navigate('PlatformSelection');
+      navigation.navigate('MainTabs');
     }
   }, [isLoggedIn, navigation]);
 
-  const handleWalletConnected = (info: {provider: string; address: string}) => {
+  const handleWalletConnected = (info: { provider: string; address: string }) => {
     console.log('Wallet connected:', info);
     try {
       dispatch(
         loginSuccess({
-          provider: info.provider as 'privy' | 'dynamic' | 'turnkey',
+          provider: info.provider as 'privy' | 'dynamic' | 'turnkey' | 'mwa',
           address: info.address,
         }),
       );
@@ -82,17 +82,17 @@ export default function LoginScreen() {
       </Svg>
 
       <View style={styles.svgContainer}>
-        <Animated.View style={{opacity: solanaDotOpacity}}>
+        <Animated.View style={{ opacity: solanaDotOpacity }}>
           <Icons.SolanaDot />
         </Animated.View>
         <Animated.View
-          style={[styles.splashTextContainer, {opacity: splashTextOpacity}]}>
+          style={[styles.splashTextContainer, { opacity: splashTextOpacity }]}>
           <Icons.SplashText />
         </Animated.View>
         <Animated.View
           style={[
             styles.smileFaceContainer,
-            {transform: [{scale: smileScale}]},
+            { transform: [{ scale: smileScale }] },
           ]}>
           <Icons.SmileFace />
         </Animated.View>

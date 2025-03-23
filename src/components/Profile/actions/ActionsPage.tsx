@@ -11,6 +11,7 @@ import {
 import ActionDetailModal from './ActionDetailModal';
 import {FontAwesome5} from '@expo/vector-icons';
 import {LinearGradient} from 'expo-linear-gradient';
+import { Action } from '../../../services/profileActions';
 
 interface RawTokenAmount {
   tokenAmount: string;
@@ -57,28 +58,6 @@ interface TransactionEvents {
   compressed?: any;
   distributeCompressionRewards?: {amount: number};
   setAuthority?: any;
-}
-
-export interface Action {
-  signature?: string;
-  slot?: number | string;
-  transactionType?: string;
-  type?: string;
-  instructions?: any[];
-  description?: string;
-  fee?: number;
-  timestamp?: number; // in seconds
-  feePayer?: string;
-  source?: string;
-  events?: TransactionEvents;
-  amount?: number;
-  tokenTransfers?: TokenTransfer[];
-  nativeTransfers?: NativeTransfer[];
-  accountData?: Array<{
-    account: string;
-    nativeBalanceChange: number;
-    tokenBalanceChanges: any[];
-  }>;
 }
 
 interface ActionsPageProps {
@@ -542,65 +521,43 @@ function getTransactionDetails(
 /**
  * Get a simple description for the transaction
  */
-function getSimpleDescription(
-  action: Action, 
-  details: {
-    direction: 'in' | 'out' | 'neutral';
-    amount: number;
-    symbol: string;
-    counterparty?: string;
-    rawData?: any;
-  }
-): string {
-  const { direction, counterparty } = details;
-  
-  // First check if we have a swap
-  if (action.events?.swap) {
-    if (direction === 'in') {
-      return counterparty 
-        ? `Got SOL for ${counterparty}` 
-        : 'Received from swap';
-    } 
+function getSimpleDescription(action: Action): string {
+  // Check for enriched data first
+  if (action.enrichedData) {
+    const { direction, counterparty } = action.enrichedData;
     
-    if (direction === 'out') {
-      return counterparty 
-        ? `Swapped for ${counterparty}` 
-        : 'Sent to swap';
+    // For swap transactions
+    if (action.enrichedType === 'SWAP') {
+      const { swapType, inputSymbol, outputSymbol } = action.enrichedData;
+      
+      if (swapType === 'TOKEN_TO_TOKEN') {
+        return `Swapped ${inputSymbol} → ${outputSymbol}`;
+      } else if (swapType === 'SOL_TO_TOKEN') {
+        return `Swapped SOL → ${outputSymbol}`;
+      } else if (swapType === 'TOKEN_TO_SOL') {
+        return `Swapped ${inputSymbol} → SOL`;
+      }
+      
+      return 'Token Swap';
     }
     
-    return 'Swapped tokens';
-  }
-  
-  // For transfers
-  if (action.type?.toLowerCase().includes('transfer') || 
-      action.transactionType?.toLowerCase().includes('transfer') ||
-      (action.nativeTransfers && action.nativeTransfers.length > 0) ||
-      (action.tokenTransfers && action.tokenTransfers.length > 0)) {
-    if (direction === 'in') {
-      return counterparty ? 
-        `Received from ${counterparty}` : 
-        'Received';
-    } 
-    
-    if (direction === 'out') {
-      return counterparty ? 
-        `Sent to ${counterparty}` : 
-        'Sent';
+    // For transfer transactions
+    if (action.enrichedType === 'TRANSFER' || action.enrichedType === 'TOKEN_TRANSFER') {
+      if (direction === 'IN') {
+        return counterparty ? 
+          `Received from ${counterparty}` : 
+          'Received';
+      }
+      
+      if (direction === 'OUT') {
+        return counterparty ? 
+          `Sent to ${counterparty}` : 
+          'Sent';
+      }
     }
-    
-    return counterparty ? `Transfer: ${counterparty}` : 'Transfer';
   }
   
-  // Generic descriptions based on direction
-  if (direction === 'in') {
-    return 'Received';
-  } 
-  
-  if (direction === 'out') {
-    return 'Sent';
-  }
-  
-  // Check description if available
+  // Fall back to previous logic if enriched data not available
   if (action.description) {
     const desc = action.description.toLowerCase();
     if (desc.includes('transfer')) return 'Transfer';
@@ -610,32 +567,66 @@ function getSimpleDescription(
     if (desc.includes('stake')) return 'Stake';
   }
   
-  // Fallback
   return 'Transaction';
 }
 
-// Special helper just to handle the common transaction amount case
-function displayTransactionAmount(action: Action): string | null {
-  // Direct fix for the 100000 lamports case from sample
-  if (action.nativeTransfers && 
-      action.nativeTransfers.length > 0 && 
-      action.nativeTransfers[0].amount === 100000) {
-    console.log('Found the 100000 lamports case!');
-    return '0.0001 SOL';
-  }
+/**
+ * Format amount to display with proper units
+ */
+function displayAmount(action: Action): { amount: string, symbol: string, color: string } {
+  // Default values
+  let amount = '0';
+  let symbol = 'SOL';
+  let color = '#333'; // Neutral color
   
-  // Extract from description when available
-  if (action.description) {
-    const amountMatch = action.description.match(/transferred\s+(\d+\.\d+)\s+([A-Za-z]+)/i);
-    if (amountMatch && amountMatch.length >= 3) {
-      const amount = amountMatch[1];
-      const symbol = amountMatch[2];
-      console.log('Extracted from description:', amount, symbol);
-      return `${amount} ${symbol}`;
+  // Check for enriched data
+  if (action.enrichedData) {
+    const { direction } = action.enrichedData;
+    
+    // Set color based on direction
+    color = direction === 'IN' ? '#14F195' : direction === 'OUT' ? '#F43860' : '#333';
+    
+    // For swap transactions
+    if (action.enrichedType === 'SWAP') {
+      const { swapType, inputAmount, outputAmount, inputSymbol, outputSymbol } = action.enrichedData;
+      
+      // Display relevant amount based on direction (what user gained or lost)
+      if (direction === 'IN') {
+        amount = outputAmount ? outputAmount.toFixed(4) : '?';
+        symbol = outputSymbol || 'tokens';
+      } else {
+        amount = inputAmount ? inputAmount.toFixed(4) : '?';
+        symbol = inputSymbol || 'tokens';
+      }
     }
+    
+    // For transfer transactions
+    else if (action.enrichedType === 'TRANSFER' || action.enrichedType === 'TOKEN_TRANSFER') {
+      const { transferType, amount: txAmount, tokenSymbol, decimals } = action.enrichedData;
+      
+      if (transferType === 'SOL') {
+        // Format SOL amount
+        amount = txAmount ? txAmount.toFixed(4) : '?';
+        symbol = 'SOL';
+      } else {
+        // Format token amount
+        amount = txAmount ? txAmount.toString() : '?';
+        symbol = tokenSymbol || 'tokens';
+      }
+    }
+  } 
+  // Fall back to previous logic if enriched data not available
+  else if (action.nativeTransfers && action.nativeTransfers.length > 0) {
+    const transfer = action.nativeTransfers[0];
+    amount = formatSolAmount(transfer.amount);
+    symbol = 'SOL';
+  } else if (action.tokenTransfers && action.tokenTransfers.length > 0) {
+    const transfer = action.tokenTransfers[0];
+    amount = transfer.tokenAmount.toString();
+    symbol = transfer.symbol || truncateAddress(transfer.mint);
   }
   
-  return null;
+  return { amount, symbol, color };
 }
 
 const ActionItem: React.FC<{
@@ -644,115 +635,21 @@ const ActionItem: React.FC<{
   walletAddress?: string;
 }> = ({action, onPress, walletAddress}) => {
   // Get transaction type and icon
-  const type = action.type || action.transactionType || 'TRANSACTION';
+  const type = action.enrichedType || action.type || action.transactionType || 'TRANSACTION';
   const { icon, color } = getTransactionTypeInfo(type);
   
-  // Debug the action data
-  console.log('Action data:', {
-    signature: action.signature?.slice(0, 8),
-    type,
-    nativeTransfers: action.nativeTransfers?.map(t => ({from: t.fromUserAccount.slice(0, 8), to: t.toUserAccount.slice(0, 8), amount: t.amount})),
-    tokenTransfers: action.tokenTransfers?.map(t => ({from: t.fromUserAccount.slice(0, 8), to: t.toUserAccount.slice(0, 8), amount: t.tokenAmount})),
-    accountData: action.accountData?.map(a => ({account: a.account.slice(0, 8), change: a.nativeBalanceChange})),
-    swap: action.events?.swap ? 'Has swap data' : 'No swap',
-    description: action.description
-  });
+  // Get simplified description
+  const description = getSimpleDescription(action);
   
-  // Get transaction details
-  const details = getTransactionDetails(action, walletAddress);
-  
-  // Log the extracted details for debugging
-  console.log('Extracted details:', {
-    direction: details.direction,
-    amount: details.amount,
-    symbol: details.symbol,
-    counterparty: details.counterparty
-  });
-  
-  const { direction, amount, symbol, rawData } = details;
-  
-  // Get description
-  const description = getSimpleDescription(action, details);
-  
-  // Check for direct transaction amount display
-  const directAmount = displayTransactionAmount(action);
-  
-  // Format amount
-  let formattedAmount = '';
-  let decimals = 0;
-  
-  // First try to use the direct amount if available
-  if (directAmount) {
-    console.log('Using direct amount:', directAmount);
-    // Split the amount and symbol
-    const parts = directAmount.split(' ');
-    formattedAmount = parts[0];
-  } else {
-    // Debug the amount before formatting
-    console.log('Raw amount before formatting:', amount);
-    
-    if (symbol === 'SOL') {
-      formattedAmount = formatSolAmount(amount);
-      console.log('Formatted SOL amount:', formattedAmount);
-    } else if (rawData && rawData.decimals) {
-      // If we have decimals information
-      decimals = rawData.decimals;
-      formattedAmount = formatTokenAmount(amount, decimals);
-      console.log('Formatted token amount with decimals:', formattedAmount, 'decimals:', decimals);
-    } else if (action.events?.swap) {
-      // Try to determine from swap data
-      const swap = action.events.swap;
-      if (direction === 'out' && swap.tokenInputs && swap.tokenInputs.length > 0) {
-        try {
-          decimals = parseInt(String(swap.tokenInputs[0].rawTokenAmount.decimals), 10);
-          formattedAmount = formatTokenAmount(amount, decimals);
-          console.log('Formatted swap input amount:', formattedAmount, 'decimals:', decimals);
-        } catch (e) {
-          console.error('Error formatting swap input:', e);
-          formattedAmount = String(amount);
-        }
-      } else if (direction === 'in' && swap.tokenOutputs && swap.tokenOutputs.length > 0) {
-        try {
-          decimals = parseInt(String(swap.tokenOutputs[0].rawTokenAmount.decimals), 10);
-          formattedAmount = formatTokenAmount(amount, decimals);
-          console.log('Formatted swap output amount:', formattedAmount, 'decimals:', decimals);
-        } catch (e) {
-          console.error('Error formatting swap output:', e);
-          formattedAmount = String(amount);
-        }
-      } else {
-        formattedAmount = formatSolAmount(amount);
-        console.log('Formatted swap SOL amount:', formattedAmount);
-      }
-    } else {
-      // Default token amount formatting
-      formattedAmount = formatTokenAmount(amount);
-      console.log('Default formatted amount:', formattedAmount);
-    }
-    
-    // Make sure we never show 0.0000 for non-zero amounts
-    if (amount > 0 && (formattedAmount === '0.0000' || formattedAmount === '0')) {
-      console.log('Fixing zero display for non-zero amount:', amount);
-      // Show the raw amount if formatting resulted in zero
-      if (symbol === 'SOL') {
-        formattedAmount = `${amount / 1_000_000_000}`;
-      } else {
-        formattedAmount = amount.toString();
-      }
-      
-      // If still zero, use a better fallback
-      if (formattedAmount === '0' || formattedAmount === '0.0') {
-        formattedAmount = '<0.0001';
-      }
-    }
-  }
+  // Get formatted amount
+  const { amount, symbol, color: amountColor } = displayAmount(action);
   
   // Time ago
   const timeAgo = action.timestamp ? getTimeAgo(action.timestamp) : '';
 
-  // Direction prefix and color
-  const directionPrefix = direction === 'in' ? '+ ' : direction === 'out' ? '- ' : '';
-  const amountColor = direction === 'in' ? '#14F195' : direction === 'out' ? '#F43860' : '#333';
+  // Direction prefix
+  const direction = action.enrichedData?.direction;
+  const directionPrefix = direction === 'IN' ? '+ ' : direction === 'OUT' ? '- ' : '';
 
   return (
     <TouchableOpacity
@@ -774,7 +671,7 @@ const ActionItem: React.FC<{
         {/* Right - Amount */}
         <View style={styles.amountContainer}>
           <Text style={[styles.amount, {color: amountColor}]}>
-            {directionPrefix}{formattedAmount}
+            {directionPrefix}{amount}
           </Text>
           <Text style={styles.symbol}>{symbol}</Text>
         </View>

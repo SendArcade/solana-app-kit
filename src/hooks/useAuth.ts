@@ -15,7 +15,7 @@ import {VersionedTransaction, PublicKey} from '@solana/web3.js';
  * This ensures that regardless of provider, components get a consistent interface
  */
 export interface StandardWallet {
-  provider: 'privy' | 'dynamic' | 'turnkey' | string;
+  provider: 'privy' | 'dynamic' | 'turnkey' | 'mwa' | string;
   address: string | null;
   publicKey: string | null;
   /**
@@ -50,6 +50,10 @@ export function useAuth() {
   const dispatch = useDispatch();
   const navigation = useAppNavigation();
   const authState = useAppSelector(state => state.auth);
+
+  // Get wallet address and provider from Redux state
+  const storedAddress = authState.address;
+  const storedProvider = authState.provider;
 
   /** PRIVY CASE */
   if (selectedProvider === 'privy') {
@@ -89,7 +93,7 @@ export function useAuth() {
         setStatusMessage: () => {},
         onWalletConnected: info => {
           dispatch(loginSuccess({provider: 'privy', address: info.address}));
-          navigation.navigate('PlatformSelection');
+          navigation.navigate('MainTabs');
         },
       });
     }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
@@ -104,7 +108,7 @@ export function useAuth() {
         setStatusMessage: () => {},
         onWalletConnected: info => {
           dispatch(loginSuccess({provider: 'privy', address: info.address}));
-          navigation.navigate('PlatformSelection');
+          navigation.navigate('MainTabs');
         },
       });
     }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
@@ -119,7 +123,7 @@ export function useAuth() {
         setStatusMessage: () => {},
         onWalletConnected: info => {
           dispatch(loginSuccess({provider: 'privy', address: info.address}));
-          navigation.navigate('PlatformSelection');
+          navigation.navigate('MainTabs');
         },
       });
     }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
@@ -421,7 +425,7 @@ export function useAuth() {
 
     const handleSuccessfulLogin = useCallback((info: {provider: 'dynamic', address: string}) => {
       dispatch(loginSuccess({provider: 'dynamic', address: info.address}));
-      navigation.navigate('PlatformSelection');
+      navigation.navigate('MainTabs');
     }, [dispatch, navigation]);
 
     const loginWithEmail = useCallback(async () => {
@@ -500,6 +504,46 @@ export function useAuth() {
       user: null,
       solanaWallet: null,
       wallet: null,
+    };
+  }
+
+  // ADDED: If we're here, check for MWA wallet in Redux state
+  if (storedProvider === 'mwa' && storedAddress) {
+    // Create standardized wallet object for MWA
+    const mwaWallet: StandardWallet = {
+      provider: 'mwa',
+      address: storedAddress,
+      publicKey: storedAddress,
+      rawWallet: { address: storedAddress },
+      getWalletInfo: () => ({
+        walletType: 'MWA',
+        address: storedAddress,
+      }),
+      // For MWA, we don't have a provider as transactions are handled by the Phantom app
+      getProvider: async () => {
+        // Throw error with useful message about MWA not having a provider
+        throw new Error('MWA uses external wallet for signing. This is expected behavior.');
+      }
+    };
+
+    // Create a solanaWallet object for backward compatibility
+    const solanaWallet = {
+      wallets: [{
+        publicKey: storedAddress,
+        address: storedAddress
+      }],
+      // Same behavior as the standardized wallet
+      getProvider: mwaWallet.getProvider
+    };
+
+    return {
+      status: 'authenticated',
+      logout: async () => {
+        dispatch(logoutSuccess());
+      },
+      user: { id: storedAddress },
+      solanaWallet,
+      wallet: mwaWallet,
     };
   }
 

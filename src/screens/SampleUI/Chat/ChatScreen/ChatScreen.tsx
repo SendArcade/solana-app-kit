@@ -9,11 +9,12 @@ import {
   SafeAreaView,
   Image,
   TouchableOpacity,
+  StatusBar,
+  Dimensions,
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks';
 import { fetchAllPosts } from '../../../../state/thread/reducer';
-import { createRetweetAsync } from '../../../../state/thread/reducer';
 import { RootState } from '../../../../state/store';
 import { ThreadPost, ThreadUser } from '../../../../components/thread/thread.types';
 import { PostBody, ThreadComposer } from '../../../../components/thread';
@@ -22,6 +23,19 @@ import RetweetPreview from '../../../../components/thread/retweet/RetweetPreview
 import RetweetModal from '../../../../components/thread/retweet/RetweetModal';
 import { styles, androidStyles, chatBodyOverrides } from './ChatScreen.styles';
 import { DEFAULT_IMAGES } from '../../../../config/constants';
+
+// Get screen width for responsive sizing
+const screenWidth = Dimensions.get('window').width;
+
+// Helper function to check if post has a trade section
+const hasTradeSection = (post: ThreadPost): boolean => {
+  return post.sections.some(section => section.type === 'TEXT_TRADE');
+};
+
+// Helper function to check if post has an NFT listing section
+const hasNftSection = (post: ThreadPost): boolean => {
+  return post.sections.some(section => section.type === 'NFT_LISTING');
+};
 
 export default function ChatScreen() {
   const dispatch = useAppDispatch();
@@ -49,6 +63,9 @@ export default function ChatScreen() {
   const [quoteReplyModalVisible, setQuoteReplyModalVisible] = useState(false);
   const [quoteReplyPostId, setQuoteReplyPostId] = useState<string | null>(null);
 
+  // Track the currently visible messages for grouping messages by user
+  const [visibleMessages, setVisibleMessages] = useState<{[key: string]: boolean}>({});
+
   // Fetch posts on mount
   useEffect(() => {
     dispatch(fetchAllPosts());
@@ -65,11 +82,17 @@ export default function ChatScreen() {
   }, [allPosts]);
 
   const scrollToEnd = useCallback(() => {
-    flatListRef.current?.scrollToEnd({ animated: true });
-  }, []);
+    if (sortedPosts.length > 0) {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }
+  }, [sortedPosts.length]);
 
   useEffect(() => {
-    scrollToEnd();
+    // Add a small delay to ensure the FlatList has updated
+    const timer = setTimeout(() => {
+      scrollToEnd();
+    }, 300);
+    return () => clearTimeout(timer);
   }, [sortedPosts.length, scrollToEnd]);
 
   /**
@@ -81,9 +104,26 @@ export default function ChatScreen() {
   };
 
   /**
+   * Check if this message is part of a series of messages from the same user
+   */
+  const isPartOfGroup = (index: number, post: ThreadPost): boolean => {
+    if (index === 0) return false;
+    
+    const prevPost = sortedPosts[index - 1];
+    // Messages are grouped if from the same user and within 5 minutes
+    return (
+      prevPost.user.id === post.user.id &&
+      Math.abs(
+        new Date(post.createdAt).getTime() - 
+        new Date(prevPost.createdAt).getTime()
+      ) < 5 * 60 * 1000 // 5 minutes
+    );
+  };
+
+  /**
    * Render each chat message bubble
    */
-  const renderItem = ({ item }: { item: ThreadPost }) => {
+  const renderItem = ({ item, index }: { item: ThreadPost; index: number }) => {
     const isSentByCurrentUser =
       userWallet &&
       item.user.id.toLowerCase() === userWallet.toLowerCase();
@@ -97,24 +137,45 @@ export default function ChatScreen() {
           : item.user.avatar
         : DEFAULT_IMAGES.user;
 
+    // Show the header row with avatar/name only for received messages or first message in a group
+    const shouldShowHeader = !isSentByCurrentUser && !isPartOfGroup(index, item);
+
+    // Add minor vertical spacing adjustment for grouped messages
+    const isGroupedMessage = isPartOfGroup(index, item);
+    
+    // Check if this message contains a trade card or NFT
+    const containsTradeCard = hasTradeSection(item);
+    const containsNft = hasNftSection(item);
+    
+    // Adjust bubble width for messages with charts
+    const specialContentBubbleStyle = containsTradeCard 
+      ? { maxWidth: Math.min(screenWidth * 0.85, 320) } 
+      : {};
+
     return (
       <View
         style={[
           styles.messageWrapper,
           isSentByCurrentUser ? styles.sentWrapper : styles.receivedWrapper,
+          isGroupedMessage && { marginTop: 2 },
+          (containsTradeCard || containsNft) && { maxWidth: '95%' }
         ]}>
-        <View style={styles.headerRow}>
-          <Image source={avatarSource} style={styles.avatar} />
-          <View style={styles.usernameContainer}>
-            <Text style={styles.senderLabel}>{item.user.username}</Text>
+        {shouldShowHeader && (
+          <View style={styles.headerRow}>
+            <Image source={avatarSource} style={styles.avatar} />
+            <View style={styles.usernameContainer}>
+              <Text style={styles.senderLabel}>{item.user.username}</Text>
+            </View>
           </View>
-        </View>
+        )}
 
         <View
           style={[
             styles.bubbleContainer,
             isSentByCurrentUser ? styles.sentBubble : styles.receivedBubble,
+            specialContentBubbleStyle
           ]}>
+          {/* Regular text content */}
           <PostBody
             post={item}
             themeOverrides={{}}
@@ -123,16 +184,47 @@ export default function ChatScreen() {
 
           {/* If this message is a quote reply, show the quoted post below */}
           {item.retweetOf && (
-            <View style={{ marginTop: 8 }}>
+            <View style={styles.quotedContentContainer}>
               <RetweetPreview
                 retweetOf={item.retweetOf}
                 themeOverrides={{}}
-                styleOverrides={{}}
+                styleOverrides={{
+                  threadItemText: { fontSize: 13 },
+                  container: { padding: 0 }
+                }}
               />
             </View>
           )}
 
-          <PostCTA post={item} />
+          {/* Wrap trade cards in a container with proper styling */}
+          {containsTradeCard && (
+            <View style={styles.chartContainer}>
+              <PostCTA 
+                post={item} 
+                styleOverrides={{
+                  container: chatBodyOverrides.threadPostCTAContainer,
+                  button: { padding: 8, height: 32 },
+                  buttonLabel: { fontSize: 12 }
+                }}
+                {...{
+                  showGraphForOutputToken: true,
+                  userAvatar: avatarSource
+                }}
+              />
+            </View>
+          )}
+          
+          {/* Regular CTA buttons for non-trade posts */}
+          {!containsTradeCard && containsNft && (
+            <PostCTA 
+              post={item} 
+              styleOverrides={{
+                container: chatBodyOverrides.threadPostCTAContainer,
+                button: styles.tradeButton,
+                buttonLabel: styles.tradeButtonText
+              }}
+            />
+          )}
 
           {/* Quote Reply button (only for messages not sent by the current user) */}
           {!isSentByCurrentUser && (
@@ -160,15 +252,23 @@ export default function ChatScreen() {
         {flex: 1, backgroundColor: '#FFFFFF'},
         Platform.OS === 'android' && androidStyles.safeArea,
       ]}>
+      <StatusBar backgroundColor="#FFFFFF" barStyle="dark-content" />
       <KeyboardAvoidingView
         style={styles.chatScreenContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
         <FlatList
           ref={flatListRef}
           data={sortedPosts}
           keyExtractor={item => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={scrollToEnd}
+          onLayout={scrollToEnd}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={10}
         />
 
         <View style={styles.composerContainer}>
@@ -192,7 +292,7 @@ export default function ChatScreen() {
           currentUser={currentUser}
           headerText="Reply"
           placeholderText="Add a reply to this message"
-          buttonText="Reply"
+          buttonText="Send Reply"
         />
       )}
     </SafeAreaView>

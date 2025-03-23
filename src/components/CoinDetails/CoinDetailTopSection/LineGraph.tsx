@@ -1,6 +1,6 @@
 // FILE: src/components/CoinDetails/CoinDetailTopSection/LineGraph.tsx
 
-import React, {useEffect, useRef} from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Dimensions,
@@ -8,16 +8,16 @@ import {
   Text,
   ImageSourcePropType,
 } from 'react-native';
-import {LineChart} from 'react-native-chart-kit';
-import {Circle, ClipPath, Defs, Image as SvgImage} from 'react-native-svg';
+import { LineChart } from 'react-native-chart-kit';
+import { Circle, ClipPath, Defs, Image as SvgImage } from 'react-native-svg';
 
 interface LineGraphProps {
   data: number[];
   width?: number;
-  executionPrice?: number; // Add this new prop
-  executionTimestamp?: number; // Add this new prop
+  executionPrice?: number;
+  executionTimestamp?: number;
   timestamps?: number[];
-  executionColor?: string; // Optional color for the execution marker
+  executionColor?: string;
   userAvatar?: any;
 }
 
@@ -34,6 +34,13 @@ const LineGraph: React.FC<LineGraphProps> = ({
   const animatedData = useRef(new Animated.Value(0)).current;
   const currentData = useRef(data);
   const [displayData, setDisplayData] = React.useState(data);
+  
+  // Store the previous props to avoid unnecessary calculations
+  const prevPropsRef = useRef({
+    dataLength: data.length,
+    executionPrice,
+    executionTimestamp,
+  });
 
   const getTimestampInMs = (
     timestamp: string | number | Date | undefined,
@@ -55,11 +62,26 @@ const LineGraph: React.FC<LineGraphProps> = ({
     return undefined;
   };
 
+  // Only animate if data has actually changed
   useEffect(() => {
+    // Check if data has changed
+    const dataChanged = 
+      data.length !== prevPropsRef.current.dataLength ||
+      JSON.stringify(data) !== JSON.stringify(currentData.current);
+      
+    if (!dataChanged) return;
+      
     // Set initial display data to avoid null rendering
     if (data && data.length > 0 && (!displayData || displayData.length === 0)) {
       setDisplayData([...data]);
     }
+
+    // Store current values for next comparison
+    prevPropsRef.current = {
+      dataLength: data.length,
+      executionPrice,
+      executionTimestamp,
+    };
 
     // Reset animation value
     animatedData.setValue(0);
@@ -68,18 +90,10 @@ const LineGraph: React.FC<LineGraphProps> = ({
     const previousData = [...currentData.current];
     currentData.current = data;
 
-    const parsedExecTimestamp = getTimestampInMs(executionTimestamp);
-
-    if (timestamps && timestamps.length > 0) {
-
-      const sortOrder =
-        timestamps[1] > timestamps[0] ? 'ascending' : 'descending';
-    }
-
-    // Animate to new data
+    // Animate to new data - make animation faster (200ms instead of 300ms)
     Animated.timing(animatedData, {
       toValue: 1,
-      duration: 300,
+      duration: 200,
       useNativeDriver: false,
     }).start();
 
@@ -95,11 +109,9 @@ const LineGraph: React.FC<LineGraphProps> = ({
     return () => {
       animatedData.removeAllListeners();
     };
-  }, [data, timestamps, executionTimestamp, executionPrice, animatedData]);
+  }, [data, animatedData]);
 
-  // console.log(executionTimestamp, "////////////");
-
-  const getAvatarUri = () => {
+  const avatarUri = useMemo(() => {
     if (!userAvatar) return null;
 
     if (typeof userAvatar === 'string') {
@@ -109,18 +121,12 @@ const LineGraph: React.FC<LineGraphProps> = ({
     }
 
     return null;
-  };
+  }, [userAvatar]);
 
-  const avatarUri = getAvatarUri();
-
-  // console.log('Avatar URI:', avatarUri);
-
-  const findExecutionPointIndex = () => {
-    if (!executionPrice) {
-      console.log('No execution price provided, skipping marker');
-      return -1;
-    }
-
+  // Memoize execution point calculation for performance
+  const executionIndex = useMemo(() => {
+    if (!executionPrice || data.length === 0) return -1;
+    
     // Make sure we have all required data for time-based positioning
     if (
       timestamps &&
@@ -146,8 +152,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
         return data.length - 1; // Last data point in the chart
       }
 
-      // [ADDED NEW FALLBACK CHECK]
-      // If for any reason the execution time is still beyond the lastTime, also place on the last data point
+      // If execution time is beyond the lastTime, also place on the last data point
       if (execTime > lastTime) {
         return data.length - 1;
       }
@@ -170,14 +175,12 @@ const LineGraph: React.FC<LineGraphProps> = ({
         }
       }
 
-      console.log('Found time-based index:', closestIndex);
       return closestIndex;
     }
 
-    console.log('Falling back to price-based positioning');
     return findNearestPriceIndex();
-
-    // Price-based positioning helper (defined inside findExecutionPointIndex)
+    
+    // Price-based positioning helper
     function findNearestPriceIndex() {
       if (!data || data.length === 0) return -1;
 
@@ -192,74 +195,58 @@ const LineGraph: React.FC<LineGraphProps> = ({
         }
       }
 
-      console.log('Using price-based index:', closestIndex);
       return closestIndex;
     }
-  };
+  }, [executionPrice, executionTimestamp, data, timestamps]);
 
-  const findNearestPriceIndex = () => {
-    if (!executionPrice || data.length === 0) return -1;
+  // Memoize chart config to prevent unnecessary recalculations
+  const chartConfig = useMemo(() => ({
+    backgroundColor: '#ffffff',
+    backgroundGradientFrom: '#ffffff',
+    backgroundGradientTo: '#ffffff',
+    decimalPlaces: 2,
+    color: () => '#318EF8',
+    labelColor: () => '#666666',
+    formatYLabel: (yValue: string) => `$${yValue}`,
+    style: {
+      borderRadius: 16,
+    },
+    propsForDots: {
+      r: '0',
+    },
+    propsForBackgroundLines: {
+      strokeWidth: 0,
+    },
+    propsForLabels: {
+      fontSize: 10,
+    },
+  }), []);
 
-    // Find the index of the closest price point to the execution price
-    let closestIndex = 0;
-    let minDiff = Math.abs(data[0] - executionPrice);
-
-    for (let i = 1; i < data.length; i++) {
-      const diff = Math.abs(data[i] - executionPrice);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closestIndex = i;
-      }
-    }
-
-    return closestIndex;
-  };
-
-  const executionIndex = findExecutionPointIndex();
+  // Memoize chart data to prevent unnecessary recalculations
+  const chartData = useMemo(() => ({
+    labels: ['', '', '', '', '', ''],
+    datasets: [
+      {
+        data: displayData,
+        strokeWidth: 4,
+        color: () => '#318EF8',
+      },
+    ],
+  }), [displayData]);
 
   return (
     <View>
       <LineChart
-        data={{
-          labels: ['', '', '', '', '', ''],
-          datasets: [
-            {
-              data: displayData,
-              strokeWidth: 4,
-              color: () => '#318EF8',
-            },
-          ],
-        }}
+        data={chartData}
         width={screenWidth - 32}
         height={200}
-        chartConfig={{
-          backgroundColor: '#ffffff',
-          backgroundGradientFrom: '#ffffff',
-          backgroundGradientTo: '#ffffff',
-          decimalPlaces: 2,
-          color: () => '#318EF8',
-          labelColor: () => '#666666',
-          // Removed yAxisLabel property (it is not allowed in AbstractChartConfig)
-          formatYLabel: (yValue: string) => `$${yValue}`, // Format each Y-axis label with a '$'
-          style: {
-            borderRadius: 16,
-          },
-          propsForDots: {
-            r: '0',
-          },
-          propsForBackgroundLines: {
-            strokeWidth: 0,
-          },
-          propsForLabels: {
-            fontSize: 10,
-          },
-        }}
+        chartConfig={chartConfig}
         bezier
         withDots={true}
-        withHorizontalLines={true} // Show horizontal grid lines
-        withVerticalLines={false} // Hide vertical grid lines
-        withHorizontalLabels={true} // Show Y-axis labels for price scale
-        withVerticalLabels={false} // Hide X-axis labels
+        withHorizontalLines={true}
+        withVerticalLines={false}
+        withHorizontalLabels={true}
+        withVerticalLabels={false}
         withShadow={false}
         style={{
           marginVertical: 8,
@@ -267,7 +254,6 @@ const LineGraph: React.FC<LineGraphProps> = ({
           paddingRight: 4,
           paddingLeft: 8,
         }}
-        // ADJUSTED: We push circle(s) into an array so the user avatar is rendered last (on top).
         renderDotContent={({x, y, index}) => {
           const elements = [];
 
@@ -334,7 +320,6 @@ const LineGraph: React.FC<LineGraphProps> = ({
             );
           }
 
-          // If no conditions matched, elements is empty => no custom dot.
           return elements;
         }}
       />
@@ -342,4 +327,25 @@ const LineGraph: React.FC<LineGraphProps> = ({
   );
 };
 
-export default LineGraph;
+// Add memo to prevent unnecessary re-renders
+export default React.memo(LineGraph, (prevProps, nextProps) => {
+  // Only re-render if these important props change
+  if (prevProps.data.length !== nextProps.data.length) return false;
+  if (prevProps.executionPrice !== nextProps.executionPrice) return false;
+  if (prevProps.executionTimestamp !== nextProps.executionTimestamp) return false;
+  if (prevProps.width !== nextProps.width) return false;
+  
+  // If data arrays are different, we need to re-render
+  if (JSON.stringify(prevProps.data) !== JSON.stringify(nextProps.data)) return false;
+  
+  // If timestamps arrays are different, we need to re-render
+  if (
+    (prevProps.timestamps && nextProps.timestamps) &&
+    JSON.stringify(prevProps.timestamps) !== JSON.stringify(nextProps.timestamps)
+  ) {
+    return false;
+  }
+  
+  // Otherwise, don't re-render
+  return true;
+});
