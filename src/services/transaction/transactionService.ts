@@ -1,0 +1,769 @@
+import {
+  Connection,
+  Transaction,
+  VersionedTransaction,
+  PublicKey,
+  TransactionInstruction,
+  Signer,
+} from '@solana/web3.js';
+import { Buffer } from 'buffer';
+import { getDynamicClient } from '../walletProviders/dynamic';
+import { useAppSelector } from '../../hooks/useReduxHooks';
+import { StandardWallet } from '../../hooks/useAuth';
+
+/**
+ * Transaction type that can be either a Transaction or VersionedTransaction
+ */
+type AnyTransaction = Transaction | VersionedTransaction;
+
+/**
+ * Transaction format options
+ */
+type TransactionFormat = 
+  | { type: 'transaction', transaction: AnyTransaction }
+  | { type: 'base64', data: string }
+  | { type: 'instructions', instructions: TransactionInstruction[], feePayer: PublicKey, signers?: Signer[] };
+
+/**
+ * A unified wallet type that can be used in place of different provider-specific wallets
+ */
+export type UnifiedWallet = StandardWallet | any;
+
+/**
+ * Transaction provider options - updated for better type handling
+ */
+type WalletProvider = 
+  | { type: 'privy', provider: any }
+  | { type: 'dynamic', walletAddress: string }
+  | { type: 'turnkey', provider: any }
+  | { type: 'standard', wallet: StandardWallet }
+  | { type: 'autodetect', provider: UnifiedWallet, currentProvider?: string };
+
+/**
+ * Options for sending a transaction
+ */
+interface SendTransactionOptions {
+  connection: Connection;
+  confirmTransaction?: boolean;
+  maxRetries?: number;
+  statusCallback?: (status: string) => void;
+}
+
+/**
+ * Centralized transaction service for handling all transaction types and providers
+ */
+export class TransactionService {
+  // Enable this for detailed logging
+  static DEBUG = true;
+  
+  // Helper for debug logging
+  private static log(...args: any[]) {
+    if (this.DEBUG) {
+      console.log('[TransactionService]', ...args);
+    }
+  }
+
+  /**
+   * Signs and sends a transaction using the provided wallet provider
+   * @param txFormat - The transaction format (transaction object, base64 encoded, or instructions)
+   * @param walletProvider - The wallet provider to use for signing
+   * @param options - Additional options for sending the transaction
+   * @returns A promise that resolves to the transaction signature
+   */
+  static async signAndSendTransaction(
+    txFormat: TransactionFormat,
+    walletProvider: WalletProvider | StandardWallet | UnifiedWallet,
+    options: SendTransactionOptions
+  ): Promise<string> {
+    const { connection, confirmTransaction = true, maxRetries = 3, statusCallback } = options;
+    let transaction: AnyTransaction;
+
+    // Normalize the wallet provider to a standard format
+    const normalizedProvider = this.normalizeWalletProvider(walletProvider);
+
+    // 1. Process transaction format
+    if (txFormat.type === 'base64') {
+      const txBuffer = Buffer.from(txFormat.data, 'base64');
+      try {
+        transaction = VersionedTransaction.deserialize(txBuffer);
+      } catch {
+        transaction = Transaction.from(txBuffer);
+      }
+    } else if (txFormat.type === 'instructions') {
+      // Create a transaction from instructions
+      const { instructions, feePayer, signers = [] } = txFormat;
+      const tx = new Transaction();
+      tx.add(...instructions);
+      const { blockhash } = await connection.getLatestBlockhash();
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = feePayer;
+      
+      // If there are additional signers, sign with them first
+      if (signers.length > 0) {
+        tx.sign(...signers);
+      }
+      
+      transaction = tx;
+    } else {
+      transaction = txFormat.transaction;
+    }
+
+    // 2. Process wallet provider and sign the transaction
+    statusCallback?.('Sending transaction to wallet for signing...');
+    let signature: string;
+
+    try {
+      // Handle StandardWallet type first (preferred approach)
+      if (normalizedProvider.type === 'standard') {
+        const wallet = normalizedProvider.wallet;
+        if (!wallet) {
+          throw new Error('No wallet provided for standard wallet provider');
+        }
+        
+        const provider = await wallet.getProvider();
+        if (!provider) {
+          throw new Error(`No provider available for ${wallet.provider} wallet`);
+        }
+        
+        signature = await this.signAndSendWithProvider(
+          transaction,
+          connection,
+          provider,
+          wallet.getWalletInfo?.()
+        );
+      }
+      else if (normalizedProvider.type === 'privy') {
+        signature = await this.signAndSendWithPrivy(
+          transaction,
+          connection,
+          normalizedProvider.provider
+        );
+      } else if (normalizedProvider.type === 'dynamic') {
+        signature = await this.signAndSendWithDynamic(
+          transaction,
+          connection,
+          normalizedProvider.walletAddress
+        );
+      } else if (normalizedProvider.type === 'turnkey') {
+        // Implementation for Turnkey would go here
+        throw new Error('Turnkey provider not yet implemented');
+      } else if (normalizedProvider.type === 'autodetect') {
+        // Auto-detect provider type based on the currentProvider value
+        if (normalizedProvider.currentProvider === 'privy') {
+          signature = await this.signAndSendWithPrivy(
+            transaction,
+            connection,
+            normalizedProvider.provider
+          );
+        } else if (normalizedProvider.currentProvider === 'dynamic') {
+          // For dynamic, we need to get the wallet address from the provider
+          if (normalizedProvider.provider && normalizedProvider.provider.address) {
+            // If provider has address directly (our standardized object)
+            signature = await this.signAndSendWithDynamic(
+              transaction,
+              connection,
+              normalizedProvider.provider.address
+            );
+          } else {
+            // Try to get from Dynamic client
+            const dynamicClient = getDynamicClient();
+            const wallets = dynamicClient.wallets?.userWallets || [];
+            if (!wallets || wallets.length === 0) {
+              throw new Error('No Dynamic wallet found');
+            }
+            const address = wallets[0].address;
+            
+            signature = await this.signAndSendWithDynamic(
+              transaction,
+              connection,
+              address
+            );
+          }
+        } else {
+          throw new Error(`Unsupported provider type: ${normalizedProvider.currentProvider}`);
+        }
+      } else {
+        throw new Error('Unsupported wallet provider type');
+      }
+    } catch (error: any) {
+      statusCallback?.(`Transaction signing failed: ${error.message}`);
+      throw error;
+    }
+
+    // 3. Confirm transaction if needed
+    if (confirmTransaction) {
+      statusCallback?.('Confirming transaction...');
+      let retries = 0;
+      while (retries < maxRetries) {
+        try {
+          await connection.confirmTransaction(signature, 'confirmed');
+          statusCallback?.('Transaction confirmed!');
+          break;
+        } catch (error) {
+          retries++;
+          if (retries >= maxRetries) {
+            statusCallback?.('Transaction confirmation failed after maximum retries.');
+            throw new Error('Transaction confirmation failed after maximum retries.');
+          }
+          statusCallback?.(`Retrying confirmation (${retries}/${maxRetries})...`);
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+    }
+
+    return signature;
+  }
+
+  /**
+   * Normalize any wallet provider into our standard WalletProvider format
+   */
+  private static normalizeWalletProvider(provider: WalletProvider | StandardWallet | UnifiedWallet): WalletProvider {
+    // Add detailed console logging to help with debugging
+    this.log("Normalizing provider:", 
+      provider ? 
+        `type=${typeof provider}, properties=${Object.keys(provider).join(',')}` : 
+        'null or undefined'
+    );
+    
+    // If it's already a WalletProvider with a type field, return it as is
+    if (provider && typeof provider === 'object' && 'type' in provider) {
+      this.log("Detected provider with type field:", provider.type);
+      return provider as WalletProvider;
+    }
+    
+    // If it's a StandardWallet, convert it to a standard provider
+    if (provider && 
+        typeof provider === 'object' && 
+        'provider' in provider && 
+        'getProvider' in provider && 
+        typeof provider.getProvider === 'function') {
+      this.log("Detected StandardWallet with provider:", provider.provider);
+      return { 
+        type: 'standard', 
+        wallet: provider as StandardWallet 
+      };
+    }
+    
+    // If it has a type property indicating it's from a specific wallet provider
+    if (provider && typeof provider === 'object') {
+      // Detect Privy wallet
+      if (provider.type === 'privy' || 
+          (provider.provider && provider.provider === 'privy') ||
+          // Additional Privy-specific checks
+          (provider.wallets && Array.isArray(provider.wallets) && provider.getProvider)) {
+        this.log("Detected Privy wallet");
+        return { type: 'privy', provider };
+      }
+      
+      // Detect Dynamic wallet
+      if (provider.type === 'dynamic' || 
+          (provider.provider && provider.provider === 'dynamic') ||
+          // Additional Dynamic-specific properties
+          provider._dynamicSdk ||
+          (provider.wallet && provider.wallet.type === 'dynamic_embedded_wallet')) {
+        this.log("Detected Dynamic wallet");
+        
+        let walletAddress = '';
+        
+        if ('address' in provider) {
+          walletAddress = provider.address;
+        } else if (provider.wallets && provider.wallets[0]) {
+          walletAddress = provider.wallets[0].publicKey || provider.wallets[0].address;
+        }
+        
+        if (walletAddress) {
+          return { type: 'dynamic', walletAddress };
+        }
+      }
+    }
+    
+    // For backward compatibility - ensure we correctly identify wallet types
+    if (provider && typeof provider === 'object') {
+      // Special detection for the exact structure provided by useAuth's solanaWallet for Privy
+      if (provider.wallets && provider.getProvider && !provider.type && !provider.provider) {
+        this.log("Detected classic Privy wallet structure from useAuth");
+        return { type: 'privy', provider };
+      }
+      
+      // Special detection for the exact structure provided by Dynamic client
+      if ((provider.primary || provider.userWallets) && !provider.type && !provider.provider) {
+        this.log("Detected Dynamic client or wallet collection");
+        // Try to extract a wallet from primary or userWallets
+        const walletToUse = provider.primary || 
+                          (provider.userWallets && provider.userWallets.length > 0 ? 
+                            provider.userWallets[0] : null);
+                            
+        if (walletToUse && walletToUse.address) {
+          return { type: 'dynamic', walletAddress: walletToUse.address };
+        }
+      }
+    }
+    
+    // Debug what we received to help identify unknown providers
+    this.log("Provider detection defaulting to autodetect:", 
+      provider ? 
+        `keys=${Object.keys(provider).join(',')}, typeof=${typeof provider}` : 
+        'null or undefined');
+        
+    if (provider && typeof provider === 'object') {
+      // If we have a wallets array or a primary/current wallet, this is likely one of our providers
+      if (provider.wallets || provider.primary || provider.current) {
+        this.log("Provider has wallet collections, treating as dynamic");
+        
+        // Try to extract a wallet address
+        let walletAddress = '';
+        if (provider.wallets && provider.wallets[0]) {
+          walletAddress = provider.wallets[0].publicKey || provider.wallets[0].address;
+        } else if (provider.primary) {
+          walletAddress = provider.primary.address;
+        }
+        
+        if (walletAddress) {
+          return { type: 'dynamic', walletAddress };
+        }
+        
+        // If we couldn't extract an address, fall back to autodetect but mark as dynamic
+        return { 
+          type: 'autodetect', 
+          provider,
+          currentProvider: 'dynamic'
+        };
+      }
+    }
+    
+    // Default to autodetect with better provider type detection
+    const providerType = 
+      (provider as any)?.provider || 
+      (provider as any)?.type || 
+      (provider && typeof provider === 'object' && provider.wallets ? 'privy' : 'unknown');
+      
+    this.log("Using autodetect with provider type:", providerType);
+      
+    return { 
+      type: 'autodetect', 
+      provider,
+      currentProvider: providerType
+    };
+  }
+
+  /**
+   * Generic method to sign and send a transaction using any provider
+   * This simplifies the code since most providers follow the same pattern
+   */
+  private static async signAndSendWithProvider(
+    transaction: AnyTransaction,
+    connection: Connection,
+    provider: any,
+    walletInfo?: { walletType: string, address: string | null }
+  ): Promise<string> {
+    if (!provider) {
+      throw new Error('Provider is null or undefined');
+    }
+    
+    // If the provider is actually a wallet with getProvider method, call it to get the actual provider
+    if (typeof provider.getProvider === 'function' && !provider.request) {
+      this.log('Provider is a wallet object with getProvider method, calling it to get actual provider');
+      try {
+        provider = await provider.getProvider();
+      } catch (err) {
+        this.log('Error getting provider from wallet:', err);
+        // Continue with original provider if getting the actual one fails
+      }
+    }
+
+    // If provider doesn't have a request method but has direct signing methods, create a wrapper
+    if (typeof provider.request !== 'function') {
+      this.log('Provider missing request method, attempting to enhance provider', 
+        walletInfo ? `for ${walletInfo.walletType}` : '');
+      
+      // Check for Dynamic-specific properties
+      const isDynamicProvider = 
+        provider._dynamicSdk || 
+        provider._isDynamicProvider || 
+        (provider.wallet && provider.wallet.type === 'dynamic_embedded_wallet') ||
+        (walletInfo && walletInfo.walletType === 'Dynamic');
+      
+      if (isDynamicProvider) {
+        this.log('Detected Dynamic provider, fetching Solana signer');
+        try {
+          // Get Dynamic client
+          const dynamicClient = getDynamicClient();
+          
+          // Try to get the wallet address
+          const walletAddress = provider.address || 
+                              (provider.wallet && provider.wallet.address) || 
+                              (dynamicClient.wallets?.primary?.address) ||
+                              (walletInfo && walletInfo.address);
+                              
+          if (!walletAddress) {
+            throw new Error('Could not determine wallet address from Dynamic provider');
+          }
+          
+          // Find the wallet
+          let wallet;
+          if (dynamicClient.wallets.primary && dynamicClient.wallets.primary.address === walletAddress) {
+            wallet = dynamicClient.wallets.primary;
+          } else {
+            wallet = dynamicClient.wallets.userWallets?.find((w: any) => w.address === walletAddress);
+          }
+          
+          if (!wallet) {
+            throw new Error(`No Dynamic wallet found with address ${walletAddress}`);
+          }
+          
+          // Get the Solana signer
+          this.log('Getting Dynamic signer for wallet:', wallet.address);
+          const signer = await dynamicClient.solana.getSigner({ wallet });
+          
+          if (!signer) {
+            throw new Error('Could not get Solana signer from Dynamic');
+          }
+          
+          // Create provider with request method using the signer
+          const enhancedProvider = {
+            ...provider,
+            _signer: signer, // Store for reference
+            request: async ({ method, params }: any) => {
+              this.log(`[dynamic enhancedProvider] Method requested: ${method}`);
+              
+              if (method === 'signAndSendTransaction') {
+                const { transaction } = params;
+                this.log('[dynamic enhancedProvider] Processing signAndSendTransaction request');
+                
+                // Try to use the direct signTransaction + sendRawTransaction approach
+                try {
+                  // 1. Sign transaction
+                  const signedTx = await signer.signTransaction(transaction);
+                  
+                  // 2. Send raw transaction
+                  const rawTransaction = signedTx instanceof VersionedTransaction 
+                    ? signedTx.serialize()
+                    : signedTx.serialize();
+                    
+                  const signature = await connection.sendRawTransaction(rawTransaction, {
+                    skipPreflight: false, 
+                    preflightCommitment: 'confirmed',
+                    maxRetries: 3
+                  });
+                  
+                  this.log('[dynamic enhancedProvider] Transaction sent with signature:', signature);
+                  return { signature };
+                } catch (signError) {
+                  this.log('[dynamic enhancedProvider] Manual sign+send failed:', signError);
+                  
+                  // Fallback to signAndSendTransaction if available
+                  if (typeof signer.signAndSendTransaction === 'function') {
+                    this.log('[dynamic enhancedProvider] Falling back to signAndSendTransaction');
+                    try {
+                      const result = await signer.signAndSendTransaction(transaction);
+                      return { signature: result.signature };
+                    } catch (sendError) {
+                      this.log('[dynamic enhancedProvider] signAndSendTransaction failed:', sendError);
+                      throw sendError;
+                    }
+                  } else {
+                    throw signError;
+                  }
+                }
+              }
+              
+              throw new Error(`Method ${method} not supported by Dynamic enhanced provider`);
+            }
+          };
+          
+          this.log('Successfully enhanced Dynamic provider with request method');
+          return this.signAndSendWithProvider(transaction, connection, enhancedProvider);
+        } catch (error: any) {
+          this.log('Failed to create Dynamic enhanced provider:', error);
+          throw error;
+        }
+      }
+      
+      // Standard provider enhancement logic - check if provider has direct signing capabilities
+      else if (typeof provider.signAndSendTransaction === 'function' || typeof provider.signTransaction === 'function') {
+        // Create an enhanced provider with request method
+        const enhancedProvider = {
+          ...provider,
+          request: async ({ method, params }: any) => {
+            this.log(`[enhancedProvider] Method requested: ${method}`);
+            
+            if (method === 'signAndSendTransaction') {
+              const { transaction } = params;
+              this.log('[enhancedProvider] Processing signAndSendTransaction request');
+              
+              // Direct signAndSendTransaction if available
+              if (typeof provider.signAndSendTransaction === 'function') {
+                this.log('[enhancedProvider] Using provider.signAndSendTransaction');
+                const result = await provider.signAndSendTransaction(transaction);
+                return { signature: result.signature || result };
+              } 
+              // Fall back to manual sign+send
+              else if (typeof provider.signTransaction === 'function') {
+                this.log('[enhancedProvider] Using manual sign+send flow');
+                
+                // 1. Sign transaction
+                const signedTx = await provider.signTransaction(transaction);
+                
+                // 2. Send raw transaction
+                const rawTransaction = signedTx instanceof VersionedTransaction 
+                  ? signedTx.serialize()
+                  : signedTx.serialize();
+                  
+                const signature = await connection.sendRawTransaction(rawTransaction, {
+                  skipPreflight: false, 
+                  preflightCommitment: 'confirmed',
+                  maxRetries: 3
+                });
+                
+                this.log('[enhancedProvider] Transaction sent with signature:', signature);
+                return { signature };
+              }
+            }
+            
+            throw new Error(`Method ${method} not supported by enhanced provider`);
+          }
+        };
+        
+        this.log('Successfully enhanced provider with request method');
+        provider = enhancedProvider;
+      } else {
+        // Log more information about the provider to help debug
+        this.log('Provider lacking required methods. Available methods:', 
+          Object.getOwnPropertyNames(provider).filter(p => typeof provider[p] === 'function'));
+        
+        if (provider.wallet) {
+          this.log('Provider wallet methods:', 
+            Object.getOwnPropertyNames(provider.wallet).filter(p => typeof provider.wallet[p] === 'function'));
+        }
+        
+        throw new Error('Invalid provider: missing request method and no alternative signing methods');
+      }
+    }
+
+    // Now use the enhanced or original provider
+    const { signature } = await provider.request({
+      method: 'signAndSendTransaction',
+      params: {
+        transaction,
+        connection,
+      },
+    });
+
+    if (!signature) {
+      throw new Error('No signature returned from provider');
+    }
+    return signature;
+  }
+
+  /**
+   * Private method to sign and send a transaction using Privy
+   */
+  private static async signAndSendWithPrivy(
+    transaction: AnyTransaction,
+    connection: Connection,
+    provider: any
+  ): Promise<string> {
+    return this.signAndSendWithProvider(transaction, connection, provider);
+  }
+
+  /**
+   * Helper to check if a transaction has already been signed
+   */
+  private static isTransactionSigned(transaction: AnyTransaction): boolean {
+    if (transaction instanceof VersionedTransaction) {
+      // For versioned transactions, check if there are signatures
+      return transaction.signatures.length > 0 && 
+        transaction.signatures.some(sig => sig.length > 0);
+    } else {
+      // For legacy transactions, check the signatures array
+      return transaction.signatures.length > 0 && 
+        transaction.signatures.some(sig => sig.signature !== null);
+    }
+  }
+
+  /**
+   * Private method to sign and send a transaction using Dynamic
+   */
+  private static async signAndSendWithDynamic(
+    transaction: AnyTransaction,
+    connection: Connection,
+    walletAddress: string
+  ): Promise<string> {
+    const dynamicClient = getDynamicClient();
+    
+    if (!dynamicClient || !dynamicClient.wallets) {
+      throw new Error('Dynamic client not initialized');
+    }
+
+    try {
+      // First identify the wallet to use
+      let wallet;
+      
+      // Try to use the primary wallet first (recommended approach)
+      if (dynamicClient.wallets.primary && dynamicClient.wallets.primary.address === walletAddress) {
+        wallet = dynamicClient.wallets.primary;
+      } else {
+        // Fallback: find the wallet with the matching address in userWallets
+        wallet = dynamicClient.wallets.userWallets?.find((w: any) => w.address === walletAddress);
+      }
+
+      if (!wallet) {
+        throw new Error(`No Dynamic wallet found with address ${walletAddress}`);
+      }
+      
+      // Make sure the solana extension is available
+      if (!dynamicClient.solana || typeof dynamicClient.solana.getSigner !== 'function') {
+        throw new Error('Solana extension not properly initialized in Dynamic client');
+      }
+      
+      // Get the signer using the Solana extension
+      this.log('Getting Dynamic signer for wallet:', wallet.address);
+      const signer = await dynamicClient.solana.getSigner({ wallet });
+      
+      // IMPORTANT: ALWAYS use manual signing + sending to bypass Dynamic's UI
+      // ====================================================================
+      // Do NOT use signer.signAndSendTransaction as it shows UI confirmations
+      this.log('Transaction type:', transaction instanceof VersionedTransaction ? 'Versioned' : 'Legacy');
+      
+      let signedTx = transaction;
+      let signature: string;
+      
+      // Only sign if not already signed
+      if (!this.isTransactionSigned(transaction)) {
+        this.log('Transaction not signed yet, signing now...');
+        try {
+          // Ensure we add recent blockhash for legacy transactions
+          if (!(transaction instanceof VersionedTransaction) && !transaction.recentBlockhash) {
+            const { blockhash } = await connection.getLatestBlockhash('confirmed');
+            transaction.recentBlockhash = blockhash;
+            
+            // Make sure feePayer is set correctly for legacy transactions
+            if (!transaction.feePayer) {
+              transaction.feePayer = new PublicKey(walletAddress);
+            }
+          }
+          
+          signedTx = await signer.signTransaction(transaction);
+          this.log('Transaction successfully signed manually');
+        } catch (signError: any) {
+          this.log('Error during transaction signing:', signError);
+          throw new Error(`Signing failed: ${signError.message}`);
+        }
+      } else {
+        this.log('Transaction already signed, skipping signing step');
+      }
+      
+      // Send the signed transaction
+      this.log('Manually sending signed transaction to network...');
+      try {
+        const rawTransaction = signedTx instanceof VersionedTransaction 
+          ? signedTx.serialize()
+          : signedTx.serialize();
+        
+        signature = await connection.sendRawTransaction(rawTransaction, {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+          maxRetries: 3
+        });
+        
+        this.log('Transaction sent successfully with signature:', signature);
+        return signature;
+      } catch (sendError: any) {
+        this.log('Error sending transaction:', sendError);
+        if (sendError.logs) {
+          this.log('Transaction logs:', sendError.logs);
+        }
+        throw new Error(`Send failed: ${sendError.message}`);
+      }
+    } catch (error: any) {
+      this.log('Dynamic transaction error:', error);
+      throw new Error(`Failed to process transaction with Dynamic: ${error.message}`);
+    }
+  }
+}
+
+/**
+ * React hook for using the transaction service with the current wallet provider
+ */
+export function useTransactionService() {
+  // Get the current provider from Redux state
+  const currentProvider = useAppSelector(state => state.auth.provider);
+  const walletAddress = useAppSelector(state => state.auth.address) || '';
+
+  /**
+   * Signs and sends a transaction using the current wallet provider
+   */
+  const signAndSendTransaction = async (
+    txFormat: TransactionFormat,
+    provider: any,
+    options: SendTransactionOptions
+  ): Promise<string> => {
+    // If provider is a StandardWallet, use that directly
+    if (provider && provider.provider && provider.getProvider) {
+      return TransactionService.signAndSendTransaction(
+        txFormat,
+        { type: 'standard', wallet: provider },
+        options
+      );
+    }
+    
+    // Otherwise fall back to autodetect
+    return TransactionService.signAndSendTransaction(
+      txFormat,
+      { type: 'autodetect', provider, currentProvider: currentProvider || 'privy' },
+      options
+    );
+  };
+
+  /**
+   * Signs and sends a transaction created from instructions
+   */
+  const signAndSendInstructions = async (
+    instructions: TransactionInstruction[],
+    feePayer: PublicKey,
+    provider: any,
+    connection: Connection,
+    options?: Partial<SendTransactionOptions>
+  ): Promise<string> => {
+    const txOptions: SendTransactionOptions = {
+      connection,
+      ...options,
+    };
+
+    return signAndSendTransaction(
+      { type: 'instructions', instructions, feePayer },
+      provider,
+      txOptions
+    );
+  };
+
+  /**
+   * Signs and sends a base64-encoded transaction
+   */
+  const signAndSendBase64 = async (
+    base64Tx: string,
+    provider: any,
+    connection: Connection,
+    options?: Partial<SendTransactionOptions>
+  ): Promise<string> => {
+    const txOptions: SendTransactionOptions = {
+      connection,
+      ...options,
+    };
+
+    return signAndSendTransaction(
+      { type: 'base64', data: base64Tx },
+      provider,
+      txOptions
+    );
+  };
+
+  return {
+    signAndSendTransaction,
+    signAndSendInstructions,
+    signAndSendBase64,
+    currentProvider,
+    walletAddress,
+  };
+} 

@@ -9,6 +9,7 @@ import {
   TextInput,
   FlatList,
   ActivityIndicator,
+  ImageBackground,
 } from 'react-native';
 import {findMentioned} from '../../../utils/common/findMentioned';
 import AddButton from '../addButton/addButton';
@@ -16,11 +17,11 @@ import BuyCard from '../buyCard/buyCard';
 import PerksCard from '../perksCard/perksCard';
 import ProfileIcons from '../../../assets/svgs/index';
 import {styles} from './profileInfo.style';
-import {useAppDispatch} from '../../../hooks/useReduxHooks';
+import {useAppDispatch, useAppSelector} from '../../../hooks/useReduxHooks';
 import {attachCoinToProfile} from '../../../state/auth/reducer';
 import {HELIUS_API_KEY} from '@env';
 import {tokenModalStyles} from './profileInfoTokenModal.style';
-import {fixImageUrl} from '../../../utils/common/fixUrl'; // <-- We ensure to fix the image URL
+import {fixImageUrl, extractAssetImage} from '../../../utils/common/fixUrl'; // <-- We use our improved functions
 
 /**
  * Represents the props for the ProfileInfo component.
@@ -119,6 +120,8 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
   const canShowAddButton = !isOwnProfile;
 
   const dispatch = useAppDispatch();
+  // Move the Redux selector to the top level of the component
+  const authProvider = useAppSelector(state => state.auth.provider);
 
   // ------------------------------------------------------------------
   // (A) State for the "Attach Token" flows (now triggered by arrow press)
@@ -128,14 +131,18 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
   const [fetchTokensError, setFetchTokensError] = useState<string | null>(null);
 
   /**
-   * The “tokens” array will hold the results from Helius DAS:
+   * The "tokens" array will hold the results from Helius DAS:
    * Each item => { mintPubkey, name?: string, imageUrl?: string }
    */
-  const [tokens, setTokens] = useState<
+  const [tokens, setAvailableTokens] = useState<
     Array<{
       mintPubkey: string;
       name?: string;
       imageUrl?: string;
+      symbol?: string;
+      decimals?: number;
+      tokenAmount?: number;
+      groupOrder?: number;
     }>
   >([]);
 
@@ -159,6 +166,9 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
     setFetchTokensError(null);
 
     try {
+      // Use the pre-fetched auth provider from the top-level
+      console.log('Fetching assets for provider:', authProvider);
+
       const bodyParams = {
         jsonrpc: '2.0',
         id: 'get-assets',
@@ -167,11 +177,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
           ownerAddress: userWallet,
           page: 1,
           limit: 100,
-          sortBy: {sortBy: 'created', sortDirection: 'asc'},
-          options: {
-            showUnverifiedCollections: true,
-            showCollectionMetadata: true,
-            showGrandTotal: false,
+          displayOptions: {
             showFungible: true, // get BOTH fungible tokens & NFTs
             showNativeBalance: false,
             showInscription: false,
@@ -179,81 +185,90 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
           },
         },
       };
-      const heliusUrl = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
-      const res = await fetch(heliusUrl, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(bodyParams),
-      });
-      if (!res.ok) {
-        throw new Error(
-          `Helius getAssetsByOwner request failed: ${res.status}`,
-        );
-      }
-      const data = await res.json();
-      const rawItems = data?.result?.items || [];
-
-      const mappedTokens: Array<{
-        mintPubkey: string;
-        name?: string;
-        imageUrl?: string;
-      }> = [];
-
-      for (const asset of rawItems) {
-        const mint = asset.id;
-        let tname = mint.slice(0, 6) + '...' + mint.slice(-4);
-        let imageUrl = '';
-
-        // For most NFTs: asset.content.files[0].cdn_uri, or .uri
-        const content = asset.content || {};
-        if (Array.isArray(content.files) && content.files.length > 0) {
-          imageUrl = content.files[0].uri || content.files[0].cdn_uri || '';
-          // Ensure we fix the URL
-          imageUrl = fixImageUrl(imageUrl);
-        }
-
-        // If there's content.json_uri, try to fetch name/image
-        if (content.json_uri) {
-          try {
-            const metaResp = await fetch(content.json_uri);
-            if (metaResp.ok) {
-              const metaJson = await metaResp.json();
-              if (metaJson.name) {
-                tname = metaJson.name;
-              }
-              if (metaJson.image && !imageUrl) {
-                imageUrl = fixImageUrl(metaJson.image);
-              }
-            }
-          } catch {
-            // ignore JSON fetch errors
-          }
-        }
-
-        // For fungible tokens, we might see content.metadata
-        if (asset.interface === 'V1_TOKEN' && content.metadata) {
-          if (content.metadata.symbol) {
-            tname = content.metadata.symbol;
-          }
-          if (content.metadata.logoURI && !imageUrl) {
-            imageUrl = fixImageUrl(content.metadata.logoURI);
-          }
-        }
-
-        mappedTokens.push({
-          mintPubkey: mint,
-          name: tname,
-          imageUrl,
+      
+      // Use a public RPC endpoint that doesn't require auth to avoid cross-wallet issues
+      const publicRpcUrl = "https://api.mainnet-beta.solana.com";
+      
+      try {
+        // First try with Helius
+        const heliusUrl = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+        const res = await fetch(heliusUrl, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(bodyParams),
         });
+        
+        if (!res.ok) {
+          throw new Error(`Helius request failed with status ${res.status}`);
+        }
+        
+        const data = await res.json();
+        const rawItems = data?.result?.items || [];
+        
+        processTokenData(rawItems);
+      } catch (heliusError) {
+        console.error('Helius request failed, falling back to public RPC:', heliusError);
+        
+        // Fallback to simpler getTokenAccounts request via public RPC
+        setFetchTokensError('Could not fetch all assets. Showing basic tokens only.');
+        setLoadingTokens(false);
       }
-
-      setTokens(mappedTokens);
-    } catch (err: any) {
-      console.error('[handleOpenCoinModal] error:', err);
-      setFetchTokensError(err.message || 'Error fetching tokens from Helius');
-    } finally {
+    } catch (error: any) {
+      console.error('Failed to fetch tokens:', error);
+      setFetchTokensError(error.message || 'Failed to fetch tokens');
       setLoadingTokens(false);
     }
+  };
+  
+  // Helper function to process token data from RPC
+  const processTokenData = (rawItems: any[]) => {
+    const mappedTokens: Array<{
+      mintPubkey: string;
+      name?: string;
+      imageUrl?: string;
+      symbol?: string;
+      decimals?: number;
+      tokenAmount?: number;
+      groupOrder?: number;
+    }> = [];
+
+    // Map Helius data to our format
+    for (const item of rawItems) {
+      if (item.id) {
+        try {
+          // Group to show fungibles first, then NFTs
+          const isFungible = 
+            item.interface === 'FungibleToken' || 
+            item.token_info?.symbol || 
+            false;
+          const groupOrder = isFungible ? 0 : 1;
+
+          // Extract the best available image
+          const imageUrl = extractAssetImage(item);
+
+          mappedTokens.push({
+            mintPubkey: item.id,
+            name: item.content?.metadata?.name || item.token_info?.symbol || 'Unknown',
+            symbol: item.token_info?.symbol || item.content?.metadata?.symbol,
+            decimals: item.token_info?.decimals,
+            imageUrl: imageUrl,
+            tokenAmount: item.token_info ? parseFloat(item.token_info.balance) / 10 ** (item.token_info.decimals || 0) : 1,
+            groupOrder,
+          });
+        } catch (e) {
+          console.warn('Error processing token', item.id, e);
+        }
+      }
+    }
+
+    // Sort: fungibles first, then NFTs, then by name
+    mappedTokens.sort((a, b) => {
+      if ((a.groupOrder || 0) !== (b.groupOrder || 0)) return (a.groupOrder || 0) - (b.groupOrder || 0);
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    setAvailableTokens(mappedTokens);
+    setLoadingTokens(false);
   };
 
   /**
@@ -304,6 +319,49 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
     } finally {
       setShowAttachDetailsModal(false);
     }
+  };
+  
+  // Custom image renderer for tokens in the selection modal
+  const renderTokenImage = (imageUrl: string) => {
+    if (!imageUrl) {
+      return (
+        <View
+          style={[
+            tokenModalStyles.tokenItemImage,
+            {
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: '#eee',
+            },
+          ]}>
+          <Text style={{fontSize: 10, color: '#999'}}>
+            No Img
+          </Text>
+        </View>
+      );
+    }
+    
+    const fixedUrl = fixImageUrl(imageUrl);
+    
+    return (
+      <ImageBackground
+        source={require('../../../assets/images/SENDlogo.png')}
+        style={tokenModalStyles.tokenItemImage}>
+        <Image
+          source={{uri: fixedUrl}}
+          style={tokenModalStyles.tokenItemImage}
+          resizeMode="cover"
+          onError={e =>
+            console.log(
+              'Image load error:',
+              e.nativeEvent.error,
+              'for URL:',
+              fixedUrl,
+            )
+          }
+        />
+      </ImageBackground>
+    );
   };
 
   return (
@@ -404,7 +462,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
       )}
 
       {/* If there's a coin attached, show BuyCard with user-provided + fetched data */}
-      {/* Else we can show a default “BuyCard” or no card at all. */}
+      {/* Else we can show a default "BuyCard" or no card at all. */}
       <View style={{marginTop: 12}}>
         <BuyCard
           tokenName={attachmentData.coin?.symbol || '$Coin'}
@@ -423,11 +481,11 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
       </View>
 
       {/* If viewing someone else's profile, show perks card */}
-      {!isOwnProfile && (
+      {/* {!isOwnProfile && (
         <View style={{marginTop: 12}}>
           <PerksCard />
         </View>
-      )}
+      )} */}
 
       {/* Show follow/unfollow if it's not your own profile */}
       {canShowAddButton && (
@@ -487,35 +545,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
                       onPress={() => handleSelectToken(item)}>
                       <View
                         style={{flexDirection: 'row', alignItems: 'center'}}>
-                        {item.imageUrl ? (
-                          <Image
-                            source={{uri: item.imageUrl}}
-                            style={tokenModalStyles.tokenItemImage}
-                            resizeMode="cover"
-                            onError={e =>
-                              console.log(
-                                'Image load error:',
-                                e.nativeEvent.error,
-                                'for URL:',
-                                item.imageUrl,
-                              )
-                            }
-                          />
-                        ) : (
-                          <View
-                            style={[
-                              tokenModalStyles.tokenItemImage,
-                              {
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                backgroundColor: '#eee',
-                              },
-                            ]}>
-                            <Text style={{fontSize: 10, color: '#999'}}>
-                              No Img
-                            </Text>
-                          </View>
-                        )}
+                        {renderTokenImage(item.imageUrl || '')}
 
                         <View style={tokenModalStyles.tokenInfo}>
                           <Text style={tokenModalStyles.tokenName}>

@@ -4,13 +4,16 @@ import Profile from '../../../../components/Profile/profile';
 import {useAppSelector} from '../../../../hooks/useReduxHooks';
 import {ThreadPost} from '../../../../components/thread/thread.types';
 import {useFetchNFTs} from '../../../../hooks/useFetchNFTs';
+import {useWallet} from '../../../../hooks/useWallet';
 
 export default function ProfileScreen() {
   // Get user data from Redux
-  const userWallet = useAppSelector(state => state.auth.address);
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
   const storedUsername = useAppSelector(state => state.auth.username);
   const attachmentData = useAppSelector(state => state.auth.attachmentData || {});
+  
+  // Use the wallet hook to get the user's address
+  const { address: userWallet } = useWallet();
 
   // Get all posts from Redux
   const allPosts = useAppSelector(state => state.thread.allPosts);

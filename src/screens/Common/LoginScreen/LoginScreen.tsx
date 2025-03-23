@@ -4,17 +4,19 @@ import {View, Animated, Text, Dimensions, Alert} from 'react-native';
 import Svg, {Defs, LinearGradient, Stop, Rect} from 'react-native-svg';
 import Icons from '../../../assets/svgs/index';
 import styles from './LoginScreen.styles';
-import {useDispatch} from 'react-redux';
+import {useDispatch, useSelector} from 'react-redux';
 import { useAppNavigation } from '../../../hooks/useAppNavigation';
 import COLORS from '../../../assets/colors';
 import EmbeddedWalletAuth from '../../../components/wallet/EmbeddedWallet';
 import { loginSuccess } from '../../../state/auth/reducer';
+import {RootState} from '../../../state/store';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
 export default function LoginScreen() {
   const navigation = useAppNavigation();
   const dispatch = useDispatch();
+  const isLoggedIn = useSelector((state: RootState) => state.auth.isLoggedIn);
 
   const solanaDotOpacity = useRef(new Animated.Value(0)).current;
   const splashTextOpacity = useRef(new Animated.Value(0)).current;
@@ -40,16 +42,21 @@ export default function LoginScreen() {
     ]).start();
   }, [solanaDotOpacity, splashTextOpacity, smileScale]);
 
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigation.navigate('PlatformSelection');
+    }
+  }, [isLoggedIn, navigation]);
+
   const handleWalletConnected = (info: {provider: string; address: string}) => {
     console.log('Wallet connected:', info);
     try {
       dispatch(
         loginSuccess({
-          provider: info.provider as 'privy' | 'dynamic' | 'turnkey' | 'mwa',
+          provider: info.provider as 'privy' | 'dynamic' | 'turnkey',
           address: info.address,
         }),
       );
-      navigation.navigate('Home');
     } catch (error) {
       console.error('Error handling wallet connection:', error);
       Alert.alert(

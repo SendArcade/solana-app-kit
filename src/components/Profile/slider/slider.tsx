@@ -9,6 +9,7 @@ import {styles, tabBarStyles} from './slider.style';
 import ActionsPage from '../actions/ActionsPage';
 import { useAppDispatch, useAppSelector } from '../../../hooks/useReduxHooks';
 import { deletePostAsync } from '../../../state/thread/reducer';
+import { AssetItem, PortfolioData } from '../../../hooks/useFetchTokens';
 
 type SwipeTabsProps = {
   myPosts: ThreadPost[];
@@ -19,6 +20,10 @@ type SwipeTabsProps = {
   loadingActions?: boolean;
   fetchActionsError?: string | null;
   onPressPost?: (post: ThreadPost) => void;
+  portfolioData?: PortfolioData;
+  onRefreshPortfolio?: () => void;
+  refreshingPortfolio?: boolean;
+  onAssetPress?: (asset: AssetItem) => void;
 };
 
 function PostPage({
@@ -102,14 +107,31 @@ function CollectiblesPage({
   nfts,
   loading,
   fetchNftsError,
+  portfolioData,
+  onRefresh,
+  refreshing,
+  onAssetPress,
 }: {
   nfts: NftItem[];
   loading?: boolean;
   fetchNftsError?: string | null;
+  portfolioData?: PortfolioData;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  onAssetPress?: (asset: AssetItem) => void;
 }) {
   return (
     <View style={styles.tabContent}>
-      <Collectibles nfts={nfts} loading={loading} error={fetchNftsError} />
+      <Collectibles 
+        nfts={nfts} 
+        loading={loading} 
+        error={fetchNftsError} 
+        portfolioItems={portfolioData?.items}
+        nativeBalance={portfolioData?.nativeBalance?.lamports}
+        onRefresh={onRefresh}
+        refreshing={refreshing}
+        onItemPress={onAssetPress}
+      />
     </View>
   );
 }
@@ -123,11 +145,15 @@ function SwipeTabs({
   loadingActions,
   fetchActionsError,
   onPressPost,
+  portfolioData,
+  onRefreshPortfolio,
+  refreshingPortfolio,
+  onAssetPress,
 }: SwipeTabsProps) {
   const [index, setIndex] = useState<number>(0);
   const [routes] = useState([
     {key: 'posts', title: 'Posts'},
-    {key: 'collectibles', title: 'Collectibles'},
+    {key: 'collectibles', title: 'Portfolio'},
     {key: 'actions', title: 'Actions'},
   ]);
   
@@ -138,6 +164,10 @@ function SwipeTabs({
         nfts={myNFTs}
         loading={loadingNfts}
         fetchNftsError={fetchNftsError}
+        portfolioData={portfolioData}
+        onRefresh={onRefreshPortfolio}
+        refreshing={refreshingPortfolio}
+        onAssetPress={onAssetPress}
       />
     ),
     actions: () => (

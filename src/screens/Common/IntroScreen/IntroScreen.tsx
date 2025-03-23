@@ -3,6 +3,7 @@ import {View, TouchableOpacity, Animated, Easing} from 'react-native';
 import Icons from '../../../assets/svgs/index';
 import styles from './IntroScreen.styles';
 import {useAppNavigation} from '../../../hooks/useAppNavigation';
+import {getDynamicClient} from '../../../services/walletProviders/dynamic';
 
 export default function IntroScreen() {
   const navigation = useAppNavigation();
@@ -11,6 +12,21 @@ export default function IntroScreen() {
   const splashTextOpacity = useRef(new Animated.Value(0)).current;
   const smileScale = useRef(new Animated.Value(0.5)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Check if user is already authenticated
+    try {
+      const client = getDynamicClient();
+      const authUser = client?.auth?.authenticatedUser;
+      
+      if (authUser) {
+        console.log('User already authenticated, skipping login screen');
+        navigation.navigate('PlatformSelection' as never);
+      }
+    } catch (e) {
+      console.log('Dynamic client not initialized yet:', e);
+    }
+  }, [navigation]);
 
   useEffect(() => {
     Animated.sequence([
