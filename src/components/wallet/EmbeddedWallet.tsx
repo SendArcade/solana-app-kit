@@ -4,6 +4,8 @@ import {View, Text, TouchableOpacity, Alert, Platform} from 'react-native';
 import Icons from '../../assets/svgs';
 import {useAuth} from '../../hooks/useAuth';
 import styles from '../../screens/Common/LoginScreen/LoginScreen.styles';
+import {useCustomization} from '../../CustomizationProvider';
+import {useAppNavigation} from '../../hooks/useAppNavigation';
 
 import type {Web3MobileWallet} from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import type { PublicKey as SolanaPublicKey } from '@solana/web3.js';
@@ -47,6 +49,23 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
     user,
     solanaWallet,
   } = useAuth();
+  
+  const {auth: authConfig} = useCustomization();
+  const navigation = useAppNavigation();
+
+  // For Dynamic, if user is already authenticated, trigger onWalletConnected immediately
+  useEffect(() => {
+    if (authConfig.provider === 'dynamic' && status === 'authenticated' && user?.id) {
+      console.log('User already authenticated with Dynamic, triggering callback and navigating');
+      onWalletConnected({provider: 'dynamic', address: user.id});
+      
+      // Navigate to PlatformSelectionScreen after a short delay
+      // The delay ensures the onWalletConnected callback has time to complete
+      setTimeout(() => {
+        navigation.navigate('PlatformSelection' as never);
+      }, 100);
+    }
+  }, [authConfig.provider, status, user, onWalletConnected, navigation]);
 
   const loginWithMWA = async () => {
     if (Platform.OS !== 'android') {
@@ -94,7 +113,7 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
 
   useEffect(() => {
     // If user + solanaWallet are present, it implies a Privy login
-    if (user && solanaWallet && onWalletConnected) {
+    if (authConfig.provider === 'privy' && user && solanaWallet && onWalletConnected) {
       const walletPublicKey =
         solanaWallet.wallets && solanaWallet.wallets.length > 0
           ? solanaWallet.wallets[0].publicKey
@@ -105,7 +124,43 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
       }
       onWalletConnected({provider: 'privy', address: walletPublicKey});
     }
-  }, [user, onWalletConnected, solanaWallet]);
+  }, [user, onWalletConnected, solanaWallet, authConfig.provider]);
+
+  // Handle login with error handling
+  const handleGoogleLogin = async () => {
+    try {
+      if (loginWithGoogle) {
+        console.log('Logging in with Google and passing navigation');
+        await loginWithGoogle();
+        // Navigation will now be handled inside loginWithGoogle
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert('Authentication Error', 'Failed to authenticate with Google. Please try again.');
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    try {
+      if (loginWithApple) {
+        console.log('Logging in with Apple and passing navigation');
+        await loginWithApple();
+        // Navigation will now be handled inside loginWithApple
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert('Authentication Error', 'Failed to authenticate with Apple. Please try again.');
+    }
+  };
+
+  const handleEmailLogin = async () => {
+    try {
+      if (loginWithEmail) await loginWithEmail();
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert('Authentication Error', 'Failed to authenticate with Email. Please try again.');
+    }
+  };
 
   return (
     <View style={styles.bottomButtonsContainer}>
@@ -116,17 +171,17 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity style={styles.loginButton} onPress={loginWithGoogle}>
+      <TouchableOpacity style={styles.loginButton} onPress={handleGoogleLogin}>
         <Icons.Google width={24} height={24} />
         <Text style={styles.buttonText}>Continue with Google</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.loginButton} onPress={loginWithApple}>
+      <TouchableOpacity style={styles.loginButton} onPress={handleAppleLogin}>
         <Icons.Apple width={24} height={24} />
         <Text style={styles.buttonText}>Continue with Apple</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={[styles.loginButton]} onPress={loginWithEmail}>
+      <TouchableOpacity style={[styles.loginButton]} onPress={handleEmailLogin}>
         <Icons.Device width={24} height={24} />
         <Text style={[styles.buttonText]}>Continue with Email</Text>
       </TouchableOpacity>

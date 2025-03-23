@@ -18,6 +18,7 @@ import {
   Connection,
   clusterApiUrl,
   Cluster,
+  PublicKey,
 } from '@solana/web3.js';
 import {TENSOR_API_KEY, HELIUS_RPC_URL, CLUSTER} from '@env';
 import {
@@ -30,6 +31,7 @@ import SelectTokenModal, {TokenInfo} from './SelectTokenModal';
 import {ENDPOINTS} from '../../../config/constants';
 import {useAppDispatch} from '../../../hooks/useReduxHooks';
 import {useAuth} from '../../../hooks/useAuth';
+import {useWallet} from '../../../hooks/useWallet';
 import {
   addPostLocally,
   createRootPostAsync,
@@ -78,9 +80,8 @@ export default function TradeModal({
   disableTabs,
 }: TradeModalProps) {
   const dispatch = useAppDispatch();
-  const {solanaWallet} = useAuth();
-  const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
-  const userWallet = solanaWallet?.wallets?.[0] || null;
+  // Use our new useWallet hook
+  const { publicKey: userPublicKey, connected, sendTransaction } = useWallet();
 
   const [selectedTab, setSelectedTab] = useState<TabOption>('TRADE_AND_SHARE');
 
@@ -150,7 +151,7 @@ export default function TradeModal({
    * On success, we ask user if they want to share the trade on the feed.
    */
   const handleTradeAndShare = useCallback(async () => {
-    if (!userPublicKey) {
+    if (!connected || !userPublicKey) {
       Alert.alert('Wallet not connected', 'Please connect your wallet first.');
       return;
     }
@@ -166,6 +167,7 @@ export default function TradeModal({
       const inputLamports = Number(toBaseUnits(solAmount, inputToken.decimals));
 
       // 1) Get quote from Jupiter
+      console.log('Getting Jupiter quote...');
       const quoteUrl = `${ENDPOINTS.jupiter.quote}?inputMint=${
         inputToken.address
       }&outputMint=${outputToken.address}&amount=${Math.round(
@@ -176,6 +178,8 @@ export default function TradeModal({
         throw new Error(`Jupiter quote failed: ${quoteResp.status}`);
       }
       const quoteData = await quoteResp.json();
+      console.log('Jupiter quote received');
+      
       let firstRoute;
       if (
         quoteData.data &&
@@ -196,6 +200,7 @@ export default function TradeModal({
       const outLamports = parseFloat(firstRoute.outAmount) || 0;
 
       // 2) Build swap Tx from server
+      console.log('Building swap transaction from server...');
       const body = {
         quoteResponse: quoteData,
         userPublicKey: userPublicKey.toString(),
@@ -211,36 +216,60 @@ export default function TradeModal({
           swapData.error || 'Failed to get Jupiter swapTransaction.',
         );
       }
+      console.log('Swap transaction received from server');
 
       const {swapTransaction} = swapData;
       const txBuffer = Buffer.from(swapTransaction, 'base64');
       let transaction: Transaction | VersionedTransaction;
       try {
         transaction = VersionedTransaction.deserialize(txBuffer);
+        console.log('Deserialized as VersionedTransaction');
       } catch {
         transaction = Transaction.from(txBuffer);
+        console.log('Deserialized as legacy Transaction');
+        
+        // Ensure feePayer is set for legacy transactions
+        if (!transaction.feePayer) {
+          transaction.feePayer = new PublicKey(userPublicKey.toString());
+          console.log('Set feePayer on legacy transaction');
+        }
       }
 
-      if (!userWallet) {
-        throw new Error('No wallet found to sign transaction.');
-      }
       const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
+      console.log('Using RPC URL:', rpcUrl);
       const connection = new Connection(rpcUrl, 'confirmed');
-      const provider = await userWallet.getProvider();
-      const {signature} = await provider.request({
-        method: 'signAndSendTransaction',
-        params: {transaction, connection},
-      });
-      if (!signature) {
-        throw new Error('No signature returned from signAndSendTransaction');
+      
+      // Use our simplified useWallet hook to send the transaction
+      console.log('Sending transaction...');
+      try {
+        const signature = await sendTransaction(
+          transaction,
+          connection,
+          { 
+            statusCallback: (status) => console.log(`[JupiterSwap] ${status}`),
+            confirmTransaction: true
+          }
+        );
+
+        console.log('Transaction successfully sent with signature:', signature);
+        setResultMsg(`Swap successful! Tx: ${signature}`);
+
+        // Instead of Alert, we now show a custom modal "Want to share your trade?"
+        setPendingBuyInputLamports(inputLamports);
+        setPendingBuyOutputLamports(outLamports);
+        setShowSharePrompt(true);
+      } catch (txError: any) {
+        console.error('Transaction sending error:', txError);
+        
+        // Try to extract useful error information
+        let errorMessage = txError.message || 'Unknown transaction error';
+        if (txError.logs) {
+          console.error('Transaction logs:', txError.logs);
+          errorMessage += '\n\nTransaction logs: ' + txError.logs.slice(0, 2).join('\n');
+        }
+        
+        throw new Error('Transaction failed: ' + errorMessage);
       }
-
-      setResultMsg(`Swap successful! Tx: ${signature}`);
-
-      // Instead of Alert, we now show a custom modal "Want to share your trade?"
-      setPendingBuyInputLamports(inputLamports);
-      setPendingBuyOutputLamports(outLamports);
-      setShowSharePrompt(true);
     } catch (err: any) {
       console.error('Trade error:', err);
       setErrorMsg(err.message);
@@ -248,11 +277,12 @@ export default function TradeModal({
       setLoading(false);
     }
   }, [
+    connected,
     userPublicKey,
     solAmount,
     inputToken,
     outputToken,
-    userWallet,
+    sendTransaction,
     setPendingBuyInputLamports,
     setPendingBuyOutputLamports,
   ]);

@@ -1,8 +1,16 @@
 // File: src/utils/common/fetch.ts
 
 import {CLUSTER, HELIUS_API_KEY} from '@env';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../state/store';
 
-
+// Helper function to get the correct RPC URL based on provider
+export function getRpcUrlForProvider(provider: string | null = null) {
+  // If no provider is explicitly passed, try to get from Redux (requires hook context)
+  const heliusUrl = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+  
+  return heliusUrl;
+}
 
 export async function fetchWithRetries(
   url: string,
@@ -47,7 +55,7 @@ export async function fetchSolBalance(
   userPublicKey: string,
 ): Promise<number | null> {
   try {
-    const url = ENDPOINTS.helius || `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+    const url = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
     const body = {
       jsonrpc: '2.0',
       id: 'get-balance-1',
@@ -162,7 +170,6 @@ export async function fetchTokenAccountBalance(tokenAccount: string) {
 
 // File: src/utils/solanaWithRetries.ts
 import {Connection, PublicKey} from '@solana/web3.js';
-import { ENDPOINTS } from '../../config/constants';
 
 export async function getBalanceWithRetries(
   connection: Connection,
