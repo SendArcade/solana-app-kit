@@ -150,7 +150,7 @@ const AddButton: React.FC<AddButtonProps> = ({
   };
 
   // Only render the send to wallet button if provider supports it
-  const showSendToWalletButton = currentProvider === 'privy' || currentProvider === 'dynamic';
+  const showSendToWalletButton = currentProvider === 'privy' || currentProvider === 'dynamic' || currentProvider === 'mwa';
 
   return (
     <View style={styles.container}>
