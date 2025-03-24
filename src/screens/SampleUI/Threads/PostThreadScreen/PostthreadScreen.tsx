@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   SafeAreaView,
   View,
@@ -8,23 +8,23 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import {RouteProp, useRoute} from '@react-navigation/native';
+import { RouteProp, useRoute } from '@react-navigation/native';
 
-import {RootStackParamList} from '../../../../navigation/RootNavigator';
+import { RootStackParamList } from '../../../../navigation/RootNavigator';
 import PostHeader from '../../../../components/thread/post/PostHeader';
 import PostBody from '../../../../components/thread/post/PostBody';
 import PostFooter from '../../../../components/thread/post/PostFooter';
 import ThreadComposer from '../../../../components/thread/ThreadComposer';
-import {useAppSelector, useAppDispatch} from '../../../../hooks/useReduxHooks';
-import {useAppNavigation} from '../../../../hooks/useAppNavigation';
+import { useAppSelector, useAppDispatch } from '../../../../hooks/useReduxHooks';
+import { useAppNavigation } from '../../../../hooks/useAppNavigation';
 
 import {
   ThreadPost,
   ThreadUser,
 } from '../../../../components/thread/thread.types';
-import {DEFAULT_IMAGES} from '../../../../config/constants';
-import {flattenPosts} from '../../../../components/thread/thread.utils';
-import {deletePostAsync} from '../../../../state/thread/reducer';
+import { DEFAULT_IMAGES } from '../../../../config/constants';
+import { flattenPosts } from '../../../../components/thread/thread.utils';
+import { deletePostAsync } from '../../../../state/thread/reducer';
 import ThreadEditModal from '../../../../components/thread/ThreadEditModal';
 
 /**
@@ -76,7 +76,7 @@ export default function PostThreadScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'PostThread'>>();
   const navigation = useAppNavigation();
   const dispatch = useAppDispatch();
-  const {postId} = route.params;
+  const { postId } = route.params;
 
   const allPosts = useAppSelector(state => state.thread.allPosts);
   const flatPosts = useMemo(() => flattenPosts(allPosts), [allPosts]);
@@ -98,7 +98,9 @@ export default function PostThreadScreen() {
     handle: userWallet
       ? '@' + userWallet.slice(0, 6) + '...' + userWallet.slice(-4)
       : '@anonymous',
-    avatar: profilePicUrl ? {uri: profilePicUrl} : {uri: DEFAULT_IMAGES.user},
+    avatar: profilePicUrl && profilePicUrl.length > 0
+      ? { uri: profilePicUrl }
+      : DEFAULT_IMAGES.user,
     verified: true,
   };
 
@@ -119,7 +121,7 @@ export default function PostThreadScreen() {
       return;
     }
     Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
-      {text: 'Cancel', style: 'cancel'},
+      { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
@@ -166,7 +168,7 @@ export default function PostThreadScreen() {
             onDeletePost={() => handleDeletePost(post)}
             onEditPost={() => handleEditPost(post)}
             onPressUser={user =>
-              navigation.navigate('OtherProfile', {userId: user.id})
+              navigation.navigate('OtherProfile', { userId: user.id })
             }
           />
           <PostBody post={post} />
@@ -191,7 +193,7 @@ export default function PostThreadScreen() {
         style={twitterRowStyles.rowContainer}
         activeOpacity={0.8}
         onPress={() => {
-          navigation.push('PostThread', {postId: post.id});
+          navigation.push('PostThread', { postId: post.id });
         }}>
         <View style={twitterRowStyles.leftCol}>
           {showTopLine && <View style={twitterRowStyles.verticalLineTop} />}
@@ -206,7 +208,7 @@ export default function PostThreadScreen() {
             onDeletePost={() => handleDeletePost(post)}
             onEditPost={() => handleEditPost(post)}
             onPressUser={user =>
-              navigation.navigate('OtherProfile', {userId: user.id})
+              navigation.navigate('OtherProfile', { userId: user.id })
             }
           />
           <PostBody post={post} />
@@ -218,7 +220,7 @@ export default function PostThreadScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, Platform.OS === 'android' && {paddingTop: 30}]}>
+      style={[styles.container, Platform.OS === 'android' && { paddingTop: 30 }]}>
       {/* Screen Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -227,7 +229,7 @@ export default function PostThreadScreen() {
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Thread</Text>
-        <View style={{width: 40}} />
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -238,7 +240,7 @@ export default function PostThreadScreen() {
               <>
                 <Text style={styles.repliesLabel}>Replies</Text>
                 {directChildren.map(child => (
-                  <View key={child.id} style={{marginLeft: 10}}>
+                  <View key={child.id} style={{ marginLeft: 10 }}>
                     {renderClickableChildPost(child)}
                   </View>
                 ))}
@@ -278,7 +280,7 @@ export default function PostThreadScreen() {
   );
 }
 
-/** Styles for the post “twitter style” layout. */
+/** Styles for the post "twitter style" layout. */
 const twitterRowStyles = {
   rowContainer: {
     flexDirection: 'row' as const,
