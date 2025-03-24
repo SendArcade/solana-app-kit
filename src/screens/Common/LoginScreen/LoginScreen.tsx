@@ -10,6 +10,7 @@ import COLORS from '../../../assets/colors';
 import EmbeddedWalletAuth from '../../../components/wallet/EmbeddedWallet';
 import { loginSuccess } from '../../../state/auth/reducer';
 import { RootState } from '../../../state/store';
+import axios from 'axios';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -48,9 +49,17 @@ export default function LoginScreen() {
     }
   }, [isLoggedIn, navigation]);
 
-  const handleWalletConnected = (info: { provider: string; address: string }) => {
+  const handleWalletConnected = async (info: { provider: string; address: string }) => {
     console.log('Wallet connected:', info);
     try {
+      // First create the user entry in the database
+      await axios.post('/api/profile/createUser', {
+        userId: info.address,
+        username: info.address, // Initially set to wallet address
+        handle: '@' + info.address.slice(0, 6),
+      });
+
+      // Then proceed with login
       dispatch(
         loginSuccess({
           provider: info.provider as 'privy' | 'dynamic' | 'turnkey' | 'mwa',

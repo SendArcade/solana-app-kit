@@ -104,7 +104,7 @@ profileImageRouter.post(
 
 /**
  * ------------------------------------------
- *  EXISTING: Fetch user’s profile data
+ *  EXISTING: Fetch user's profile data
  * ------------------------------------------
  */
 profileImageRouter.get('/', async (req: any, res: any) => {
@@ -136,7 +136,7 @@ profileImageRouter.get('/', async (req: any, res: any) => {
 
 /**
  * ------------------------------------------
- *  EXISTING: Update user’s username
+ *  EXISTING: Update user's username
  * ------------------------------------------
  */
 profileImageRouter.post('/updateUsername', async (req: any, res: any) => {
@@ -248,7 +248,7 @@ profileImageRouter.post('/unfollow', async (req: any, res: any) => {
 
 /**
  * ------------------------------------------
- *  NEW: GET list of a user’s followers
+ *  NEW: GET list of a user's followers
  *  Query param: ?userId=xxx
  * ------------------------------------------
  */
@@ -282,7 +282,7 @@ profileImageRouter.get('/followers', async (req: any, res: any) => {
 
 /**
  * ------------------------------------------
- *  NEW: GET list of a user’s following
+ *  NEW: GET list of a user's following
  *  Query param: ?userId=xxx
  * ------------------------------------------
  */
@@ -397,6 +397,46 @@ profileImageRouter.get('/search', async (req: any, res: any) => {
   } catch (error: any) {
     console.error('[User search error]', error);
     return res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * ------------------------------------------
+ *  NEW: Create a new user
+ *  Body: { userId, username, handle }
+ * ------------------------------------------
+ */
+profileImageRouter.post('/createUser', async (req: any, res: any) => {
+  try {
+    const { userId, username, handle } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'Missing userId' });
+    }
+
+    // Check if user already exists
+    const existingUser = await knex('users').where({ id: userId }).first();
+    if (existingUser) {
+      // User already exists, just return success
+      return res.json({ success: true, user: existingUser });
+    }
+
+    // Create new user with minimal data
+    const newUser = {
+      id: userId,
+      username: username || userId, // Default to userId if username not provided
+      handle: handle || '@' + userId.slice(0, 6), // Default handle if not provided
+      profile_picture_url: null,
+      attachment_data: null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+
+    await knex('users').insert(newUser);
+
+    return res.json({ success: true, user: newUser });
+  } catch (error: any) {
+    console.error('[Create user error]', error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 
