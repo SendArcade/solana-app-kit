@@ -10,6 +10,8 @@ import { Buffer } from 'buffer';
 import { getDynamicClient } from '../walletProviders/dynamic';
 import { useAppSelector } from '../../hooks/useReduxHooks';
 import { StandardWallet } from '../../hooks/useAuth';
+import { Platform } from 'react-native';
+import { CLUSTER } from '@env';
 
 /**
  * Transaction type that can be either a Transaction or VersionedTransaction
@@ -37,6 +39,7 @@ type WalletProvider =
   | { type: 'dynamic', walletAddress: string }
   | { type: 'turnkey', provider: any }
   | { type: 'standard', wallet: StandardWallet }
+  | { type: 'mwa', walletAddress: string }
   | { type: 'autodetect', provider: UnifiedWallet, currentProvider?: string };
 
 /**
@@ -80,6 +83,7 @@ export class TransactionService {
 
     // Normalize the wallet provider to a standard format
     const normalizedProvider = this.normalizeWalletProvider(walletProvider);
+    this.log("Normalized provider type:", normalizedProvider.type);
 
     // 1. Process transaction format
     if (txFormat.type === 'base64') {
@@ -113,24 +117,50 @@ export class TransactionService {
     let signature: string;
 
     try {
-      // Handle StandardWallet type first (preferred approach)
-      if (normalizedProvider.type === 'standard') {
+      // MWA wallet needs special handling - check it first
+      if (normalizedProvider.type === 'mwa') {
+        statusCallback?.('Opening mobile wallet for transaction approval...');
+        this.log("Using MWA transaction flow");
+        signature = await this.signAndSendWithMWA(
+          transaction,
+          connection,
+          normalizedProvider.walletAddress
+        );
+      }
+      // Handle StandardWallet type 
+      else if (normalizedProvider.type === 'standard') {
         const wallet = normalizedProvider.wallet;
         if (!wallet) {
           throw new Error('No wallet provided for standard wallet provider');
         }
         
-        const provider = await wallet.getProvider();
-        if (!provider) {
-          throw new Error(`No provider available for ${wallet.provider} wallet`);
+        // Don't try to get provider for MWA wallets
+        if (wallet.provider === 'mwa') {
+          statusCallback?.('Opening mobile wallet for transaction approval...');
+          this.log("Standard wallet with MWA provider, using MWA flow");
+          const walletAddress = wallet.address || wallet.publicKey;
+          if (!walletAddress) {
+            throw new Error('No wallet address found for MWA wallet');
+          }
+          signature = await this.signAndSendWithMWA(
+            transaction,
+            connection,
+            walletAddress
+          );
+        } else {
+          // Normal standard wallet flow
+          const provider = await wallet.getProvider();
+          if (!provider) {
+            throw new Error(`No provider available for ${wallet.provider} wallet`);
+          }
+          
+          signature = await this.signAndSendWithProvider(
+            transaction,
+            connection,
+            provider,
+            wallet.getWalletInfo?.()
+          );
         }
-        
-        signature = await this.signAndSendWithProvider(
-          transaction,
-          connection,
-          provider,
-          wallet.getWalletInfo?.()
-        );
       }
       else if (normalizedProvider.type === 'privy') {
         signature = await this.signAndSendWithPrivy(
@@ -149,7 +179,24 @@ export class TransactionService {
         throw new Error('Turnkey provider not yet implemented');
       } else if (normalizedProvider.type === 'autodetect') {
         // Auto-detect provider type based on the currentProvider value
-        if (normalizedProvider.currentProvider === 'privy') {
+        if (normalizedProvider.currentProvider === 'mwa') {
+          statusCallback?.('Opening mobile wallet for transaction approval...');
+          this.log("Autodetected MWA provider");
+          const walletAddress = 
+            normalizedProvider.provider.address || 
+            normalizedProvider.provider.publicKey;
+          
+          if (!walletAddress) {
+            throw new Error('No wallet address found for MWA provider');
+          }
+          
+          signature = await this.signAndSendWithMWA(
+            transaction,
+            connection,
+            walletAddress
+          );
+        }
+        else if (normalizedProvider.currentProvider === 'privy') {
           signature = await this.signAndSendWithPrivy(
             transaction,
             connection,
@@ -179,6 +226,21 @@ export class TransactionService {
               address
             );
           }
+        } else if (normalizedProvider.currentProvider === 'mwa') {
+          statusCallback?.('Opening mobile wallet for transaction approval...');
+          const walletAddress = 
+            normalizedProvider.provider.address || 
+            normalizedProvider.provider.publicKey;
+          
+          if (!walletAddress) {
+            throw new Error('No wallet address found for MWA provider');
+          }
+          
+          signature = await this.signAndSendWithMWA(
+            transaction,
+            connection,
+            walletAddress
+          );
         } else {
           throw new Error(`Unsupported provider type: ${normalizedProvider.currentProvider}`);
         }
@@ -226,6 +288,59 @@ export class TransactionService {
         'null or undefined'
     );
     
+    // First, check for MWA wallet - this should be prioritized
+    if (provider && typeof provider === 'object') {
+      // Check for special isMWAProvider flag (from our useWallet hook)
+      if (provider.isMWAProvider) {
+        this.log("Detected special MWA provider from useWallet");
+        const walletAddress = provider.address;
+        if (!walletAddress) {
+          throw new Error('No wallet address found in MWA provider');
+        }
+        return { 
+          type: 'mwa', 
+          walletAddress: walletAddress
+        };
+      }
+      
+      // Direct check for MWA provider
+      if (provider.provider === 'mwa') {
+        this.log("Detected MWA wallet by provider property");
+        const walletAddress = provider.address || provider.publicKey;
+        if (!walletAddress) {
+          throw new Error('No wallet address found for MWA provider');
+        }
+        return { 
+          type: 'mwa', 
+          walletAddress: walletAddress
+        };
+      }
+      
+      // Check via getWalletInfo for MWA
+      if (typeof provider.getWalletInfo === 'function') {
+        try {
+          const walletInfo = provider.getWalletInfo();
+          if (walletInfo && walletInfo.walletType === 'MWA') {
+            this.log("Detected MWA wallet by wallet info");
+            const walletAddress = provider.address || provider.publicKey;
+            if (!walletAddress) {
+              this.log("MWA wallet detected but no address found, falling back to standard");
+              return { 
+                type: 'standard', 
+                wallet: provider as StandardWallet 
+              };
+            }
+            return { 
+              type: 'mwa', 
+              walletAddress: walletAddress
+            };
+          }
+        } catch (e) {
+          // Ignore errors in getWalletInfo
+        }
+      }
+    }
+    
     // If it's already a WalletProvider with a type field, return it as is
     if (provider && typeof provider === 'object' && 'type' in provider) {
       this.log("Detected provider with type field:", provider.type);
@@ -239,6 +354,24 @@ export class TransactionService {
         'getProvider' in provider && 
         typeof provider.getProvider === 'function') {
       this.log("Detected StandardWallet with provider:", provider.provider);
+      
+      // Special case for MWA Standard wallet
+      if (provider.provider === 'mwa') {
+        this.log("Detected StandardWallet with MWA provider");
+        const walletAddress = provider.address || provider.publicKey;
+        if (!walletAddress) {
+          this.log("MWA wallet detected but no address found, falling back to standard");
+          return { 
+            type: 'standard', 
+            wallet: provider as StandardWallet 
+          };
+        }
+        return { 
+          type: 'mwa', 
+          walletAddress: walletAddress
+        };
+      }
+      
       return { 
         type: 'standard', 
         wallet: provider as StandardWallet 
@@ -336,7 +469,8 @@ export class TransactionService {
     const providerType = 
       (provider as any)?.provider || 
       (provider as any)?.type || 
-      (provider && typeof provider === 'object' && provider.wallets ? 'privy' : 'unknown');
+      (provider && typeof provider === 'object' && provider.wallets ? 'privy' : 
+       (provider && typeof provider === 'object' && provider.provider === 'mwa' ? 'mwa' : 'unknown'));
       
     this.log("Using autodetect with provider type:", providerType);
       
@@ -679,6 +813,140 @@ export class TransactionService {
     } catch (error: any) {
       this.log('Dynamic transaction error:', error);
       throw new Error(`Failed to process transaction with Dynamic: ${error.message}`);
+    }
+  }
+
+  /**
+   * Signs and sends a transaction using MWA (Mobile Wallet Adapter)
+   */
+  private static async signAndSendWithMWA(
+    transaction: AnyTransaction,
+    connection: Connection,
+    walletAddress: string
+  ): Promise<string> {
+    if (Platform.OS !== 'android') {
+      throw new Error('MWA is only supported on Android devices');
+    }
+    
+    this.log('Starting MWA transaction flow for address:', walletAddress);
+    
+    try {
+      // Import MWA dynamically to avoid issues on iOS
+      let mobileWalletAdapter;
+      try {
+        mobileWalletAdapter = require('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
+      } catch (importError) {
+        console.error('Failed to import mobile-wallet-adapter:', importError);
+        throw new Error('Mobile Wallet Adapter module not found. Make sure @solana-mobile/mobile-wallet-adapter-protocol-web3js is installed');
+      }
+
+      if (!mobileWalletAdapter || !mobileWalletAdapter.transact) {
+        throw new Error('Mobile Wallet Adapter module is invalid or missing the transact function');
+      }
+
+      const { transact } = mobileWalletAdapter;
+      const { Buffer } = require('buffer');
+
+      return await transact(async (wallet: any) => {
+        try {
+          this.log('Inside MWA transact callback...');
+          
+          // Authorize with the wallet
+          const authResult = await wallet.authorize({
+            cluster: CLUSTER || 'mainnet-beta',
+            identity: {
+              name: 'MWA-enabled dApp',
+              uri: 'https://yourdapp.com',
+              icon: 'favicon.ico',
+            },
+          });
+          
+          this.log('MWA auth result:', authResult ? 'success' : 'failed');
+          
+          if (!authResult || !authResult.accounts || !authResult.accounts.length) {
+            throw new Error('No accounts returned from MWA authorization');
+          }
+          
+          // Get authorized account
+          const selectedAccount = authResult.accounts[0];
+          const accountAddress = selectedAccount.address;
+          
+          this.log('MWA selected account address:', accountAddress);
+          
+          // Convert base64 to PublicKey if needed
+          let userPubkey: PublicKey;
+          try {
+            // First try to interpret as a base58 string
+            userPubkey = new PublicKey(accountAddress);
+          } catch (e) {
+            // If that fails, try to decode from base64
+            try {
+              const userPubkeyBytes = Buffer.from(accountAddress, 'base64');
+              userPubkey = new PublicKey(userPubkeyBytes);
+            } catch (decodeError) {
+              this.log('Failed to decode pubkey from base64:', decodeError);
+              throw new Error(`Invalid account address format: ${accountAddress}`);
+            }
+          }
+          
+          this.log('MWA authorized with public key:', userPubkey.toBase58());
+          
+          // Get latest blockhash if transaction doesn't have one
+          if (transaction instanceof Transaction && !transaction.recentBlockhash) {
+            this.log('Getting latest blockhash for transaction');
+            const { blockhash } = await connection.getLatestBlockhash();
+            transaction.recentBlockhash = blockhash;
+            
+            // Make sure feePayer is set correctly for legacy transactions
+            if (!transaction.feePayer) {
+              this.log('Setting feePayer to', userPubkey.toBase58());
+              transaction.feePayer = userPubkey;
+            }
+          }
+          
+          // Log transaction details for debugging
+          if (transaction instanceof VersionedTransaction) {
+            this.log('Versioned transaction with', transaction.message.compiledInstructions.length, 'instructions');
+          } else {
+            this.log('Legacy transaction with', transaction.instructions.length, 'instructions');
+          }
+          
+          // Sign the transaction
+          this.log('Calling wallet.signTransactions...');
+          const signedTransactions = await wallet.signTransactions({
+            transactions: [transaction],
+          });
+          
+          if (!signedTransactions?.length) {
+            throw new Error('No signed transactions returned from MWA');
+          }
+          
+          // Send the signed transaction
+          const signedTx = signedTransactions[0];
+          this.log('Submitting signed transaction to network...');
+          const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+            skipPreflight: false,
+            preflightCommitment: 'confirmed',
+            maxRetries: 3
+          });
+          this.log('Transaction sent with signature:', signature);
+          
+          return signature;
+        } catch (error: any) {
+          this.log('MWA transaction error:', error);
+          
+          // Provide more detailed error information
+          let errorMessage = `MWA transaction failed: ${error.message}`;
+          if (error.logs) {
+            errorMessage += `\nLogs: ${error.logs.slice(0, 3).join('\n')}`;
+          }
+          
+          throw new Error(errorMessage);
+        }
+      });
+    } catch (error: any) {
+      this.log('MWA module error:', error);
+      throw new Error(`MWA transaction failed: ${error.message}`);
     }
   }
 }
