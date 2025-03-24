@@ -10,7 +10,8 @@ import { useAppDispatch } from '../../hooks/useReduxHooks';
 import { loginSuccess } from '../../state/auth/reducer';
 
 import type { Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
-import type { PublicKey as SolanaPublicKey } from '@solana/web3.js';
+import type { Cluster, PublicKey as SolanaPublicKey } from '@solana/web3.js';
+import { CLUSTER } from '@env';
 
 type TransactFunction = <T>(
   callback: (wallet: Web3MobileWallet) => Promise<T>
@@ -89,7 +90,7 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
     try {
       const authorizationResult = await transact(async (wallet: Web3MobileWallet) => {
         return await wallet.authorize({
-          cluster: 'devnet',
+          cluster: CLUSTER as Cluster,
           identity: APP_IDENTITY,
         });
       });
