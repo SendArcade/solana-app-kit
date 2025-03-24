@@ -120,10 +120,13 @@ function CollectiblesPage({
   refreshing?: boolean;
   onAssetPress?: (asset: AssetItem) => void;
 }) {
+  // If portfolio data is provided, use that instead of legacy nfts
+  const hasPortfolioData = portfolioData?.items && portfolioData.items.length > 0;
+  
   return (
     <View style={styles.tabContent}>
       <Collectibles 
-        nfts={nfts} 
+        nfts={hasPortfolioData ? [] : nfts} 
         loading={loading} 
         error={fetchNftsError} 
         portfolioItems={portfolioData?.items}

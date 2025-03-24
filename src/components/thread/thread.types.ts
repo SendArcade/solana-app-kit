@@ -37,10 +37,9 @@ export interface TradeData {
   outputSymbol: string;
   outputQuantity: string;
   outputUsdValue?: string;
-
-  // (Add the two lines below if missing)
-  inputAmountLamports?: string; // <--- ADD THIS
-  outputAmountLamports?: string; // <--- ADD THIS
+  inputAmountLamports?: string;
+  outputAmountLamports?: string;
+  executionTimestamp?: number; // Add timestamp for when the trade was executed
 }
 
 

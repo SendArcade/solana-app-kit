@@ -1,5 +1,5 @@
 // FILE: src/components/thread/post/PostBody.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import {View} from 'react-native';
 import {createThreadStyles, getMergedTheme} from '../thread.styles';
 import {ThreadPost} from '../thread.types';
@@ -23,7 +23,7 @@ interface PostBodyProps {
   styleOverrides?: {[key: string]: object};
   /**
    * A numeric value used to refresh the trade chart in SectionTrade,
-   * if it’s included in the post's sections.
+   * if it's included in the post's sections.
    */
   externalRefreshTrigger?: number;
 }
@@ -37,23 +37,34 @@ function renderSection(
   createdAt: string,
   externalRefreshTrigger?: number,
 ) {
+  const sectionKey = `${section.id}-${section.type}`;
+
   switch (section.type) {
     case 'TEXT_ONLY':
-      return <SectionTextOnly text={section.text} />;
+      return <SectionTextOnly key={sectionKey} text={section.text} />;
 
     case 'TEXT_IMAGE':
       return (
-        <SectionTextImage text={section.text} imageUrl={section.imageUrl} />
+        <SectionTextImage 
+          key={sectionKey} 
+          text={section.text} 
+          imageUrl={section.imageUrl} 
+        />
       );
 
     case 'TEXT_VIDEO':
       return (
-        <SectionTextVideo text={section.text} videoUrl={section.videoUrl} />
+        <SectionTextVideo 
+          key={sectionKey} 
+          text={section.text} 
+          videoUrl={section.videoUrl} 
+        />
       );
 
     case 'TEXT_TRADE':
       return (
         <SectionTrade
+          key={sectionKey}
           text={section.text}
           tradeData={section.tradeData}
           user={user}
@@ -63,10 +74,10 @@ function renderSection(
       );
 
     case 'POLL':
-      return <SectionPoll pollData={section.pollData} />;
+      return <SectionPoll key={sectionKey} pollData={section.pollData} />;
 
     case 'NFT_LISTING':
-      return <SectionNftListing listingData={section.listingData} />;
+      return <SectionNftListing key={sectionKey} listingData={section.listingData} />;
 
     default:
       return null;
@@ -79,19 +90,26 @@ function PostBody({
   styleOverrides,
   externalRefreshTrigger,
 }: PostBodyProps) {
-  const mergedTheme = getMergedTheme(themeOverrides);
-  const styles = createThreadStyles(mergedTheme, styleOverrides);
-  const {user, createdAt} = post;
+  // Memoize theme and styles to prevent recalculation
+  const mergedTheme = useMemo(() => getMergedTheme(themeOverrides), [themeOverrides]);
+  const styles = useMemo(() => createThreadStyles(mergedTheme, styleOverrides), [mergedTheme, styleOverrides]);
+  
+  const {user, createdAt, sections = []} = post;
+
+  // Memoize the sections rendering to prevent re-creation on every render
+  const renderedSections = useMemo(() => {
+    return sections.map(section => (
+      <View key={section.id} style={styles.extraContentContainer}>
+        <View style={{width: '84%'}}>
+          {renderSection(section, user, createdAt, externalRefreshTrigger)}
+        </View>
+      </View>
+    ));
+  }, [sections, user, createdAt, externalRefreshTrigger, styles.extraContentContainer]);
 
   return (
     <View style={{marginTop: 8, padding: 0}}>
-      {post.sections.map(section => (
-        <View key={section.id} style={styles.extraContentContainer}>
-          <View style={{width: '84%'}}>
-            {renderSection(section, user, createdAt, externalRefreshTrigger)}
-          </View>
-        </View>
-      ))}
+      {renderedSections}
     </View>
   );
 }
@@ -115,6 +133,23 @@ function arePropsEqual(prev: PostBodyProps, next: PostBodyProps): boolean {
       prevSections[i].type !== nextSections[i].type
     ) {
       return false;
+    }
+    
+    // For trade sections, check tradeData
+    if (prevSections[i].type === 'TEXT_TRADE') {
+      const prevTrade = prevSections[i].tradeData;
+      const nextTrade = nextSections[i].tradeData;
+      
+      if (!prevTrade || !nextTrade) {
+        if (prevTrade !== nextTrade) return false;
+        continue;
+      }
+      
+      // Deep compare important trade data fields
+      if (prevTrade.inputMint !== nextTrade.inputMint) return false;
+      if (prevTrade.outputMint !== nextTrade.outputMint) return false;
+      if (prevTrade.inputQuantity !== nextTrade.inputQuantity) return false;
+      if (prevTrade.outputQuantity !== nextTrade.outputQuantity) return false;
     }
   }
 
