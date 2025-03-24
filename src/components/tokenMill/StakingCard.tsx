@@ -3,12 +3,13 @@ import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet, Alert} from 'react-native';
 import {Connection} from '@solana/web3.js';
 import { stakeTokens } from '../../services/tokenMill/tokenMillService';
+import { StandardWallet } from '../../hooks/useAuth';
 
 interface Props {
   marketAddress: string;
   connection: Connection;
   publicKey: string;
-  solanaWallet: any;
+  solanaWallet: StandardWallet | any;
   setLoading: (val: boolean) => void;
 }
 
@@ -21,22 +22,21 @@ export default function StakingCard({
 }: Props) {
   const onPressStake = async () => {
     if (!marketAddress) {
-      Alert.alert('Error', 'You must enter or create a market before staking.');
+      Alert.alert('No market', 'Please enter or create a market first!');
       return;
     }
     try {
       setLoading(true);
-      const provider = await solanaWallet.getProvider();
       const txSig = await stakeTokens({
         marketAddress,
-        amount: 50000,
+        amount: 100,
         userPublicKey: publicKey,
         connection,
-        provider,
+        solanaWallet,
       });
-      Alert.alert('Staked Successfully', `Tx: ${txSig}`);
+      Alert.alert('Staking Complete', `Tx: ${txSig}`);
     } catch (err: any) {
-      Alert.alert('Stake Error', err.message);
+      Alert.alert('Error', err.message);
     } finally {
       setLoading(false);
     }
@@ -44,9 +44,9 @@ export default function StakingCard({
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Stake</Text>
+      <Text style={styles.sectionTitle}>Staking</Text>
       <TouchableOpacity style={styles.button} onPress={onPressStake}>
-        <Text style={styles.buttonText}>Stake 50,000 tokens</Text>
+        <Text style={styles.buttonText}>Stake 100 Tokens</Text>
       </TouchableOpacity>
     </View>
   );
