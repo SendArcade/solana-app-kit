@@ -10,11 +10,12 @@ import {
 } from 'react-native';
 import {Connection} from '@solana/web3.js';
 import { createMarket } from '../../services/tokenMill/tokenMillService';
+import { StandardWallet } from '../../hooks/useAuth';
 
 interface Props {
   connection: Connection;
   publicKey: string;
-  solanaWallet: any;
+  solanaWallet: StandardWallet | any;
   setLoading: (val: boolean) => void;
   onMarketCreated: (marketAddr: string, baseMint: string) => void;
 }
@@ -36,7 +37,6 @@ export default function MarketCreationCard({
   const onPressCreateMarket = async () => {
     try {
       setLoading(true);
-      const provider = await solanaWallet.getProvider();
       const {txSignature, marketAddress, baseTokenMint} = await createMarket({
         tokenName,
         tokenSymbol,
@@ -46,7 +46,7 @@ export default function MarketCreationCard({
         stakingFee: parseInt(stakingFee, 10),
         userPublicKey: publicKey,
         connection,
-        provider,
+        solanaWallet,
       });
       Alert.alert(
         'Market Created',
