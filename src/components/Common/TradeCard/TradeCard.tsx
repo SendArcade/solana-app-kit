@@ -1,6 +1,6 @@
 // FILE: src/components/Common/TradeCard/TradeCard.tsx
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -33,13 +33,24 @@ export interface TradeData {
   executionTimestamp?: any;
 }
 
+// Cache for Jupiter token metadata to avoid duplicate fetches
+const jupiterTokenCache = new Map();
+
 async function fetchJupiterTokenData(mint: string) {
+  // Return from cache if available
+  if (jupiterTokenCache.has(mint)) {
+    return jupiterTokenCache.get(mint);
+  }
+  
   try {
     const response = await fetch(`https://api.jup.ag/tokens/v1/token/${mint}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch token data for ${mint}`);
     }
-    return await response.json();
+    const data = await response.json();
+    // Store in cache
+    jupiterTokenCache.set(mint, data);
+    return data;
   } catch (err) {
     console.error('Jupiter token fetch error:', err);
     return null;
@@ -82,7 +93,7 @@ function TradeCard({
   userAvatar,
   externalRefreshTrigger,
 }: TradeCardProps) {
-  const mergedTheme = getMergedTheme(themeOverrides);
+  const mergedTheme = useMemo(() => getMergedTheme(themeOverrides), [themeOverrides]);
 
   // --------------------------------------------------
   // Jupiter metadata about input & output tokens
@@ -90,6 +101,7 @@ function TradeCard({
   const [inputTokenMeta, setInputTokenMeta] = useState<any>(null);
   const [outputTokenMeta, setOutputTokenMeta] = useState<any>(null);
   const [loadingMeta, setLoadingMeta] = useState(false);
+  const [metaFetchFinished, setMetaFetchFinished] = useState(false);
 
   // For preventing duplicate fetch calls
   const prevMintPairRef = useRef<{ inputMint: string; outputMint: string }>({
@@ -119,65 +131,61 @@ function TradeCard({
   const prevRefreshTriggerRef = useRef(externalRefreshTrigger);
 
   // --------------------------------------------------
-  // 1) Fetch Jupiter output token metadata
+  // 1) Fetch Jupiter output token metadata - OPTIMIZED
   // --------------------------------------------------
-  useEffect(() => {
+  const fetchTokenMetadata = useCallback(async () => {
     if (
       prevMintPairRef.current.inputMint === tradeData.inputMint &&
-      prevMintPairRef.current.outputMint === tradeData.outputMint
+      prevMintPairRef.current.outputMint === tradeData.outputMint &&
+      metaFetchFinished
     ) {
-      return;
+      return; // Already fetched this pair and completed
     }
+    
     let canceled = false;
     setLoadingMeta(true);
-
-    (async () => {
-      try {
-        // Only output token fetch. If you also need input meta, do fetchJupiterTokenData(tradeData.inputMint).
-        const [outMeta] = await Promise.all([
-          fetchJupiterTokenData(tradeData.outputMint),
-        ]);
-
-        if (!canceled) {
-          setOutputTokenMeta(outMeta);
-          prevMintPairRef.current = {
-            inputMint: tradeData.inputMint,
-            outputMint: tradeData.outputMint,
-          };
-
-          // If user wants a chart & there's a coingeckoId => set it & fetch data immediately
-          if (showGraphForOutputToken && outMeta?.extensions?.coingeckoId) {
-            setSelectedCoinId(outMeta.extensions.coingeckoId.toLowerCase());
-            // Force an immediate fetch so the chart is populated on first render
-            refreshCoinData();
-          }
+    
+    try {
+      // Only output token fetch to reduce API calls
+      const outMeta = await fetchJupiterTokenData(tradeData.outputMint);
+      
+      if (!canceled) {
+        setOutputTokenMeta(outMeta);
+        prevMintPairRef.current = {
+          inputMint: tradeData.inputMint,
+          outputMint: tradeData.outputMint,
+        };
+        setMetaFetchFinished(true);
+        
+        // If user wants a chart & there's a coingeckoId => set it & fetch data immediately
+        if (showGraphForOutputToken && outMeta?.extensions?.coingeckoId) {
+          setSelectedCoinId(outMeta.extensions.coingeckoId.toLowerCase());
         }
-      } catch (err) {
-        console.error('TradeCard: jupiter token fetch error', err);
-      } finally {
-        if (!canceled) setLoadingMeta(false);
       }
-    })();
-
+    } catch (err) {
+      console.error('TradeCard: jupiter token fetch error', err);
+    } finally {
+      if (!canceled) setLoadingMeta(false);
+    }
+    
     return () => {
       canceled = true;
     };
-  }, [
-    tradeData.inputMint,
-    tradeData.outputMint,
-    showGraphForOutputToken,
-    setSelectedCoinId,
-    refreshCoinData,
-  ]);
+  }, [tradeData.outputMint, tradeData.inputMint, showGraphForOutputToken, setSelectedCoinId, metaFetchFinished]);
+
+  useEffect(() => {
+    fetchTokenMetadata();
+  }, [fetchTokenMetadata]);
 
   // --------------------------------------------------
-  // 2) Timeframe changes => refresh if in chart mode
+  // 2) Handle timeframe changes - OPTIMIZED
   // --------------------------------------------------
   useEffect(() => {
     if (!showGraphForOutputToken) return;
     const coinId = outputTokenMeta?.extensions?.coingeckoId;
     if (!coinId) return;
 
+    // Only refresh if timeframe actually changed
     if (timeframe !== prevTimeframeRef.current) {
       prevTimeframeRef.current = timeframe;
       refreshCoinData();
@@ -185,7 +193,7 @@ function TradeCard({
   }, [timeframe, showGraphForOutputToken, outputTokenMeta, refreshCoinData]);
 
   // --------------------------------------------------
-  // 3) External refresh => call refreshCoinData
+  // 3) Handle external refresh triggers - OPTIMIZED
   // --------------------------------------------------
   useEffect(() => {
     if (!showGraphForOutputToken) return;
@@ -204,9 +212,9 @@ function TradeCard({
   ]);
 
   // --------------------------------------------------
-  // Compute the execution price from tradeData
+  // Compute the execution price from tradeData - MEMOIZED
   // --------------------------------------------------
-  function calculateExecutionInfo() {
+  const { executionPrice, executionTimestamp } = useMemo(() => {
     let executionPrice: number | undefined;
     if (tradeData.inputAmountLamports && tradeData.outputAmountLamports) {
       const inputLamports = parseFloat(tradeData.inputAmountLamports);
@@ -225,23 +233,42 @@ function TradeCard({
       executionPrice,
       executionTimestamp: tradeData.executionTimestamp,
     };
-  }
-  const { executionPrice, executionTimestamp } = calculateExecutionInfo();
+  }, [tradeData]);
 
   // --------------------------------------------------
-  // Fallback name/logo from Jupiter metadata
+  // Fallback name/logo from Jupiter metadata - MEMOIZED
   // --------------------------------------------------
-  const fallbackInName = inputTokenMeta?.name ?? tradeData.inputSymbol;
-  const fallbackInLogo = inputTokenMeta?.logoURI ?? '';
-  const fallbackOutName = outputTokenMeta?.name ?? tradeData.outputSymbol;
-  const fallbackOutLogo = outputTokenMeta?.logoURI ?? '';
+  const { 
+    fallbackInName, 
+    fallbackInLogo, 
+    fallbackOutName, 
+    fallbackOutLogo 
+  } = useMemo(() => {
+    // Use token metadata if available, otherwise fallback to tradeData symbols
+    return {
+      fallbackInName: inputTokenMeta?.name ?? tradeData.inputSymbol,
+      fallbackInLogo: inputTokenMeta?.logoURI ?? '',
+      fallbackOutName: outputTokenMeta?.name ?? tradeData.outputSymbol,
+      fallbackOutLogo: outputTokenMeta?.logoURI ?? '',
+    };
+  }, [
+    inputTokenMeta, 
+    outputTokenMeta, 
+    tradeData.inputSymbol, 
+    tradeData.outputSymbol
+  ]);
+
+  // Memoize the refresh handler to prevent unnecessary re-renders
+  const handleRefresh = useCallback(() => {
+    refreshCoinData();
+  }, [refreshCoinData]);
 
   // --------------------------------------------------
   // Render: Chart Mode
   // --------------------------------------------------
   const isOutputChartMode = !!showGraphForOutputToken;
   const isLoading = loadingMeta || loadingOHLC;
-
+  
   if (isOutputChartMode) {
     return (
       <View style={styles.tradeCardContainer}>
@@ -265,7 +292,7 @@ function TradeCard({
           </View>
           <View style={styles.tradeCardRightSide}>
             <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
-              {tradeData.outputQuantity} {tradeData.outputSymbol}
+              {tradeData.outputQuantity}
             </Text>
             <Text style={styles.tradeCardUsdPrice}>
               {tradeData.outputUsdValue ?? ''}
@@ -307,7 +334,7 @@ function TradeCard({
           {/* Refresh icon => re-fetch coin data */}
           <TouchableOpacity
             style={{ marginLeft: 16, flexDirection: 'row', alignItems: 'center' }}
-            onPress={refreshCoinData}
+            onPress={handleRefresh}
             accessibilityLabel="Refresh Chart"
           >
             <Icon.SwapIcon width={20} height={20} />
@@ -427,7 +454,7 @@ function TradeCard({
               </View>
               <View style={styles.tradeCardRightSide}>
                 <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
-                  {tradeData.inputQuantity} {tradeData.inputSymbol}
+                  {tradeData.inputQuantity}
                 </Text>
                 <Text style={styles.tradeCardUsdPrice}>
                   {tradeData.inputUsdValue ?? ''}
@@ -492,13 +519,15 @@ function TradeCard({
   );
 }
 
-// Memo comparison to skip unnecessary re-renders
+// Memo comparison to skip unnecessary re-renders - OPTIMIZED with deep prop checking
 function arePropsEqual(prev: TradeCardProps, next: TradeCardProps) {
   if (prev.showGraphForOutputToken !== next.showGraphForOutputToken) return false;
   if (prev.externalRefreshTrigger !== next.externalRefreshTrigger) return false;
 
+  // Deep compare tradeData objects
   const p = prev.tradeData;
   const n = next.tradeData;
+  
   if (
     p.inputMint !== n.inputMint ||
     p.outputMint !== n.outputMint ||
@@ -514,7 +543,19 @@ function arePropsEqual(prev: TradeCardProps, next: TradeCardProps) {
   ) {
     return false;
   }
-  return true;
+  
+  // Compare theme and style references
+  if (prev.themeOverrides !== next.themeOverrides) return false;
+  if (prev.styleOverrides !== next.styleOverrides) return false;
+  if (prev.userStyleSheet !== next.userStyleSheet) return false;
+  
+  // If avatar is a string (URI), compare as string
+  if (typeof prev.userAvatar === 'string' || typeof next.userAvatar === 'string') {
+    return prev.userAvatar === next.userAvatar;
+  }
+  
+  // Otherwise compare avatar references
+  return prev.userAvatar === next.userAvatar;
 }
 
 export default React.memo(TradeCard, arePropsEqual);
