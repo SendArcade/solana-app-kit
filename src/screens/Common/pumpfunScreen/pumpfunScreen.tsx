@@ -48,6 +48,7 @@ export default function PumpfunScreen() {
   const myWallet = useAppSelector(state => state.auth.address);
 
   const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || myWallet || null;
+  // console.log('userPublicKey', userPublicKey);
 
   const [activeTab, setActiveTab] = useState<'buy' | 'sell' | 'launch'>('buy');
   const [solBalance, setSolBalance] = useState<number | null>(null);
