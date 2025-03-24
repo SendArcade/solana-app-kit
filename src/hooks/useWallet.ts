@@ -4,6 +4,7 @@ import { Connection, Transaction, VersionedTransaction, PublicKey, TransactionIn
 import { isDynamicWallet } from '../services/walletProviders/dynamic';
 import { useMemo } from 'react';
 import { useAppSelector } from './useReduxHooks';
+import { Platform } from 'react-native';
 
 /**
  * A hook that provides wallet and transaction capabilities
@@ -24,7 +25,8 @@ export function useWallet() {
 
   // Create a standardized wallet object for MWA if needed
   const mwaWallet: StandardWallet | null = useMemo(() => {
-    if (authState.provider === 'mwa' && authState.address) {
+    // Only create MWA wallet on Android
+    if (authState.provider === 'mwa' && authState.address && Platform.OS === 'android') {
       return {
         provider: 'mwa',
         address: authState.address,
@@ -36,8 +38,14 @@ export function useWallet() {
         }),
         // For MWA, we don't have a provider as transactions are handled by the Phantom app
         getProvider: async () => {
-          // Throw error with useful message about MWA not having a provider
-          throw new Error('MWA uses external wallet for signing. This is expected behavior.');
+          // Now we don't immediately throw, but return a special MWA provider
+          return {
+            type: 'mwa',
+            provider: 'mwa',
+            address: authState.address,
+            // This will be used by transactionService
+            isMWAProvider: true
+          };
         }
       };
     }
