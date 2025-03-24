@@ -42,7 +42,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     console.log('user', user);
     console.log('attachmentData from Redux:', attachmentData);
-  }, [user, attachmentData]);
+  }, [userWallet, storedProfilePic, storedUsername]);
 
   return (
     <View style={{ flex: 1 }}>
