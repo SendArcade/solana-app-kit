@@ -3,12 +3,13 @@ import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet, Alert} from 'react-native';
 import {Connection} from '@solana/web3.js';
 import { fundMarket } from '../../services/tokenMill/tokenMillService';
+import { StandardWallet } from '../../hooks/useAuth';
 
 interface Props {
   marketAddress: string;
   connection: Connection;
   publicKey: string;
-  solanaWallet: any;
+  solanaWallet: StandardWallet | any;
   setLoading: (val: boolean) => void;
 }
 
@@ -19,19 +20,18 @@ export default function FundMarketCard({
   solanaWallet,
   setLoading,
 }: Props) {
-  const onPressFundMarket = async () => {
+  const onPressFund = async () => {
     try {
       setLoading(true);
-      const provider = await solanaWallet.getProvider();
       const txSig = await fundMarket({
         marketAddress,
         userPublicKey: publicKey,
         connection,
-        provider,
+        solanaWallet,
       });
-      Alert.alert('Market Funded', `wSOL deposited.\nTx: ${txSig}`);
+      Alert.alert('Market Funded', `Deposited 0.1 SOL.\nTx: ${txSig}`);
     } catch (err: any) {
-      Alert.alert('Error funding market', err.message);
+      Alert.alert('Error', err.message);
     } finally {
       setLoading(false);
     }
@@ -39,11 +39,9 @@ export default function FundMarketCard({
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>
-        Fund Market Quote Token Account (wSOL)
-      </Text>
-      <TouchableOpacity style={styles.button} onPress={onPressFundMarket}>
-        <Text style={styles.buttonText}>Fund Market (0.1 SOL)</Text>
+      <Text style={styles.sectionTitle}>Fund Market</Text>
+      <TouchableOpacity style={styles.button} onPress={onPressFund}>
+        <Text style={styles.buttonText}>Fund Market with 0.1 SOL</Text>
       </TouchableOpacity>
     </View>
   );

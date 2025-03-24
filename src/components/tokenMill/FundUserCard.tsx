@@ -3,11 +3,12 @@ import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet, Alert} from 'react-native';
 import {Connection} from '@solana/web3.js';
 import { fundUserWithWSOL } from '../../services/tokenMill/tokenMillService';
+import { StandardWallet } from '../../hooks/useAuth';
 
 interface Props {
   connection: Connection;
   publicKey: string;
-  solanaWallet: any;
+  solanaWallet: StandardWallet | any;  // Can be StandardWallet or legacy wallet
   setLoading: (val: boolean) => void;
 }
 
@@ -20,12 +21,13 @@ export default function FundUserCard({
   const onPressFund = async () => {
     try {
       setLoading(true);
-      const provider = await solanaWallet.getProvider();
+      
+      // Call the service with the full wallet object
       const txSig = await fundUserWithWSOL({
         solAmount: 0.5,
         connection,
         signerPublicKey: publicKey,
-        provider,
+        solanaWallet, // Pass the full wallet object
       });
       Alert.alert('User funded wSOL', `Deposited ~0.5 SOL.\nTx: ${txSig}`);
     } catch (err: any) {
