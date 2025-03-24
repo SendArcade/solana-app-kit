@@ -5,7 +5,6 @@ import { RootState } from '../state/store';
 import MainTabs from './MainTabs';
 import TokenMillScreen from '../screens/Common/TokenMillScreen/TokenMillScreen';
 import ChatScreen from '../screens/SampleUI/Chat/ChatScreen/ChatScreen';
-import PlatformSelectionScreen from '../screens/Common/PlatformSelectionScreen';
 import CoinDetailPage from '../screens/SampleUI/Threads/CoinDetailPage/CoinDetailPage';
 import BlinkScreen from '../screens/Common/BlinkScreen';
 import PumpfunScreen from '../screens/Common/pumpfunScreen/pumpfunScreen';
@@ -28,7 +27,6 @@ export type RootStackParamList = {
   Pumpfun: undefined;
   TokenMill: undefined;
   NftScreen: undefined;
-  PlatformSelection: undefined;
   ChatScreen: undefined;
   // NEW ROUTE
   OtherProfile: { userId: string };
@@ -46,10 +44,6 @@ export default function RootNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {isLoggedIn ? (
         <>
-          <Stack.Screen
-            name="PlatformSelection"
-            component={PlatformSelectionScreen}
-          />
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="CoinDetailPage" component={CoinDetailPage} />
           <Stack.Screen name="Blink" component={BlinkScreen} />

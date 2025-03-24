@@ -5,6 +5,7 @@ import BN from 'bn.js';
 import {setBondingCurve} from '../../services/tokenMill/tokenMillService';
 import {BondingCurveCardStyles as defaultStyles} from './BondingCurveCard.style';
 import BondingCurveConfigurator from './BondingCurveConfigurator';
+import { StandardWallet } from '../../hooks/useAuth';
 
 /**
  * Props for the BondingCurveCard component
@@ -18,7 +19,7 @@ interface BondingCurveCardProps {
   /** The public key of the user setting the curve */
   publicKey: string;
   /** The Solana wallet instance for signing transactions */
-  solanaWallet: any;
+  solanaWallet: StandardWallet | any;
   /** Callback function to set loading state */
   setLoading: (val: boolean) => void;
   /** Optional style overrides for the component */
@@ -79,7 +80,6 @@ export default function BondingCurveCard({
     }
     try {
       setLoading(true);
-      const provider = await solanaWallet.getProvider();
 
       // Convert BN => number before passing
       const askNumbers = askPrices.map(p => p.toNumber());
@@ -91,7 +91,7 @@ export default function BondingCurveCard({
         bidPrices: bidNumbers,
         userPublicKey: publicKey,
         connection,
-        provider,
+        solanaWallet,
       });
       Alert.alert('Curve Set', `Tx: ${txSig}`);
     } catch (err: any) {

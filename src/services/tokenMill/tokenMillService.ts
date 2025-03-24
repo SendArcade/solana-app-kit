@@ -17,6 +17,7 @@ import {
   signAndSendWithPrivy,
 } from '../../utils/transactions/transactionCompatUtils';
 import { PUBLIC_KEYS } from '../../config/constants';
+import { StandardWallet } from '../../hooks/useAuth';
 
 /**
  * fundUserWithWSOL
@@ -25,12 +26,12 @@ export async function fundUserWithWSOL({
   solAmount,
   connection,
   signerPublicKey,
-  provider,
+  solanaWallet,
 }: {
   solAmount: number;
   connection: Connection;
   signerPublicKey: string;
-  provider: any;
+  solanaWallet: StandardWallet | any;
 }): Promise<string> {
   const wSolMint = new PublicKey(PUBLIC_KEYS.wSolMint);
   const userPubkey = new PublicKey(signerPublicKey);
@@ -65,7 +66,7 @@ export async function fundUserWithWSOL({
 
   return TransactionService.signAndSendTransaction(
     { type: 'transaction', transaction: tx },
-    provider,
+    solanaWallet,
     { connection }
   );
 }
@@ -82,7 +83,7 @@ export async function createMarket({
   stakingFee,
   userPublicKey,
   connection,
-  provider,
+  solanaWallet,
 }: {
   tokenName: string;
   tokenSymbol: string;
@@ -92,7 +93,7 @@ export async function createMarket({
   stakingFee: number;
   userPublicKey: string;
   connection: Connection;
-  provider: any;
+  solanaWallet: StandardWallet | any;
 }): Promise<{
   txSignature: string;
   marketAddress: string;
@@ -120,7 +121,7 @@ export async function createMarket({
 
   const txSignature = await TransactionService.signAndSendTransaction(
     { type: 'base64', data: json.transaction },
-    provider,
+    solanaWallet,
     { connection }
   );
 
@@ -139,13 +140,13 @@ export async function stakeTokens({
   amount,
   userPublicKey,
   connection,
-  provider,
+  solanaWallet,
 }: {
   marketAddress: string;
   amount: number;
   userPublicKey: string;
   connection: Connection;
-  provider: any;
+  solanaWallet: StandardWallet | any;
 }): Promise<string> {
   const resp = await fetch(`${SERVER_URL}/api/stake`, {
     method: 'POST',
@@ -163,7 +164,7 @@ export async function stakeTokens({
 
   return TransactionService.signAndSendTransaction(
     { type: 'base64', data: json.data },
-    provider,
+    solanaWallet,
     { connection }
   );
 }
@@ -177,14 +178,14 @@ export async function createVesting({
   vestingAmount,
   userPublicKey,
   connection,
-  provider,
+  solanaWallet,
 }: {
   marketAddress: string;
   baseTokenMint: string;
   vestingAmount: number;
   userPublicKey: string;
   connection: Connection;
-  provider: any;
+  solanaWallet: StandardWallet | any;
 }): Promise<{txSignature: string; ephemeralVestingPubkey: string}> {
   const resp = await fetch(`${SERVER_URL}/api/vesting`, {
     method: 'POST',
@@ -207,7 +208,7 @@ export async function createVesting({
 
   const txSignature = await TransactionService.signAndSendTransaction(
     { type: 'base64', data: data.data.transaction },
-    provider,
+    solanaWallet,
     { connection }
   );
 
@@ -226,14 +227,14 @@ export async function releaseVesting({
   baseTokenMint,
   userPublicKey,
   connection,
-  provider,
+  solanaWallet,
 }: {
   marketAddress: string;
   vestingPlanAddress: string;
   baseTokenMint: string;
   userPublicKey: string;
   connection: Connection;
-  provider: any;
+  solanaWallet: StandardWallet | any;
 }): Promise<string> {
   const resp = await fetch(`${SERVER_URL}/api/vesting/release`, {
     method: 'POST',
@@ -252,7 +253,7 @@ export async function releaseVesting({
 
   return TransactionService.signAndSendTransaction(
     { type: 'base64', data: data.data },
-    provider,
+    solanaWallet,
     { connection }
   );
 }
@@ -266,14 +267,14 @@ export async function swapTokens({
   swapAmount,
   userPublicKey,
   connection,
-  provider,
+  solanaWallet,
 }: {
   marketAddress: string;
   swapType: 'buy' | 'sell';
   swapAmount: number;
   userPublicKey: string;
   connection: Connection;
-  provider: any;
+  solanaWallet: StandardWallet | any;
 }): Promise<string> {
   const resp = await fetch(`${SERVER_URL}/api/swap`, {
     method: 'POST',
@@ -295,7 +296,7 @@ export async function swapTokens({
 
   return TransactionService.signAndSendTransaction(
     { type: 'base64', data: data.transaction },
-    provider,
+    solanaWallet,
     { connection }
   );
 }
@@ -307,12 +308,12 @@ export async function fundMarket({
   marketAddress,
   userPublicKey,
   connection,
-  provider,
+  solanaWallet,
 }: {
   marketAddress: string;
   userPublicKey: string;
   connection: Connection;
-  provider: any;
+  solanaWallet: StandardWallet | any;
 }): Promise<string> {
   const marketPubkey = new PublicKey(marketAddress);
   const quoteTokenMint = new PublicKey(PUBLIC_KEYS.wSolMint);
@@ -353,7 +354,7 @@ export async function fundMarket({
 
   return TransactionService.signAndSendTransaction(
     { type: 'transaction', transaction: tx },
-    provider,
+    solanaWallet,
     { connection }
   );
 }
@@ -367,14 +368,14 @@ export async function setBondingCurve({
   bidPrices,
   userPublicKey,
   connection,
-  provider,
+  solanaWallet,
 }: {
   marketAddress: string;
   askPrices: number[];
   bidPrices: number[];
   userPublicKey: string;
   connection: Connection;
-  provider: any;
+  solanaWallet: StandardWallet | any;
 }): Promise<string> {
   const body = {
     market: marketAddress,
@@ -395,7 +396,7 @@ export async function setBondingCurve({
 
   return TransactionService.signAndSendTransaction(
     { type: 'base64', data: json.transaction },
-    provider,
+    solanaWallet,
     { connection }
   );
 }
