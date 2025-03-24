@@ -12,14 +12,13 @@ import {
   ActivityIndicator,
   ImageBackground
 } from 'react-native';
-import {styles} from './buyCard.style';
+import {styles as buyCardStyles} from './buyCard.style';
 import Icons from '../../../assets/svgs/index';
 import {DEFAULT_IMAGES} from '../../../config/constants';
 import TradeModal from '../../thread/trade/TradeModal';
 import {useAppSelector} from '../../../hooks/useReduxHooks';
 import {useAuth} from '../../../hooks/useAuth';
-import {AssetItem, useFetchPortfolio} from '../../../hooks/useFetchTokens';
-import {fixImageUrl} from '../../../utils/common/fixUrl';
+import {AssetItem, useFetchPortfolio, fixImageUrl} from '../../../hooks/useFetchTokens';
 
 /**
  * Define props for the BuyCard
@@ -74,6 +73,69 @@ const PortfolioAssetItem: React.FC<{
   const {width} = Dimensions.get('window');
   const itemWidth = (width - 48) / 2;
   
+  // For tokens, use a list item style
+  if (asset.assetType === 'token') {
+    const imageUrl = asset.image ? fixImageUrl(asset.image) : '';
+    
+    const formattedBalance = asset.token_info ? 
+      parseFloat(
+        (parseInt(asset.token_info.balance) / Math.pow(10, asset.token_info.decimals))
+          .toFixed(asset.token_info.decimals)
+      ).toString() : '0';
+    
+    const tokenValue = asset.token_info?.price_info?.total_price 
+      ? `$${asset.token_info.price_info.total_price.toFixed(2)}`
+      : '';
+
+    return (
+      <TouchableOpacity 
+        style={portfolioStyles.tokenItem}
+        onPress={() => onSelect && onSelect(asset)}
+        activeOpacity={0.7}
+      >
+        {/* Token Logo */}
+        <View style={portfolioStyles.tokenLogoContainer}>
+          {imageUrl ? (
+            <Image
+              source={{ uri: imageUrl }}
+              style={portfolioStyles.tokenLogo}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={portfolioStyles.tokenLogoPlaceholder}>
+              <Text style={portfolioStyles.tokenLogoPlaceholderText}>
+                {asset.symbol?.[0] || asset.name?.[0] || '?'}
+              </Text>
+            </View>
+          )}
+        </View>
+        
+        {/* Token Details */}
+        <View style={portfolioStyles.tokenDetails}>
+          <Text style={portfolioStyles.tokenName} numberOfLines={1}>
+            {asset.name}
+          </Text>
+          <Text style={portfolioStyles.tokenSymbol} numberOfLines={1}>
+            {asset.token_info?.symbol || asset.symbol || ''}
+          </Text>
+        </View>
+        
+        {/* Token Balance & Value */}
+        <View style={portfolioStyles.tokenBalanceContainer}>
+          <Text style={portfolioStyles.tokenBalance}>
+            {formattedBalance}
+          </Text>
+          {tokenValue ? (
+            <Text style={portfolioStyles.tokenValue}>
+              {tokenValue}
+            </Text>
+          ) : null}
+        </View>
+      </TouchableOpacity>
+    );
+  }
+  
+  // For NFTs, use a grid item style
   // Properly handle image rendering
   const renderAssetImage = () => {
     const imageUrl = asset.image ? fixImageUrl(asset.image) : '';
@@ -89,24 +151,26 @@ const PortfolioAssetItem: React.FC<{
     }
     
     return (
-      <ImageBackground
-        source={require("../../../assets/images/SENDlogo.png")}
-        style={portfolioStyles.assetImage}
-        resizeMode="cover"
-      >
+      <View style={portfolioStyles.assetImageWrapper}>
+        <Image
+          source={require('../../../assets/images/SENDlogo.png')}
+          style={portfolioStyles.fallbackImage}
+          resizeMode="cover"
+        />
         <Image
           source={{uri: imageUrl}}
           style={portfolioStyles.assetImage}
           resizeMode="cover"
         />
-      </ImageBackground>
+      </View>
     );
   };
   
   return (
-    <TouchableOpacity
+    <TouchableOpacity 
       style={[portfolioStyles.assetItem, {width: itemWidth}]}
       onPress={() => onSelect && onSelect(asset)}
+      activeOpacity={0.7}
     >
       <View style={portfolioStyles.assetImageContainer}>
         {renderAssetImage()}
@@ -116,19 +180,28 @@ const PortfolioAssetItem: React.FC<{
             <Text style={portfolioStyles.compressedText}>C</Text>
           </View>
         )}
+        
+        {/* Show price if available */}
+        {asset.token_info?.price_info?.price_per_token && (
+          <View style={portfolioStyles.priceBadge}>
+            <Text style={portfolioStyles.priceText}>
+              ${asset.token_info.price_info.price_per_token.toFixed(2)}
+            </Text>
+          </View>
+        )}
       </View>
-      <Text style={portfolioStyles.assetName} numberOfLines={1}>
-        {asset.name}
-      </Text>
-      {asset.token_info ? (
-        <Text style={portfolioStyles.assetBalance}>
-          {parseFloat(
-            (parseInt(asset.token_info.balance) / 
-             Math.pow(10, asset.token_info.decimals))
-              .toFixed(asset.token_info.decimals)
-          ).toString()} {asset.token_info.symbol || asset.symbol}
+      
+      <View style={portfolioStyles.assetDetails}>
+        <Text style={portfolioStyles.assetName} numberOfLines={1}>
+          {asset.name}
         </Text>
-      ) : null}
+        
+        {asset.collection?.name ? (
+          <Text style={portfolioStyles.assetCollection} numberOfLines={1}>
+            {asset.collection.name}
+          </Text>
+        ) : null}
+      </View>
     </TouchableOpacity>
   );
 };
@@ -206,17 +279,24 @@ const BuyCard: React.FC<BuyCardProps> = ({
     if (tokenImage) {
       if (typeof tokenImage === 'string') {
         return (
-          <Image
-            source={{uri: fixImageUrl(tokenImage)}}
-            style={styles.img}
-            resizeMode="cover"
-          />
+          <View style={cardStyles.imgWrapper}>
+            <Image
+              source={require('../../../assets/images/SENDlogo.png')}
+              style={cardStyles.imgBackground}
+              resizeMode="cover"
+            />
+            <Image
+              source={{uri: fixImageUrl(tokenImage)}}
+              style={cardStyles.img}
+              resizeMode="cover"
+            />
+          </View>
         );
       } else {
         return (
           <Image
             source={tokenImage}
-            style={styles.img}
+            style={cardStyles.img}
             resizeMode="cover"
           />
         );
@@ -225,7 +305,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
       return (
         <Image
           source={DEFAULT_IMAGES.user5}
-          style={styles.img}
+          style={cardStyles.img}
           resizeMode="cover"
         />
       );
@@ -237,11 +317,28 @@ const BuyCard: React.FC<BuyCardProps> = ({
     ? tokenName.substring(1)
     : tokenName;
 
+  // Group portfolio items by type
+  const tokens = portfolio.items?.filter(item => 
+    item.assetType === 'token'
+  ) || [];
+  
+  const regularNfts = portfolio.items?.filter(item => 
+    item.assetType === 'nft'
+  ) || [];
+  
+  const compressedNfts = portfolio.items?.filter(item => 
+    item.assetType === 'cnft'
+  ) || [];
+
+  const solBalance = portfolio.nativeBalance 
+    ? (portfolio.nativeBalance.lamports / 1000000000).toFixed(4) 
+    : '0';
+
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View style={[cardStyles.container, containerStyle]}>
       {/* Left section with image + name/desc */}
-      <View style={styles.contentContainer}>
-        <View style={styles.imgContainer}>
+      <View style={cardStyles.contentContainer}>
+        <View style={cardStyles.imgContainer}>
           {renderBuyCardImage()}
         </View>
 
@@ -270,9 +367,9 @@ const BuyCard: React.FC<BuyCardProps> = ({
       </View>
 
       {/* Right section: Buy button + optional arrow */}
-      <View style={styles.buyButtonContainer}>
-        <TouchableOpacity style={styles.buyButton} onPress={handleBuyPress}>
-          <Text style={styles.buyButtonText}>Buy</Text>
+      <View style={cardStyles.buyButtonContainer}>
+        <TouchableOpacity style={cardStyles.buyButton} onPress={handleBuyPress}>
+          <Text style={cardStyles.buyButtonText}>Buy</Text>
         </TouchableOpacity>
 
         {/* Only show arrow if showDownArrow is true */}
@@ -318,7 +415,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
         <View style={portfolioStyles.modalContainer}>
           <View style={portfolioStyles.modalContent}>
             <View style={portfolioStyles.modalHeader}>
-              <Text style={portfolioStyles.modalTitle}>Portfolio</Text>
+              <Text style={portfolioStyles.modalTitle}>Your Portfolio</Text>
               <TouchableOpacity
                 style={portfolioStyles.closeButton}
                 onPress={() => setShowPortfolioModal(false)}
@@ -330,11 +427,21 @@ const BuyCard: React.FC<BuyCardProps> = ({
             {loading ? (
               <View style={portfolioStyles.loadingContainer}>
                 <ActivityIndicator size="large" color="#1d9bf0" />
-                <Text style={portfolioStyles.loadingText}>Loading portfolio...</Text>
+                <Text style={portfolioStyles.loadingText}>Loading your assets...</Text>
               </View>
             ) : error ? (
               <View style={portfolioStyles.errorContainer}>
                 <Text style={portfolioStyles.errorText}>{error}</Text>
+                <TouchableOpacity 
+                  style={portfolioStyles.retryButton}
+                  onPress={() => {
+                    // Close and reopen the modal to retry
+                    setShowPortfolioModal(false);
+                    setTimeout(() => setShowPortfolioModal(true), 500);
+                  }}
+                >
+                  <Text style={portfolioStyles.retryText}>Retry</Text>
+                </TouchableOpacity>
               </View>
             ) : portfolio.items.length === 0 ? (
               <View style={portfolioStyles.emptyContainer}>
@@ -347,77 +454,57 @@ const BuyCard: React.FC<BuyCardProps> = ({
                   <View style={portfolioStyles.solBalanceContainer}>
                     <Text style={portfolioStyles.solBalanceLabel}>SOL Balance</Text>
                     <Text style={portfolioStyles.solBalanceValue}>
-                      {(portfolio.nativeBalance.lamports / 1000000000).toFixed(4)} SOL
+                      {solBalance} SOL
                     </Text>
                   </View>
                 )}
                 
                 {/* Tokens Section */}
-                {portfolio.items.filter(item => 
-                  item.interface === 'V1_TOKEN' || 
-                  item.interface === 'FungibleToken' ||
-                  item.token_info
-                ).length > 0 && (
+                {tokens.length > 0 && (
                   <View style={portfolioStyles.sectionContainer}>
                     <Text style={portfolioStyles.sectionTitle}>Tokens</Text>
-                    <View style={portfolioStyles.assetsGrid}>
-                      {portfolio.items
-                        .filter(item => 
-                          item.interface === 'V1_TOKEN' || 
-                          item.interface === 'FungibleToken' ||
-                          item.token_info
-                        )
-                        .map(asset => (
+                    <View style={portfolioStyles.tokenListContainer}>
+                      {tokens.map((asset, index) => (
+                        <React.Fragment key={asset.id || asset.mint}>
                           <PortfolioAssetItem 
-                            key={asset.id || asset.mint} 
                             asset={asset} 
                             onSelect={handleSelectAsset}
                           />
-                        ))}
+                          {index < tokens.length - 1 && <View style={portfolioStyles.divider} />}
+                        </React.Fragment>
+                      ))}
                     </View>
                   </View>
                 )}
                 
                 {/* NFTs Section */}
-                {portfolio.items.filter(item => 
-                  (item.interface === 'V1_NFT' || item.interface === 'ProgrammableNFT') && 
-                  (!item.compression || !item.compression.compressed)
-                ).length > 0 && (
+                {regularNfts.length > 0 && (
                   <View style={portfolioStyles.sectionContainer}>
                     <Text style={portfolioStyles.sectionTitle}>NFTs</Text>
                     <View style={portfolioStyles.assetsGrid}>
-                      {portfolio.items
-                        .filter(item => 
-                          (item.interface === 'V1_NFT' || item.interface === 'ProgrammableNFT') && 
-                          (!item.compression || !item.compression.compressed)
-                        )
-                        .map(asset => (
-                          <PortfolioAssetItem 
-                            key={asset.id || asset.mint} 
-                            asset={asset} 
-                            onSelect={handleSelectAsset}
-                          />
-                        ))}
+                      {regularNfts.map(asset => (
+                        <PortfolioAssetItem 
+                          key={asset.id || asset.mint} 
+                          asset={asset} 
+                          onSelect={handleSelectAsset}
+                        />
+                      ))}
                     </View>
                   </View>
                 )}
                 
                 {/* Compressed NFTs Section */}
-                {portfolio.items.filter(item => 
-                  item.compression && item.compression.compressed
-                ).length > 0 && (
+                {compressedNfts.length > 0 && (
                   <View style={portfolioStyles.sectionContainer}>
                     <Text style={portfolioStyles.sectionTitle}>Compressed NFTs</Text>
                     <View style={portfolioStyles.assetsGrid}>
-                      {portfolio.items
-                        .filter(item => item.compression && item.compression.compressed)
-                        .map(asset => (
-                          <PortfolioAssetItem 
-                            key={asset.id || asset.mint} 
-                            asset={asset} 
-                            onSelect={handleSelectAsset}
-                          />
-                        ))}
+                      {compressedNfts.map(asset => (
+                        <PortfolioAssetItem 
+                          key={asset.id || asset.mint} 
+                          asset={asset} 
+                          onSelect={handleSelectAsset}
+                        />
+                      ))}
                     </View>
                   </View>
                 )}
@@ -428,6 +515,22 @@ const BuyCard: React.FC<BuyCardProps> = ({
       </Modal>
     </View>
   );
+};
+
+// Combine buyCardStyles with additional styles
+const cardStyles = {
+  ...buyCardStyles,
+  imgWrapper: {
+    width: '100%' as const,
+    height: '100%' as const,
+    position: 'relative' as const,
+  },
+  imgBackground: {
+    position: 'absolute' as const,
+    width: '100%' as const,
+    height: '100%' as const,
+    opacity: 0.2,
+  },
 };
 
 const portfolioStyles = StyleSheet.create({
@@ -475,9 +578,10 @@ const portfolioStyles = StyleSheet.create({
     padding: 20,
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 16,
     fontSize: 16,
     color: '#657786',
+    textAlign: 'center',
   },
   errorContainer: {
     flex: 1,
@@ -489,6 +593,18 @@ const portfolioStyles = StyleSheet.create({
     fontSize: 16,
     color: '#e0245e',
     textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#1d9bf0',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 10,
+  },
+  retryText: {
+    color: 'white',
+    fontWeight: '600',
   },
   emptyContainer: {
     flex: 1,
@@ -505,14 +621,14 @@ const portfolioStyles = StyleSheet.create({
     flex: 1,
   },
   sectionContainer: {
-    marginVertical: 12,
+    marginVertical: 16,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#14171a',
     marginHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   assetsGrid: {
     flexDirection: 'row',
@@ -521,7 +637,6 @@ const portfolioStyles = StyleSheet.create({
   },
   assetItem: {
     marginBottom: 12,
-    padding: 8,
     backgroundColor: 'white',
     borderRadius: 12,
     shadowColor: '#000',
@@ -530,15 +645,26 @@ const portfolioStyles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
     margin: 8,
+    overflow: 'hidden',
   },
   assetImageContainer: {
     height: 120,
     width: '100%',
     borderRadius: 8,
     overflow: 'hidden',
-    marginBottom: 8,
     position: 'relative',
     backgroundColor: '#f0f2f5',
+  },
+  assetImageWrapper: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  fallbackImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    opacity: 0.2,
   },
   assetImage: {
     width: '100%',
@@ -556,6 +682,9 @@ const portfolioStyles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#AAB8C2',
   },
+  assetDetails: {
+    padding: 8,
+  },
   assetName: {
     fontSize: 14,
     fontWeight: '500',
@@ -566,6 +695,10 @@ const portfolioStyles = StyleSheet.create({
     fontSize: 12,
     color: '#657786',
   },
+  assetCollection: {
+    fontSize: 12,
+    color: '#657786',
+  },
   solBalanceContainer: {
     margin: 16,
     padding: 16,
@@ -573,6 +706,11 @@ const portfolioStyles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e1e8ed',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   solBalanceLabel: {
     fontSize: 14,
@@ -599,6 +737,98 @@ const portfolioStyles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  priceBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  priceText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  tokenItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    margin: 8,
+    overflow: 'hidden',
+  },
+  tokenLogoContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginRight: 8,
+  },
+  tokenLogo: {
+    width: '100%',
+    height: '100%',
+  },
+  tokenLogoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#f7f8fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tokenLogoPlaceholderText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#AAB8C2',
+  },
+  tokenDetails: {
+    flex: 1,
+  },
+  tokenName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#14171a',
+    marginBottom: 2,
+  },
+  tokenSymbol: {
+    fontSize: 12,
+    color: '#657786',
+  },
+  tokenBalanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tokenBalance: {
+    fontSize: 12,
+    color: '#657786',
+  },
+  tokenValue: {
+    fontSize: 12,
+    color: '#657786',
+  },
+  tokenListContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    overflow: 'hidden',
+    margin: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#f0f2f5',
+    marginLeft: 56,
   },
 });
 
