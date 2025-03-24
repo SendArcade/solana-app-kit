@@ -12,8 +12,8 @@ import { Provider as ReduxProvider } from 'react-redux';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RootNavigator from './src/navigation/RootNavigator';
-import {navigationRef} from './src/hooks/useAppNavigation';
-import {store} from './src/state/store';
+import { navigationRef } from './src/hooks/useAppNavigation';
+import { store } from './src/state/store';
 import './src/utils/polyfills';
 
 import { PrivyProvider, PrivyElements } from '@privy-io/expo';
@@ -45,7 +45,7 @@ export default function App() {
   // Get Dynamic client after initialization is complete
   const getDynamicWebView = () => {
     if (!dynamicInitialized) return null;
-    
+
     try {
       const client = getDynamicClient();
       return client?.reactNative?.WebView ? <client.reactNative.WebView /> : null;
