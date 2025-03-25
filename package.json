@@ -28,6 +28,7 @@
     "@privy-io/expo": "^0.45.0",
     "@privy-io/expo-native-extensions": "^0.0.3",
     "@project-serum/borsh": "^0.2.5",
+    "@react-native-clipboard/clipboard": "^1.16.2",
     "@react-native-community/datetimepicker": "8.2.0",
     "@react-native-community/masked-view": "^0.1.11",
     "@react-native-community/slider": "4.5.5",

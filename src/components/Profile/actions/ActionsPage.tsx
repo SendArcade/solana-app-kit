@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import ActionDetailModal from './ActionDetailModal';
 import {FontAwesome5} from '@expo/vector-icons';
@@ -65,6 +66,8 @@ interface ActionsPageProps {
   loadingActions?: boolean;
   fetchActionsError?: string | null;
   walletAddress?: string;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }
 
 /** Format lamports as SOL with proper decimal places */
@@ -685,34 +688,34 @@ const ActionsPage: React.FC<ActionsPageProps> = ({
   loadingActions,
   fetchActionsError,
   walletAddress,
+  refreshing,
+  onRefresh
 }) => {
   const [selectedAction, setSelectedAction] = useState<Action | null>(null);
 
   if (loadingActions) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#3871DD" />
-        <Text style={styles.emptyText}>Loading transactions...</Text>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#1d9bf0" />
+        <Text style={styles.loadingText}>Loading actions...</Text>
       </View>
     );
   }
 
   if (fetchActionsError) {
     return (
-      <View style={styles.centered}>
-        <FontAwesome5 name="exclamation-circle" size={32} color="#F43860" />
-        <Text style={styles.errorText}>{fetchActionsError}</Text>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>
+          Error loading actions: {fetchActionsError}
+        </Text>
       </View>
     );
   }
 
   if (!myActions || myActions.length === 0) {
     return (
-      <View style={styles.centered}>
-        <View style={styles.emptyStateIcon}>
-          <FontAwesome5 name="history" size={26} color="#FFF" />
-        </View>
-        <Text style={styles.emptyText}>No transactions yet</Text>
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>No actions yet!</Text>
       </View>
     );
   }
@@ -721,7 +724,7 @@ const ActionsPage: React.FC<ActionsPageProps> = ({
     <View style={styles.container}>
       <FlatList
         data={myActions}
-        keyExtractor={(item, index) => item.signature || `action-${index}`}
+        keyExtractor={(item, index) => `action-${index}`}
         renderItem={({item}) => (
           <ActionItem 
             action={item} 
@@ -731,6 +734,14 @@ const ActionsPage: React.FC<ActionsPageProps> = ({
         )}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing || false}
+            onRefresh={onRefresh}
+            colors={['#1d9bf0']}
+            tintColor="#1d9bf0"
+          />
+        }
       />
 
       <ActionDetailModal
@@ -752,46 +763,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  centered: {
+  loadingContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F7F9FC',
-  },
-  emptyStateIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#9945FF',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#9945FF',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 6,
-      },
-    }),
   },
-  emptyText: {
-    marginTop: 8,
-    fontSize: 16,
-    color: '#6E7191',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  errorText: {
+  loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#F43860',
-    fontWeight: '500',
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#ff3b30',
     textAlign: 'center',
-    paddingHorizontal: 32,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
   },
   card: {
     backgroundColor: '#FFFFFF',

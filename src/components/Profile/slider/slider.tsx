@@ -1,6 +1,6 @@
 // File: src/components/Profile/slider/slider.tsx
 import React, {memo, useState} from 'react';
-import {View, Text, FlatList, TouchableOpacity, Alert} from 'react-native';
+import {View, Text, FlatList, TouchableOpacity, Alert, RefreshControl} from 'react-native';
 import {TabView, SceneMap, TabBar} from 'react-native-tab-view';
 import {ThreadPost} from '../../thread/thread.types';
 import Collectibles, {NftItem} from '../collectibles/collectibles';
@@ -24,14 +24,20 @@ type SwipeTabsProps = {
   onRefreshPortfolio?: () => void;
   refreshingPortfolio?: boolean;
   onAssetPress?: (asset: AssetItem) => void;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 };
 
 function PostPage({
   myPosts,
   onPressPost,
+  refreshing,
+  onRefresh,
 }: {
   myPosts: ThreadPost[];
   onPressPost?: (post: ThreadPost) => void;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }) {
   const dispatch = useAppDispatch();
   const [editingPost, setEditingPost] = useState<ThreadPost | null>(null);
@@ -99,6 +105,14 @@ function PostPage({
       renderItem={renderPost}
       keyExtractor={p => p.id}
       contentContainerStyle={styles.postList}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing || false}
+          onRefresh={onRefresh}
+          colors={['#1d9bf0']}
+          tintColor="#1d9bf0"
+        />
+      }
     />
   );
 }
@@ -111,6 +125,8 @@ function CollectiblesPage({
   onRefresh,
   refreshing,
   onAssetPress,
+  mainRefreshing,
+  mainOnRefresh,
 }: {
   nfts: NftItem[];
   loading?: boolean;
@@ -119,9 +135,15 @@ function CollectiblesPage({
   onRefresh?: () => void;
   refreshing?: boolean;
   onAssetPress?: (asset: AssetItem) => void;
+  mainRefreshing?: boolean;
+  mainOnRefresh?: () => void;
 }) {
   // If portfolio data is provided, use that instead of legacy nfts
   const hasPortfolioData = portfolioData?.items && portfolioData.items.length > 0;
+  
+  // Use portfolio refresh if available, otherwise use main refresh
+  const effectiveRefreshing = refreshing !== undefined ? refreshing : mainRefreshing;
+  const effectiveOnRefresh = onRefresh || mainOnRefresh;
   
   return (
     <View style={styles.tabContent}>
@@ -131,11 +153,35 @@ function CollectiblesPage({
         error={fetchNftsError} 
         portfolioItems={portfolioData?.items}
         nativeBalance={portfolioData?.nativeBalance?.lamports}
-        onRefresh={onRefresh}
-        refreshing={refreshing}
+        onRefresh={effectiveOnRefresh}
+        refreshing={effectiveRefreshing}
         onItemPress={onAssetPress}
       />
     </View>
+  );
+}
+
+function ActionsPageWrapper({
+  myActions,
+  loadingActions,
+  fetchActionsError,
+  refreshing,
+  onRefresh,
+}: {
+  myActions: any[];
+  loadingActions?: boolean;
+  fetchActionsError?: string | null;
+  refreshing?: boolean;
+  onRefresh?: () => void;
+}) {
+  return (
+    <ActionsPage
+      myActions={myActions}
+      loadingActions={loadingActions}
+      fetchActionsError={fetchActionsError}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+    />
   );
 }
 
@@ -152,6 +198,8 @@ function SwipeTabs({
   onRefreshPortfolio,
   refreshingPortfolio,
   onAssetPress,
+  refreshing,
+  onRefresh,
 }: SwipeTabsProps) {
   const [index, setIndex] = useState<number>(0);
   const [routes] = useState([
@@ -160,27 +208,45 @@ function SwipeTabs({
     {key: 'actions', title: 'Actions'},
   ]);
   
-  const renderScene = SceneMap({
-    posts: () => <PostPage myPosts={myPosts} onPressPost={onPressPost} />,
-    collectibles: () => (
-      <CollectiblesPage
-        nfts={myNFTs}
-        loading={loadingNfts}
-        fetchNftsError={fetchNftsError}
-        portfolioData={portfolioData}
-        onRefresh={onRefreshPortfolio}
-        refreshing={refreshingPortfolio}
-        onAssetPress={onAssetPress}
-      />
-    ),
-    actions: () => (
-      <ActionsPage
-        myActions={myActions}
-        loadingActions={loadingActions}
-        fetchActionsError={fetchActionsError}
-      />
-    ),
-  });
+  const renderScene = ({route}: {route: {key: string}}) => {
+    switch (route.key) {
+      case 'posts':
+        return (
+          <PostPage 
+            myPosts={myPosts} 
+            onPressPost={onPressPost} 
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        );
+      case 'collectibles':
+        return (
+          <CollectiblesPage
+            nfts={myNFTs}
+            loading={loadingNfts}
+            fetchNftsError={fetchNftsError}
+            portfolioData={portfolioData}
+            onRefresh={onRefreshPortfolio}
+            refreshing={refreshingPortfolio}
+            onAssetPress={onAssetPress}
+            mainRefreshing={refreshing}
+            mainOnRefresh={onRefresh}
+          />
+        );
+      case 'actions':
+        return (
+          <ActionsPageWrapper
+            myActions={myActions}
+            loadingActions={loadingActions}
+            fetchActionsError={fetchActionsError}
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        );
+      default:
+        return null;
+    }
+  };
   
   const renderTabBar = (props: any) => (
     <TabBar
