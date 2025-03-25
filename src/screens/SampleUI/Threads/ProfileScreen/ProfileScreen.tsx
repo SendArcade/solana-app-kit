@@ -1,17 +1,17 @@
-import React from 'react';
-import {View} from 'react-native';
+import React, { useEffect } from 'react';
+import { View } from 'react-native';
 import Profile from '../../../../components/Profile/profile';
-import {useAppSelector} from '../../../../hooks/useReduxHooks';
-import {ThreadPost} from '../../../../components/thread/thread.types';
-import {useFetchNFTs} from '../../../../hooks/useFetchNFTs';
-import {useWallet} from '../../../../hooks/useWallet';
+import { useAppSelector } from '../../../../hooks/useReduxHooks';
+import { ThreadPost } from '../../../../components/thread/thread.types';
+import { useFetchNFTs } from '../../../../hooks/useFetchNFTs';
+import { useWallet } from '../../../../hooks/useWallet';
 
 export default function ProfileScreen() {
   // Get user data from Redux
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
   const storedUsername = useAppSelector(state => state.auth.username);
   const attachmentData = useAppSelector(state => state.auth.attachmentData || {});
-  
+
   // Use the wallet hook to get the user's address
   const { address: userWallet } = useWallet();
 
@@ -37,10 +37,15 @@ export default function ProfileScreen() {
     username: storedUsername || 'Unknown User',
     attachmentData,
   };
-  console.log('user', user);
-  console.log('attachmentData from Redux:', attachmentData);
+
+  // Log user data only when it changes
+  useEffect(() => {
+    console.log('user', user);
+    console.log('attachmentData from Redux:', attachmentData);
+  }, [user, attachmentData]);
+
   return (
-    <View style={{flex: 1}}>
+    <View style={{ flex: 1 }}>
       <Profile
         isOwnProfile={true}
         user={user}

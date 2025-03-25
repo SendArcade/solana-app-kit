@@ -15,6 +15,7 @@ import {
   TextInput,
   ScrollView,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { setStatusBarStyle } from 'expo-status-bar';
@@ -124,6 +125,9 @@ export default function Profile({
   // For refreshing the portfolio data
   const [refreshingPortfolio, setRefreshingPortfolio] = useState(false);
 
+  // Add refreshing state
+  const [refreshing, setRefreshing] = useState(false);
+
   const handleRefreshPortfolio = useCallback(async () => {
     if (!userWallet) return;
 
@@ -138,6 +142,52 @@ export default function Profile({
       setRefreshingPortfolio(false);
     }
   }, [userWallet]);
+
+  // Function to handle refresh
+  const handleRefresh = useCallback(async () => {
+    if (!userWallet) return;
+    
+    setRefreshing(true);
+    
+    try {
+      // Refresh profile data
+      await dispatch(fetchUserProfile(userWallet)).unwrap();
+      
+      // Refresh posts
+      await dispatch(fetchAllPosts()).unwrap();
+      
+      // Refresh followers/following
+      if (isOwnProfile) {
+        const newFollowers = await fetchFollowers(userWallet);
+        const newFollowing = await fetchFollowing(userWallet);
+        setFollowersList(newFollowers);
+        setFollowingList(newFollowing);
+      } else {
+        const newFollowers = await fetchFollowers(userWallet);
+        setFollowersList(newFollowers);
+        
+        const newFollowing = await fetchFollowing(userWallet);
+        setFollowingList(newFollowing);
+        
+        if (currentUserWallet) {
+          const result = await checkIfUserFollowsMe(currentUserWallet, userWallet);
+          setAreTheyFollowingMe(result);
+          
+          // Check if I'm following them
+          const isFollowing = newFollowers.some((follower: any) => 
+            follower.id && follower.id.toLowerCase() === currentUserWallet.toLowerCase()
+          );
+          setAmIFollowing(isFollowing);
+        }
+      }
+      
+      // Actions are refreshed separately in the ProfileView component
+    } catch (error) {
+      console.error('Error refreshing profile data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [userWallet, dispatch, isOwnProfile, currentUserWallet]);
 
   // Handle asset press
   const handleAssetPress = useCallback((asset: AssetItem) => {
@@ -485,6 +535,9 @@ export default function Profile({
         onRefreshPortfolio={handleRefreshPortfolio}
         refreshingPortfolio={refreshingPortfolio}
         onAssetPress={handleAssetPress}
+        // Add refresh-related props
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
       />
 
       {/* (A) Avatar Option Modal */}

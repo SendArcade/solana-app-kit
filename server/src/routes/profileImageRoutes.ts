@@ -104,7 +104,7 @@ profileImageRouter.post(
 
 /**
  * ------------------------------------------
- *  EXISTING: Fetch user’s profile data
+ *  EXISTING: Fetch user's profile data
  * ------------------------------------------
  */
 profileImageRouter.get('/', async (req: any, res: any) => {
@@ -136,7 +136,7 @@ profileImageRouter.get('/', async (req: any, res: any) => {
 
 /**
  * ------------------------------------------
- *  EXISTING: Update user’s username
+ *  EXISTING: Update user's username
  * ------------------------------------------
  */
 profileImageRouter.post('/updateUsername', async (req: any, res: any) => {
@@ -248,7 +248,7 @@ profileImageRouter.post('/unfollow', async (req: any, res: any) => {
 
 /**
  * ------------------------------------------
- *  NEW: GET list of a user’s followers
+ *  NEW: GET list of a user's followers
  *  Query param: ?userId=xxx
  * ------------------------------------------
  */
@@ -282,7 +282,7 @@ profileImageRouter.get('/followers', async (req: any, res: any) => {
 
 /**
  * ------------------------------------------
- *  NEW: GET list of a user’s following
+ *  NEW: GET list of a user's following
  *  Query param: ?userId=xxx
  * ------------------------------------------
  */
@@ -397,6 +397,327 @@ profileImageRouter.get('/search', async (req: any, res: any) => {
   } catch (error: any) {
     console.error('[User search error]', error);
     return res.status(500).json({success: false, error: error.message});
+  }
+});
+
+/**
+ * ------------------------------------------
+ *  NEW: Create a new user
+ *  Body: { userId, username, handle }
+ * ------------------------------------------
+ */
+profileImageRouter.post('/createUser', async (req: any, res: any) => {
+  try {
+    const { userId, username, handle } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'Missing userId' });
+    }
+
+    // Check if user already exists
+    const existingUser = await knex('users').where({ id: userId }).first();
+    if (existingUser) {
+      // User already exists, just return success
+      return res.json({ success: true, user: existingUser });
+    }
+
+    // Create new user with minimal data
+    const newUser = {
+      id: userId,
+      username: username || userId, // Default to userId if username not provided
+      handle: handle || '@' + userId.slice(0, 6), // Default handle if not provided
+      profile_picture_url: null,
+      attachment_data: null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+
+    await knex('users').insert(newUser);
+
+    return res.json({ success: true, user: newUser });
+  } catch (error: any) {
+    console.error('[Create user error]', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * ------------------------------------------
+ *  NEW: Get all wallets for a user
+ *  Query param: ?userId=xxx
+ * ------------------------------------------
+ */
+profileImageRouter.get('/wallets', async (req: any, res: any) => {
+  try {
+    const userId = req.query.userId;
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'Missing userId param' });
+    }
+
+    const wallets = await knex('user_wallets')
+      .where({ user_id: userId })
+      .orderBy([
+        { column: 'is_primary', order: 'desc' },
+        { column: 'created_at', order: 'desc' }
+      ]);
+
+    return res.json({
+      success: true,
+      wallets,
+    });
+  } catch (error: any) {
+    console.error('[Get wallets error]', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * ------------------------------------------
+ *  NEW: Add a wallet for a user
+ *  Body: { userId, walletAddress, provider, name }
+ * ------------------------------------------
+ */
+profileImageRouter.post('/addWallet', async (req: any, res: any) => {
+  try {
+    const { userId, walletAddress, provider, name } = req.body;
+    if (!userId || !walletAddress || !provider) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required fields: userId, walletAddress, provider' 
+      });
+    }
+
+    // Check if this wallet address already exists for any user
+    const existingWallet = await knex('user_wallets')
+      .where({ wallet_address: walletAddress })
+      .first();
+      
+    if (existingWallet) {
+      return res.status(400).json({
+        success: false,
+        error: 'Wallet address already registered'
+      });
+    }
+    
+    // Check if the user exists, create if needed
+    const user = await knex('users').where({ id: userId }).first();
+    if (!user) {
+      await knex('users').insert({
+        id: userId,
+        username: name || userId.slice(0, 10),
+        handle: '@' + userId.slice(0, 6),
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+    }
+    
+    // Check if user has any wallets
+    const userWallets = await knex('user_wallets').where({ user_id: userId });
+    const isPrimary = userWallets.length === 0; // First wallet is primary
+    
+    // Insert the new wallet
+    const [newWallet] = await knex('user_wallets')
+      .insert({
+        user_id: userId,
+        wallet_address: walletAddress,
+        provider,
+        name: name || `Wallet ${userWallets.length + 1}`,
+        is_primary: isPrimary,
+        created_at: new Date()
+      })
+      .returning('*');
+
+    return res.json({
+      success: true,
+      wallet: newWallet
+    });
+  } catch (error: any) {
+    console.error('[Add wallet error]', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * ------------------------------------------
+ *  NEW: Set a wallet as primary
+ *  Body: { userId, walletAddress }
+ * ------------------------------------------
+ */
+profileImageRouter.post('/setPrimaryWallet', async (req: any, res: any) => {
+  try {
+    const { userId, walletAddress } = req.body;
+    if (!userId || !walletAddress) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required fields: userId, walletAddress' 
+      });
+    }
+
+    // Check if this wallet belongs to the user
+    const targetWallet = await knex('user_wallets')
+      .where({ 
+        user_id: userId, 
+        wallet_address: walletAddress 
+      })
+      .first();
+      
+    if (!targetWallet) {
+      return res.status(404).json({
+        success: false,
+        error: 'Wallet not found for this user'
+      });
+    }
+    
+    // Update all wallets for this user
+    await knex.transaction(async (trx) => {
+      // First, set all wallets to not primary
+      await trx('user_wallets')
+        .where({ user_id: userId })
+        .update({ is_primary: false });
+        
+      // Then set the target wallet as primary
+      await trx('user_wallets')
+        .where({ wallet_address: walletAddress })
+        .update({ is_primary: true });
+    });
+
+    const wallets = await knex('user_wallets')
+      .where({ user_id: userId })
+      .orderBy([
+        { column: 'is_primary', order: 'desc' },
+        { column: 'created_at', order: 'desc' }
+      ]);
+
+    return res.json({
+      success: true,
+      wallets
+    });
+  } catch (error: any) {
+    console.error('[Set primary wallet error]', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * ------------------------------------------
+ *  NEW: Remove a wallet
+ *  Body: { userId, walletAddress }
+ * ------------------------------------------
+ */
+profileImageRouter.post('/removeWallet', async (req: any, res: any) => {
+  try {
+    const { userId, walletAddress } = req.body;
+    if (!userId || !walletAddress) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required fields: userId, walletAddress' 
+      });
+    }
+
+    // Check if this wallet belongs to the user
+    const targetWallet = await knex('user_wallets')
+      .where({ 
+        user_id: userId, 
+        wallet_address: walletAddress 
+      })
+      .first();
+      
+    if (!targetWallet) {
+      return res.status(404).json({
+        success: false,
+        error: 'Wallet not found for this user'
+      });
+    }
+    
+    // Don't allow removing the primary wallet if there are others
+    if (targetWallet.is_primary) {
+      const walletCount = await knex('user_wallets')
+        .where({ user_id: userId })
+        .count('* as count')
+        .first();
+        
+      if (walletCount && Number(walletCount.count) > 1) {
+        return res.status(400).json({
+          success: false,
+          error: 'Cannot remove primary wallet. Set another wallet as primary first.'
+        });
+      }
+    }
+    
+    // Remove the wallet
+    await knex('user_wallets')
+      .where({ 
+        user_id: userId, 
+        wallet_address: walletAddress 
+      })
+      .delete();
+      
+    // If we removed the primary and there are other wallets, set the first one as primary
+    if (targetWallet.is_primary) {
+      const remainingWallets = await knex('user_wallets')
+        .where({ user_id: userId })
+        .orderBy('created_at', 'asc');
+        
+      if (remainingWallets.length > 0) {
+        await knex('user_wallets')
+          .where({ id: remainingWallets[0].id })
+          .update({ is_primary: true });
+      }
+    }
+
+    return res.json({
+      success: true
+    });
+  } catch (error: any) {
+    console.error('[Remove wallet error]', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * ------------------------------------------
+ *  NEW: Update wallet name
+ *  Body: { userId, walletAddress, name }
+ * ------------------------------------------
+ */
+profileImageRouter.post('/updateWalletName', async (req: any, res: any) => {
+  try {
+    const { userId, walletAddress, name } = req.body;
+    if (!userId || !walletAddress || !name) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required fields: userId, walletAddress, name' 
+      });
+    }
+
+    // Check if this wallet belongs to the user
+    const targetWallet = await knex('user_wallets')
+      .where({ 
+        user_id: userId, 
+        wallet_address: walletAddress 
+      })
+      .first();
+      
+    if (!targetWallet) {
+      return res.status(404).json({
+        success: false,
+        error: 'Wallet not found for this user'
+      });
+    }
+    
+    // Update the wallet name
+    await knex('user_wallets')
+      .where({ 
+        user_id: userId, 
+        wallet_address: walletAddress 
+      })
+      .update({ name });
+
+    return res.json({
+      success: true
+    });
+  } catch (error: any) {
+    console.error('[Update wallet name error]', error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 

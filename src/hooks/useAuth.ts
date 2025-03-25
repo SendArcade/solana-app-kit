@@ -1,13 +1,22 @@
 // File: src/hooks/useAuth.ts
-import {useCallback} from 'react';
+import {useCallback, useEffect} from 'react';
 import {useDispatch} from 'react-redux';
-import {loginSuccess, logoutSuccess} from '../state/auth/reducer';
+import {
+  loginSuccess, 
+  logoutSuccess,
+  fetchUserWallets,
+  addWallet,
+  setPrimaryWallet,
+  removeWallet,
+  switchWallet,
+  Wallet
+} from '../state/auth/reducer';
 import {usePrivyWalletLogic} from '../services/walletProviders/privy';
 import {useDynamicWalletLogic} from './useDynamicWalletLogic';
 import {useCustomization} from '../CustomizationProvider';
 import {useAppNavigation} from './useAppNavigation';
 import {getDynamicClient} from '../services/walletProviders/dynamic';
-import {useAppSelector} from './useReduxHooks';
+import {useAppSelector, useAppDispatch} from './useReduxHooks';
 import {VersionedTransaction, PublicKey} from '@solana/web3.js';
 
 /**
@@ -47,13 +56,25 @@ export interface StandardWallet {
 export function useAuth() {
   const {auth: authConfig} = useCustomization();
   const selectedProvider = authConfig.provider;
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   const navigation = useAppNavigation();
   const authState = useAppSelector(state => state.auth);
 
   // Get wallet address and provider from Redux state
   const storedAddress = authState.address;
   const storedProvider = authState.provider;
+  const storedUserId = authState.userId;
+  const storedWallets = authState.wallets;
+
+  // Fetch wallets when userId is available
+  useEffect(() => {
+    if (storedUserId && authState.isLoggedIn && storedWallets.length === 0) {
+      dispatch(fetchUserWallets(storedUserId))
+        .catch((err: Error) => {
+          console.error('Error fetching user wallets:', err);
+        });
+    }
+  }, [storedUserId, authState.isLoggedIn, storedWallets.length, dispatch]);
 
   /** PRIVY CASE */
   if (selectedProvider === 'privy') {
@@ -92,11 +113,39 @@ export function useAuth() {
         selectedProvider: 'privy',
         setStatusMessage: () => {},
         onWalletConnected: info => {
-          dispatch(loginSuccess({provider: 'privy', address: info.address}));
+          // Store both user ID and wallet
+          const userId = user?.id || info.address;
+          const walletObj: Wallet = {
+            user_id: userId,
+            wallet_address: info.address,
+            provider: 'privy',
+            name: 'Privy Wallet',
+            is_primary: true
+          };
+          
+          dispatch(loginSuccess({
+            provider: 'privy', 
+            address: info.address, 
+            userId: userId,
+            wallet: walletObj
+          }));
+          
+          // Add the wallet to database
+          dispatch(addWallet({
+            userId: userId,
+            walletAddress: info.address,
+            provider: 'privy',
+            name: 'Privy Wallet',
+          }))
+            .unwrap()
+            .catch((error: Error) => {
+              console.error('Error adding wallet:', error);
+            });
+          
           navigation.navigate('MainTabs');
         },
       });
-    }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
+    }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation, user]);
 
     const loginWithApple = useCallback(async () => {
       await handlePrivyLogin({
@@ -107,11 +156,39 @@ export function useAuth() {
         selectedProvider: 'privy',
         setStatusMessage: () => {},
         onWalletConnected: info => {
-          dispatch(loginSuccess({provider: 'privy', address: info.address}));
+          // Store both user ID and wallet
+          const userId = user?.id || info.address;
+          const walletObj: Wallet = {
+            user_id: userId,
+            wallet_address: info.address,
+            provider: 'privy',
+            name: 'Privy Wallet',
+            is_primary: true
+          };
+          
+          dispatch(loginSuccess({
+            provider: 'privy', 
+            address: info.address, 
+            userId: userId,
+            wallet: walletObj
+          }));
+          
+          // Add the wallet to database
+          dispatch(addWallet({
+            userId: userId,
+            walletAddress: info.address,
+            provider: 'privy',
+            name: 'Privy Wallet',
+          }))
+            .unwrap()
+            .catch((error: Error) => {
+              console.error('Error adding wallet:', error);
+            });
+          
           navigation.navigate('MainTabs');
         },
       });
-    }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
+    }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation, user]);
 
     const loginWithEmail = useCallback(async () => {
       await handlePrivyLogin({
@@ -122,16 +199,96 @@ export function useAuth() {
         selectedProvider: 'privy',
         setStatusMessage: () => {},
         onWalletConnected: info => {
-          dispatch(loginSuccess({provider: 'privy', address: info.address}));
+          // Store both user ID and wallet
+          const userId = user?.id || info.address;
+          const walletObj: Wallet = {
+            user_id: userId,
+            wallet_address: info.address,
+            provider: 'privy',
+            name: 'Privy Wallet',
+            is_primary: true
+          };
+          
+          dispatch(loginSuccess({
+            provider: 'privy', 
+            address: info.address, 
+            userId: userId,
+            wallet: walletObj
+          }));
+          
+          // Add the wallet to database
+          dispatch(addWallet({
+            userId: userId,
+            walletAddress: info.address,
+            provider: 'privy',
+            name: 'Privy Wallet',
+          }))
+            .unwrap()
+            .catch((error: Error) => {
+              console.error('Error adding wallet:', error);
+            });
+          
           navigation.navigate('MainTabs');
         },
       });
-    }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
+    }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation, user]);
 
     const logout = useCallback(async () => {
       await handlePrivyLogout(() => {});
       dispatch(logoutSuccess());
     }, [handlePrivyLogout, dispatch]);
+
+    // Add function to create a new wallet
+    const createNewWallet = useCallback(async (name?: string) => {
+      if (!user?.id) {
+        throw new Error('User is not authenticated');
+      }
+      
+      try {
+        // This would need to be implemented in Privy's SDK
+        // For now, we'll just log that this isn't implemented
+        console.warn('Creating new wallets with Privy is not implemented in this demo');
+        return null;
+      } catch (error) {
+        console.error('Error creating new wallet:', error);
+        throw error;
+      }
+    }, [user?.id]);
+
+    // Switch between wallets
+    const handleSwitchWallet = useCallback((walletAddress: string) => {
+      dispatch(switchWallet(walletAddress));
+    }, [dispatch]);
+
+    // Set a wallet as primary
+    const handleSetPrimaryWallet = useCallback((walletAddress: string) => {
+      if (!storedUserId) {
+        throw new Error('User ID not available');
+      }
+      dispatch(setPrimaryWallet({
+        userId: storedUserId,
+        walletAddress,
+      }))
+        .unwrap()
+        .catch((error: Error) => {
+          console.error('Error setting primary wallet:', error);
+        });
+    }, [dispatch, storedUserId]);
+
+    // Remove a wallet
+    const handleRemoveWallet = useCallback((walletAddress: string) => {
+      if (!storedUserId) {
+        throw new Error('User ID not available');
+      }
+      dispatch(removeWallet({
+        userId: storedUserId,
+        walletAddress,
+      }))
+        .unwrap()
+        .catch((error: Error) => {
+          console.error('Error removing wallet:', error);
+        });
+    }, [dispatch, storedUserId]);
 
     return {
       status: '',
@@ -142,6 +299,11 @@ export function useAuth() {
       user,
       solanaWallet, // Keep for backward compatibility
       wallet: standardWallet, // Add standardized wallet
+      wallets: storedWallets, // Return all wallets
+      createNewWallet, // Function to create a new wallet
+      switchWallet: handleSwitchWallet, // Function to switch wallets
+      setPrimaryWallet: handleSetPrimaryWallet, // Function to set primary wallet
+      removeWallet: handleRemoveWallet, // Function to remove a wallet
     };
   } else if (selectedProvider === 'dynamic') {
     /** DYNAMIC CASE */
@@ -424,9 +586,36 @@ export function useAuth() {
     }
 
     const handleSuccessfulLogin = useCallback((info: {provider: 'dynamic', address: string}) => {
-      dispatch(loginSuccess({provider: 'dynamic', address: info.address}));
+      const userId = user?.id || info.address;
+      const walletObj: Wallet = {
+        user_id: userId,
+        wallet_address: info.address,
+        provider: 'dynamic',
+        name: 'Dynamic Wallet',
+        is_primary: true
+      };
+      
+      dispatch(loginSuccess({
+        provider: 'dynamic', 
+        address: info.address, 
+        userId: userId,
+        wallet: walletObj
+      }));
+      
+      // Also add as a wallet
+      dispatch(addWallet({
+        userId: userId,
+        walletAddress: info.address,
+        provider: 'dynamic',
+        name: 'Dynamic Wallet',
+      }))
+        .unwrap()
+        .catch((error: Error) => {
+          console.error('Error adding wallet:', error);
+        });
+      
       navigation.navigate('MainTabs');
-    }, [dispatch, navigation]);
+    }, [dispatch, navigation, user]);
 
     const loginWithEmail = useCallback(async () => {
       await handleDynamicLogin({
@@ -467,6 +656,81 @@ export function useAuth() {
       dispatch(logoutSuccess());
     }, [handleDynamicLogout, dispatch]);
 
+    // Add function to create a new embedded wallet
+    const createNewWallet = useCallback(async (name?: string) => {
+      if (!storedUserId) {
+        throw new Error('User is not authenticated');
+      }
+
+      try {
+        const dynamicClient = getDynamicClient();
+        if (!dynamicClient || !dynamicClient.wallets) {
+          throw new Error('Dynamic client not initialized');
+        }
+
+        // Create a new embedded wallet using Dynamic SDK
+        console.log('Creating new embedded wallet...');
+        const newWallet = await dynamicClient.wallets.createEmbeddedWallet({
+          waitForSigner: true
+        });
+
+        if (!newWallet || !newWallet.address) {
+          throw new Error('Failed to create new wallet');
+        }
+
+        console.log('New wallet created with address:', newWallet.address);
+
+        // Save the wallet in our database
+        const walletName = name || `Dynamic Wallet ${storedWallets.length + 1}`;
+        await dispatch(addWallet({
+          userId: storedUserId,
+          walletAddress: newWallet.address,
+          provider: 'dynamic',
+          name: walletName,
+        })).unwrap();
+
+        return newWallet;
+      } catch (error) {
+        console.error('Error creating new wallet:', error);
+        throw error;
+      }
+    }, [storedUserId, storedWallets.length, dispatch]);
+
+    // Switch between wallets
+    const handleSwitchWallet = useCallback((walletAddress: string) => {
+      dispatch(switchWallet(walletAddress));
+    }, [dispatch]);
+
+    // Set a wallet as primary
+    const handleSetPrimaryWallet = useCallback((walletAddress: string) => {
+      if (!storedUserId) {
+        throw new Error('User ID not available');
+      }
+      dispatch(setPrimaryWallet({
+        userId: storedUserId,
+        walletAddress,
+      }))
+        .unwrap()
+        .catch((error: Error) => {
+          console.error('Error setting primary wallet:', error);
+        });
+    }, [dispatch, storedUserId]);
+
+    // Remove a wallet
+    const handleRemoveWallet = useCallback((walletAddress: string) => {
+      if (!storedUserId) {
+        throw new Error('User ID not available');
+      }
+      dispatch(removeWallet({
+        userId: storedUserId,
+        walletAddress,
+      }))
+        .unwrap()
+        .catch((error: Error) => {
+          console.error('Error removing wallet:', error);
+        });
+    }, [dispatch, storedUserId]);
+
     // Create a solanaWallet object that mimics the Privy structure for compatibility
     const solanaWallet = standardWallet ? {
       wallets: [{
@@ -486,6 +750,11 @@ export function useAuth() {
       user: walletAddress ? {id: walletAddress} : user,
       solanaWallet, // Add compatibility object
       wallet: standardWallet, // Add standardized wallet
+      wallets: storedWallets, // Return all wallets
+      createNewWallet, // Function to create a new wallet
+      switchWallet: handleSwitchWallet, // Function to switch wallets
+      setPrimaryWallet: handleSetPrimaryWallet, // Function to set primary wallet
+      removeWallet: handleRemoveWallet, // Function to remove a wallet
     };
   } else if (selectedProvider === 'turnkey') {
     /** TURNKEY CASE */
@@ -494,6 +763,49 @@ export function useAuth() {
       // For Turnkey, you might do some session reset
       dispatch(logoutSuccess());
     }, [dispatch]);
+
+    const createNewWallet = useCallback(async (name?: string) => {
+      if (!storedUserId) {
+        throw new Error('User is not authenticated');
+      }
+      console.warn('Creating new wallets with Turnkey is not implemented in this demo');
+      return null;
+    }, [storedUserId]);
+
+    // Switch between wallets
+    const handleSwitchWallet = useCallback((walletAddress: string) => {
+      dispatch(switchWallet(walletAddress));
+    }, [dispatch]);
+
+    // Set a wallet as primary
+    const handleSetPrimaryWallet = useCallback((walletAddress: string) => {
+      if (!storedUserId) {
+        throw new Error('User ID not available');
+      }
+      dispatch(setPrimaryWallet({
+        userId: storedUserId,
+        walletAddress,
+      }))
+        .unwrap()
+        .catch((error: Error) => {
+          console.error('Error setting primary wallet:', error);
+        });
+    }, [dispatch, storedUserId]);
+
+    // Remove a wallet
+    const handleRemoveWallet = useCallback((walletAddress: string) => {
+      if (!storedUserId) {
+        throw new Error('User ID not available');
+      }
+      dispatch(removeWallet({
+        userId: storedUserId,
+        walletAddress,
+      }))
+        .unwrap()
+        .catch((error: Error) => {
+          console.error('Error removing wallet:', error);
+        });
+    }, [dispatch, storedUserId]);
 
     return {
       status: '',
@@ -504,6 +816,11 @@ export function useAuth() {
       user: null,
       solanaWallet: null,
       wallet: null,
+      wallets: storedWallets,
+      createNewWallet,
+      switchWallet: handleSwitchWallet,
+      setPrimaryWallet: handleSetPrimaryWallet,
+      removeWallet: handleRemoveWallet,
     };
   }
 
@@ -536,22 +853,84 @@ export function useAuth() {
       getProvider: mwaWallet.getProvider
     };
 
+    // Add function to create a new MWA wallet
+    const createNewWallet = useCallback(async (name?: string) => {
+      if (!storedUserId) {
+        throw new Error('User is not authenticated');
+      }
+      console.warn('Creating new MWA wallets requires the Phantom app and is not implemented in this demo');
+      return null;
+    }, [storedUserId]);
+
+    // Switch between wallets
+    const handleSwitchWallet = useCallback((walletAddress: string) => {
+      dispatch(switchWallet(walletAddress));
+    }, [dispatch]);
+
+    // Set a wallet as primary
+    const handleSetPrimaryWallet = useCallback((walletAddress: string) => {
+      if (!storedUserId) {
+        throw new Error('User ID not available');
+      }
+      dispatch(setPrimaryWallet({
+        userId: storedUserId,
+        walletAddress,
+      }))
+        .unwrap()
+        .catch((error: Error) => {
+          console.error('Error setting primary wallet:', error);
+        });
+    }, [dispatch, storedUserId]);
+
+    // Remove a wallet
+    const handleRemoveWallet = useCallback((walletAddress: string) => {
+      if (!storedUserId) {
+        throw new Error('User ID not available');
+      }
+      dispatch(removeWallet({
+        userId: storedUserId,
+        walletAddress,
+      }))
+        .unwrap()
+        .catch((error: Error) => {
+          console.error('Error removing wallet:', error);
+        });
+    }, [dispatch, storedUserId]);
+
     return {
       status: 'authenticated',
       logout: async () => {
         dispatch(logoutSuccess());
       },
-      user: { id: storedAddress },
+      user: { id: storedUserId || storedAddress },
       solanaWallet,
       wallet: mwaWallet,
+      wallets: storedWallets,
+      createNewWallet,
+      switchWallet: handleSwitchWallet,
+      setPrimaryWallet: handleSetPrimaryWallet,
+      removeWallet: handleRemoveWallet,
     };
   }
 
-  // If no recognized provider, just return empties
+  // If no recognized provider, just return empties with necessary functions
+  const createNewWallet = useCallback(async (name?: string) => {
+    if (!storedUserId) {
+      throw new Error('User is not authenticated');
+    }
+    console.warn('Creating wallets requires logging in first');
+    return null;
+  }, [storedUserId]);
+
   return {
     status: '', 
     logout: async () => {},
     solanaWallet: null,
-    wallet: null
+    wallet: null,
+    wallets: [],
+    createNewWallet,
+    switchWallet: () => {},
+    setPrimaryWallet: () => {},
+    removeWallet: () => {},
   };
 }

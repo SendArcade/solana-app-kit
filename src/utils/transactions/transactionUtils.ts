@@ -274,6 +274,7 @@ export async function sendTransactionWithPriorityFee({
 
 /**
  * Sends SOL to a recipient with the current priority fee settings
+ * Updated to use the currently selected wallet from multiple wallets
  */
 export async function sendSOL({
   wallet,
@@ -307,7 +308,7 @@ export async function sendSOL({
     const lamports = Math.floor(parsedAmount * LAMPORTS_PER_SOL);
     
     // Check if this is an MWA wallet
-    if (wallet.provider === 'mwa' && Platform.OS === 'android') {
+    if ((wallet.provider === 'mwa' || (wallet.getWalletInfo && wallet.getWalletInfo().walletType === 'MWA')) && Platform.OS === 'android') {
       onStatusUpdate?.(`Using Mobile Wallet Adapter to send ${amountSol} SOL to ${recipientAddress}`);
       
       // For MWA we use a different flow that uses the external wallet for signing
@@ -320,13 +321,17 @@ export async function sendSOL({
       );
     }
     
-    // Get wallet public key
+    // Get wallet public key - check multiple possible locations
     let walletPublicKey: PublicKey;
     
     if (wallet.publicKey) {
       walletPublicKey = new PublicKey(wallet.publicKey);
     } else if (wallet.address) {
       walletPublicKey = new PublicKey(wallet.address);
+    } else if (wallet.wallet_address) { // Support for our Wallet type
+      walletPublicKey = new PublicKey(wallet.wallet_address);
+    } else if (wallet.rawWallet?.address) {
+      walletPublicKey = new PublicKey(wallet.rawWallet.address);
     } else {
       throw new Error('No wallet public key or address found');
     }

@@ -279,6 +279,7 @@ export class TransactionService {
 
   /**
    * Normalize any wallet provider into our standard WalletProvider format
+   * Updated to better support multiple wallets
    */
   private static normalizeWalletProvider(provider: WalletProvider | StandardWallet | UnifiedWallet): WalletProvider {
     // Add detailed console logging to help with debugging
@@ -372,14 +373,22 @@ export class TransactionService {
         };
       }
       
+      // For other providers, use the standard wallet type
       return { 
         type: 'standard', 
         wallet: provider as StandardWallet 
       };
     }
     
-    // If it has a type property indicating it's from a specific wallet provider
+    // Enhanced provider detection for specific wallet providers
     if (provider && typeof provider === 'object') {
+      // Check for the wallet address in various locations for better support
+      const walletAddress = 
+        provider.address || 
+        provider.publicKey || 
+        (provider.wallet && provider.wallet.address) || 
+        null;
+
       // Detect Privy wallet
       if (provider.type === 'privy' || 
           (provider.provider && provider.provider === 'privy') ||
@@ -396,14 +405,6 @@ export class TransactionService {
           provider._dynamicSdk ||
           (provider.wallet && provider.wallet.type === 'dynamic_embedded_wallet')) {
         this.log("Detected Dynamic wallet");
-        
-        let walletAddress = '';
-        
-        if ('address' in provider) {
-          walletAddress = provider.address;
-        } else if (provider.wallets && provider.wallets[0]) {
-          walletAddress = provider.wallets[0].publicKey || provider.wallets[0].address;
-        }
         
         if (walletAddress) {
           return { type: 'dynamic', walletAddress };
