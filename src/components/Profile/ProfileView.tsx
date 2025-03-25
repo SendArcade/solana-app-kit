@@ -1,6 +1,6 @@
 // File: src/components/Profile/ProfileView.tsx
 import React from 'react';
-import {View, StyleProp, ViewStyle} from 'react-native';
+import {View, StyleProp, ViewStyle, RefreshControl, ScrollView} from 'react-native';
 import ProfileInfo from './ProfileInfo/profileInfo';
 import SwipeTabs from './slider/slider';
 
@@ -50,6 +50,9 @@ export interface ProfileViewProps {
   onRefreshPortfolio?: () => void;
   refreshingPortfolio?: boolean;
   onAssetPress?: (asset: AssetItem) => void;
+  // Add new props for refresh functionality
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }
 
 function ProfileViewComponent({
@@ -79,6 +82,9 @@ function ProfileViewComponent({
   onRefreshPortfolio,
   refreshingPortfolio,
   onAssetPress,
+  // Refresh props
+  refreshing,
+  onRefresh,
 }: ProfileViewProps) {
   // Instead of extracting separate coin fields, now use the attachmentData object.
   const attachmentData = user.attachmentData || {};
@@ -118,6 +124,9 @@ function ProfileViewComponent({
           onRefreshPortfolio={onRefreshPortfolio}
           refreshingPortfolio={refreshingPortfolio}
           onAssetPress={onAssetPress}
+          // Pass refresh props to SwipeTabs
+          refreshing={refreshing}
+          onRefresh={onRefresh}
         />
       </View>
     </View>
@@ -147,6 +156,10 @@ function arePropsEqual(prev: ProfileViewProps, next: ProfileViewProps) {
   if (prev.onRefreshPortfolio !== next.onRefreshPortfolio) return false;
   if (prev.refreshingPortfolio !== next.refreshingPortfolio) return false;
   if (prev.onAssetPress !== next.onAssetPress) return false;
+  
+  // Check new refresh props
+  if (prev.refreshing !== next.refreshing) return false;
+  if (prev.onRefresh !== next.onRefresh) return false;
 
   return true;
 }

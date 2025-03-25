@@ -5,6 +5,7 @@
  */
 
 import {SERVER_URL} from '@env';
+import { Wallet } from '../state/auth/reducer';
 
 /**
  * Upload a profile avatar image for a given user.
@@ -127,7 +128,10 @@ export async function checkIfUserFollowsMe(
 
 export const fetchUserProfile = async (userId: string) => {
   try {
-    const response = await fetch(`YOUR_API_URL/profile?userId=${userId}`);
+    if (!SERVER_URL) {
+      throw new Error('SERVER_URL not set');
+    }
+    const response = await fetch(`${SERVER_URL}/api/profile?userId=${userId}`);
     if (!response.ok) throw new Error('Failed to fetch profile');
     const data = await response.json();
     
@@ -138,6 +142,204 @@ export const fetchUserProfile = async (userId: string) => {
     };
   } catch (error) {
     console.error('Error fetching profile:', error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch all wallets for a user
+ * @param userId User ID
+ * @returns Array of user wallets
+ */
+export const fetchWallets = async (userId: string): Promise<Wallet[]> => {
+  try {
+    if (!SERVER_URL) {
+      console.warn('SERVER_URL not set. Returning empty wallets array.');
+      return [];
+    }
+    
+    const response = await fetch(`${SERVER_URL}/api/profile/wallets?userId=${userId}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch wallets: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    if (data.success && Array.isArray(data.wallets)) {
+      return data.wallets;
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Error fetching wallets:', error);
+    throw error;
+  }
+};
+
+/**
+ * Add a new wallet for a user
+ * @param userId User ID
+ * @param walletAddress Wallet address to add
+ * @param provider Wallet provider
+ * @param name Optional wallet name
+ * @returns The newly created wallet
+ */
+export const addWallet = async (
+  userId: string,
+  walletAddress: string,
+  provider: 'privy' | 'dynamic' | 'turnkey' | 'mwa',
+  name?: string,
+): Promise<Wallet> => {
+  try {
+    if (!SERVER_URL) {
+      throw new Error('SERVER_URL not set');
+    }
+    
+    const response = await fetch(`${SERVER_URL}/api/profile/addWallet`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        userId,
+        walletAddress,
+        provider,
+        name,
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to add wallet: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to add wallet');
+    }
+    
+    return data.wallet;
+  } catch (error) {
+    console.error('Error adding wallet:', error);
+    throw error;
+  }
+};
+
+/**
+ * Set a wallet as primary
+ * @param userId User ID
+ * @param walletAddress Wallet address to set as primary
+ * @returns Updated list of wallets
+ */
+export const setPrimaryWallet = async (
+  userId: string,
+  walletAddress: string,
+): Promise<Wallet[]> => {
+  try {
+    if (!SERVER_URL) {
+      throw new Error('SERVER_URL not set');
+    }
+    
+    const response = await fetch(`${SERVER_URL}/api/profile/setPrimaryWallet`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        userId,
+        walletAddress,
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to set primary wallet: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to set primary wallet');
+    }
+    
+    return data.wallets;
+  } catch (error) {
+    console.error('Error setting primary wallet:', error);
+    throw error;
+  }
+};
+
+/**
+ * Remove a wallet
+ * @param userId User ID
+ * @param walletAddress Wallet address to remove
+ * @returns true if successful
+ */
+export const removeWallet = async (
+  userId: string,
+  walletAddress: string,
+): Promise<boolean> => {
+  try {
+    if (!SERVER_URL) {
+      throw new Error('SERVER_URL not set');
+    }
+    
+    const response = await fetch(`${SERVER_URL}/api/profile/removeWallet`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        userId,
+        walletAddress,
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to remove wallet: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to remove wallet');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error removing wallet:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update a wallet's name
+ * @param userId User ID
+ * @param walletAddress Wallet address to update
+ * @param name New wallet name
+ * @returns true if successful
+ */
+export const updateWalletName = async (
+  userId: string,
+  walletAddress: string,
+  name: string,
+): Promise<boolean> => {
+  try {
+    if (!SERVER_URL) {
+      throw new Error('SERVER_URL not set');
+    }
+    
+    const response = await fetch(`${SERVER_URL}/api/profile/updateWalletName`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        userId,
+        walletAddress,
+        name,
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to update wallet name: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to update wallet name');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating wallet name:', error);
     throw error;
   }
 };
