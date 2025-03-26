@@ -1,18 +1,19 @@
 // File: src/components/Profile/ProfileView.tsx
 import React from 'react';
-import {View, StyleProp, ViewStyle} from 'react-native';
+import { View, StyleProp, ViewStyle } from 'react-native';
 import ProfileInfo from './ProfileInfo/profileInfo';
 import SwipeTabs from './slider/slider';
 
-import {styles as profileStyles} from './profile.style';
-import {ThreadPost} from '../thread/thread.types';
-import {NftItem} from '../../hooks/useFetchNFTs';
-import {AssetItem, PortfolioData} from '../../hooks/useFetchTokens';
+import { styles as profileStyles } from './profile.style';
+import { ThreadPost } from '../thread/thread.types';
+import { NftItem } from '../../hooks/useFetchNFTs';
+import { AssetItem, PortfolioData } from '../../hooks/useFetchTokens';
 
 export interface UserProfileData {
   address: string;
   profilePicUrl: string;
   username: string;
+  description?: string;
   // Instead of separate coin fields, we now store an object
   attachmentData?: {
     coin?: {
@@ -89,6 +90,7 @@ function ProfileViewComponent({
         profilePicUrl={user.profilePicUrl}
         username={user.username}
         userWallet={user.address}
+        bioText={user.description}
         isOwnProfile={isOwnProfile}
         onAvatarPress={onAvatarPress}
         onEditProfile={onEditProfile}
@@ -104,7 +106,7 @@ function ProfileViewComponent({
         attachmentData={attachmentData}
       />
 
-      <View style={{flex: 1}}>
+      <View style={{ flex: 1 }}>
         <SwipeTabs
           myPosts={myPosts}
           myNFTs={myNFTs}
@@ -129,6 +131,7 @@ function arePropsEqual(prev: ProfileViewProps, next: ProfileViewProps) {
   if (prev.user.address !== next.user.address) return false;
   if (prev.user.profilePicUrl !== next.user.profilePicUrl) return false;
   if (prev.user.username !== next.user.username) return false;
+  if (prev.user.description !== next.user.description) return false;
 
   if (prev.loadingNfts !== next.loadingNfts) return false;
   if (prev.fetchNftsError !== next.fetchNftsError) return false;

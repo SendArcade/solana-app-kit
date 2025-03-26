@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -8,9 +8,11 @@ import {
   ScrollView,
   Linking,
   TouchableOpacity,
+  Animated,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import {FontAwesome5} from '@expo/vector-icons';
+import { FontAwesome5 } from '@expo/vector-icons';
 import { Action } from '../../../services/profileActions';
 
 export interface ActionDetailModalProps {
@@ -72,17 +74,40 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
 }) => {
   const [showInstructions, setShowInstructions] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showFromTooltip, setShowFromTooltip] = useState(false);
+  const [showToTooltip, setShowToTooltip] = useState(false);
+  const tooltipAnimation = useRef(new Animated.Value(0)).current;
+
+  // Hide tooltip animation function - defined before useEffect
+  const hideTooltip = () => {
+    Animated.timing(tooltipAnimation, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowFromTooltip(false);
+      setShowToTooltip(false);
+    });
+  };
+
+  // Add effect to dismiss tooltip when user taps outside
+  useEffect(() => {
+    // Hide tooltip when modal is closed
+    if (!visible) {
+      hideTooltip();
+    }
+  }, [visible]);
 
   if (!action) return null;
 
   // Determine the action label using enriched type if available
   let actionType = action.enrichedType || action.transactionType || action.type || 'Transaction';
-  
+
   // Prettier action type name for display
   if (actionType === 'SWAP') actionType = 'Swap';
   if (actionType === 'TRANSFER') actionType = 'Transfer';
   if (actionType === 'TOKEN_TRANSFER') actionType = 'Token Transfer';
-  
+
   const accentColor = getActionColor(actionType);
   const signature = action.signature || '';
   const truncatedSignature = truncateAddress(signature);
@@ -98,11 +123,15 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   let direction = 'neutral';
   let swapDetails = null;
 
+  // Get the original address before truncation
+  let originalFromAddress = '';
+  let originalToAddress = '';
+
   if (action.enrichedData) {
     // Get details from enriched data
     if (action.enrichedType === 'SWAP') {
       const { swapType, inputSymbol, outputSymbol, inputAmount, outputAmount, direction: enrichedDirection } = action.enrichedData;
-      
+
       swapDetails = {
         inputAmount: inputAmount?.toFixed(4) || '?',
         inputSymbol: inputSymbol || '?',
@@ -110,38 +139,44 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
         outputSymbol: outputSymbol || '?',
         direction: enrichedDirection || 'neutral'
       };
-      
+
       direction = enrichedDirection || 'neutral';
-    } 
+    }
     else if (action.enrichedType === 'TRANSFER' || action.enrichedType === 'TOKEN_TRANSFER') {
       const { transferType, amount: txAmount, tokenSymbol, counterparty, direction: enrichedDirection } = action.enrichedData;
-      
+
       // For display in the transaction detail view
-      amount = txAmount ? 
-        (transferType === 'SOL' ? txAmount.toFixed(4) : txAmount.toString()) : 
+      amount = txAmount ?
+        (transferType === 'SOL' ? txAmount.toFixed(4) : txAmount.toString()) :
         '?';
       symbol = transferType === 'SOL' ? 'SOL' : (tokenSymbol || 'tokens');
       direction = enrichedDirection || 'neutral';
-      
+
       // Set from/to based on direction
       if (enrichedDirection === 'OUT' && walletAddress) {
         fromAddress = truncateAddress(walletAddress);
+        originalFromAddress = walletAddress;
         toAddress = counterparty || '?';
+        originalToAddress = counterparty || '?';
       } else if (enrichedDirection === 'IN' && walletAddress) {
         toAddress = truncateAddress(walletAddress);
+        originalToAddress = walletAddress;
         fromAddress = counterparty || '?';
+        originalFromAddress = counterparty || '?';
       }
     }
-  } 
+  }
   // Fall back to original implementation for non-enriched data
   else {
     if (action.nativeTransfers && action.nativeTransfers.length > 0) {
       const transfer = action.nativeTransfers[0];
       fromAddress = truncateAddress(transfer.fromUserAccount);
+      originalFromAddress = transfer.fromUserAccount;
       toAddress = truncateAddress(transfer.toUserAccount);
+      originalToAddress = transfer.toUserAccount;
       amount = formatSolAmount(transfer.amount);
       symbol = 'SOL';
-      
+
       if (walletAddress) {
         if (transfer.fromUserAccount === walletAddress) {
           direction = 'out';
@@ -152,10 +187,12 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
     } else if (action.tokenTransfers && action.tokenTransfers.length > 0) {
       const transfer = action.tokenTransfers[0];
       fromAddress = truncateAddress(transfer.fromUserAccount);
+      originalFromAddress = transfer.fromUserAccount;
       toAddress = truncateAddress(transfer.toUserAccount);
+      originalToAddress = transfer.toUserAccount;
       amount = transfer.tokenAmount.toString();
       symbol = transfer.symbol || truncateAddress(transfer.mint);
-      
+
       if (walletAddress) {
         if (transfer.fromUserAccount === walletAddress) {
           direction = 'out';
@@ -172,7 +209,7 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
       let inputSymbol = '';
       let outputAmount = '';
       let outputSymbol = '';
-      
+
       if (swap.nativeInput) {
         inputAmount = formatSolAmount(parseInt(String(swap.nativeInput.amount), 10));
         inputSymbol = 'SOL';
@@ -182,7 +219,7 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
         inputAmount = (parseFloat(input.rawTokenAmount.tokenAmount) / Math.pow(10, decimals)).toFixed(4);
         inputSymbol = truncateAddress(input.mint);
       }
-      
+
       if (swap.nativeOutput) {
         outputAmount = formatSolAmount(parseInt(String(swap.nativeOutput.amount), 10));
         outputSymbol = 'SOL';
@@ -192,7 +229,7 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
         outputAmount = (parseFloat(output.rawTokenAmount.tokenAmount) / Math.pow(10, decimals)).toFixed(4);
         outputSymbol = truncateAddress(output.mint);
       }
-      
+
       if (inputAmount && outputAmount) {
         swapDetails = {
           inputAmount,
@@ -220,189 +257,262 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   };
 
   // Format direction for display
-  const directionDisplay = direction === 'IN' || direction === 'in' ? 'Received' : 
-                          direction === 'OUT' || direction === 'out' ? 'Sent' : '';
-  
+  const directionDisplay = direction === 'IN' || direction === 'in' ? 'Received' :
+    direction === 'OUT' || direction === 'out' ? 'Sent' : '';
+
   // Set color based on direction
-  const amountColor = direction === 'IN' || direction === 'in' ? '#14F195' : 
-                     direction === 'OUT' || direction === 'out' ? '#F43860' : '#333';
+  const amountColor = direction === 'IN' || direction === 'in' ? '#14F195' :
+    direction === 'OUT' || direction === 'out' ? '#F43860' : '#333';
+
+  // Show tooltip animation
+  const showTooltip = (tooltipType: 'from' | 'to') => {
+    if (tooltipType === 'from') {
+      setShowFromTooltip(true);
+      setShowToTooltip(false);
+    } else {
+      setShowFromTooltip(false);
+      setShowToTooltip(true);
+    }
+
+    Animated.timing(tooltipAnimation, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      <View style={modalStyles.overlay}>
-        <View style={modalStyles.modalContainer}>
-          {/* Draggable Handle */}
-          <View style={modalStyles.handleBar} />
-          
-          {/* Header */}
-          <View style={modalStyles.header}>
-            <TouchableOpacity 
-              style={modalStyles.closeButton}
-              onPress={onClose}
-              activeOpacity={0.7}>
-              <FontAwesome5 name="times" size={18} color="#666" />
-            </TouchableOpacity>
-            <Text style={modalStyles.headerTitle}>Transaction Details</Text>
-          </View>
-          
-          <ScrollView
-            style={modalStyles.content}
-            showsVerticalScrollIndicator={false}>
-            
-            {/* Transaction Type Banner */}
-            <View style={[modalStyles.typeBanner, {backgroundColor: `${accentColor}10`}]}>
-              <View style={[modalStyles.iconContainer, {backgroundColor: `${accentColor}20`}]}>
-                <FontAwesome5 
-                  name={actionType.toLowerCase().includes('transfer') ? 'exchange-alt' 
-                       : actionType.toLowerCase().includes('swap') ? 'sync-alt'
-                       : 'receipt'} 
-                  size={16} 
-                  color={accentColor} 
-                />
+      <TouchableWithoutFeedback onPress={hideTooltip}>
+        <View style={modalStyles.overlay}>
+          <TouchableWithoutFeedback>
+            <View style={modalStyles.modalContainer}>
+              {/* Draggable Handle */}
+              <View style={modalStyles.handleBar} />
+
+              {/* Header */}
+              <View style={modalStyles.header}>
+                <TouchableOpacity
+                  style={modalStyles.closeButton}
+                  onPress={onClose}
+                  activeOpacity={0.7}>
+                  <FontAwesome5 name="times" size={18} color="#666" />
+                </TouchableOpacity>
+                <Text style={modalStyles.headerTitle}>Transaction Details</Text>
               </View>
-              <View style={modalStyles.typeInfo}>
-                <Text style={[modalStyles.typeTitle, {color: accentColor}]}>
-                  {actionType}
-                </Text>
-                <Text style={modalStyles.dateText}>{date}</Text>
-              </View>
-            </View>
-            
-            {/* Transaction Amount for Transfers */}
-            {direction !== 'neutral' && amount && (
-              <View style={modalStyles.amountContainer}>
-                <Text style={[
-                  modalStyles.amountText, 
-                  {color: amountColor}
-                ]}>
-                  {direction === 'IN' || direction === 'in' ? '+ ' : direction === 'OUT' || direction === 'out' ? '- ' : ''}{amount} {symbol}
-                </Text>
-                {directionDisplay && (
-                  <Text style={modalStyles.directionLabel}>
-                    {directionDisplay}
-                  </Text>
-                )}
-              </View>
-            )}
-            
-            {/* Swap Details */}
-            {swapDetails && (
-              <View style={modalStyles.swapContainer}>
-                <View style={modalStyles.swapRow}>
-                  <View style={modalStyles.swapAmount}>
-                    <Text style={modalStyles.swapValue}>
-                      {swapDetails.inputAmount} {swapDetails.inputSymbol}
-                    </Text>
-                    <Text style={modalStyles.swapLabel}>Paid</Text>
-                  </View>
-                  <View style={modalStyles.swapArrow}>
-                    <FontAwesome5 name="arrow-right" size={14} color="#999" />
-                  </View>
-                  <View style={modalStyles.swapAmount}>
-                    <Text style={modalStyles.swapValue}>
-                      {swapDetails.outputAmount} {swapDetails.outputSymbol}
-                    </Text>
-                    <Text style={modalStyles.swapLabel}>Received</Text>
-                  </View>
-                </View>
-              </View>
-            )}
-            
-            {/* Transaction Details */}
-            <View style={modalStyles.detailsSection}>
-              <Text style={modalStyles.sectionTitle}>Details</Text>
-              
-              {/* Fee */}
-              <View style={modalStyles.detailRow}>
-                <Text style={modalStyles.detailLabel}>Fee</Text>
-                <Text style={modalStyles.detailValue}>{fee} SOL</Text>
-              </View>
-              
-              {/* From / To for transfers */}
-              {fromAddress && (
-                <View style={modalStyles.detailRow}>
-                  <Text style={modalStyles.detailLabel}>From</Text>
-                  <Text style={modalStyles.detailValue}>{fromAddress}</Text>
-                </View>
-              )}
-              
-              {toAddress && (
-                <View style={modalStyles.detailRow}>
-                  <Text style={modalStyles.detailLabel}>To</Text>
-                  <Text style={modalStyles.detailValue}>{toAddress}</Text>
-                </View>
-              )}
-              
-              {/* Signature with copy button */}
-              <View style={modalStyles.detailRow}>
-                <Text style={modalStyles.detailLabel}>Signature</Text>
-                <View style={modalStyles.signatureContainer}>
-                  <Text style={modalStyles.detailValue}>{truncatedSignature}</Text>
-                  <TouchableOpacity 
-                    onPress={copySignature}
-                    style={modalStyles.copyButton}>
-                    <FontAwesome5 
-                      name={copied ? "check" : "copy"} 
-                      size={14} 
-                      color={copied ? "#4caf50" : "#1d9bf0"} 
+
+              <ScrollView
+                style={modalStyles.content}
+                showsVerticalScrollIndicator={false}>
+
+                {/* Transaction Type Banner */}
+                <View style={[modalStyles.typeBanner, { backgroundColor: `${accentColor}10` }]}>
+                  <View style={[modalStyles.iconContainer, { backgroundColor: `${accentColor}20` }]}>
+                    <FontAwesome5
+                      name={actionType.toLowerCase().includes('transfer') ? 'exchange-alt'
+                        : actionType.toLowerCase().includes('swap') ? 'sync-alt'
+                          : 'receipt'}
+                      size={16}
+                      color={accentColor}
                     />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              
-              {/* Slot */}
-              {action.slot && (
-                <View style={modalStyles.detailRow}>
-                  <Text style={modalStyles.detailLabel}>Slot</Text>
-                  <Text style={modalStyles.detailValue}>{action.slot}</Text>
-                </View>
-              )}
-            </View>
-            
-            {/* View on Solscan Button */}
-            <TouchableOpacity
-              onPress={openSolscan}
-              style={modalStyles.solscanButton}
-              activeOpacity={0.8}>
-              <FontAwesome5 name="external-link-alt" size={14} color="#1d9bf0" style={modalStyles.solscanIcon} />
-              <Text style={modalStyles.solscanText}>View on Solscan</Text>
-            </TouchableOpacity>
-            
-            {/* Instructions Section */}
-            {action.instructions && action.instructions.length > 0 && (
-              <View style={modalStyles.instructionsContainer}>
-                <View style={modalStyles.instructionHeader}>
-                  <Text style={modalStyles.sectionTitle}>Instructions</Text>
-                  <TouchableOpacity
-                    onPress={() => setShowInstructions(!showInstructions)}
-                    style={modalStyles.toggleButton}>
-                    <Text style={modalStyles.toggleButtonText}>
-                      {showInstructions ? 'Hide' : 'Show'}
+                  </View>
+                  <View style={modalStyles.typeInfo}>
+                    <Text style={[modalStyles.typeTitle, { color: accentColor }]}>
+                      {actionType}
                     </Text>
-                  </TouchableOpacity>
+                    <Text style={modalStyles.dateText}>{date}</Text>
+                  </View>
                 </View>
-                
-                {showInstructions && (
-                  <View style={modalStyles.instructionsList}>
-                    {action.instructions.map((instr, idx) => (
-                      <View key={idx} style={modalStyles.instructionItem}>
-                        <Text style={modalStyles.instructionProgram}>
-                          Program: {instr.programId || instr.program || 'Unknown'}
-                        </Text>
-                        <View style={modalStyles.instructionData}>
-                          <Text style={modalStyles.instructionDataText}>
-                            {JSON.stringify(instr.data || instr, null, 2)}
-                          </Text>
-                        </View>
-                      </View>
-                    ))}
+
+                {/* Transaction Amount for Transfers */}
+                {direction !== 'neutral' && amount && (
+                  <View style={modalStyles.amountContainer}>
+                    <Text style={[
+                      modalStyles.amountText,
+                      { color: amountColor }
+                    ]}>
+                      {direction === 'IN' || direction === 'in' ? '+ ' : direction === 'OUT' || direction === 'out' ? '- ' : ''}{amount} {symbol}
+                    </Text>
+                    {directionDisplay && (
+                      <Text style={modalStyles.directionLabel}>
+                        {directionDisplay}
+                      </Text>
+                    )}
                   </View>
                 )}
-              </View>
-            )}
-          </ScrollView>
+
+                {/* Swap Details */}
+                {swapDetails && (
+                  <View style={modalStyles.swapContainer}>
+                    <View style={modalStyles.swapRow}>
+                      <View style={modalStyles.swapAmount}>
+                        <Text style={modalStyles.swapValue}>
+                          {swapDetails.inputAmount} {swapDetails.inputSymbol}
+                        </Text>
+                        <Text style={modalStyles.swapLabel}>Paid</Text>
+                      </View>
+                      <View style={modalStyles.swapArrow}>
+                        <FontAwesome5 name="arrow-right" size={14} color="#999" />
+                      </View>
+                      <View style={modalStyles.swapAmount}>
+                        <Text style={modalStyles.swapValue}>
+                          {swapDetails.outputAmount} {swapDetails.outputSymbol}
+                        </Text>
+                        <Text style={modalStyles.swapLabel}>Received</Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Transaction Details */}
+                <View style={modalStyles.detailsSection}>
+                  <Text style={modalStyles.sectionTitle}>Details</Text>
+
+                  {/* Fee */}
+                  <View style={modalStyles.detailRow}>
+                    <Text style={modalStyles.detailLabel}>Fee</Text>
+                    <Text style={modalStyles.detailValue}>{fee} SOL</Text>
+                  </View>
+
+                  {/* From / To for transfers */}
+                  {fromAddress && (
+                    <View style={modalStyles.detailRow}>
+                      <Text style={modalStyles.detailLabel}>From</Text>
+                      <TouchableOpacity
+                        onPressIn={() => showTooltip('from')}
+                        onPressOut={hideTooltip}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={modalStyles.detailValue}>{fromAddress}</Text>
+
+                        {showFromTooltip && (
+                          <Animated.View
+                            style={[
+                              modalStyles.tooltip,
+                              {
+                                opacity: tooltipAnimation,
+                                transform: [{
+                                  translateY: tooltipAnimation.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [-5, 0],
+                                  })
+                                }]
+                              }
+                            ]}
+                          >
+                            <Text style={modalStyles.tooltipText}>{originalFromAddress}</Text>
+                            <View style={modalStyles.tooltipArrow} />
+                          </Animated.View>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {toAddress && (
+                    <View style={modalStyles.detailRow}>
+                      <Text style={modalStyles.detailLabel}>To</Text>
+                      <TouchableOpacity
+                        onPressIn={() => showTooltip('to')}
+                        onPressOut={hideTooltip}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={modalStyles.detailValue}>{toAddress}</Text>
+
+                        {showToTooltip && (
+                          <Animated.View
+                            style={[
+                              modalStyles.tooltip,
+                              {
+                                opacity: tooltipAnimation,
+                                transform: [{
+                                  translateY: tooltipAnimation.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [-5, 0],
+                                  })
+                                }]
+                              }
+                            ]}
+                          >
+                            <Text style={modalStyles.tooltipText}>{originalToAddress}</Text>
+                            <View style={modalStyles.tooltipArrow} />
+                          </Animated.View>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Signature with copy button */}
+                  <View style={modalStyles.detailRow}>
+                    <Text style={modalStyles.detailLabel}>Signature</Text>
+                    <View style={modalStyles.signatureContainer}>
+                      <Text style={modalStyles.detailValue}>{truncatedSignature}</Text>
+                      <TouchableOpacity
+                        onPress={copySignature}
+                        style={modalStyles.copyButton}>
+                        <FontAwesome5
+                          name={copied ? "check" : "copy"}
+                          size={14}
+                          color={copied ? "#4caf50" : "#1d9bf0"}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Slot */}
+                  {action.slot && (
+                    <View style={modalStyles.detailRow}>
+                      <Text style={modalStyles.detailLabel}>Slot</Text>
+                      <Text style={modalStyles.detailValue}>{action.slot}</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* View on Solscan Button */}
+                <TouchableOpacity
+                  onPress={openSolscan}
+                  style={modalStyles.solscanButton}
+                  activeOpacity={0.8}>
+                  <FontAwesome5 name="external-link-alt" size={14} color="#1d9bf0" style={modalStyles.solscanIcon} />
+                  <Text style={modalStyles.solscanText}>View on Solscan</Text>
+                </TouchableOpacity>
+
+                {/* Instructions Section */}
+                {action.instructions && action.instructions.length > 0 && (
+                  <View style={modalStyles.instructionsContainer}>
+                    <View style={modalStyles.instructionHeader}>
+                      <Text style={modalStyles.sectionTitle}>Instructions</Text>
+                      <TouchableOpacity
+                        onPress={() => setShowInstructions(!showInstructions)}
+                        style={modalStyles.toggleButton}>
+                        <Text style={modalStyles.toggleButtonText}>
+                          {showInstructions ? 'Hide' : 'Show'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {showInstructions && (
+                      <View style={modalStyles.instructionsList}>
+                        {action.instructions.map((instr, idx) => (
+                          <View key={idx} style={modalStyles.instructionItem}>
+                            <Text style={modalStyles.instructionProgram}>
+                              Program: {instr.programId || instr.program || 'Unknown'}
+                            </Text>
+                            <View style={modalStyles.instructionData}>
+                              <Text style={modalStyles.instructionDataText}>
+                                {JSON.stringify(instr.data || instr, null, 2)}
+                              </Text>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </TouchableWithoutFeedback>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
@@ -612,6 +722,37 @@ const modalStyles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     fontWeight: '500',
+  },
+  tooltip: {
+    position: 'absolute',
+    bottom: 30,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderRadius: 6,
+    padding: 8,
+    zIndex: 1000,
+    minWidth: 200,
+    maxWidth: 280,
+  },
+  tooltipText: {
+    color: 'white',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  tooltipArrow: {
+    position: 'absolute',
+    bottom: -8,
+    right: 10,
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: 'rgba(0,0,0,0.75)',
   },
 });
 

@@ -126,6 +126,7 @@ profileImageRouter.get('/', async (req: any, res: any) => {
       success: true,
       url: user.profile_picture_url,
       username: user.username,
+      description: user.description || '',
       attachmentData: user.attachment_data || {}, // e.g., { coin: { mint, symbol, name, image, description } }
     });
   } catch (error: any) {
@@ -408,7 +409,7 @@ profileImageRouter.get('/search', async (req: any, res: any) => {
  */
 profileImageRouter.post('/createUser', async (req: any, res: any) => {
   try {
-    const { userId, username, handle } = req.body;
+    const { userId, username, handle, description } = req.body;
     if (!userId) {
       return res.status(400).json({ success: false, error: 'Missing userId' });
     }
@@ -425,6 +426,7 @@ profileImageRouter.post('/createUser', async (req: any, res: any) => {
       id: userId,
       username: username || userId, // Default to userId if username not provided
       handle: handle || '@' + userId.slice(0, 6), // Default handle if not provided
+      description: description || '', // Default empty description if not provided
       profile_picture_url: null,
       attachment_data: null,
       created_at: new Date(),
@@ -437,6 +439,45 @@ profileImageRouter.post('/createUser', async (req: any, res: any) => {
   } catch (error: any) {
     console.error('[Create user error]', error);
     return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * ------------------------------------------
+ *  NEW: Update user's description
+ * ------------------------------------------
+ */
+profileImageRouter.post('/updateDescription', async (req: any, res: any) => {
+  try {
+    const {userId, description} = req.body;
+    if (!userId) {
+      return res
+        .status(400)
+        .json({success: false, error: 'Missing userId'});
+    }
+
+    const existingUser = await knex('users').where({id: userId}).first();
+    if (!existingUser) {
+      await knex('users').insert({
+        id: userId,
+        username: userId,
+        handle: '@' + userId.slice(0, 6),
+        description: description || '',
+        profile_picture_url: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+    } else {
+      await knex('users').where({id: userId}).update({
+        description: description || '',
+        updated_at: new Date(),
+      });
+    }
+
+    return res.json({success: true, description: description || ''});
+  } catch (error: any) {
+    console.error('[updateDescription error]', error);
+    return res.status(500).json({success: false, error: error.message});
   }
 });
 

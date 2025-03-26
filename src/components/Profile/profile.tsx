@@ -23,6 +23,7 @@ import {
   fetchUserProfile,
   updateProfilePic,
   updateUsername,
+  updateDescription,
 } from '../../state/auth/reducer';
 import { fetchAllPosts } from '../../state/thread/reducer';
 import { ThreadPost } from '../thread/thread.types';
@@ -59,6 +60,7 @@ export interface ProfileProps {
     address: string;
     profilePicUrl?: string;
     username?: string;
+    description?: string;
     attachmentData?: any;
   };
   posts?: ThreadPost[];
@@ -92,9 +94,10 @@ export default function Profile({
   const customizationData = user?.attachmentData || {};
 
 
-  // Local states for profile picture and username
+  // Local states for profile picture, username, and description
   const [profilePicUrl, setProfilePicUrl] = useState<string>(storedProfilePic);
   const [localUsername, setLocalUsername] = useState<string>(user?.username || 'Anonymous');
+  const [localDescription, setLocalDescription] = useState<string>(user?.description || '');
 
   // Followers/following state
   const [followersList, setFollowersList] = useState<any[]>([]);
@@ -213,6 +216,7 @@ export default function Profile({
       .then(value => {
         if (value.profilePicUrl) setProfilePicUrl(value.profilePicUrl);
         if (value.username) setLocalUsername(value.username);
+        if (value.description) setLocalDescription(value.description);
       })
       .catch(err => {
         console.error('Failed to fetch user profile:', err);
@@ -317,6 +321,7 @@ export default function Profile({
   const [nftsModalVisible, setNftsModalVisible] = useState(false);
   const [editNameModalVisible, setEditNameModalVisible] = useState(false);
   const [tempName, setTempName] = useState(localUsername || '');
+  const [tempDescription, setTempDescription] = useState(localDescription || '');
 
   useEffect(() => {
     setStatusBarStyle('dark');
@@ -395,25 +400,52 @@ export default function Profile({
   const handleOpenEditModal = useCallback(() => {
     if (!isOwnProfile) return;
     setTempName(localUsername || '');
+    setTempDescription(localDescription || '');
     setEditNameModalVisible(true);
-  }, [isOwnProfile, localUsername]);
+  }, [isOwnProfile, localUsername, localDescription]);
 
   const handleSaveName = useCallback(async () => {
-    if (!isOwnProfile || !userWallet || !tempName.trim()) {
+    if (!isOwnProfile || !userWallet) {
       setEditNameModalVisible(false);
       return;
     }
+
     try {
-      await dispatch(
-        updateUsername({ userId: userWallet, newUsername: tempName.trim() }),
-      ).unwrap();
-      setLocalUsername(tempName.trim());
+      let updatedUsername = false;
+      let updatedDescription = false;
+
+      // Only dispatch if name changed
+      if (tempName.trim() && tempName.trim() !== localUsername) {
+        await dispatch(
+          updateUsername({ userId: userWallet, newUsername: tempName.trim() }),
+        ).unwrap();
+        setLocalUsername(tempName.trim());
+        updatedUsername = true;
+      }
+
+      // Only dispatch if description changed  
+      if (tempDescription !== localDescription) {
+        await dispatch(
+          updateDescription({ userId: userWallet, newDescription: tempDescription.trim() }),
+        ).unwrap();
+        setLocalDescription(tempDescription.trim());
+        updatedDescription = true;
+      }
+
+      if (updatedUsername && updatedDescription) {
+        Alert.alert('Profile Updated', 'Your name and description have been updated.');
+      } else if (updatedUsername) {
+        Alert.alert('Name Updated', 'Your display name has been updated.');
+      } else if (updatedDescription) {
+        Alert.alert('Description Updated', 'Your bio has been updated.');
+      }
+
     } catch (err: any) {
-      Alert.alert('Update Name Failed', err.message || 'Unknown error');
+      Alert.alert('Update Failed', err.message || 'Unknown error');
     } finally {
       setEditNameModalVisible(false);
     }
-  }, [dispatch, tempName, isOwnProfile, userWallet]);
+  }, [dispatch, tempName, tempDescription, isOwnProfile, userWallet, localUsername, localDescription]);
 
   const handlePressFollowers = useCallback(() => {
     if (followersList.length === 0) {
@@ -444,9 +476,10 @@ export default function Profile({
       address: userWallet || '',
       profilePicUrl,
       username: localUsername,
+      description: localDescription,
       attachmentData: customizationData,
     }),
-    [userWallet, profilePicUrl, localUsername, customizationData],
+    [userWallet, profilePicUrl, localUsername, localDescription, customizationData],
   );
 
   return (
@@ -671,7 +704,7 @@ export default function Profile({
         </View>
       )}
 
-      {/* (E) Edit Name Modal */}
+      {/* (E) Edit Name and Description Modal */}
       {isOwnProfile && (
         <Modal
           animationType="slide"
@@ -680,12 +713,20 @@ export default function Profile({
           onRequestClose={() => setEditNameModalVisible(false)}>
           <View style={editNameModalStyles.overlay}>
             <View style={editNameModalStyles.container}>
-              <Text style={editNameModalStyles.title}>Edit Profile Name</Text>
+              <Text style={editNameModalStyles.title}>Edit Profile</Text>
               <TextInput
                 style={editNameModalStyles.input}
                 placeholder="Enter your display name"
                 value={tempName}
                 onChangeText={setTempName}
+              />
+              <TextInput
+                style={[editNameModalStyles.input, { height: 80 }]}
+                placeholder="Enter your bio"
+                value={tempDescription}
+                onChangeText={setTempDescription}
+                multiline
+                numberOfLines={3}
               />
               <View style={editNameModalStyles.btnRow}>
                 <TouchableOpacity
