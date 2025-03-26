@@ -16,7 +16,7 @@ import Icon from '../../../assets/svgs/index';
 import { getMergedTheme } from '../../thread/thread.styles';
 import styles from './TradeCard.style';
 import { useCoingecko, Timeframe } from '../../../hooks/useCoingecko';
-import LineGraph from '../../CoinDetails/CoinDetailTopSection/LineGraph';
+import LineGraph from './LineGraph';
 
 export interface TradeData {
   inputMint: string;
