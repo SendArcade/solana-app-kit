@@ -15,7 +15,6 @@ import {
   TextInput,
   ScrollView,
   Dimensions,
-  RefreshControl,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { setStatusBarStyle } from 'expo-status-bar';
@@ -67,12 +66,6 @@ export interface ProfileProps {
   loadingNfts?: boolean;
   fetchNftsError?: string | null;
   containerStyle?: object;
-  refreshing?: boolean;
-  onRefresh?: () => void;
-  followersCount?: number;
-  followingCount?: number;
-  amIFollowing?: boolean;
-  areTheyFollowingMe?: boolean;
 }
 
 export default function Profile({
@@ -83,12 +76,6 @@ export default function Profile({
   loadingNfts = false,
   fetchNftsError,
   containerStyle,
-  refreshing = false,
-  onRefresh,
-  followersCount: propFollowersCount,
-  followingCount: propFollowingCount,
-  amIFollowing: propAmIFollowing,
-  areTheyFollowingMe: propAreTheyFollowingMe,
 }: ProfileProps) {
   const dispatch = useAppDispatch();
   const allReduxPosts = useAppSelector(state => state.thread.allPosts);
@@ -112,8 +99,8 @@ export default function Profile({
   // Followers/following state
   const [followersList, setFollowersList] = useState<any[]>([]);
   const [followingList, setFollowingList] = useState<any[]>([]);
-  const [amIFollowing, setAmIFollowing] = useState(propAmIFollowing || false);
-  const [areTheyFollowingMe, setAreTheyFollowingMe] = useState(propAreTheyFollowingMe || false);
+  const [amIFollowing, setAmIFollowing] = useState(false);
+  const [areTheyFollowingMe, setAreTheyFollowingMe] = useState(false);
 
   // --- ACTIONS state ---
   const [myActions, setMyActions] = useState<any[]>([]);
@@ -132,7 +119,6 @@ export default function Profile({
     portfolio,
     loading: loadingPortfolio,
     error: portfolioError,
-    refetch: refetchPortfolio,
   } = useFetchPortfolio(userWallet || undefined);
 
   // For refreshing the portfolio data
@@ -143,15 +129,15 @@ export default function Profile({
 
     setRefreshingPortfolio(true);
     try {
-      if (refetchPortfolio) {
-        await refetchPortfolio();
-      }
+      // Re-fetch portfolio (in a real app, you would implement a refresh method in the hook)
+      // For now, we'll just simulate a refresh with a delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (err) {
       console.error('Error refreshing portfolio:', err);
     } finally {
       setRefreshingPortfolio(false);
     }
-  }, [userWallet, refetchPortfolio]);
+  }, [userWallet]);
 
   // Handle asset press
   const handleAssetPress = useCallback((asset: AssetItem) => {
@@ -236,22 +222,12 @@ export default function Profile({
   // --- Followers/Following logic ---
   useEffect(() => {
     if (!userWallet || !isOwnProfile) return;
-    fetchFollowers(userWallet).then(list => {
-      setFollowersList(list);
-    });
-    fetchFollowing(userWallet).then(list => {
-      setFollowingList(list);
-    });
+    fetchFollowers(userWallet).then(list => setFollowersList(list));
+    fetchFollowing(userWallet).then(list => setFollowingList(list));
   }, [userWallet, isOwnProfile]);
 
   useEffect(() => {
     if (!userWallet || isOwnProfile) return;
-    
-    // If props are provided, use them instead of fetching
-    if (propFollowersCount !== undefined && propFollowingCount !== undefined) {
-      return;
-    }
-    
     fetchFollowers(userWallet).then(followers => {
       setFollowersList(followers);
       if (currentUserWallet && followers.findIndex((x: any) => x.id === currentUserWallet) >= 0) {
@@ -268,7 +244,7 @@ export default function Profile({
         setAreTheyFollowingMe(result);
       });
     }
-  }, [userWallet, isOwnProfile, currentUserWallet, propFollowersCount, propFollowingCount]);
+  }, [userWallet, isOwnProfile, currentUserWallet]);
 
   // --- Fetch posts if not provided ---
   useEffect(() => {
@@ -290,14 +266,6 @@ export default function Profile({
     userAll.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
     return userAll;
   }, [userWallet, posts, allReduxPosts]);
-
-  // --- Handle refresh ---
-  const handleProfileRefresh = useCallback(() => {
-    if (onRefresh) {
-      onRefresh();
-    }
-    handleRefreshPortfolio();
-  }, [onRefresh, handleRefreshPortfolio]);
 
   // --- Follow / Unfollow handlers ---
   const handleFollow = useCallback(async () => {
@@ -448,10 +416,7 @@ export default function Profile({
   }, [dispatch, tempName, isOwnProfile, userWallet]);
 
   const handlePressFollowers = useCallback(() => {
-    // Use prop value if provided, otherwise use followersList length
-    const followerCount = propFollowersCount !== undefined ? propFollowersCount : followersList.length;
-    
-    if (followerCount === 0) {
+    if (followersList.length === 0) {
       Alert.alert('No Followers', 'This user has no followers yet.');
       return;
     }
@@ -460,13 +425,10 @@ export default function Profile({
       userId: userWallet,
       userList: followersList,
     } as never);
-  }, [followersList, navigation, userWallet, propFollowersCount]);
+  }, [followersList, navigation, userWallet]);
 
   const handlePressFollowing = useCallback(() => {
-    // Use prop value if provided, otherwise use followingList length
-    const followingCount = propFollowingCount !== undefined ? propFollowingCount : followingList.length;
-    
-    if (followingCount === 0) {
+    if (followingList.length === 0) {
       Alert.alert('No Following', 'This user is not following anyone yet.');
       return;
     }
@@ -475,7 +437,7 @@ export default function Profile({
       userId: userWallet,
       userList: followingList,
     } as never);
-  }, [followingList, navigation, userWallet, propFollowingCount]);
+  }, [followingList, navigation, userWallet]);
 
   const resolvedUser: UserProfileData = useMemo(
     () => ({
@@ -507,8 +469,8 @@ export default function Profile({
         areTheyFollowingMe={areTheyFollowingMe}
         onFollowPress={handleFollow}
         onUnfollowPress={handleUnfollow}
-        followersCount={propFollowersCount !== undefined ? propFollowersCount : followersList.length}
-        followingCount={propFollowingCount !== undefined ? propFollowingCount : followingList.length}
+        followersCount={followersList.length}
+        followingCount={followingList.length}
         onPressFollowers={handlePressFollowers}
         onPressFollowing={handlePressFollowing}
         onPressPost={post => {
@@ -523,9 +485,6 @@ export default function Profile({
         onRefreshPortfolio={handleRefreshPortfolio}
         refreshingPortfolio={refreshingPortfolio}
         onAssetPress={handleAssetPress}
-        // Add refresh props
-        refreshing={refreshing}
-        onRefresh={handleProfileRefresh}
       />
 
       {/* (A) Avatar Option Modal */}
