@@ -125,8 +125,6 @@ function CollectiblesPage({
   onRefresh,
   refreshing,
   onAssetPress,
-  mainRefreshing,
-  mainOnRefresh,
 }: {
   nfts: NftItem[];
   loading?: boolean;
@@ -135,15 +133,9 @@ function CollectiblesPage({
   onRefresh?: () => void;
   refreshing?: boolean;
   onAssetPress?: (asset: AssetItem) => void;
-  mainRefreshing?: boolean;
-  mainOnRefresh?: () => void;
 }) {
   // If portfolio data is provided, use that instead of legacy nfts
   const hasPortfolioData = portfolioData?.items && portfolioData.items.length > 0;
-  
-  // Use portfolio refresh if available, otherwise use main refresh
-  const effectiveRefreshing = refreshing !== undefined ? refreshing : mainRefreshing;
-  const effectiveOnRefresh = onRefresh || mainOnRefresh;
   
   return (
     <View style={styles.tabContent}>
@@ -153,8 +145,8 @@ function CollectiblesPage({
         error={fetchNftsError} 
         portfolioItems={portfolioData?.items}
         nativeBalance={portfolioData?.nativeBalance?.lamports}
-        onRefresh={effectiveOnRefresh}
-        refreshing={effectiveRefreshing}
+        onRefresh={onRefresh}
+        refreshing={refreshing}
         onItemPress={onAssetPress}
       />
     </View>
@@ -208,45 +200,36 @@ function SwipeTabs({
     {key: 'actions', title: 'Actions'},
   ]);
   
-  const renderScene = ({route}: {route: {key: string}}) => {
-    switch (route.key) {
-      case 'posts':
-        return (
-          <PostPage 
-            myPosts={myPosts} 
-            onPressPost={onPressPost} 
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-          />
-        );
-      case 'collectibles':
-        return (
-          <CollectiblesPage
-            nfts={myNFTs}
-            loading={loadingNfts}
-            fetchNftsError={fetchNftsError}
-            portfolioData={portfolioData}
-            onRefresh={onRefreshPortfolio}
-            refreshing={refreshingPortfolio}
-            onAssetPress={onAssetPress}
-            mainRefreshing={refreshing}
-            mainOnRefresh={onRefresh}
-          />
-        );
-      case 'actions':
-        return (
-          <ActionsPageWrapper
-            myActions={myActions}
-            loadingActions={loadingActions}
-            fetchActionsError={fetchActionsError}
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-          />
-        );
-      default:
-        return null;
-    }
-  };
+  const renderScene = SceneMap({
+    posts: () => (
+      <PostPage 
+        myPosts={myPosts} 
+        onPressPost={onPressPost} 
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+      />
+    ),
+    collectibles: () => (
+      <CollectiblesPage
+        nfts={myNFTs}
+        loading={loadingNfts}
+        fetchNftsError={fetchNftsError}
+        portfolioData={portfolioData}
+        onRefresh={onRefresh || onRefreshPortfolio}
+        refreshing={refreshing || refreshingPortfolio}
+        onAssetPress={onAssetPress}
+      />
+    ),
+    actions: () => (
+      <ActionsPageWrapper
+        myActions={myActions}
+        loadingActions={loadingActions}
+        fetchActionsError={fetchActionsError}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+      />
+    ),
+  });
   
   const renderTabBar = (props: any) => (
     <TabBar

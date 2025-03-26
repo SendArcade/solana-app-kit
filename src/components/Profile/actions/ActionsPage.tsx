@@ -688,34 +688,36 @@ const ActionsPage: React.FC<ActionsPageProps> = ({
   loadingActions,
   fetchActionsError,
   walletAddress,
-  refreshing,
-  onRefresh
+  refreshing = false,
+  onRefresh,
 }) => {
   const [selectedAction, setSelectedAction] = useState<Action | null>(null);
 
   if (loadingActions) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1d9bf0" />
-        <Text style={styles.loadingText}>Loading actions...</Text>
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#3871DD" />
+        <Text style={styles.emptyText}>Loading transactions...</Text>
       </View>
     );
   }
 
   if (fetchActionsError) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>
-          Error loading actions: {fetchActionsError}
-        </Text>
+      <View style={styles.centered}>
+        <FontAwesome5 name="exclamation-circle" size={32} color="#F43860" />
+        <Text style={styles.errorText}>{fetchActionsError}</Text>
       </View>
     );
   }
 
   if (!myActions || myActions.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No actions yet!</Text>
+      <View style={styles.centered}>
+        <View style={styles.emptyStateIcon}>
+          <FontAwesome5 name="history" size={26} color="#FFF" />
+        </View>
+        <Text style={styles.emptyText}>No transactions yet</Text>
       </View>
     );
   }
@@ -724,7 +726,7 @@ const ActionsPage: React.FC<ActionsPageProps> = ({
     <View style={styles.container}>
       <FlatList
         data={myActions}
-        keyExtractor={(item, index) => `action-${index}`}
+        keyExtractor={(item, index) => item.signature || `action-${index}`}
         renderItem={({item}) => (
           <ActionItem 
             action={item} 
@@ -736,10 +738,10 @@ const ActionsPage: React.FC<ActionsPageProps> = ({
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing || false}
+            refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#1d9bf0']}
-            tintColor="#1d9bf0"
+            colors={['#3871DD']}
+            tintColor="#3871DD"
           />
         }
       />
@@ -763,35 +765,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  loadingContainer: {
+  centered: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
-    flex: 1,
     justifyContent: 'center',
+    backgroundColor: '#F7F9FC',
+  },
+  emptyStateIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#9945FF',
     alignItems: 'center',
-    padding: 16,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#ff3b30',
-    textAlign: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    marginBottom: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#9945FF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
   },
   emptyText: {
+    marginTop: 8,
     fontSize: 16,
-    color: '#666',
+    color: '#6E7191',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  errorText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#F43860',
+    fontWeight: '500',
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
   card: {
     backgroundColor: '#FFFFFF',
