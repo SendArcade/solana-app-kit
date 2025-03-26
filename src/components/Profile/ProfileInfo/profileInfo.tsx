@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   Image,
   View,
@@ -11,17 +11,17 @@ import {
   ActivityIndicator,
   ImageBackground,
 } from 'react-native';
-import {findMentioned} from '../../../utils/common/findMentioned';
+import { findMentioned } from '../../../utils/common/findMentioned';
 import AddButton from '../addButton/addButton';
 import BuyCard from '../buyCard/buyCard';
 import PerksCard from '../perksCard/perksCard';
 import ProfileIcons from '../../../assets/svgs/index';
-import {styles} from './profileInfo.style';
-import {useAppDispatch, useAppSelector} from '../../../hooks/useReduxHooks';
-import {attachCoinToProfile} from '../../../state/auth/reducer';
-import {HELIUS_API_KEY} from '@env';
-import {tokenModalStyles} from './profileInfoTokenModal.style';
-import {fixImageUrl, extractAssetImage} from '../../../utils/common/fixUrl'; // <-- We use our improved functions
+import { styles } from './profileInfo.style';
+import { useAppDispatch, useAppSelector } from '../../../hooks/useReduxHooks';
+import { attachCoinToProfile } from '../../../state/auth/reducer';
+import { HELIUS_API_KEY } from '@env';
+import { tokenModalStyles } from './profileInfoTokenModal.style';
+import { fixImageUrl, extractAssetImage } from '../../../utils/common/fixUrl'; // <-- We use our improved functions
 
 /**
  * Represents the props for the ProfileInfo component.
@@ -185,30 +185,30 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
           },
         },
       };
-      
+
       // Use a public RPC endpoint that doesn't require auth to avoid cross-wallet issues
       const publicRpcUrl = "https://api.mainnet-beta.solana.com";
-      
+
       try {
         // First try with Helius
         const heliusUrl = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
         const res = await fetch(heliusUrl, {
           method: 'POST',
-          headers: {'Content-Type': 'application/json'},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(bodyParams),
         });
-        
+
         if (!res.ok) {
           throw new Error(`Helius request failed with status ${res.status}`);
         }
-        
+
         const data = await res.json();
         const rawItems = data?.result?.items || [];
-        
+
         processTokenData(rawItems);
       } catch (heliusError) {
         console.error('Helius request failed, falling back to public RPC:', heliusError);
-        
+
         // Fallback to simpler getTokenAccounts request via public RPC
         setFetchTokensError('Could not fetch all assets. Showing basic tokens only.');
         setLoadingTokens(false);
@@ -219,7 +219,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
       setLoadingTokens(false);
     }
   };
-  
+
   // Helper function to process token data from RPC
   const processTokenData = (rawItems: any[]) => {
     const mappedTokens: Array<{
@@ -237,9 +237,9 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
       if (item.id) {
         try {
           // Group to show fungibles first, then NFTs
-          const isFungible = 
-            item.interface === 'FungibleToken' || 
-            item.token_info?.symbol || 
+          const isFungible =
+            item.interface === 'FungibleToken' ||
+            item.token_info?.symbol ||
             false;
           const groupOrder = isFungible ? 0 : 1;
 
@@ -293,7 +293,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
       setShowAttachDetailsModal(false);
       return;
     }
-    const {mintPubkey, name, imageUrl} = selectedToken;
+    const { mintPubkey, name, imageUrl } = selectedToken;
 
     const coinData = {
       mint: mintPubkey,
@@ -307,7 +307,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
       await dispatch(
         attachCoinToProfile({
           userId: userWallet,
-          attachmentData: {coin: coinData},
+          attachmentData: { coin: coinData },
         }),
       ).unwrap();
       Alert.alert(
@@ -320,7 +320,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
       setShowAttachDetailsModal(false);
     }
   };
-  
+
   // Custom image renderer for tokens in the selection modal
   const renderTokenImage = (imageUrl: string) => {
     if (!imageUrl) {
@@ -334,21 +334,21 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
               backgroundColor: '#eee',
             },
           ]}>
-          <Text style={{fontSize: 10, color: '#999'}}>
+          <Text style={{ fontSize: 10, color: '#999' }}>
             No Img
           </Text>
         </View>
       );
     }
-    
+
     const fixedUrl = fixImageUrl(imageUrl);
-    
+
     return (
       <ImageBackground
         source={require('../../../assets/images/SENDlogo.png')}
         style={tokenModalStyles.tokenItemImage}>
         <Image
-          source={{uri: fixedUrl}}
+          source={{ uri: fixedUrl }}
           style={tokenModalStyles.tokenItemImage}
           resizeMode="cover"
           onError={e =>
@@ -367,7 +367,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
   return (
     <View style={styles.profileInfo}>
       {/* Row with avatar & name */}
-      <View style={{flexDirection: 'row', gap: 12, alignItems: 'center'}}>
+      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
         <TouchableOpacity
           style={styles.profImgContainer}
           onPress={onAvatarPress}
@@ -376,22 +376,22 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
             style={styles.profImg}
             source={
               profilePicUrl
-                ? {uri: profilePicUrl}
+                ? { uri: profilePicUrl }
                 : require('../../../assets/images/User.png')
             }
           />
         </TouchableOpacity>
 
         <View>
-          <View style={{flexDirection: 'row', gap: 4, alignItems: 'center'}}>
-            <Text style={{fontSize: 18, fontWeight: '600', lineHeight: 22}}>
+          <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+            <Text style={{ fontSize: 18, fontWeight: '600', lineHeight: 22 }}>
               {username}
             </Text>
             <ProfileIcons.SubscriptionTick />
           </View>
 
-          <View style={{flexDirection: 'row', gap: 12, marginTop: 4}}>
-            <Text style={{fontSize: 12, fontWeight: '500', color: '#999999'}}>
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+            <Text style={{ fontSize: 12, fontWeight: '500', color: '#999999' }}>
               {handleString}
             </Text>
             {canShowFollowsYou && (
@@ -414,37 +414,37 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
       </View>
 
       {/* Short bio */}
-      <View style={{marginTop: 8}}>
+      <View style={{ marginTop: 8 }}>
         <Text style={styles.bioSection}>{findMentioned(sampleBio)}</Text>
       </View>
 
       {/* Follower/following row */}
-      <View style={{flexDirection: 'row', gap: 12, marginTop: 8}}>
+      <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
         <TouchableOpacity
-          style={{flexDirection: 'row', gap: 2}}
+          style={{ flexDirection: 'row', gap: 2 }}
           onPress={onPressFollowers}>
-          <Text style={{fontSize: 12, fontWeight: '600'}}>
+          <Text style={{ fontSize: 12, fontWeight: '600' }}>
             {followersCount}
           </Text>
-          <Text style={{fontSize: 12, fontWeight: '500', color: '#B7B7B7'}}>
+          <Text style={{ fontSize: 12, fontWeight: '500', color: '#B7B7B7' }}>
             Followers
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={{flexDirection: 'row', gap: 2}}
+          style={{ flexDirection: 'row', gap: 2 }}
           onPress={onPressFollowing}>
-          <Text style={{fontSize: 12, fontWeight: '600'}}>
+          <Text style={{ fontSize: 12, fontWeight: '600' }}>
             {followingCount}
           </Text>
-          <Text style={{fontSize: 12, fontWeight: '500', color: '#B7B7B7'}}>
+          <Text style={{ fontSize: 12, fontWeight: '500', color: '#B7B7B7' }}>
             Following
           </Text>
         </TouchableOpacity>
 
-        <View style={{flexDirection: 'row', gap: 2}}>
+        <View style={{ flexDirection: 'row', gap: 2 }}>
           <ProfileIcons.PinLocation />
-          <Text style={{fontSize: 12, fontWeight: '500', color: '#B7B7B7'}}>
+          <Text style={{ fontSize: 12, fontWeight: '500', color: '#B7B7B7' }}>
             Global
           </Text>
         </View>
@@ -452,7 +452,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
 
       {/* Edit profile if it's your profile */}
       {isOwnProfile && (
-        <View style={{marginTop: 8, flexDirection: 'row', gap: 12}}>
+        <View style={{ marginTop: 8, flexDirection: 'row', gap: 12 }}>
           <TouchableOpacity
             style={styles.editProfileBtn}
             onPress={onEditProfile}>
@@ -463,13 +463,13 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
 
       {/* If there's a coin attached, show BuyCard with user-provided + fetched data */}
       {/* Else we can show a default "BuyCard" or no card at all. */}
-      <View style={{marginTop: 12}}>
+      <View style={{ marginTop: 12 }}>
         <BuyCard
           tokenName={attachmentData.coin?.symbol || '$Coin'}
           description={attachmentData.coin?.name || 'Creator Coin'}
           tokenImage={attachmentData.coin?.image || null}
           tokenDesc={attachmentData.coin?.description || ''}
-          onBuyPress={() => {}}
+          onBuyPress={() => { }}
           tokenMint={attachmentData.coin?.mint}
           /**
            * Show the arrow only if isOwnProfile is true => user can change attached token
@@ -489,12 +489,12 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
 
       {/* Show follow/unfollow if it's not your own profile */}
       {canShowAddButton && (
-        <View style={{marginTop: 12}}>
+        <View style={{ marginTop: 12 }}>
           <AddButton
             amIFollowing={amIFollowing}
             areTheyFollowingMe={areTheyFollowingMe}
-            onPressFollow={onFollowPress || (() => {})}
-            onPressUnfollow={onUnfollowPress || (() => {})}
+            onPressFollow={onFollowPress || (() => { })}
+            onPressUnfollow={onUnfollowPress || (() => { })}
             recipientAddress={userWallet}
           />
         </View>
@@ -519,7 +519,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
 
             {/* LOADING or ERROR states */}
             {loadingTokens && (
-              <View style={{marginTop: 8, alignItems: 'center'}}>
+              <View style={{ marginTop: 8, alignItems: 'center' }}>
                 <ActivityIndicator size="small" color="#999" />
                 <Text style={tokenModalStyles.loadingText}>
                   Loading tokens from Helius...
@@ -539,12 +539,12 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
                   data={tokens}
                   keyExtractor={item => item.mintPubkey}
                   style={tokenModalStyles.listContainer}
-                  renderItem={({item}) => (
+                  renderItem={({ item }) => (
                     <TouchableOpacity
                       style={tokenModalStyles.tokenItem}
                       onPress={() => handleSelectToken(item)}>
                       <View
-                        style={{flexDirection: 'row', alignItems: 'center'}}>
+                        style={{ flexDirection: 'row', alignItems: 'center' }}>
                         {renderTokenImage(item.imageUrl || '')}
 
                         <View style={tokenModalStyles.tokenInfo}>
@@ -593,8 +593,8 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
               </TouchableOpacity>
             </View>
 
-            <View style={{marginVertical: 8}}>
-              <Text style={{fontSize: 14, fontWeight: '600'}}>
+            <View style={{ marginVertical: 8 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600' }}>
                 Description:
               </Text>
               <TextInput
@@ -612,11 +612,11 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
               />
             </View>
 
-            <View style={{flexDirection: 'row', marginTop: 16}}>
+            <View style={{ flexDirection: 'row', marginTop: 16 }}>
               <TouchableOpacity
                 style={[
                   tokenModalStyles.closeButton,
-                  {backgroundColor: '#aaa', marginRight: 8},
+                  { backgroundColor: '#aaa', marginRight: 8 },
                 ]}
                 onPress={() => setShowAttachDetailsModal(false)}>
                 <Text style={tokenModalStyles.closeButtonText}>Cancel</Text>
@@ -624,7 +624,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
               <TouchableOpacity
                 style={[
                   tokenModalStyles.closeButton,
-                  {backgroundColor: '#1d9bf0'},
+                  { backgroundColor: '#1d9bf0' },
                 ]}
                 onPress={handleAttachCoinConfirm}>
                 <Text style={tokenModalStyles.closeButtonText}>Save</Text>

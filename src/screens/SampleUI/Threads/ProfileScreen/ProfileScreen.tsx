@@ -10,6 +10,7 @@ export default function ProfileScreen() {
   // Get user data from Redux
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
   const storedUsername = useAppSelector(state => state.auth.username);
+  const storedDescription = useAppSelector(state => state.auth.description);
   const attachmentData = useAppSelector(state => state.auth.attachmentData || {});
 
   // Use the wallet hook to get the user's address
@@ -35,6 +36,7 @@ export default function ProfileScreen() {
     address: userWallet || '',
     profilePicUrl: storedProfilePic || '',
     username: storedUsername || 'Unknown User',
+    description: storedDescription || '',
     attachmentData,
   };
 
@@ -42,7 +44,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     console.log('user', user);
     console.log('attachmentData from Redux:', attachmentData);
-  }, [userWallet, storedProfilePic, storedUsername]);
+  }, [userWallet, storedProfilePic, storedUsername, storedDescription]);
 
   return (
     <View style={{ flex: 1 }}>

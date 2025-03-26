@@ -7,6 +7,7 @@ export interface AuthState {
   isLoggedIn: boolean;
   profilePicUrl: string | null;
   username: string | null; // storing user's chosen display name
+  description: string | null; // storing user's bio description
   // NEW: attachmentData object to hold any attached profile data (e.g., coin)
   attachmentData?: {
     coin?: {
@@ -23,6 +24,7 @@ const initialState: AuthState = {
   isLoggedIn: false,
   profilePicUrl: null,
   username: null,
+  description: null,
   attachmentData: {},
 };
 
@@ -43,6 +45,7 @@ export const fetchUserProfile = createAsyncThunk(
       return {
         profilePicUrl: data.url,
         username: data.username,
+        description: data.description,
         attachmentData: data.attachmentData || {},
       };
     } else {
@@ -81,6 +84,39 @@ export const updateUsername = createAsyncThunk(
     } catch (error: any) {
       return thunkAPI.rejectWithValue(
         error.message || 'Error updating username',
+      );
+    }
+  },
+);
+
+/**
+ * Update the user's description in the database.
+ */
+export const updateDescription = createAsyncThunk(
+  'auth/updateDescription',
+  async (
+    {userId, newDescription}: {userId: string; newDescription: string},
+    thunkAPI,
+  ) => {
+    try {
+      const response = await fetch(
+        `${SERVER_BASE_URL}/api/profile/updateDescription`,
+        {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({userId, description: newDescription}),
+        },
+      );
+      const data = await response.json();
+      if (!data.success) {
+        return thunkAPI.rejectWithValue(
+          data.error || 'Failed to update description',
+        );
+      }
+      return data.description as string;
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(
+        error.message || 'Error updating description',
       );
     }
   },
@@ -140,6 +176,7 @@ const authSlice = createSlice({
         address: string;
         profilePicUrl?: string;
         username?: string;
+        description?: string;
       }>,
     ) {
       // Preserve existing profile data if available and no new data provided
@@ -155,6 +192,10 @@ const authSlice = createSlice({
       if (action.payload.username || !state.username) {
         state.username = action.payload.username || state.username;
       }
+      
+      if (action.payload.description || !state.description) {
+        state.description = action.payload.description || state.description;
+      }
     },
     logoutSuccess(state) {
       state.provider = null;
@@ -162,6 +203,7 @@ const authSlice = createSlice({
       state.isLoggedIn = false;
       state.profilePicUrl = null;
       state.username = null;
+      state.description = null;
       state.attachmentData = {};
     },
     updateProfilePic(state, action: PayloadAction<string>) {
@@ -173,6 +215,7 @@ const authSlice = createSlice({
       const {
         profilePicUrl: fetchedProfilePicUrl,
         username: fetchedUsername,
+        description: fetchedDescription,
         attachmentData,
       } = action.payload as any;
 
@@ -188,6 +231,7 @@ const authSlice = createSlice({
           requestedUserId.toLowerCase() === state.address.toLowerCase()) {
         state.profilePicUrl = fetchedProfilePicUrl || state.profilePicUrl;
         state.username = fetchedUsername || state.username;
+        state.description = fetchedDescription || state.description;
         state.attachmentData = attachmentData || state.attachmentData || {};
       }
       // If the user IDs don't match, we don't update the auth state
@@ -196,6 +240,10 @@ const authSlice = createSlice({
 
     builder.addCase(updateUsername.fulfilled, (state, action) => {
       state.username = action.payload;
+    });
+
+    builder.addCase(updateDescription.fulfilled, (state, action) => {
+      state.description = action.payload;
     });
 
     builder.addCase(attachCoinToProfile.fulfilled, (state, action) => {
