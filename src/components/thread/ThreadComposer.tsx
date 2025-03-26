@@ -20,16 +20,14 @@ import {
 } from '../../state/thread/reducer';
 import { createThreadStyles, getMergedTheme } from './thread.styles';
 import { ThreadSection, ThreadSectionType, ThreadUser } from './thread.types';
-import {
-  ImageLibraryOptions,
-  launchImageLibrary,
-} from 'react-native-image-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { TENSOR_API_KEY } from '@env';
 import { useWallet } from '../../hooks/useWallet';
 import TradeModal from './/trade/TradeModal';
 import { DEFAULT_IMAGES } from '../../config/constants';
 import { NftItem, useFetchNFTs } from '../../hooks/useFetchNFTs';
 import NftListingModal from './NftListingModal';
+import { uploadThreadImage } from '../../services/threadImageService';
 
 /**
  * Props for the ThreadComposer component
@@ -87,7 +85,7 @@ export default function ThreadComposer({
 }: ThreadComposerProps) {
   const dispatch = useAppDispatch();
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
-  
+
   // Use wallet hook instead of useAuth directly
   const { wallet, address } = useWallet();
 
@@ -97,6 +95,7 @@ export default function ThreadComposer({
   // Basic composer state
   const [textValue, setTextValue] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // NFT listing states
   const [showListingModal, setShowListingModal] = useState(false);
@@ -194,56 +193,71 @@ export default function ThreadComposer({
   const handlePost = async () => {
     if (!textValue.trim() && !selectedImage && !selectedListingNft) return;
 
-    const sections: ThreadSection[] = [];
-
-    // Text section
-    if (textValue.trim()) {
-      sections.push({
-        id: 'section-' + Math.random().toString(36).substr(2, 9),
-        type: 'TEXT_ONLY' as ThreadSectionType,
-        text: textValue.trim(),
-      });
-    }
-
-    // Image section
-    if (selectedImage) {
-      sections.push({
-        id: 'section-' + Math.random().toString(36).substr(2, 9),
-        type: 'TEXT_IMAGE',
-        imageUrl: { uri: selectedImage },
-      });
-    }
-
-    // NFT listing
-    if (selectedListingNft) {
-      sections.push({
-        id: 'section-' + Math.random().toString(36).substr(2, 9),
-        type: 'NFT_LISTING',
-        listingData: {
-          mint: selectedListingNft.mint,
-          owner: currentUser.id, // wallet address
-          priceSol: undefined, // or logic if you have a price
-          name: selectedListingNft.name,
-          image: selectedListingNft.image,
-        },
-      });
-    }
-
-    // Fallback post if network fails
-    const fallbackPost = {
-      id: 'local-' + Math.random().toString(36).substr(2, 9),
-      userId: currentUser.id,
-      user: currentUser,
-      sections,
-      createdAt: new Date().toISOString(),
-      parentId: parentId ?? undefined,
-      replies: [],
-      reactionCount: 0,
-      retweetCount: 0,
-      quoteCount: 0,
-    };
+    // Show loading indicator
+    setIsSubmitting(true);
 
     try {
+      const sections: ThreadSection[] = [];
+
+      // Text section
+      if (textValue.trim()) {
+        sections.push({
+          id: 'section-' + Math.random().toString(36).substr(2, 9),
+          type: 'TEXT_ONLY' as ThreadSectionType,
+          text: textValue.trim(),
+        });
+      }
+
+      // Image section - upload image to IPFS first
+      if (selectedImage) {
+        try {
+          // First upload the image to IPFS
+          const uploadedImageUrl = await uploadThreadImage(currentUser.id, selectedImage);
+
+          // Once we have the IPFS URL, add it to sections
+          sections.push({
+            id: 'section-' + Math.random().toString(36).substr(2, 9),
+            type: 'TEXT_IMAGE',
+            text: '', // Can be empty or contain caption text
+            imageUrl: { uri: uploadedImageUrl },
+          });
+        } catch (error) {
+          console.error('Failed to upload image:', error);
+          Alert.alert('Image Upload Error', 'Failed to upload image. Please try again.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // NFT listing
+      if (selectedListingNft) {
+        sections.push({
+          id: 'section-' + Math.random().toString(36).substr(2, 9),
+          type: 'NFT_LISTING',
+          listingData: {
+            mint: selectedListingNft.mint,
+            owner: currentUser.id, // wallet address
+            priceSol: undefined, // or logic if you have a price
+            name: selectedListingNft.name,
+            image: selectedListingNft.image,
+          },
+        });
+      }
+
+      // Fallback post if network fails
+      const fallbackPost = {
+        id: 'local-' + Math.random().toString(36).substr(2, 9),
+        userId: currentUser.id,
+        user: currentUser,
+        sections,
+        createdAt: new Date().toISOString(),
+        parentId: parentId ?? undefined,
+        replies: [],
+        reactionCount: 0,
+        retweetCount: 0,
+        quoteCount: 0,
+      };
+
       if (parentId) {
         // create a reply by passing only the user id
         await dispatch(
@@ -273,15 +287,33 @@ export default function ThreadComposer({
         'Network request failed, adding post locally:',
         error.message,
       );
+
+      // Create a local fallback post with the sections we have
+      const fallbackPost = {
+        id: 'local-' + Math.random().toString(36).substr(2, 9),
+        userId: currentUser.id,
+        user: currentUser,
+        sections: [], // We can't add the sections here because we don't have the image URLs
+        createdAt: new Date().toISOString(),
+        parentId: parentId ?? undefined,
+        replies: [],
+        reactionCount: 0,
+        retweetCount: 0,
+        quoteCount: 0,
+      };
+
       if (parentId) {
         dispatch(addReplyLocally({ parentId, reply: fallbackPost }));
       } else {
         dispatch(addPostLocally(fallbackPost));
       }
+
       setTextValue('');
       setSelectedImage(null);
       setSelectedListingNft(null);
       onPostCreated && onPostCreated();
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -294,27 +326,33 @@ export default function ThreadComposer({
   /**
    * Media picking
    */
-  const handleMediaPress = () => {
-    const options: ImageLibraryOptions = {
-      mediaType: 'photo',
-      quality: 1,
-      includeBase64: true,
-    };
-    launchImageLibrary(options, response => {
-      if (response.didCancel) {
-        console.log('User cancelled image picker');
-      } else if (response.errorCode) {
-        console.log('ImagePicker Error:', response.errorMessage);
-      } else if (response.assets && response.assets.length > 0) {
-        const asset = response.assets[0];
-        if (asset.base64 && asset.type) {
-          setSelectedImage(`data:${asset.type};base64,${asset.base64}`);
-        } else if (asset.uri) {
-          setSelectedImage(asset.uri);
-        }
+  const handleMediaPress = useCallback(async () => {
+    try {
+      // Request permissions first
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow access to your photo library to attach images.');
+        return;
       }
-    });
-  };
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: false,
+        quality: 0.8,
+        allowsEditing: true,
+        aspect: [1, 1]
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const pickedUri = result.assets[0].uri;
+        setSelectedImage(pickedUri);
+      }
+    } catch (error: any) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error picking image', error.message);
+    }
+  }, []);
 
   /**
    * Listing Flow
@@ -360,10 +398,18 @@ export default function ThreadComposer({
 
           {/* Selected image preview */}
           {selectedImage && (
-            <Image
-              source={{ uri: selectedImage }}
-              style={{ width: 100, height: 100, marginTop: 10 }}
-            />
+            <View style={styles.imagePreviewContainer}>
+              <Image
+                source={{ uri: selectedImage }}
+                style={styles.imagePreview}
+                resizeMode="cover"
+              />
+              <TouchableOpacity
+                style={styles.removeImageButton}
+                onPress={() => setSelectedImage(null)}>
+                <Text style={styles.removeImageButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {/* NFT listing preview */}
@@ -411,10 +457,26 @@ export default function ThreadComposer({
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity onPress={handlePost}>
-              <Text style={{ color: '#1d9bf0', fontWeight: '600' }}>
-                {parentId ? 'Reply' : 'Post'}
-              </Text>
+            <TouchableOpacity
+              onPress={handlePost}
+              disabled={isSubmitting}
+              style={{
+                opacity: isSubmitting ? 0.6 : 1,
+                flexDirection: 'row',
+                alignItems: 'center'
+              }}>
+              {isSubmitting ? (
+                <>
+                  <ActivityIndicator size="small" color="#1d9bf0" style={{ marginRight: 5 }} />
+                  <Text style={{ color: '#1d9bf0', fontWeight: '600' }}>
+                    {parentId ? 'Replying...' : 'Posting...'}
+                  </Text>
+                </>
+              ) : (
+                <Text style={{ color: '#1d9bf0', fontWeight: '600' }}>
+                  {parentId ? 'Reply' : 'Post'}
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
