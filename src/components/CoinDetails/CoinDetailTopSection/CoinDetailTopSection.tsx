@@ -18,7 +18,7 @@ import Icons from '../../../assets/svgs/index';
 import {defaultTopSectionStyles} from './CoinDetailTopSection.style';
 import SuggestionsCard from '../suggestionsCard/suggestionsCard';
 import Tweet from '../tweet/tweet';
-import LineGraph from './LineGraph';
+import LineGraph from '../../Common/TradeCard/LineGraph';
 import {useCoingecko, Timeframe} from '../../../hooks/useCoingecko';
 import {
   formatAmount,
