@@ -1,5 +1,5 @@
 // File: src/screens/SampleUI/Threads/OtherProfileScreen/OtherProfileScreen.tsx
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, StyleSheet, Platform, Alert, ActivityIndicator, Text } from 'react-native';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../../../navigation/RootNavigator';
@@ -10,7 +10,6 @@ import { ThreadPost } from '../../../../components/thread/thread.types';
 import { fetchAllPosts } from '../../../../state/thread/reducer';
 import { NftItem, useFetchNFTs } from '../../../../hooks/useFetchNFTs';
 import COLORS from '../../../../assets/colors';
-import { fetchFollowers, fetchFollowing, checkIfUserFollowsMe } from '../../../../services/profileService';
 
 type OtherProfileRouteProp = RouteProp<RootStackParamList, 'OtherProfile'>;
 
@@ -32,11 +31,6 @@ export default function OtherProfileScreen() {
   const [attachmentData, setAttachmentData] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [followersCount, setFollowersCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
-  const [isFollowingMe, setIsFollowingMe] = useState(false);
-  const [amIFollowing, setAmIFollowing] = useState(false);
 
   // Check if the user we're trying to view is ourselves
   const isOwnProfile = useMemo(() => {
@@ -51,71 +45,42 @@ export default function OtherProfileScreen() {
     }
   }, [isOwnProfile, navigation]);
 
-  // Fetch followers and following data
-  const fetchFollowerData = useCallback(async () => {
-    if (!userId) return;
-    
-    try {
-      const followers = await fetchFollowers(userId);
-      const following = await fetchFollowing(userId);
-      setFollowersCount(followers.length);
-      setFollowingCount(following.length);
-      
-      // Check if the user follows me
-      if (myWallet) {
-        const followsMe = await checkIfUserFollowsMe(myWallet, userId);
-        setIsFollowingMe(followsMe);
-        
-        // Check if I'm following this user
-        const amFollowing = followers.some(
-          (follower: any) => follower.id.toLowerCase() === myWallet.toLowerCase()
-        );
-        setAmIFollowing(amFollowing);
-      }
-    } catch (error) {
-      console.error('Error fetching follower data:', error);
-    }
-  }, [userId, myWallet]);
-
-  // Fetch user profile from server
-  const fetchProfileData = useCallback(async () => {
+  // Fetch user profile from server (like we do in ProfileScreen)
+  useEffect(() => {
     if (!userId) {
       setError('No user ID provided');
       setLoading(false);
       return;
     }
     
-    setLoading(true);
-    setError(null);
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const profileData = await dispatch(fetchUserProfile(userId)).unwrap();
+        
+        if (profileData.profilePicUrl) {
+          console.log('Fetched profilePicUrl:', profileData);
+          setProfilePicUrl(profileData.profilePicUrl);
+        }
+        if (profileData.username) {
+          setUsername(profileData.username);
+        }
+        if (profileData.attachmentData) {
+          setAttachmentData(profileData.attachmentData);
+        }
+      } catch (err: any) {
+        console.warn('Failed to fetch user profile for other user:', err);
+        setError(`Couldn't load profile data: ${err.message || 'Unknown error'}`);
+        // Don't show the error to the user, just set default values
+        setUsername('Unknown User');
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    try {
-      const profileData = await dispatch(fetchUserProfile(userId)).unwrap();
-      
-      if (profileData.profilePicUrl) {
-        console.log('Fetched profilePicUrl:', profileData);
-        setProfilePicUrl(profileData.profilePicUrl);
-      }
-      if (profileData.username) {
-        setUsername(profileData.username);
-      }
-      if (profileData.attachmentData) {
-        setAttachmentData(profileData.attachmentData);
-      }
-    } catch (err: any) {
-      console.warn('Failed to fetch user profile for other user:', err);
-      setError(`Couldn't load profile data: ${err.message || 'Unknown error'}`);
-      // Don't show the error to the user, just set default values
-      setUsername('Unknown User');
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, dispatch]);
-
-  // Initial data load
-  useEffect(() => {
-    fetchProfileData();
-    fetchFollowerData();
-  }, [fetchProfileData, fetchFollowerData]);
+    fetchData();
+  }, [userId, dispatch, provider]); // Add provider dependency to refetch when wallet provider changes
 
   // Fetch all posts so we can filter
   useEffect(() => {
@@ -144,31 +109,11 @@ export default function OtherProfileScreen() {
     }
   }, [allPosts, userId]);
 
-  // Handle refresh
-  const handleRefresh = useCallback(async () => {
-    if (!userId) return;
-    
-    setRefreshing(true);
-    
-    try {
-      // Refresh all data
-      await fetchProfileData();
-      await dispatch(fetchAllPosts()).unwrap();
-      await fetchFollowerData();
-      refetchNfts(); // Defined below in the useFetchNFTs hook
-    } catch (error) {
-      console.error('Error refreshing user profile:', error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [userId, dispatch, fetchProfileData, fetchFollowerData]);
-
   // Custom useFetchNFTs hook with error handling for Dynamic wallet
   const { 
     nfts, 
     loading: loadingNfts, 
-    error: nftsError,
-    refetch: refetchNfts
+    error: nftsError 
   } = useFetchNFTs(userId, { providerType: provider });
 
   // Show a loading spinner while profile data is being fetched
@@ -208,12 +153,6 @@ export default function OtherProfileScreen() {
         nfts={nfts}
         loadingNfts={loadingNfts || loading}
         fetchNftsError={nftsError}
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-        followersCount={followersCount}
-        followingCount={followingCount}
-        amIFollowing={amIFollowing}
-        areTheyFollowingMe={isFollowingMe}
       />
     </View>
   );

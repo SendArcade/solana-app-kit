@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
-  RefreshControl,
 } from 'react-native';
 import ActionDetailModal from './ActionDetailModal';
 import {FontAwesome5} from '@expo/vector-icons';
@@ -66,8 +65,6 @@ interface ActionsPageProps {
   loadingActions?: boolean;
   fetchActionsError?: string | null;
   walletAddress?: string;
-  refreshing?: boolean;
-  onRefresh?: () => void;
 }
 
 /** Format lamports as SOL with proper decimal places */
@@ -688,8 +685,6 @@ const ActionsPage: React.FC<ActionsPageProps> = ({
   loadingActions,
   fetchActionsError,
   walletAddress,
-  refreshing = false,
-  onRefresh,
 }) => {
   const [selectedAction, setSelectedAction] = useState<Action | null>(null);
 
@@ -736,14 +731,6 @@ const ActionsPage: React.FC<ActionsPageProps> = ({
         )}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#3871DD']}
-            tintColor="#3871DD"
-          />
-        }
       />
 
       <ActionDetailModal
