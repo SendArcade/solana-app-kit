@@ -5,7 +5,6 @@ import { isDynamicWallet } from '../services/walletProviders/dynamic';
 import { useMemo } from 'react';
 import { useAppSelector } from './useReduxHooks';
 import { Platform } from 'react-native';
-import { Wallet } from '../state/auth/reducer';
 
 /**
  * A hook that provides wallet and transaction capabilities
@@ -16,13 +15,7 @@ export function useWallet() {
   const authState = useAppSelector(state => state.auth);
   
   // Get wallet from useAuth
-  const { 
-    wallet, 
-    solanaWallet, 
-    wallets: authWallets, 
-    switchWallet: authSwitchWallet 
-  } = useAuth();
-  
+  const { wallet, solanaWallet } = useAuth();
   const { 
     signAndSendTransaction,
     signAndSendInstructions,
@@ -71,32 +64,6 @@ export function useWallet() {
   const currentWallet = useMemo(() => {
     return getWallet();
   }, [wallet, mwaWallet, solanaWallet]);
-
-  // Get all available wallets from auth
-  const wallets = useMemo(() => {
-    return authWallets || [];
-  }, [authWallets]);
-
-  // Check if a wallet with specific address exists
-  const hasWallet = (address: string): boolean => {
-    return wallets.some(w => w.wallet_address === address);
-  };
-
-  // Get a wallet by address
-  const getWalletByAddress = (address: string): Wallet | undefined => {
-    return wallets.find(w => w.wallet_address === address);
-  };
-
-  // Switch to a different wallet
-  const switchWallet = (address: string): boolean => {
-    if (!hasWallet(address)) {
-      console.warn('Cannot switch to wallet - address not found:', address);
-      return false;
-    }
-    
-    authSwitchWallet(address);
-    return true;
-  };
 
   /**
    * Signs and sends a transaction using the current wallet
@@ -252,10 +219,5 @@ export function useWallet() {
     isDynamic,                // Check if using Dynamic
     isPrivy,                  // Check if using Privy
     isMWA,                    // Check if using MWA
-    // Multiple wallet support
-    wallets,                  // All available wallets
-    hasWallet,                // Check if a wallet exists
-    getWalletByAddress,       // Get a specific wallet by address
-    switchWallet,             // Switch to a different wallet
   };
 } 

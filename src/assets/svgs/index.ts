@@ -41,6 +41,7 @@ import BookmarkActive from './bookmark-active.svg'
 import SendIdle from './send-idle.svg';
 import CryptoIcon from './crypto-icon.svg';
 import MagnifyingGlass from './magnifying-glass.svg';
+import MagnifyingGlassSelected from './magnifying-glass-selected.svg';
 import tensor from './Vector.svg';
 import listedNft from './Vector (1).svg';
 import cross from "./Close.svg"
@@ -90,6 +91,7 @@ export default {
   SendIdle,
   CryptoIcon,
   MagnifyingGlass,
+  MagnifyingGlassSelected,
   tensor,
   listedNft,
   cross,
