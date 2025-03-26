@@ -6,7 +6,7 @@ export interface AuthState {
   address: string | null;
   isLoggedIn: boolean;
   profilePicUrl: string | null;
-  username: string | null; // storing user’s chosen display name
+  username: string | null; // storing user's chosen display name
   // NEW: attachmentData object to hold any attached profile data (e.g., coin)
   attachmentData?: {
     coin?: {
@@ -142,11 +142,19 @@ const authSlice = createSlice({
         username?: string;
       }>,
     ) {
+      // Preserve existing profile data if available and no new data provided
       state.provider = action.payload.provider;
       state.address = action.payload.address;
       state.isLoggedIn = true;
-      state.profilePicUrl = action.payload.profilePicUrl || null;
-      state.username = action.payload.username || null;
+      
+      // Only update these if they are provided or we don't have them
+      if (action.payload.profilePicUrl || !state.profilePicUrl) {
+        state.profilePicUrl = action.payload.profilePicUrl || state.profilePicUrl;
+      }
+      
+      if (action.payload.username || !state.username) {
+        state.username = action.payload.username || state.username;
+      }
     },
     logoutSuccess(state) {
       state.provider = null;
@@ -168,16 +176,22 @@ const authSlice = createSlice({
         attachmentData,
       } = action.payload as any;
 
+      // Get the userId that was requested as the argument to the thunk
       const requestedUserId = action.meta.arg;
-      if (
-        requestedUserId &&
-        state.address &&
-        requestedUserId.toLowerCase() === state.address.toLowerCase()
-      ) {
-        state.profilePicUrl = fetchedProfilePicUrl || null;
-        state.username = fetchedUsername || null;
-        state.attachmentData = attachmentData || {};
+
+      // Only update auth state if:
+      // 1. We are logged in AND
+      // 2. The requested user ID matches the current user's address
+      if (state.isLoggedIn && 
+          state.address && 
+          requestedUserId && 
+          requestedUserId.toLowerCase() === state.address.toLowerCase()) {
+        state.profilePicUrl = fetchedProfilePicUrl || state.profilePicUrl;
+        state.username = fetchedUsername || state.username;
+        state.attachmentData = attachmentData || state.attachmentData || {};
       }
+      // If the user IDs don't match, we don't update the auth state
+      // This prevents other users' profiles from affecting the current user's profile
     });
 
     builder.addCase(updateUsername.fulfilled, (state, action) => {

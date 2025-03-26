@@ -1,15 +1,17 @@
 // File: src/screens/SampleUI/Threads/OtherProfileScreen/OtherProfileScreen.tsx
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, StyleSheet, Platform, Alert, ActivityIndicator, Text } from 'react-native';
-import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
+import { useRoute, RouteProp, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../../../../navigation/RootNavigator';
 import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks';
-import { fetchUserProfile } from '../../../../state/auth/reducer';
 import Profile from '../../../../components/Profile/profile';
 import { ThreadPost } from '../../../../components/thread/thread.types';
 import { fetchAllPosts } from '../../../../state/thread/reducer';
 import { NftItem, useFetchNFTs } from '../../../../hooks/useFetchNFTs';
 import COLORS from '../../../../assets/colors';
+import { SERVER_URL } from '@env';
+
+const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 
 type OtherProfileRouteProp = RouteProp<RootStackParamList, 'OtherProfile'>;
 
@@ -31,6 +33,8 @@ export default function OtherProfileScreen() {
   const [attachmentData, setAttachmentData] = useState<any>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Track the current profile ID to handle navigation between profiles
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
 
   // Check if the user we're trying to view is ourselves
   const isOwnProfile = useMemo(() => {
@@ -45,42 +49,79 @@ export default function OtherProfileScreen() {
     }
   }, [isOwnProfile, navigation]);
 
-  // Fetch user profile from server (like we do in ProfileScreen)
+  // Reset user data when userId changes, especially when navigating between different users
   useEffect(() => {
+    if (userId !== currentProfileId) {
+      // Clear previous user data when viewing a different user
+      setUsername('Loading...');
+      setProfilePicUrl(null);
+      setAttachmentData({});
+      setCurrentProfileId(userId);
+      setLoading(true);
+    }
+  }, [userId, currentProfileId]);
+
+  // Refetch when screen comes into focus to ensure fresh data
+  useFocusEffect(
+    React.useCallback(() => {
+      // Only fetch if we have a userId and it doesn't match the current profile
+      if (userId && (!currentProfileId || userId !== currentProfileId)) {
+        const fetchUserData = async () => {
+          setLoading(true);
+          await fetchData();
+        };
+        fetchUserData();
+      }
+      return () => {
+        // Cleanup if needed
+      };
+    }, [userId, currentProfileId])
+  );
+
+  // Fetch user profile from server directly, not through auth reducer
+  const fetchData = async () => {
     if (!userId) {
       setError('No user ID provided');
       setLoading(false);
       return;
     }
-    
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const profileData = await dispatch(fetchUserProfile(userId)).unwrap();
-        
-        if (profileData.profilePicUrl) {
-          console.log('Fetched profilePicUrl:', profileData);
-          setProfilePicUrl(profileData.profilePicUrl);
+
+    setLoading(true);
+    setError(null);
+    try {
+      // Fetch profile directly from API instead of using auth reducer
+      const response = await fetch(
+        `${SERVER_BASE_URL}/api/profile?userId=${userId}`,
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        if (data.url) {
+          setProfilePicUrl(data.url);
         }
-        if (profileData.username) {
-          setUsername(profileData.username);
+        if (data.username) {
+          setUsername(data.username);
         }
-        if (profileData.attachmentData) {
-          setAttachmentData(profileData.attachmentData);
+        if (data.attachmentData) {
+          setAttachmentData(data.attachmentData);
         }
-      } catch (err: any) {
-        console.warn('Failed to fetch user profile for other user:', err);
-        setError(`Couldn't load profile data: ${err.message || 'Unknown error'}`);
-        // Don't show the error to the user, just set default values
-        setUsername('Unknown User');
-      } finally {
-        setLoading(false);
+      } else {
+        throw new Error(data.error || 'Failed to fetch user profile');
       }
-    };
-    
+    } catch (err: any) {
+      console.warn('Failed to fetch user profile for other user:', err);
+      setError(`Couldn't load profile data: ${err.message || 'Unknown error'}`);
+      // Don't show the error to the user, just set default values
+      setUsername('Unknown User');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial profile fetch
+  useEffect(() => {
     fetchData();
-  }, [userId, dispatch, provider]); // Add provider dependency to refetch when wallet provider changes
+  }, [userId]); // Remove provider dependency
 
   // Fetch all posts so we can filter
   useEffect(() => {
@@ -95,7 +136,7 @@ export default function OtherProfileScreen() {
       setMyPosts([]);
       return;
     }
-    
+
     try {
       const userPosts = allPosts.filter(
         p => p.user?.id?.toLowerCase() === userId.toLowerCase(),
@@ -110,10 +151,10 @@ export default function OtherProfileScreen() {
   }, [allPosts, userId]);
 
   // Custom useFetchNFTs hook with error handling for Dynamic wallet
-  const { 
-    nfts, 
-    loading: loadingNfts, 
-    error: nftsError 
+  const {
+    nfts,
+    loading: loadingNfts,
+    error: nftsError
   } = useFetchNFTs(userId, { providerType: provider });
 
   // Show a loading spinner while profile data is being fetched
