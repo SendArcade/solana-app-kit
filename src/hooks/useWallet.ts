@@ -2,9 +2,10 @@ import { useAuth, StandardWallet } from './useAuth';
 import { useTransactionService } from '../services/transaction/transactionService';
 import { Connection, Transaction, VersionedTransaction, PublicKey, TransactionInstruction } from '@solana/web3.js';
 import { isDynamicWallet } from '../services/walletProviders/dynamic';
-import { useMemo } from 'react';
-import { useAppSelector } from './useReduxHooks';
+import { useMemo, useEffect } from 'react';
+import { useAppSelector, useAppDispatch } from './useReduxHooks';
 import { Platform } from 'react-native';
+import { fetchUserProfile } from '../state/auth/reducer';
 
 /**
  * A hook that provides wallet and transaction capabilities
@@ -13,6 +14,7 @@ import { Platform } from 'react-native';
 export function useWallet() {
   // Get Redux auth state
   const authState = useAppSelector(state => state.auth);
+  const dispatch = useAppDispatch();
   
   // Get wallet from useAuth
   const { wallet, solanaWallet } = useAuth();
@@ -22,6 +24,36 @@ export function useWallet() {
     signAndSendBase64,
     currentProvider 
   } = useTransactionService();
+
+  // Add an effect to ensure profile data is loaded if we have a wallet address
+  // but no profile info (prevents "flashing" anonymous state)
+  useEffect(() => {
+    // We need a stable flag to track if we should fetch
+    let shouldFetch = false;
+    
+    // Check if we need to fetch profile data
+    if (authState.isLoggedIn && authState.address) {
+      // Only fetch if we're missing profile data
+      if (!authState.username || !authState.profilePicUrl) {
+        shouldFetch = true;
+      }
+    }
+    
+    // Use a timeout to debounce multiple profile fetch requests
+    // and avoid multiple fetches during app initialization
+    if (shouldFetch) {
+      const timer = setTimeout(() => {
+        // Explicitly pass the current user's address to ensure we only fetch their profile
+        // This prevents fetching other users' profiles
+        const userAddress = authState.address;
+        if (userAddress) {
+          dispatch(fetchUserProfile(userAddress));
+        }
+      }, 300); // Small delay to allow for auth state to stabilize
+      
+      return () => clearTimeout(timer);
+    }
+  }, [authState.isLoggedIn, authState.address, authState.username, authState.profilePicUrl, dispatch]);
 
   // Create a standardized wallet object for MWA if needed
   const mwaWallet: StandardWallet | null = useMemo(() => {
