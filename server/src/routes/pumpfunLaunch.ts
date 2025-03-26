@@ -1,4 +1,3 @@
-// server/src/routes/pinataLaunch.ts
 import {Router} from 'express';
 import multer from 'multer';
 import {UploadMetadataController} from '../controllers/uploadMetadataController';
@@ -8,10 +7,6 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const launchRouter = Router();
 
-/**
- * POST /api/pinata-launch/launch
- * multipart/form-data => { publicKey, tokenName, tokenSymbol, description, image }
- */
 launchRouter.post(
   '/uploadMetadata',
   upload.single('image'),
