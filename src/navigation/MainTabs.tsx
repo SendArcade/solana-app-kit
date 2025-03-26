@@ -243,7 +243,7 @@ export default function MainTabs() {
             borderTopWidth: 0,
           },
         }}>
-        <Tab.Screen
+        {/* <Tab.Screen
           name="Home"
           component={HomeScreen}
           options={{
@@ -267,7 +267,7 @@ export default function MainTabs() {
               />
             ),
           }}
-        />
+        /> */}
         <Tab.Screen
           name="Modules"
           component={ModuleScreen}
