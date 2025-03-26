@@ -1,16 +1,16 @@
-import React, {useState} from 'react';
-import {View, Alert, TouchableOpacity} from 'react-native';
+import React, { useState } from 'react';
+import { View, Alert, TouchableOpacity } from 'react-native';
 import ThreadAncestors from './ThreadAncestors';
 import PostHeader from './post/PostHeader';
 import PostBody from './post/PostBody';
 import PostFooter from './post/PostFooter';
 import PostCTA from './post/PostCTA';
 import RetweetPreview from './retweet/RetweetPreview';
-import {createThreadStyles, getMergedTheme} from './thread.styles';
-import {ThreadCTAButton, ThreadPost, ThreadUser} from './thread.types';
-import {useAppDispatch} from '../../hooks/useReduxHooks';
-import {deletePostAsync} from '../../state/thread/reducer';
-import ThreadEditModal from './ThreadEditModal';
+import { createThreadStyles, getMergedTheme } from './thread.styles';
+import { ThreadCTAButton, ThreadPost, ThreadUser } from './thread.types';
+import { useAppDispatch } from '../../hooks/useReduxHooks';
+import { deletePostAsync } from '../../state/thread/reducer';
+import EditPostModal from './EditPostModal';
 
 interface ThreadItemProps {
   /** The post to display. */
@@ -28,9 +28,9 @@ interface ThreadItemProps {
   /** Theming overrides. */
   themeOverrides?: Partial<Record<string, any>>;
   /** Style overrides for specific keys in the default style. */
-  styleOverrides?: {[key: string]: object};
+  styleOverrides?: { [key: string]: object };
   /** A user-provided stylesheet that merges with internal styles. */
-  userStyleSheet?: {[key: string]: object};
+  userStyleSheet?: { [key: string]: object };
   /**
    * Invoked if the user's avatar/username is pressed (e.g., to open a profile).
    */
@@ -101,7 +101,7 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => onPressPost?.(post)}
-        style={{flex: 1}}>
+        style={{ flex: 1 }}>
         <PostHeader
           post={post}
           onDeletePost={handleDeletePost}
@@ -129,7 +129,7 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
 
         {/* If it's a retweet, show the retweet preview inside this post. */}
         {post.retweetOf && (
-          <View style={{marginBottom: 6}}>
+          <View style={{ marginBottom: 6 }}>
             <RetweetPreview
               retweetOf={post.retweetOf}
               onPress={onPressPost}
@@ -160,13 +160,10 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
 
       {/* "Edit Post" Modal */}
       {showEditModal && (
-        <ThreadEditModal
-          post={post}
-          visible={showEditModal}
+        <EditPostModal
+          isVisible={showEditModal}
           onClose={() => setShowEditModal(false)}
-          currentUser={currentUser}
-          themeOverrides={themeOverrides}
-          styleOverrides={styleOverrides}
+          post={post}
         />
       )}
     </View>
