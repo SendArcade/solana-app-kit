@@ -1,8 +1,8 @@
 // FILE: src/components/thread/post/PostBody.tsx
 import React, { useMemo } from 'react';
-import {View} from 'react-native';
-import {createThreadStyles, getMergedTheme} from '../thread.styles';
-import {ThreadPost} from '../thread.types';
+import { View } from 'react-native';
+import { createThreadStyles, getMergedTheme } from '../thread.styles';
+import { ThreadPost } from '../thread.types';
 import SectionTextOnly from '../sections/SectionTextOnly';
 import SectionTextImage from '../sections/SectionTextImage';
 import SectionTextVideo from '../sections/SectionTextVideo';
@@ -20,7 +20,7 @@ interface PostBodyProps {
   /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
   /** Style overrides for specific components */
-  styleOverrides?: {[key: string]: object};
+  styleOverrides?: { [key: string]: object };
   /**
    * A numeric value used to refresh the trade chart in SectionTrade,
    * if it's included in the post's sections.
@@ -45,19 +45,19 @@ function renderSection(
 
     case 'TEXT_IMAGE':
       return (
-        <SectionTextImage 
-          key={sectionKey} 
-          text={section.text} 
-          imageUrl={section.imageUrl} 
+        <SectionTextImage
+          key={sectionKey}
+          text={section.text}
+          imageUrl={section.imageUrl}
         />
       );
 
     case 'TEXT_VIDEO':
       return (
-        <SectionTextVideo 
-          key={sectionKey} 
-          text={section.text} 
-          videoUrl={section.videoUrl} 
+        <SectionTextVideo
+          key={sectionKey}
+          text={section.text}
+          videoUrl={section.videoUrl}
         />
       );
 
@@ -93,14 +93,14 @@ function PostBody({
   // Memoize theme and styles to prevent recalculation
   const mergedTheme = useMemo(() => getMergedTheme(themeOverrides), [themeOverrides]);
   const styles = useMemo(() => createThreadStyles(mergedTheme, styleOverrides), [mergedTheme, styleOverrides]);
-  
-  const {user, createdAt, sections = []} = post;
+
+  const { user, createdAt, sections = [] } = post;
 
   // Memoize the sections rendering to prevent re-creation on every render
   const renderedSections = useMemo(() => {
     return sections.map(section => (
       <View key={section.id} style={styles.extraContentContainer}>
-        <View style={{width: '84%'}}>
+        <View style={{ width: '84%' }}>
           {renderSection(section, user, createdAt, externalRefreshTrigger)}
         </View>
       </View>
@@ -108,7 +108,7 @@ function PostBody({
   }, [sections, user, createdAt, externalRefreshTrigger, styles.extraContentContainer]);
 
   return (
-    <View style={{marginTop: 8, padding: 0}}>
+    <View style={{ marginTop: 8, padding: 0 }}>
       {renderedSections}
     </View>
   );
@@ -134,17 +134,17 @@ function arePropsEqual(prev: PostBodyProps, next: PostBodyProps): boolean {
     ) {
       return false;
     }
-    
+
     // For trade sections, check tradeData
     if (prevSections[i].type === 'TEXT_TRADE') {
       const prevTrade = prevSections[i].tradeData;
       const nextTrade = nextSections[i].tradeData;
-      
+
       if (!prevTrade || !nextTrade) {
         if (prevTrade !== nextTrade) return false;
         continue;
       }
-      
+
       // Deep compare important trade data fields
       if (prevTrade.inputMint !== nextTrade.inputMint) return false;
       if (prevTrade.outputMint !== nextTrade.outputMint) return false;
