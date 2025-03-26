@@ -1,12 +1,17 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View } from 'react-native';
 import Profile from '../../../../components/Profile/profile';
-import { useAppSelector } from '../../../../hooks/useReduxHooks';
+import { useAppSelector, useAppDispatch } from '../../../../hooks/useReduxHooks';
 import { ThreadPost } from '../../../../components/thread/thread.types';
 import { useFetchNFTs } from '../../../../hooks/useFetchNFTs';
 import { useWallet } from '../../../../hooks/useWallet';
+import { fetchUserProfile } from '../../../../state/auth/reducer';
+import { fetchAllPosts } from '../../../../state/thread/reducer';
+import { fetchFollowers, fetchFollowing } from '../../../../services/profileService';
 
 export default function ProfileScreen() {
+  const dispatch = useAppDispatch();
+  
   // Get user data from Redux
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
   const storedUsername = useAppSelector(state => state.auth.username);
@@ -18,6 +23,11 @@ export default function ProfileScreen() {
   // Get all posts from Redux
   const allPosts = useAppSelector(state => state.thread.allPosts);
 
+  // Refresh state
+  const [refreshing, setRefreshing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+
   // Filter posts belonging to the current user
   const myPosts: ThreadPost[] = userWallet
     ? allPosts.filter(p => p.user.id.toLowerCase() === userWallet.toLowerCase())
@@ -28,7 +38,53 @@ export default function ProfileScreen() {
     nfts,
     loading: loadingNfts,
     error: fetchNftsError,
+    refetch: refetchNfts,
   } = useFetchNFTs(userWallet || undefined);
+
+  // Fetch follower/following counts
+  const fetchFollowerCounts = useCallback(async () => {
+    if (!userWallet) return;
+    
+    try {
+      const followers = await fetchFollowers(userWallet);
+      const following = await fetchFollowing(userWallet);
+      setFollowerCount(followers.length);
+      setFollowingCount(following.length);
+    } catch (error) {
+      console.error('Error fetching follower counts:', error);
+    }
+  }, [userWallet]);
+
+  // Initial data load
+  useEffect(() => {
+    fetchFollowerCounts();
+  }, [fetchFollowerCounts]);
+
+  // Handle refresh
+  const handleRefresh = useCallback(async () => {
+    if (!userWallet) return;
+    
+    setRefreshing(true);
+    
+    try {
+      // Refresh profile data
+      await dispatch(fetchUserProfile(userWallet)).unwrap();
+      
+      // Refresh posts
+      await dispatch(fetchAllPosts()).unwrap();
+      
+      // Refresh NFTs
+      refetchNfts();
+      
+      // Refresh follower/following counts
+      await fetchFollowerCounts();
+      
+    } catch (error) {
+      console.error('Error refreshing profile data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [userWallet, dispatch, refetchNfts, fetchFollowerCounts]);
 
   // Build the user object
   const user = {
@@ -37,12 +93,6 @@ export default function ProfileScreen() {
     username: storedUsername || 'Unknown User',
     attachmentData,
   };
-
-  // Log user data only when it changes
-  useEffect(() => {
-    console.log('user', user);
-    console.log('attachmentData from Redux:', attachmentData);
-  }, [user, attachmentData]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -53,6 +103,10 @@ export default function ProfileScreen() {
         nfts={nfts}
         loadingNfts={loadingNfts}
         fetchNftsError={fetchNftsError}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+        followersCount={followerCount}
+        followingCount={followingCount}
       />
     </View>
   );

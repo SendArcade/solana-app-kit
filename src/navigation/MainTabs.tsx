@@ -344,7 +344,7 @@ export default function MainTabs() {
         />
 
         <Tab.Screen
-          name="Notifications"
+          name="Search"
           component={NotificationsScreen}
           options={{
             tabBarIcon: ({ focused, size }) => (
@@ -352,13 +352,13 @@ export default function MainTabs() {
                 focused={focused}
                 size={size * 1}
                 icon={
-                  Icons.NotifBell as React.ComponentType<{
+                  Icons.MagnifyingGlass as React.ComponentType<{
                     width: number;
                     height: number;
                   }>
                 }
                 iconSelected={
-                  Icons.NotifBellSelected as React.ComponentType<{
+                  Icons.MagnifyingGlassSelected as React.ComponentType<{
                     width: number;
                     height: number;
                   }>
