@@ -147,18 +147,16 @@ export async function createAndBuyTokenViaPumpfun({
     // Combine create + buy instructions
     const combinedTx = createTx;
     if (buyTx) {
+      console.log("buyTx =>", buyTx);
       buyTx.instructions.forEach(ix => combinedTx.add(ix));
     }
-
     // Sign it with the mint keypair
-    combinedTx.partialSign(mintKeypair);
-
-    // Get blockhash
     const blockhash = await provider.connection.getLatestBlockhash();
     combinedTx.recentBlockhash = blockhash.blockhash;
     combinedTx.feePayer = creatorPubkey;
-
+    combinedTx.partialSign(mintKeypair);
     // Use the new transaction service
+    console.log("combinedTx =>", combinedTx);
     const txSignature = await TransactionService.signAndSendTransaction(
       { type: 'transaction', transaction: combinedTx },
       solanaWallet, // Pass wallet directly - TransactionService will handle it
