@@ -489,6 +489,39 @@ export function createThreadStyles(
       fontWeight: 'bold',
       fontSize: 15,
     },
+
+    // Image preview in composer
+    imagePreviewContainer: {
+      marginTop: 12,
+      marginBottom: 8,
+      borderRadius: 12,
+      overflow: 'hidden',
+      position: 'relative',
+      alignSelf: 'flex-start',
+      borderWidth: 1,
+      borderColor: '#eaeaea',
+    },
+    imagePreview: {
+      width: 160,
+      height: 160,
+      borderRadius: 12,
+    },
+    removeImageButton: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    removeImageButtonText: {
+      color: 'white',
+      fontSize: 14,
+      fontWeight: 'bold',
+    },
   });
 
   // Merge userStyleSheet if provided

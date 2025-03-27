@@ -53,7 +53,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
     price: number;
   } | null>(null);
 
-  // We’ll store requestAnimationFrame IDs here so we can cancel on cleanup.
+  // We'll store requestAnimationFrame IDs here so we can cancel on cleanup.
   const rafIdRef = useRef<number | null>(null);
 
   // For easy comparison of old vs new props
@@ -76,10 +76,58 @@ const LineGraph: React.FC<LineGraphProps> = ({
     timestamp: string | number | Date | undefined,
   ): number | undefined => {
     if (!timestamp) return undefined;
-    if (typeof timestamp === 'number') return timestamp;
-    if (typeof timestamp === 'string') return new Date(timestamp).getTime();
+    
+    // If timestamp is a Date object, get its milliseconds
     if (timestamp instanceof Date) return timestamp.getTime();
+    
+    // If timestamp is a string, try to parse it
+    if (typeof timestamp === 'string') {
+      // Try to parse as ISO date string
+      const parsedDate = new Date(timestamp);
+      if (!isNaN(parsedDate.getTime())) {
+        return parsedDate.getTime();
+      }
+      
+      // If not a valid date string, try parsing as a number
+      const numTimestamp = parseInt(timestamp, 10);
+      if (!isNaN(numTimestamp)) {
+        return convertTimestampToMs(numTimestamp);
+      }
+      
+      return undefined;
+    }
+    
+    // If timestamp is a number, check if it's in seconds and convert if needed
+    if (typeof timestamp === 'number') {
+      return convertTimestampToMs(timestamp);
+    }
+    
     return undefined;
+  };
+  
+  // Helper to distinguish between second-based and millisecond-based timestamps
+  const convertTimestampToMs = (timestamp: number): number => {
+    // If timestamp is in seconds (before year 2000), convert to milliseconds
+    // Using a simple heuristic: if timestamp represents a date before year 2000, 
+    // it's likely in seconds not milliseconds
+    const year2000 = 946684800000; // milliseconds since epoch for Jan 1, 2000
+    
+    if (timestamp < year2000 / 1000) {
+      console.log(`Converting timestamp ${timestamp} from seconds to milliseconds`);
+      return timestamp * 1000;
+    }
+    
+    // Heuristic for timestamps in seconds after year 2000
+    // Current time is around 1.7 trillion milliseconds since epoch
+    // If timestamp is much smaller than current time (< 1% of current time in ms)
+    // but still represents a date after 2000, it's likely in seconds
+    const currentTimeMs = Date.now();
+    if (timestamp > 946684800 && timestamp < currentTimeMs / 100) {
+      console.log(`Converting timestamp ${timestamp} from seconds to milliseconds`);
+      return timestamp * 1000;
+    }
+    
+    return timestamp;
   };
 
   // Interpolate the Y position for a given data point
@@ -99,7 +147,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
     (locationX: number) => {
       if (!data || data.length === 0) return;
 
-      // chart width minus chart kit’s default padding
+      // chart width minus chart kit's default padding
       const chartWidth = screenWidth - 40;
       const segmentWidth = chartWidth / (data.length - 1);
 
@@ -115,18 +163,41 @@ const LineGraph: React.FC<LineGraphProps> = ({
   );
 
   // For the pan responder, we now use requestAnimationFrame for super-smooth updates
+  // and add debounce logic to avoid too many updates
+  const lastUpdateTimeRef = useRef<number>(0);
+  const pendingPositionRef = useRef<number | null>(null);
+  
   const handleTooltip = useCallback(
     (e: any) => {
       if (!data || data.length === 0) return;
       const locationX = e?.nativeEvent?.locationX;
       if (locationX == null) return;
-
+      
+      // Store the latest position
+      pendingPositionRef.current = locationX;
+      
+      // Cancel any existing animation frame
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
       }
-      rafIdRef.current = requestAnimationFrame(() => {
+      
+      const now = Date.now();
+      // If we've updated recently, wait a bit before doing another update
+      if (now - lastUpdateTimeRef.current < 16) { // ~60fps timing
+        rafIdRef.current = requestAnimationFrame(() => {
+          // Only calculate position if we still have a pending position
+          if (pendingPositionRef.current !== null) {
+            calculateTooltipPosition(pendingPositionRef.current);
+            lastUpdateTimeRef.current = Date.now();
+            pendingPositionRef.current = null;
+          }
+        });
+      } else {
+        // Update immediately
         calculateTooltipPosition(locationX);
-      });
+        lastUpdateTimeRef.current = now;
+        pendingPositionRef.current = null;
+      }
     },
     [calculateTooltipPosition, data],
   );
@@ -136,6 +207,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
       cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = null;
     }
+    pendingPositionRef.current = null; // Clear any pending position
     setTooltipPos(null);
   }, []);
 
@@ -151,7 +223,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
   }, [handleTooltip, clearTooltip]);
 
   // Smoothly animate from old data to new data
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dataChanged =
       data.length !== prevPropsRef.current.dataLength ||
       JSON.stringify(data) !== JSON.stringify(currentData.current);
@@ -202,7 +274,17 @@ const LineGraph: React.FC<LineGraphProps> = ({
   // Format date/time
   const formatTimestamp = useCallback((ts: number) => {
     if (!ts) return '';
-    const date = new Date(ts);
+    
+    // Make sure ts is in milliseconds
+    const tsInMs = ts < 10000000000 ? ts * 1000 : ts; // Convert if in seconds
+    const date = new Date(tsInMs);
+    
+    // Check if it's a valid date before formatting
+    if (isNaN(date.getTime())) {
+      console.error(`Invalid timestamp: ${ts}`);
+      return '';
+    }
+    
     return date.toLocaleString(undefined, {
       month: 'short',
       day: 'numeric',
@@ -229,7 +311,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
     return null;
   }, [userAvatar]);
 
-  // Figure out which index to place the “execution” marker
+  // Figure out which index to place the "execution" marker
   const executionIndex = useMemo(() => {
     if (!executionPrice || data.length === 0) return -1;
 
@@ -242,23 +324,50 @@ const LineGraph: React.FC<LineGraphProps> = ({
       const parsedExecTs = getTimestampInMs(executionTimestamp);
       if (!parsedExecTs) return findClosestByPrice();
 
-      const lastTime = Number(timestamps[timestamps.length - 1]);
-      const firstTime = Number(timestamps[0]);
+      // Convert timestamps array to milliseconds if needed
+      const timeInMs = timestamps.map(t => t < 10000000000 ? t * 1000 : t);
+      
+      const lastTime = timeInMs[timeInMs.length - 1];
+      const firstTime = timeInMs[0];
+
+      console.log("Execution timestamp:", new Date(parsedExecTs).toISOString(), parsedExecTs);
+      console.log("Chart timeframe:", 
+        `${new Date(firstTime).toISOString()} (${firstTime}) to ${new Date(lastTime).toISOString()} (${lastTime})`
+      );
 
       // If it's beyond the chart range, clamp to edges
-      if (parsedExecTs > lastTime) return data.length - 1;
-      if (parsedExecTs < firstTime) return 0;
+      if (parsedExecTs > lastTime) {
+        console.log("Execution timestamp is after chart range, clamping to end");
+        return data.length - 1;
+      }
+      if (parsedExecTs < firstTime) {
+        console.log("Execution timestamp is before chart range, clamping to start");
+        return 0;
+      }
 
+      // Logic to find closest timestamp index
       let closest = 0;
-      let minDiff = Math.abs(Number(timestamps[0]) - parsedExecTs);
+      let minDiff = Math.abs(timeInMs[0] - parsedExecTs);
 
-      for (let i = 1; i < timestamps.length; i++) {
-        const diff = Math.abs(Number(timestamps[i]) - parsedExecTs);
+      // Find the closest timestamp by iterating through all points
+      for (let i = 1; i < timeInMs.length; i++) {
+        const diff = Math.abs(timeInMs[i] - parsedExecTs);
         if (diff < minDiff) {
           minDiff = diff;
           closest = i;
         }
       }
+      
+      // If the execution time is very close to start but not exactly,
+      // move it slightly inward to make it more visible
+      if (closest === 0 && timeInMs.length > 2 && 
+          parsedExecTs > firstTime && 
+          parsedExecTs < firstTime + (lastTime - firstTime) * 0.1) {
+        closest = 1;
+      }
+      
+      console.log("Placing execution marker at index:", closest, 
+                 `(${(closest/(timeInMs.length-1)*100).toFixed(1)}% of chart)`);
       return closest;
     }
 
@@ -266,6 +375,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
     return findClosestByPrice();
 
     function findClosestByPrice() {
+      if (executionPrice === undefined) return -1;
       let cIdx = 0;
       let best = Math.abs(data[0] - executionPrice);
       for (let i = 1; i < data.length; i++) {
@@ -324,7 +434,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
   // Renders the tooltip above the touched point
   const renderTooltip = useCallback(
     (x: number, y: number, idx: number, price: number) => {
-      // We’ll shift the tooltip to avoid edges if needed
+      // We'll shift the tooltip to avoid edges if needed
       const isNearLeft = x < 120;
       const isNearRight = x > screenWidth - 120;
       const tooltipW = 150;

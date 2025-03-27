@@ -471,6 +471,27 @@ export default function Profile({
     } as never);
   }, [followingList, navigation, userWallet]);
 
+  // Memoize follow/unfollow callbacks to prevent re-renders when amIFollowing changes
+  const memoizedFollowProps = useMemo(() => ({
+    amIFollowing,
+    areTheyFollowingMe,
+    onFollowPress: handleFollow,
+    onUnfollowPress: handleUnfollow,
+    followersCount: followersList.length,
+    followingCount: followingList.length,
+    onPressFollowers: handlePressFollowers,
+    onPressFollowing: handlePressFollowing
+  }), [
+    // Only include the follower counts in dependencies, not the actual following state
+    // This prevents re-renders of unrelated components when following state changes
+    followersList.length,
+    followingList.length,
+    handleFollow,
+    handleUnfollow,
+    handlePressFollowers,
+    handlePressFollowing
+  ]);
+
   const resolvedUser: UserProfileData = useMemo(
     () => ({
       address: userWallet || '',
@@ -498,14 +519,8 @@ export default function Profile({
         fetchNftsError={resolvedNftError}
         onAvatarPress={handleAvatarPress}
         onEditProfile={handleOpenEditModal}
-        amIFollowing={amIFollowing}
-        areTheyFollowingMe={areTheyFollowingMe}
-        onFollowPress={handleFollow}
-        onUnfollowPress={handleUnfollow}
-        followersCount={followersList.length}
-        followingCount={followingList.length}
-        onPressFollowers={handlePressFollowers}
-        onPressFollowing={handlePressFollowing}
+        // Pass the memoized props to avoid unnecessary re-renders
+        {...memoizedFollowProps}
         onPressPost={post => {
           navigation.navigate('PostThread', { postId: post.id });
         }}

@@ -17,6 +17,8 @@ import { getMergedTheme } from '../../thread/thread.styles';
 import styles from './TradeCard.style';
 import { useCoingecko, Timeframe } from '../../../hooks/useCoingecko';
 import LineGraph from './LineGraph';
+import TokenDetailsDrawer from '../TokenDetailsDrawer/TokenDetailsDrawer';
+import { fetchJupiterTokenData } from '../../../utils/tokenUtils';
 
 export interface TradeData {
   inputMint: string;
@@ -33,29 +35,11 @@ export interface TradeData {
   executionTimestamp?: any;
 }
 
-// Cache for Jupiter token metadata to avoid duplicate fetches
-const jupiterTokenCache = new Map();
+// Cache moved to tokenUtils.ts
+// const jupiterTokenCache = new Map();
 
-async function fetchJupiterTokenData(mint: string) {
-  // Return from cache if available
-  if (jupiterTokenCache.has(mint)) {
-    return jupiterTokenCache.get(mint);
-  }
-  
-  try {
-    const response = await fetch(`https://api.jup.ag/tokens/v1/token/${mint}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch token data for ${mint}`);
-    }
-    const data = await response.json();
-    // Store in cache
-    jupiterTokenCache.set(mint, data);
-    return data;
-  } catch (err) {
-    console.error('Jupiter token fetch error:', err);
-    return null;
-  }
-}
+// Function moved to tokenUtils.ts
+// async function fetchJupiterTokenData(mint: string) {...}
 
 export interface TradeCardProps {
   tradeData: TradeData;
@@ -103,6 +87,12 @@ function TradeCard({
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [metaFetchFinished, setMetaFetchFinished] = useState(false);
 
+  // --------------------------------------------------
+  // Token Details Drawer state
+  // --------------------------------------------------
+  const [showInputTokenDrawer, setShowInputTokenDrawer] = useState(false);
+  const [showOutputTokenDrawer, setShowOutputTokenDrawer] = useState(false);
+
   // For preventing duplicate fetch calls
   const prevMintPairRef = useRef<{ inputMint: string; outputMint: string }>({
     inputMint: '',
@@ -146,10 +136,14 @@ function TradeCard({
     setLoadingMeta(true);
     
     try {
-      // Only output token fetch to reduce API calls
-      const outMeta = await fetchJupiterTokenData(tradeData.outputMint);
+      // Fetch both input and output token data
+      const [inMeta, outMeta] = await Promise.all([
+        fetchJupiterTokenData(tradeData.inputMint),
+        fetchJupiterTokenData(tradeData.outputMint)
+      ]);
       
       if (!canceled) {
+        setInputTokenMeta(inMeta);
         setOutputTokenMeta(outMeta);
         prevMintPairRef.current = {
           inputMint: tradeData.inputMint,
@@ -264,6 +258,17 @@ function TradeCard({
   }, [refreshCoinData]);
 
   // --------------------------------------------------
+  // Handlers for Token Detail Drawer
+  // --------------------------------------------------
+  const handleOpenInputTokenDetails = useCallback(() => {
+    setShowInputTokenDrawer(true);
+  }, []);
+
+  const handleOpenOutputTokenDetails = useCallback(() => {
+    setShowOutputTokenDrawer(true);
+  }, []);
+
+  // --------------------------------------------------
   // Render: Chart Mode
   // --------------------------------------------------
   const isOutputChartMode = !!showGraphForOutputToken;
@@ -271,152 +276,170 @@ function TradeCard({
   
   if (isOutputChartMode) {
     return (
-      <View style={styles.tradeCardContainer}>
-        {/* Output token details row */}
-        <View style={styles.tradeCardCombinedSides}>
-          <View style={styles.tradeCardLeftSide}>
-            <Image
-              source={
-                fallbackOutLogo
-                  ? { uri: fallbackOutLogo }
-                  : require('../../../assets/images/SENDlogo.png')
-              }
-              style={styles.tradeCardTokenImage}
-            />
-            <View style={styles.tradeCardNamePriceContainer}>
-              <Text style={styles.tradeCardTokenName}>{fallbackOutName}</Text>
-              <Text style={styles.tradeCardTokenPrice}>
-                {timeframePrice ? `$${timeframePrice.toFixed(4)}` : '$0.00'}
+      <>
+        <View style={styles.tradeCardContainer}>
+          {/* Output token details row */}
+          <TouchableOpacity 
+            style={styles.tradeCardCombinedSides}
+            onPress={handleOpenOutputTokenDetails}
+            activeOpacity={0.7}
+          >
+            <View style={styles.tradeCardLeftSide}>
+              <Image
+                source={
+                  fallbackOutLogo
+                    ? { uri: fallbackOutLogo }
+                    : require('../../../assets/images/SENDlogo.png')
+                }
+                style={styles.tradeCardTokenImage}
+              />
+              <View style={styles.tradeCardNamePriceContainer}>
+                <Text style={styles.tradeCardTokenName}>{fallbackOutName}</Text>
+                <Text style={styles.tradeCardTokenPrice}>
+                  {timeframePrice ? `$${timeframePrice.toFixed(4)}` : '$0.00'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.tradeCardRightSide}>
+              <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
+                {tradeData.outputQuantity}
+              </Text>
+              <Text style={styles.tradeCardUsdPrice}>
+                {tradeData.outputUsdValue ?? ''}
               </Text>
             </View>
-          </View>
-          <View style={styles.tradeCardRightSide}>
-            <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
-              {tradeData.outputQuantity}
-            </Text>
-            <Text style={styles.tradeCardUsdPrice}>
-              {tradeData.outputUsdValue ?? ''}
-            </Text>
-          </View>
-        </View>
-
-        {/* Timeframe Row + Refresh Button */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginVertical: 8,
-          }}
-        >
-          {(['1H', '1D', '1W', '1M', 'All'] as Timeframe[]).map(tf => (
-            <TouchableOpacity
-              key={tf}
-              style={{
-                marginHorizontal: 4,
-                padding: 6,
-                borderRadius: 6,
-                backgroundColor: timeframe === tf ? '#D6FDFF' : 'transparent',
-              }}
-              onPress={() => setTimeframe(tf)}
-            >
-              <Text
-                style={{
-                  color: timeframe === tf ? '#32D4DE' : '#666666',
-                  fontWeight: timeframe === tf ? '600' : '400',
-                }}
-              >
-                {tf}
-              </Text>
-            </TouchableOpacity>
-          ))}
-
-          {/* Refresh icon => re-fetch coin data */}
-          <TouchableOpacity
-            style={{ marginLeft: 16, flexDirection: 'row', alignItems: 'center' }}
-            onPress={handleRefresh}
-            accessibilityLabel="Refresh Chart"
-          >
-            <Icon.SwapIcon width={20} height={20} />
-            <Text style={{ color: '#1d9bf0', marginLeft: 4 }}>Refresh</Text>
           </TouchableOpacity>
-        </View>
 
-        {/* Chart container */}
-        <View
-          style={[
-            {
-              width: '100%',
-              height: 220,
+          {/* Timeframe Row + Refresh Button */}
+          <View
+            style={{
+              flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: '#FFFFFF',
-            } as StyleProp<ViewStyle>,
-          ]}
-        >
-          {isLoading ? (
-            <ActivityIndicator size="large" color="#1d9bf0" />
-          ) : graphData.length > 0 ? (
-            <>
-              <LineGraph
-                data={graphData}
-                width={Dimensions.get('window').width - 70}
-                executionPrice={executionPrice}
-                executionTimestamp={executionTimestamp}
-                timestamps={timestamps}
-                userAvatar={userAvatar}
-              />
-              <View
+              marginVertical: 8,
+            }}
+          >
+            {(['1H', '1D', '1W', '1M', 'All'] as Timeframe[]).map(tf => (
+              <TouchableOpacity
+                key={tf}
                 style={{
-                  flexDirection: 'row',
-                  justifyContent: 'center',
-                  marginTop: 5,
-                  opacity: 0.7,
+                  marginHorizontal: 4,
+                  padding: 6,
+                  borderRadius: 6,
+                  backgroundColor: timeframe === tf ? '#D6FDFF' : 'transparent',
                 }}
+                onPress={() => setTimeframe(tf)}
               >
+                <Text
+                  style={{
+                    color: timeframe === tf ? '#32D4DE' : '#666666',
+                    fontWeight: timeframe === tf ? '600' : '400',
+                  }}
+                >
+                  {tf}
+                </Text>
+              </TouchableOpacity>
+            ))}
+
+            {/* Refresh icon => re-fetch coin data */}
+            <TouchableOpacity
+              style={{ marginLeft: 16, flexDirection: 'row', alignItems: 'center' }}
+              onPress={handleRefresh}
+              accessibilityLabel="Refresh Chart"
+            >
+              <Icon.SwapIcon width={20} height={20} />
+              <Text style={{ color: '#1d9bf0', marginLeft: 4 }}>Refresh</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Chart container */}
+          <View
+            style={[
+              {
+                width: '100%',
+                height: 220,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#FFFFFF',
+              } as StyleProp<ViewStyle>,
+            ]}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="large" color="#1d9bf0" />
+            ) : graphData.length > 0 ? (
+              <>
+                <LineGraph
+                  data={graphData}
+                  width={Dimensions.get('window').width - 70}
+                  executionPrice={executionPrice}
+                  executionTimestamp={executionTimestamp}
+                  timestamps={timestamps}
+                  userAvatar={userAvatar}
+                />
                 <View
                   style={{
                     flexDirection: 'row',
-                    alignItems: 'center',
-                    marginRight: 12,
+                    justifyContent: 'center',
+                    marginTop: 5,
+                    opacity: 0.7,
                   }}
                 >
                   <View
                     style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: '#318EF8',
-                      marginRight: 4,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      marginRight: 12,
                     }}
-                  />
-                  <Text style={{ fontSize: 10 }}>Current</Text>
+                  >
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: '#318EF8',
+                        marginRight: 4,
+                      }}
+                    />
+                    <Text style={{ fontSize: 10 }}>Current</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: '#FF5722',
+                        marginRight: 4,
+                      }}
+                    />
+                    <Text style={{ fontSize: 10 }}>Trade Execution</Text>
+                  </View>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <View
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: '#FF5722',
-                      marginRight: 4,
-                    }}
-                  />
-                  <Text style={{ fontSize: 10 }}>Trade Execution</Text>
-                </View>
-              </View>
-            </>
-          ) : coinError ? (
-            <Text style={{ color: 'red', marginTop: 6 }}>
-              Error: {coinError.toString()}
-            </Text>
-          ) : (
-            <Text style={{ color: '#999', marginTop: 6 }}>
-              No chart data found. Try a different timeframe or refresh.
-            </Text>
-          )}
+              </>
+            ) : coinError ? (
+              <Text style={{ color: 'red', marginTop: 6 }}>
+                Error: {coinError.toString()}
+              </Text>
+            ) : (
+              <Text style={{ color: '#999', marginTop: 6 }}>
+                No chart data found. Try a different timeframe or refresh.
+              </Text>
+            )}
+          </View>
         </View>
-      </View>
+
+        {/* Token Details Drawer for output token */}
+        <TokenDetailsDrawer
+          visible={showOutputTokenDrawer}
+          onClose={() => setShowOutputTokenDrawer(false)}
+          tokenMint={tradeData.outputMint}
+          initialData={{
+            symbol: tradeData.outputSymbol,
+            name: fallbackOutName,
+            logoURI: fallbackOutLogo,
+          }}
+        />
+      </>
     );
   }
 
@@ -424,98 +447,131 @@ function TradeCard({
   // Non-chart mode => standard "swap" view
   // --------------------------------------------------
   return (
-    <View style={styles.tradeCardContainer}>
-      {loadingMeta ? (
-        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="small" color="#1d9bf0" />
-        </View>
-      ) : (
-        <>
-          <View style={{ position: 'relative' }}>
-            {/* Input token info */}
-            <View style={styles.tradeCardCombinedSides}>
-              <View style={styles.tradeCardLeftSide}>
-                <Image
-                  source={
-                    fallbackInLogo
-                      ? { uri: fallbackInLogo }
-                      : require('../../../assets/images/SENDlogo.png')
-                  }
-                  style={styles.tradeCardTokenImage}
-                />
-                <View style={styles.tradeCardNamePriceContainer}>
-                  <Text style={styles.tradeCardTokenName}>
-                    {fallbackInName}
+    <>
+      <View style={styles.tradeCardContainer}>
+        {loadingMeta ? (
+          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="small" color="#1d9bf0" />
+          </View>
+        ) : (
+          <>
+            <View style={{ position: 'relative' }}>
+              {/* Input token info */}
+              <TouchableOpacity 
+                style={styles.tradeCardCombinedSides} 
+                onPress={handleOpenInputTokenDetails}
+                activeOpacity={0.7}
+              >
+                <View style={styles.tradeCardLeftSide}>
+                  <Image
+                    source={
+                      fallbackInLogo
+                        ? { uri: fallbackInLogo }
+                        : require('../../../assets/images/SENDlogo.png')
+                    }
+                    style={styles.tradeCardTokenImage}
+                  />
+                  <View style={styles.tradeCardNamePriceContainer}>
+                    <Text style={styles.tradeCardTokenName}>
+                      {fallbackInName}
+                    </Text>
+                    <Text style={styles.tradeCardTokenPrice}>
+                      {tradeData.inputUsdValue ?? ''}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.tradeCardRightSide}>
+                  <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
+                    {tradeData.inputQuantity}
                   </Text>
-                  <Text style={styles.tradeCardTokenPrice}>
+                  <Text style={styles.tradeCardUsdPrice}>
                     {tradeData.inputUsdValue ?? ''}
                   </Text>
                 </View>
-              </View>
-              <View style={styles.tradeCardRightSide}>
-                <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
-                  {tradeData.inputQuantity}
-                </Text>
-                <Text style={styles.tradeCardUsdPrice}>
-                  {tradeData.inputUsdValue ?? ''}
-                </Text>
-              </View>
-            </View>
+              </TouchableOpacity>
 
-            {/* Center swap icon */}
-            <View style={styles.tradeCardSwapIcon}>
-              <Icon.SwapIcon />
-            </View>
+              {/* Center swap icon */}
+              <View style={styles.tradeCardSwapIcon}>
+                <Icon.SwapIcon />
+              </View>
 
-            {/* Output token info */}
-            <View style={styles.tradeCardCombinedSides}>
-              <View style={styles.tradeCardLeftSide}>
-                <Image
-                  source={
-                    fallbackOutLogo
-                      ? { uri: fallbackOutLogo }
-                      : require('../../../assets/images/SENDlogo.png')
-                  }
-                  style={styles.tradeCardTokenImage}
-                />
-                <View style={styles.tradeCardNamePriceContainer}>
-                  <Text style={styles.tradeCardTokenName}>
-                    {fallbackOutName}
+              {/* Output token info */}
+              <TouchableOpacity 
+                style={styles.tradeCardCombinedSides}
+                onPress={handleOpenOutputTokenDetails}
+                activeOpacity={0.7}
+              >
+                <View style={styles.tradeCardLeftSide}>
+                  <Image
+                    source={
+                      fallbackOutLogo
+                        ? { uri: fallbackOutLogo }
+                        : require('../../../assets/images/SENDlogo.png')
+                    }
+                    style={styles.tradeCardTokenImage}
+                  />
+                  <View style={styles.tradeCardNamePriceContainer}>
+                    <Text style={styles.tradeCardTokenName}>
+                      {fallbackOutName}
+                    </Text>
+                    <Text style={styles.tradeCardTokenPrice}>
+                      {tradeData.outputUsdValue ?? ''}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.tradeCardRightSide}>
+                  <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
+                    {tradeData.outputQuantity} {tradeData.outputSymbol}
                   </Text>
-                  <Text style={styles.tradeCardTokenPrice}>
+                  <Text style={styles.tradeCardUsdPrice}>
                     {tradeData.outputUsdValue ?? ''}
                   </Text>
                 </View>
-              </View>
-              <View style={styles.tradeCardRightSide}>
-                <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
-                  {tradeData.outputQuantity} {tradeData.outputSymbol}
-                </Text>
-                <Text style={styles.tradeCardUsdPrice}>
-                  {tradeData.outputUsdValue ?? ''}
-                </Text>
-              </View>
+              </TouchableOpacity>
             </View>
-          </View>
 
-          {/* Optional CTA button */}
-          {onTrade && (
-            <TouchableOpacity
-              style={{
-                marginTop: 10,
-                backgroundColor: '#1d9bf0',
-                padding: 10,
-                borderRadius: 5,
-                alignItems: 'center',
-              }}
-              onPress={onTrade}
-            >
-              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Trade Now</Text>
-            </TouchableOpacity>
-          )}
-        </>
-      )}
-    </View>
+            {/* Optional CTA button */}
+            {onTrade && (
+              <TouchableOpacity
+                style={{
+                  marginTop: 10,
+                  backgroundColor: '#1d9bf0',
+                  padding: 10,
+                  borderRadius: 5,
+                  alignItems: 'center',
+                }}
+                onPress={onTrade}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Trade Now</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+      </View>
+
+      {/* Token Details Drawers */}
+      <TokenDetailsDrawer
+        visible={showInputTokenDrawer}
+        onClose={() => setShowInputTokenDrawer(false)}
+        tokenMint={tradeData.inputMint}
+        initialData={{
+          symbol: tradeData.inputSymbol,
+          name: fallbackInName,
+          logoURI: fallbackInLogo,
+        }}
+      />
+      
+      <TokenDetailsDrawer
+        visible={showOutputTokenDrawer}
+        onClose={() => setShowOutputTokenDrawer(false)}
+        tokenMint={tradeData.outputMint}
+        initialData={{
+          symbol: tradeData.outputSymbol,
+          name: fallbackOutName,
+          logoURI: fallbackOutLogo,
+        }}
+      />
+    </>
   );
 }
 

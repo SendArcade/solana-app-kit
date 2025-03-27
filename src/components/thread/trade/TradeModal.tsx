@@ -65,6 +65,8 @@ interface TradeModalProps {
   initialOutputToken?: TokenInfo;
   /** Whether to disable tab switching */
   disableTabs?: boolean;
+  /** Initial active tab to show */
+  initialActiveTab?: TabOption;
 }
 
 /**
@@ -85,12 +87,15 @@ export default function TradeModal({
   initialInputToken,
   initialOutputToken,
   disableTabs,
+  initialActiveTab,
 }: TradeModalProps) {
   const dispatch = useAppDispatch();
   // Use our wallet hook
   const { publicKey: userPublicKey, connected, sendTransaction } = useWallet();
 
-  const [selectedTab, setSelectedTab] = useState<TabOption>('PAST_SWAPS');
+  const [selectedTab, setSelectedTab] = useState<TabOption>(
+    initialActiveTab ?? 'PAST_SWAPS'
+  );
 
   const [inputToken, setInputToken] = useState<TokenInfo>(
     initialInputToken ?? {
@@ -118,11 +123,13 @@ export default function TradeModal({
   >('input');
   const [showSelectTokenModal, setShowSelectTokenModal] = useState(false);
 
-  const [solAmount, setSolAmount] = useState('0.01');
+  const [solAmount, setSolAmount] = useState('0');
   const [loading, setLoading] = useState(false);
   const [resultMsg, setResultMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [solscanTxSig, setSolscanTxSig] = useState('');
+  const [currentTokenPrice, setCurrentTokenPrice] = useState<number | null>(null);
+  const [currentBalance, setCurrentBalance] = useState<number | null>(null);
 
   // State to handle "Share your trade?" prompt
   const [showSharePrompt, setShowSharePrompt] = useState(false);
@@ -168,6 +175,153 @@ export default function TradeModal({
     if (isNaN(val)) return 0;
     return val * Math.pow(10, decimals);
   }
+
+  /**
+   * Fetches the user's balance for the current input token
+   */
+  const fetchTokenBalance = useCallback(async () => {
+    if (!connected || !userPublicKey) return;
+    
+    try {
+      const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
+      const connection = new Connection(rpcUrl, 'confirmed');
+      
+      if (inputToken.symbol === 'SOL' || 
+          inputToken.address === 'So11111111111111111111111111111111111111112') {
+        // For native SOL
+        const balance = await connection.getBalance(userPublicKey);
+        // Reserve some SOL for transaction fees
+        const usableBalance = Math.max(0, balance - 0.005 * 1e9); // Reserve 0.01 SOL
+        setCurrentBalance(usableBalance / Math.pow(10, 9));
+      } else {
+        // For SPL tokens
+        try {
+          const tokenPubkey = new PublicKey(inputToken.address);
+          const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+            userPublicKey,
+            { mint: tokenPubkey }
+          );
+          
+          if (tokenAccounts.value.length > 0) {
+            // Get the token amount from the first account
+            const tokenBalance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount;
+            const amount = parseFloat(tokenBalance.amount) / Math.pow(10, tokenBalance.decimals);
+            setCurrentBalance(amount);
+          } else {
+            setCurrentBalance(0);
+          }
+        } catch (err) {
+          console.error('Error fetching token balance:', err);
+          setCurrentBalance(0);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching balance:', err);
+      setCurrentBalance(0);
+    }
+  }, [connected, userPublicKey, inputToken]);
+
+  /**
+   * Fetches current price of the input token
+   */
+  const fetchTokenPrice = useCallback(async () => {
+    try {
+      if (inputToken.symbol === 'SOL' || 
+          inputToken.address === 'So11111111111111111111111111111111111111112') {
+        // Fetch SOL price from CoinGecko or similar API
+        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+        const data = await response.json();
+        if (data && data.solana && data.solana.usd) {
+          setCurrentTokenPrice(data.solana.usd);
+        }
+      } else if (inputToken.symbol === 'USDC' || 
+                inputToken.address === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') {
+        // Stablecoins
+        setCurrentTokenPrice(1);
+      } else {
+        // For other tokens, you could fetch from Jupiter or another price API
+        // For now, fallback to approximate value
+        setCurrentTokenPrice(null);
+      }
+    } catch (err) {
+      console.error('Error fetching token price:', err);
+      setCurrentTokenPrice(null);
+    }
+  }, [inputToken]);
+
+  // Fetch balance and price when input token changes or when wallet connects
+  useEffect(() => {
+    if (connected && userPublicKey) {
+      fetchTokenBalance();
+      fetchTokenPrice();
+    }
+  }, [connected, userPublicKey, inputToken, fetchTokenBalance, fetchTokenPrice]);
+
+  /**
+   * Estimates USD value of a token by approximation using various methods.
+   * For SOL we get the price from Jupiter, for other tokens we make simple approximations.
+   */
+  const estimateTokenUsdValue = async (
+    tokenAmount: number,
+    decimals: number,
+    tokenMint: string,
+    tokenSymbol?: string
+  ): Promise<string> => {
+    // Default when all else fails
+    let result = `$??`;
+    
+    try {
+      // Convert lamports to tokens
+      const normalizedAmount = tokenAmount / Math.pow(10, decimals);
+      
+      // SOL special case - use a known price or fetch current price
+      if (
+        tokenMint === 'So11111111111111111111111111111111111111112' || 
+        tokenSymbol?.toUpperCase() === 'SOL'
+      ) {
+        // Use cached SOL price or fetch if needed
+        let solPrice = currentTokenPrice;
+        if (!solPrice) {
+          try {
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+            const data = await response.json();
+            if (data && data.solana && data.solana.usd) {
+              solPrice = data.solana.usd;
+            } else {
+              solPrice = 150; // Fallback if API fails
+            }
+          } catch (err) {
+            solPrice = 150; // Fallback on error
+          }
+        }
+        const estimated = normalizedAmount * (solPrice || 150); // Use 150 as fallback if still null
+        return `$${estimated.toFixed(2)}`;
+      }
+      
+      // USDC, USDT case
+      if (
+        tokenMint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' || // USDC
+        tokenSymbol?.toUpperCase() === 'USDC' ||
+        tokenMint === 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB' || // USDT
+        tokenSymbol?.toUpperCase() === 'USDT'
+      ) {
+        // Stablecoins - approximately $1
+        return `$${normalizedAmount.toFixed(2)}`;
+      }
+      
+      // For all other tokens, we would ideally fetch price from an API
+      // For now, let's return a placeholder if amount is small, or rough estimate if large
+      if (normalizedAmount < 1000) {
+        result = `$${(normalizedAmount * 0.1).toFixed(2)}`; // Assume $0.10 per token for small amounts
+      } else {
+        result = `~$${Math.round(normalizedAmount * 0.05)}`; // Rough estimate for large amounts
+      }
+    } catch (err) {
+      console.error('Error estimating token value:', err);
+    }
+    
+    return result;
+  };
 
   /**
    * This method triggers a Jupiter swap, returning a transaction that we sign & send.
@@ -319,11 +473,24 @@ export default function TradeModal({
         // Prepare post content
         const localId = 'local-' + Math.random().toString(36).substr(2, 9);
 
-        // Build some placeholders for "display name" & USD values
-        // (In a real scenario, you'd fetch up-to-date token prices.)
+        // Calculate token quantities
         const localInputQty = inputLamports / Math.pow(10, inputTokenInfo.decimals);
-        const localOutputQty =
-          outputLamports / Math.pow(10, outputTokenInfo.decimals);
+        const localOutputQty = outputLamports / Math.pow(10, outputTokenInfo.decimals);
+
+        // Estimate USD values
+        const inputUsdValue = await estimateTokenUsdValue(
+          inputLamports,
+          inputTokenInfo.decimals,
+          inputTokenInfo.address,
+          inputTokenInfo.symbol
+        );
+        
+        const outputUsdValue = await estimateTokenUsdValue(
+          outputLamports,
+          outputTokenInfo.decimals,
+          outputTokenInfo.address,
+          outputTokenInfo.symbol
+        );
 
         const tradeData: TradeData = {
           inputMint: inputTokenInfo.address,
@@ -331,10 +498,12 @@ export default function TradeModal({
           aggregator: 'Jupiter',
           inputSymbol: inputTokenInfo.symbol,
           inputQuantity: localInputQty.toFixed(4),
-          inputUsdValue: '$??',
+          inputUsdValue,
           outputSymbol: outputTokenInfo.symbol,
           outputQuantity: localOutputQty.toFixed(4),
-          outputUsdValue: '$??',
+          outputUsdValue,
+          // For new trades, use current timestamp in milliseconds
+          executionTimestamp: Date.now(),
         };
 
         const postSections: ThreadSection[] = [
@@ -390,8 +559,32 @@ export default function TradeModal({
     async (swap: SwapTransaction) => {
       try {
         // Format amounts properly
+        console.log("swap", swap);
         const inputQty = swap.inputToken.amount / Math.pow(10, swap.inputToken.decimals);
         const outputQty = swap.outputToken.amount / Math.pow(10, swap.outputToken.decimals);
+
+        // Convert timestamp to milliseconds if needed (Helius provides timestamps in seconds)
+        const timestampMs = swap.timestamp < 10000000000 
+          ? swap.timestamp * 1000  // Convert to milliseconds if in seconds
+          : swap.timestamp;
+        
+        console.log("Original swap timestamp:", swap.timestamp);
+        console.log("Converted timestamp:", timestampMs, "->", new Date(timestampMs).toISOString());
+
+        // Estimate USD values
+        const inputUsdValue = await estimateTokenUsdValue(
+          swap.inputToken.amount,
+          swap.inputToken.decimals,
+          swap.inputToken.mint,
+          swap.inputToken.symbol
+        );
+        
+        const outputUsdValue = await estimateTokenUsdValue(
+          swap.outputToken.amount,
+          swap.outputToken.decimals,
+          swap.outputToken.mint,
+          swap.outputToken.symbol
+        );
 
         // Create trade data object
         const tradeData: TradeData = {
@@ -400,13 +593,13 @@ export default function TradeModal({
           aggregator: 'Jupiter',
           inputSymbol: swap.inputToken.symbol || 'Unknown',
           inputQuantity: inputQty.toFixed(4),
-          inputUsdValue: '$??',
+          inputUsdValue,
           outputSymbol: swap.outputToken.symbol || 'Unknown',
           inputAmountLamports: swap.inputToken.amount.toString(),
           outputAmountLamports: swap.outputToken.amount.toString(),
           outputQuantity: outputQty.toFixed(4),
-          outputUsdValue: '$??',
-          executionTimestamp: swap.timestamp,
+          outputUsdValue,
+          executionTimestamp: timestampMs,
         };
 
         // Generate a post with the trade data
@@ -758,13 +951,28 @@ export default function TradeModal({
               <TouchableOpacity
                 style={styles.maxButton}
                 onPress={() => {
-                  // In a real app, this would fetch and set max balance
-                  setSolAmount('1.0');
+                  // Set to user's actual balance
+                  if (currentBalance !== null) {
+                    setSolAmount(String(currentBalance));
+                  } else {
+                    // Fallback
+                    fetchTokenBalance().then(() => {
+                      if (currentBalance !== null) {
+                        setSolAmount(String(currentBalance));
+                      }
+                    });
+                  }
                 }}>
                 <Text style={styles.maxButtonText}>MAX</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.amountUsdValue}>~ $??</Text>
+            {currentTokenPrice && !isNaN(parseFloat(solAmount)) ? (
+              <Text style={styles.amountUsdValue}>
+                ~ ${(parseFloat(solAmount) * currentTokenPrice).toFixed(2)}
+              </Text>
+            ) : (
+              <Text style={styles.amountUsdValue}>~ $??</Text>
+            )}
           </View>
 
           {loading ? (

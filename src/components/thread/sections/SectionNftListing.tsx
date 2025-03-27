@@ -1,32 +1,60 @@
-import React, {useState, useEffect, useRef} from 'react';
-import {View, Text, Image, ActivityIndicator} from 'react-native';
-import {NftListingData} from '../thread.types';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, Image, ActivityIndicator } from 'react-native';
+import { NftListingData } from '../thread.types';
 import styles from './SectionNftListing.style';
-import {TENSOR_API_KEY} from '@env';
-import {DEFAULT_IMAGES} from '../../../config/constants';
+import { TENSOR_API_KEY } from '@env';
+import { DEFAULT_IMAGES } from '../../../config/constants';
 
 interface SectionNftListingProps {
   listingData?: NftListingData;
 }
 
-export default function SectionNftListing({listingData}: SectionNftListingProps) {
+// Create a cache for NFT and collection data to prevent redundant fetches
+const nftDataCache = new Map<string, any>();
+const collectionDataCache = new Map<string, any>();
+
+export default function SectionNftListing({ listingData }: SectionNftListingProps) {
   const [loading, setLoading] = useState(false);
   const [nftData, setNftData] = useState<any>(null);
   const [collectionData, setCollectionData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Track what we last fetched to avoid redundant fetches
-  const lastFetchedRef = useRef<{mint?: string, collId?: string} | null>(null);
+  const lastFetchedRef = useRef<{ mint?: string, collId?: string } | null>(null);
+  // Track if the component is mounted to prevent state updates after unmount
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!listingData) return;
 
-    // Determine if we need to fetch data
-    const needsFetch = 
-      !lastFetchedRef.current || 
+    // Check if we have cached data
+    if (listingData.isCollection && listingData.collId && collectionDataCache.has(listingData.collId)) {
+      const cachedData = collectionDataCache.get(listingData.collId);
+      if (cachedData) {
+        setCollectionData(cachedData);
+        return;
+      }
+    } else if (listingData.mint && nftDataCache.has(listingData.mint)) {
+      const cachedData = nftDataCache.get(listingData.mint);
+      if (cachedData) {
+        setNftData(cachedData);
+        return;
+      }
+    }
+
+    // If no cached data, determine if we need to fetch data
+    const needsFetch =
+      !lastFetchedRef.current ||
       (listingData.mint && lastFetchedRef.current.mint !== listingData.mint) ||
       (listingData.collId && lastFetchedRef.current.collId !== listingData.collId);
-    
+
     if (!needsFetch) return;
 
     let cancelled = false;
@@ -39,7 +67,7 @@ export default function SectionNftListing({listingData}: SectionNftListingProps)
         if (listingData.isCollection && listingData.collId) {
           await fetchCollectionData(listingData.collId);
           if (cancelled) return;
-        } 
+        }
         // Otherwise fetch specific NFT data
         else if (listingData.mint) {
           await fetchNftData(listingData.mint);
@@ -48,11 +76,11 @@ export default function SectionNftListing({listingData}: SectionNftListingProps)
           setError('No mint or collection ID provided');
         }
       } catch (err: any) {
-        if (!cancelled) {
+        if (!cancelled && isMountedRef.current) {
           setError(err.message || 'Failed to fetch data');
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && isMountedRef.current) {
           setLoading(false);
           // Track what we fetched
           lastFetchedRef.current = {
@@ -71,6 +99,15 @@ export default function SectionNftListing({listingData}: SectionNftListingProps)
 
   // Function to fetch NFT data
   const fetchNftData = async (mint: string) => {
+    // Check cache first
+    if (nftDataCache.has(mint)) {
+      const cachedData = nftDataCache.get(mint);
+      if (isMountedRef.current) {
+        setNftData(cachedData);
+      }
+      return;
+    }
+
     const url = `https://api.mainnet.tensordev.io/api/v1/mint?mints=${mint}`;
     const resp = await fetch(url, {
       headers: {
@@ -82,59 +119,82 @@ export default function SectionNftListing({listingData}: SectionNftListingProps)
     }
     const data = await resp.json();
     if (Array.isArray(data) && data.length > 0) {
-      setNftData(data[0]);
+      // Cache the data
+      nftDataCache.set(mint, data[0]);
+      if (isMountedRef.current) {
+        setNftData(data[0]);
+      }
     } else {
       throw new Error('No data returned from Tensor');
     }
   };
 
-// Function to fetch collection data - updated to use find_collection endpoint
-const fetchCollectionData = async (collId: string) => {
-  try {
-    // Use the find_collection endpoint to get comprehensive collection data
-    const url = `https://api.mainnet.tensordev.io/api/v1/collections/find_collection?filter=${collId}`;
-    const resp = await fetch(url, {
-      headers: {
-        'x-tensor-api-key': TENSOR_API_KEY,
-      },
-    });
-    
-    if (!resp.ok) {
-      throw new Error(`Tensor API error: ${resp.status}`);
+  // Function to fetch collection data - updated to use find_collection endpoint
+  const fetchCollectionData = async (collId: string) => {
+    // Check cache first
+    if (collectionDataCache.has(collId)) {
+      const cachedData = collectionDataCache.get(collId);
+      if (isMountedRef.current) {
+        setCollectionData(cachedData);
+      }
+      return;
     }
-    
-    const data = await resp.json();
-    console.log('Collection data:', data);
-    setCollectionData(data);
-    
-    // Now that we have collection data, fetch the current floor price
+
     try {
-      const floorUrl = `https://api.mainnet.tensordev.io/api/v1/mint/collection?collId=${collId}&sortBy=ListingPriceAsc&limit=1`;
-      const floorResp = await fetch(floorUrl, {
+      // Use the find_collection endpoint to get comprehensive collection data
+      const url = `https://api.mainnet.tensordev.io/api/v1/collections/find_collection?filter=${collId}`;
+      const resp = await fetch(url, {
         headers: {
           'x-tensor-api-key': TENSOR_API_KEY,
         },
       });
-      
-      if (floorResp.ok) {
-        const floorData = await floorResp.json();
-        if (floorData.mints?.length > 0 && floorData.mints[0].listing?.price) {
-          // Add floor price to collection data
-          setCollectionData((prev : any) => ({
-            ...prev,
-            floorPrice: parseFloat(floorData.mints[0].listing.price) / 1_000_000_000
-          }));
-        }
-      }
-    } catch (floorErr) {
-      console.error('Error fetching floor price:', floorErr);
-    }
-  } catch (err) {
-    console.error('Error fetching collection data:', err);
-    throw err;
-  }
-};
 
+      if (!resp.ok) {
+        throw new Error(`Tensor API error: ${resp.status}`);
+      }
+
+      const data = await resp.json();
+      if (isMountedRef.current) {
+        setCollectionData(data);
+      }
+
+      // Cache the data
+      collectionDataCache.set(collId, data);
+
+      // Now that we have collection data, fetch the current floor price
+      try {
+        const floorUrl = `https://api.mainnet.tensordev.io/api/v1/mint/collection?collId=${collId}&sortBy=ListingPriceAsc&limit=1`;
+        const floorResp = await fetch(floorUrl, {
+          headers: {
+            'x-tensor-api-key': TENSOR_API_KEY,
+          },
+        });
+
+        if (floorResp.ok) {
+          const floorData = await floorResp.json();
+          if (floorData.mints?.length > 0 && floorData.mints[0].listing?.price) {
+            // Add floor price to collection data
+            const updatedData = {
+              ...data,
+              floorPrice: parseFloat(floorData.mints[0].listing.price) / 1_000_000_000
+            };
+
+            // Update cache with floor price
+            collectionDataCache.set(collId, updatedData);
+
+            if (isMountedRef.current) {
+              setCollectionData(updatedData);
+            }
+          }
+        }
+      } catch (floorErr) {
+        console.error('Error fetching floor price:', floorErr);
+      }
+    } catch (err) {
+      console.error('Error fetching collection data:', err);
+      throw err;
+    }
+  };
 
   if (!listingData) {
     return <Text>[Missing listing data]</Text>;
@@ -142,8 +202,8 @@ const fetchCollectionData = async (collId: string) => {
 
   function formatSolPrice(price: number | string | undefined) {
     if (!price) return null;
-    const solPrice = typeof price === 'string' ? 
-      parseFloat(price) / 1_000_000_000 : 
+    const solPrice = typeof price === 'string' ?
+      parseFloat(price) / 1_000_000_000 :
       price;
     return solPrice.toFixed(2);
   }
@@ -152,7 +212,7 @@ const fetchCollectionData = async (collId: string) => {
     if (!uri || typeof uri !== 'string') {
       return DEFAULT_IMAGES.user; // fallback
     }
-    return {uri};
+    return { uri };
   }
 
   // Render based on whether it's a collection or specific NFT
@@ -183,7 +243,7 @@ const fetchCollectionData = async (collId: string) => {
             </Text>
 
             {collectionData?.floorPrice && (
-              <Text style={[styles.priceText, {color: '#32D4DE'}]}>
+              <Text style={[styles.priceText, { color: '#32D4DE' }]}>
                 Current Floor: {formatSolPrice(collectionData.floorPrice)} SOL
               </Text>
             )}
@@ -239,7 +299,7 @@ const fetchCollectionData = async (collId: string) => {
 
           {nftData?.lastSale?.price && (
             <Text style={styles.lastSale}>
-                            Last sale: {formatSolPrice(nftData.lastSale.price)} SOL
+              Last sale: {formatSolPrice(nftData.lastSale.price)} SOL
             </Text>
           )}
 
@@ -260,7 +320,7 @@ const fetchCollectionData = async (collId: string) => {
         {renderContent()}
 
         {error && (
-          <Text style={{color: 'red', marginTop: 8, fontSize: 12}}>
+          <Text style={{ color: 'red', marginTop: 8, fontSize: 12 }}>
             {error}
           </Text>
         )}

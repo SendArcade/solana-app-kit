@@ -18,7 +18,7 @@ import PerksCard from '../perksCard/perksCard';
 import ProfileIcons from '../../../assets/svgs/index';
 import { styles } from './profileInfo.style';
 import { useAppDispatch, useAppSelector } from '../../../hooks/useReduxHooks';
-import { attachCoinToProfile } from '../../../state/auth/reducer';
+import { attachCoinToProfile, removeAttachedCoin } from '../../../state/auth/reducer';
 import { HELIUS_API_KEY } from '@env';
 import { tokenModalStyles } from './profileInfoTokenModal.style';
 import { fixImageUrl, extractAssetImage } from '../../../utils/common/fixUrl'; // <-- We use our improved functions
@@ -124,166 +124,16 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
   const authProvider = useAppSelector(state => state.auth.provider);
 
   // ------------------------------------------------------------------
-  // (A) State for the "Attach Token" flows (now triggered by arrow press)
+  // (A) State for the "Attach Token" flows
   // ------------------------------------------------------------------
-  const [showCoinModal, setShowCoinModal] = useState(false);
-  const [loadingTokens, setLoadingTokens] = useState(false);
-  const [fetchTokensError, setFetchTokensError] = useState<string | null>(null);
-
-  /**
-   * The "tokens" array will hold the results from Helius DAS:
-   * Each item => { mintPubkey, name?: string, imageUrl?: string }
-   */
-  const [tokens, setAvailableTokens] = useState<
-    Array<{
-      mintPubkey: string;
-      name?: string;
-      imageUrl?: string;
-      symbol?: string;
-      decimals?: number;
-      tokenAmount?: number;
-      groupOrder?: number;
-    }>
-  >([]);
-
-  // Additional states for user-provided description
+  const [tokenDescription, setTokenDescription] = useState('');
   const [showAttachDetailsModal, setShowAttachDetailsModal] = useState(false);
   const [selectedToken, setSelectedToken] = useState<{
     mintPubkey: string;
     name?: string;
     imageUrl?: string;
+    symbol?: string;
   } | null>(null);
-  const [tokenDescription, setTokenDescription] = useState('');
-
-  /**
-   * Open the "Attach Token" modal by fetching the user's tokens (NFT or fungible).
-   */
-  const handleOpenCoinModal = async () => {
-    if (!isOwnProfile) return;
-    setShowCoinModal(true);
-    // Start fresh
-    setLoadingTokens(true);
-    setFetchTokensError(null);
-
-    try {
-      // Use the pre-fetched auth provider from the top-level
-      console.log('Fetching assets for provider:', authProvider);
-
-      const bodyParams = {
-        jsonrpc: '2.0',
-        id: 'get-assets',
-        method: 'getAssetsByOwner',
-        params: {
-          ownerAddress: userWallet,
-          page: 1,
-          limit: 100,
-          displayOptions: {
-            showFungible: true, // get BOTH fungible tokens & NFTs
-            showNativeBalance: false,
-            showInscription: false,
-            showZeroBalance: false,
-          },
-        },
-      };
-
-      // Use a public RPC endpoint that doesn't require auth to avoid cross-wallet issues
-      const publicRpcUrl = "https://api.mainnet-beta.solana.com";
-
-      try {
-        // First try with Helius
-        const heliusUrl = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
-        const res = await fetch(heliusUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bodyParams),
-        });
-
-        if (!res.ok) {
-          throw new Error(`Helius request failed with status ${res.status}`);
-        }
-
-        const data = await res.json();
-        const rawItems = data?.result?.items || [];
-
-        processTokenData(rawItems);
-      } catch (heliusError) {
-        console.error('Helius request failed, falling back to public RPC:', heliusError);
-
-        // Fallback to simpler getTokenAccounts request via public RPC
-        setFetchTokensError('Could not fetch all assets. Showing basic tokens only.');
-        setLoadingTokens(false);
-      }
-    } catch (error: any) {
-      console.error('Failed to fetch tokens:', error);
-      setFetchTokensError(error.message || 'Failed to fetch tokens');
-      setLoadingTokens(false);
-    }
-  };
-
-  // Helper function to process token data from RPC
-  const processTokenData = (rawItems: any[]) => {
-    const mappedTokens: Array<{
-      mintPubkey: string;
-      name?: string;
-      imageUrl?: string;
-      symbol?: string;
-      decimals?: number;
-      tokenAmount?: number;
-      groupOrder?: number;
-    }> = [];
-
-    // Map Helius data to our format
-    for (const item of rawItems) {
-      if (item.id) {
-        try {
-          // Group to show fungibles first, then NFTs
-          const isFungible =
-            item.interface === 'FungibleToken' ||
-            item.token_info?.symbol ||
-            false;
-          const groupOrder = isFungible ? 0 : 1;
-
-          // Extract the best available image
-          const imageUrl = extractAssetImage(item);
-
-          mappedTokens.push({
-            mintPubkey: item.id,
-            name: item.content?.metadata?.name || item.token_info?.symbol || 'Unknown',
-            symbol: item.token_info?.symbol || item.content?.metadata?.symbol,
-            decimals: item.token_info?.decimals,
-            imageUrl: imageUrl,
-            tokenAmount: item.token_info ? parseFloat(item.token_info.balance) / 10 ** (item.token_info.decimals || 0) : 1,
-            groupOrder,
-          });
-        } catch (e) {
-          console.warn('Error processing token', item.id, e);
-        }
-      }
-    }
-
-    // Sort: fungibles first, then NFTs, then by name
-    mappedTokens.sort((a, b) => {
-      if ((a.groupOrder || 0) !== (b.groupOrder || 0)) return (a.groupOrder || 0) - (b.groupOrder || 0);
-      return (a.name || '').localeCompare(b.name || '');
-    });
-
-    setAvailableTokens(mappedTokens);
-    setLoadingTokens(false);
-  };
-
-  /**
-   * Handle user selection => open "attach details" modal
-   */
-  const handleSelectToken = (tokenItem: {
-    mintPubkey: string;
-    name?: string;
-    imageUrl?: string;
-  }) => {
-    setSelectedToken(tokenItem);
-    setShowCoinModal(false);
-    setTokenDescription('');
-    setShowAttachDetailsModal(true);
-  };
 
   /**
    * user final confirm => attach coin => store image & user description
@@ -293,11 +143,11 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
       setShowAttachDetailsModal(false);
       return;
     }
-    const { mintPubkey, name, imageUrl } = selectedToken;
+    const { mintPubkey, name, imageUrl, symbol } = selectedToken;
 
     const coinData = {
       mint: mintPubkey,
-      symbol: name || 'MyToken',
+      symbol: symbol || name || 'MyToken',
       name: name || 'MyToken',
       image: imageUrl || '',
       description: tokenDescription.trim(),
@@ -321,46 +171,51 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
     }
   };
 
-  // Custom image renderer for tokens in the selection modal
-  const renderTokenImage = (imageUrl: string) => {
-    if (!imageUrl) {
-      return (
-        <View
-          style={[
-            tokenModalStyles.tokenItemImage,
-            {
-              justifyContent: 'center',
-              alignItems: 'center',
-              backgroundColor: '#eee',
-            },
-          ]}>
-          <Text style={{ fontSize: 10, color: '#999' }}>
-            No Img
-          </Text>
-        </View>
-      );
-    }
+  /**
+   * Handle token selection from the portfolio modal
+   */
+  const handleSelectToken = (token: any) => {
+    setSelectedToken({
+      mintPubkey: token.id || token.mint,
+      name: token.name || 'Unknown',
+      imageUrl: token.image || '',
+      symbol: token.symbol || token.token_info?.symbol,
+    });
+    setTokenDescription('');
+    setShowAttachDetailsModal(true);
+  };
 
-    const fixedUrl = fixImageUrl(imageUrl);
-
-    return (
-      <ImageBackground
-        source={require('../../../assets/images/SENDlogo.png')}
-        style={tokenModalStyles.tokenItemImage}>
-        <Image
-          source={{ uri: fixedUrl }}
-          style={tokenModalStyles.tokenItemImage}
-          resizeMode="cover"
-          onError={e =>
-            console.log(
-              'Image load error:',
-              e.nativeEvent.error,
-              'for URL:',
-              fixedUrl,
-            )
-          }
-        />
-      </ImageBackground>
+  /**
+   * Remove the attached coin
+   */
+  const handleRemoveCoin = async () => {
+    if (!isOwnProfile) return;
+    
+    Alert.alert(
+      'Remove Coin',
+      'Are you sure you want to remove the attached coin?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await dispatch(
+                removeAttachedCoin({
+                  userId: userWallet,
+                }),
+              ).unwrap();
+              Alert.alert('Success', 'Coin removed from your profile');
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to remove coin');
+            }
+          },
+        },
+      ],
     );
   };
 
@@ -442,12 +297,12 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
           </Text>
         </TouchableOpacity>
 
-        <View style={{ flexDirection: 'row', gap: 2 }}>
+        {/* <View style={{ flexDirection: 'row', gap: 2 }}>
           <ProfileIcons.PinLocation />
           <Text style={{ fontSize: 12, fontWeight: '500', color: '#B7B7B7' }}>
             Global
           </Text>
-        </View>
+        </View> */}
       </View>
 
       {/* Edit profile if it's your profile */}
@@ -465,18 +320,22 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
       {/* Else we can show a default "BuyCard" or no card at all. */}
       <View style={{ marginTop: 12 }}>
         <BuyCard
-          tokenName={attachmentData.coin?.symbol || '$Coin'}
-          description={attachmentData.coin?.name || 'Creator Coin'}
+          tokenName={attachmentData.coin?.symbol || 'Pin your coin'}
+          description={attachmentData.coin?.name || 'Attach a token to your profile'}
           tokenImage={attachmentData.coin?.image || null}
           tokenDesc={attachmentData.coin?.description || ''}
           onBuyPress={() => { }}
           tokenMint={attachmentData.coin?.mint}
           /**
            * Show the arrow only if isOwnProfile is true => user can change attached token
-           * On arrow press => open the modal
+           * On arrow press => open the portfolio modal directly
            */
           showDownArrow={isOwnProfile}
-          onArrowPress={handleOpenCoinModal}
+          onArrowPress={undefined}
+          walletAddress={userWallet}
+          onSelectAsset={handleSelectToken}
+          showRemoveButton={isOwnProfile && !!attachmentData.coin}
+          onRemoveToken={handleRemoveCoin}
         />
       </View>
 
@@ -500,83 +359,7 @@ const ProfileInfo: React.FC<ProfileInfoProps> = ({
         </View>
       )}
 
-      {/* 1) Helius token selection modal */}
-      <Modal
-        transparent
-        visible={showCoinModal}
-        animationType="fade"
-        onRequestClose={() => setShowCoinModal(false)}>
-        <View style={tokenModalStyles.overlay}>
-          <View style={tokenModalStyles.container}>
-            <View style={tokenModalStyles.headerRow}>
-              <Text style={tokenModalStyles.headerTitle}>Select a Token</Text>
-              <TouchableOpacity
-                style={tokenModalStyles.closeButton}
-                onPress={() => setShowCoinModal(false)}>
-                <Text style={tokenModalStyles.closeButtonText}>X</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* LOADING or ERROR states */}
-            {loadingTokens && (
-              <View style={{ marginTop: 8, alignItems: 'center' }}>
-                <ActivityIndicator size="small" color="#999" />
-                <Text style={tokenModalStyles.loadingText}>
-                  Loading tokens from Helius...
-                </Text>
-              </View>
-            )}
-            {fetchTokensError && !loadingTokens && (
-              <Text style={tokenModalStyles.errorText}>{fetchTokensError}</Text>
-            )}
-
-            {/* LIST of tokens */}
-            {!loadingTokens &&
-              !fetchTokensError &&
-              tokens &&
-              tokens.length > 0 && (
-                <FlatList
-                  data={tokens}
-                  keyExtractor={item => item.mintPubkey}
-                  style={tokenModalStyles.listContainer}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={tokenModalStyles.tokenItem}
-                      onPress={() => handleSelectToken(item)}>
-                      <View
-                        style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        {renderTokenImage(item.imageUrl || '')}
-
-                        <View style={tokenModalStyles.tokenInfo}>
-                          <Text style={tokenModalStyles.tokenName}>
-                            {item.name}
-                          </Text>
-                          <Text
-                            style={tokenModalStyles.tokenMint}
-                            numberOfLines={1}>
-                            Mint: {item.mintPubkey}
-                          </Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                />
-              )}
-
-            {/* If tokens array is empty */}
-            {!loadingTokens &&
-              !fetchTokensError &&
-              tokens &&
-              tokens.length === 0 && (
-                <Text style={tokenModalStyles.emptyText}>
-                  No tokens found in Helius data.
-                </Text>
-              )}
-          </View>
-        </View>
-      </Modal>
-
-      {/* 2) Attach details (custom description) modal */}
+      {/* Details modal for token description */}
       <Modal
         animationType="slide"
         transparent

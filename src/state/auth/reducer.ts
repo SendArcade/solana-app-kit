@@ -165,6 +165,43 @@ export const attachCoinToProfile = createAsyncThunk(
   },
 );
 
+/**
+ * Remove an attached coin from the user's profile.
+ */
+export const removeAttachedCoin = createAsyncThunk(
+  'auth/removeAttachedCoin',
+  async (
+    {
+      userId,
+    }: {
+      userId: string;
+    },
+    thunkAPI,
+  ) => {
+    try {
+      const response = await fetch(
+        `${SERVER_BASE_URL}/api/profile/removeAttachedCoin`,
+        {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            userId,
+          }),
+        },
+      );
+      const data = await response.json();
+      if (!data.success) {
+        return thunkAPI.rejectWithValue(data.error || 'Failed to remove coin');
+      }
+      return data.success;
+    } catch (err: any) {
+      return thunkAPI.rejectWithValue(
+        err.message || 'Remove coin request failed.',
+      );
+    }
+  },
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -249,6 +286,15 @@ const authSlice = createSlice({
     builder.addCase(attachCoinToProfile.fulfilled, (state, action) => {
       if (state.address) {
         state.attachmentData = {coin: action.payload.coin};
+      }
+    });
+
+    builder.addCase(removeAttachedCoin.fulfilled, (state) => {
+      if (state.address) {
+        // Remove the coin property from attachmentData
+        if (state.attachmentData) {
+          delete state.attachmentData.coin;
+        }
       }
     });
   },
