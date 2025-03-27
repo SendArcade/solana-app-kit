@@ -373,6 +373,52 @@ profileImageRouter.post('/attachCoin', async (req: any, res: any) => {
   }
 });
 
+/**
+ * ------------------------------------------
+ *  Remove an attached coin from the user's profile
+ *  Body: { userId }
+ * ------------------------------------------
+ */
+profileImageRouter.post('/removeAttachedCoin', async (req: any, res: any) => {
+  try {
+    const {userId} = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing userId',
+      });
+    }
+
+    // Ensure user exists
+    const existingUser = await knex('users').where({id: userId}).first();
+    if (!existingUser) {
+      return res.status(404).json({success: false, error: 'User not found'});
+    }
+
+    // Get current attachment data
+    const currentAttachmentData = existingUser.attachment_data || {};
+
+    // Remove the coin property from the attachment data
+    if (currentAttachmentData.coin) {
+      delete currentAttachmentData.coin;
+    }
+
+    // Update the user record
+    await knex('users').where({id: userId}).update({
+      attachment_data: currentAttachmentData,
+      updated_at: new Date(),
+    });
+
+    return res.json({
+      success: true,
+    });
+  } catch (error: any) {
+    console.error('[RemoveAttachedCoin error]', error);
+    return res.status(500).json({success: false, error: error.message});
+  }
+});
+
 profileImageRouter.get('/search', async (req: any, res: any) => {
   try {
     const searchQuery = req.query.q;

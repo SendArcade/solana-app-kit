@@ -1,5 +1,5 @@
 // File: src/components/Profile/ProfileView.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleProp, ViewStyle } from 'react-native';
 import ProfileInfo from './ProfileInfo/profileInfo';
 import SwipeTabs from './slider/slider';
@@ -84,43 +84,79 @@ function ProfileViewComponent({
   // Instead of extracting separate coin fields, now use the attachmentData object.
   const attachmentData = user.attachmentData || {};
 
+  // Memoize props for the ProfileInfo component to prevent re-renders of other tabs
+  const profileInfoProps = useMemo(() => ({
+    profilePicUrl: user.profilePicUrl,
+    username: user.username,
+    userWallet: user.address,
+    bioText: user.description,
+    isOwnProfile,
+    onAvatarPress,
+    onEditProfile,
+    amIFollowing,
+    areTheyFollowingMe,
+    onFollowPress,
+    onUnfollowPress,
+    followersCount,
+    followingCount,
+    onPressFollowers,
+    onPressFollowing,
+    attachmentData,
+  }), [
+    user.profilePicUrl,
+    user.username,
+    user.address,
+    user.description,
+    isOwnProfile,
+    onAvatarPress,
+    onEditProfile,
+    attachmentData,
+    // Include these props in dependencies but they shouldn't trigger re-renders of SwipeTabs
+    amIFollowing,
+    areTheyFollowingMe,
+    onFollowPress,
+    onUnfollowPress,
+    followersCount,
+    followingCount,
+    onPressFollowers,
+    onPressFollowing,
+  ]);
+
+  // Memoize props for SwipeTabs to prevent unnecessary re-renders
+  const swipeTabsProps = useMemo(() => ({
+    myPosts,
+    myNFTs,
+    loadingNfts,
+    fetchNftsError,
+    onPressPost,
+    myActions,
+    loadingActions,
+    fetchActionsError,
+    portfolioData,
+    onRefreshPortfolio,
+    refreshingPortfolio,
+    onAssetPress,
+  }), [
+    myPosts,
+    myNFTs,
+    loadingNfts,
+    fetchNftsError,
+    onPressPost,
+    myActions,
+    loadingActions,
+    fetchActionsError,
+    portfolioData,
+    onRefreshPortfolio,
+    refreshingPortfolio,
+    onAssetPress,
+  ]);
+
   return (
     <View style={[profileStyles.container, containerStyle]}>
-      <ProfileInfo
-        profilePicUrl={user.profilePicUrl}
-        username={user.username}
-        userWallet={user.address}
-        bioText={user.description}
-        isOwnProfile={isOwnProfile}
-        onAvatarPress={onAvatarPress}
-        onEditProfile={onEditProfile}
-        amIFollowing={amIFollowing}
-        areTheyFollowingMe={areTheyFollowingMe}
-        onFollowPress={onFollowPress}
-        onUnfollowPress={onUnfollowPress}
-        followersCount={followersCount}
-        followingCount={followingCount}
-        onPressFollowers={onPressFollowers}
-        onPressFollowing={onPressFollowing}
-        // Pass the new attachmentData object
-        attachmentData={attachmentData}
-      />
+      <ProfileInfo {...profileInfoProps} />
 
       <View style={{ flex: 1 }}>
-        <SwipeTabs
-          myPosts={myPosts}
-          myNFTs={myNFTs}
-          loadingNfts={loadingNfts}
-          fetchNftsError={fetchNftsError}
-          onPressPost={onPressPost}
-          myActions={myActions}
-          loadingActions={loadingActions}
-          fetchActionsError={fetchActionsError}
-          portfolioData={portfolioData}
-          onRefreshPortfolio={onRefreshPortfolio}
-          refreshingPortfolio={refreshingPortfolio}
-          onAssetPress={onAssetPress}
-        />
+        <SwipeTabs {...swipeTabsProps} />
       </View>
     </View>
   );

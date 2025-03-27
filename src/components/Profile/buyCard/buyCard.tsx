@@ -63,6 +63,22 @@ export interface BuyCardProps {
    * If not provided, will use connected wallet.
    */
   walletAddress?: string;
+
+  /**
+   * Callback when an asset is selected from the portfolio
+   * Used for profile token selection.
+   */
+  onSelectAsset?: (asset: AssetItem) => void;
+
+  /**
+   * Whether to show a remove button for the token
+   */
+  showRemoveButton?: boolean;
+
+  /**
+   * Callback when remove button is pressed
+   */
+  onRemoveToken?: () => void;
 }
 
 // Portfolio asset item display
@@ -221,6 +237,9 @@ const BuyCard: React.FC<BuyCardProps> = ({
   showDownArrow = false,
   onArrowPress,
   walletAddress,
+  onSelectAsset,
+  showRemoveButton = false,
+  onRemoveToken,
 }) => {
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
@@ -256,26 +275,37 @@ const BuyCard: React.FC<BuyCardProps> = ({
     // Custom handler if provided
     if (onArrowPress) {
       onArrowPress();
-      return;
+      return; // Don't open portfolio modal if custom handler is provided
     }
     
-    // Otherwise, show portfolio modal
+    // Open portfolio modal
     setShowPortfolioModal(true);
   };
   
   const handleSelectAsset = (asset: AssetItem) => {
-    // Here you can add logic to select an asset from portfolio
-    console.log('Selected asset:', asset);
+    // Close the portfolio modal
     setShowPortfolioModal(false);
     
-    // If it's a token, you could open the trade modal with this token
-    if (asset.token_info) {
-      // You could implement this logic based on your requirements
+    // If onSelectAsset is provided, call it with the asset
+    if (onSelectAsset) {
+      onSelectAsset(asset);
+    } else {
+      // Default behavior (for normal BuyCard usage)
+      console.log('Selected asset:', asset);
+      // If it's a token, you could open the trade modal with this token
+      if (asset.token_info) {
+        // You could implement this logic based on your requirements
+      }
     }
   };
 
   // Render image for the buy card
   const renderBuyCardImage = () => {
+    // If we're in "Pin your coin" state and no token image, don't show an image
+    if (isPinYourCoin && !tokenImage) {
+      return null;
+    }
+    
     if (tokenImage) {
       if (typeof tokenImage === 'string') {
         return (
@@ -302,13 +332,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
         );
       }
     } else {
-      return (
-        <Image
-          source={DEFAULT_IMAGES.user5}
-          style={cardStyles.img}
-          resizeMode="cover"
-        />
-      );
+      return null; // Don't show any image if no tokenImage is provided
     }
   };
 
@@ -334,20 +358,32 @@ const BuyCard: React.FC<BuyCardProps> = ({
     ? (portfolio.nativeBalance.lamports / 1000000000).toFixed(4) 
     : '0';
 
+  // Is this a "Pin your coin" state? (No token attached yet)
+  const isPinYourCoin = tokenName === 'Pin your coin' || !tokenMint;
+
   return (
-    <View style={[cardStyles.container, containerStyle]}>
+    <View style={[
+      cardStyles.container, 
+      isPinYourCoin ? cardStyles.pinYourCoinContainer : null,
+      containerStyle
+    ]}>
       {/* Left section with image + name/desc */}
       <View style={cardStyles.contentContainer}>
-        <View style={cardStyles.imgContainer}>
-          {renderBuyCardImage()}
-        </View>
+        {renderBuyCardImage() && (
+          <View style={cardStyles.imgContainer}>
+            {renderBuyCardImage()}
+          </View>
+        )}
 
         <View>
           <Text
             style={{
               fontWeight: '500',
-              fontSize: 15,
-            }}>{`Buy $${tokenName}`}</Text>
+              fontSize: isPinYourCoin ? 16 : 15,
+              color: isPinYourCoin ? '#1d9bf0' : '#000000',
+            }}>
+            {isPinYourCoin ? tokenName : `Buy $${tokenName}`}
+          </Text>
           {tokenDesc ? (
             <Text style={{fontWeight: '400', fontSize: 13, color: '#999999'}}>
               {tokenDesc}
@@ -357,10 +393,10 @@ const BuyCard: React.FC<BuyCardProps> = ({
               style={{
                 fontWeight: '400',
                 fontSize: 12,
-                color: '#333',
+                color: '#666',
                 marginTop: 4,
               }}>
-              Buy my Token
+              {isPinYourCoin ? description : 'Buy my Token'}
             </Text>
           )}
         </View>
@@ -368,14 +404,25 @@ const BuyCard: React.FC<BuyCardProps> = ({
 
       {/* Right section: Buy button + optional arrow */}
       <View style={cardStyles.buyButtonContainer}>
-        <TouchableOpacity style={cardStyles.buyButton} onPress={handleBuyPress}>
-          <Text style={cardStyles.buyButtonText}>Buy</Text>
-        </TouchableOpacity>
+        {!isPinYourCoin && (
+          <TouchableOpacity style={cardStyles.buyButton} onPress={handleBuyPress}>
+            <Text style={cardStyles.buyButtonText}>Buy</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Only show arrow if showDownArrow is true */}
         {showDownArrow && (
-          <TouchableOpacity onPress={handleArrowPress}>
-            <Icons.Arrow />
+          <TouchableOpacity 
+            style={[cardStyles.arrowButton, isPinYourCoin ? cardStyles.pinArrowButton : null]} 
+            onPress={handleArrowPress}
+          >
+            {isPinYourCoin ? (
+              <>
+                <Text style={cardStyles.pinButtonText}>Add Coin</Text>
+              </>
+            ) : (
+              <Icons.Arrow />
+            )}
           </TouchableOpacity>
         )}
       </View>
@@ -402,6 +449,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
             decimals: 6, // Assuming most tokens use 6 decimals
             logoURI: typeof tokenImage === 'string' ? fixImageUrl(tokenImage) : '',
           }}
+          initialActiveTab="TRADE_AND_SHARE"
         />
       )}
       
@@ -415,7 +463,9 @@ const BuyCard: React.FC<BuyCardProps> = ({
         <View style={portfolioStyles.modalContainer}>
           <View style={portfolioStyles.modalContent}>
             <View style={portfolioStyles.modalHeader}>
-              <Text style={portfolioStyles.modalTitle}>Your Portfolio</Text>
+              <Text style={portfolioStyles.modalTitle}>
+                {onSelectAsset ? "Select a Token to Pin" : "Your Portfolio"}
+              </Text>
               <TouchableOpacity
                 style={portfolioStyles.closeButton}
                 onPress={() => setShowPortfolioModal(false)}
@@ -423,6 +473,25 @@ const BuyCard: React.FC<BuyCardProps> = ({
                 <Text style={portfolioStyles.closeButtonText}>✕</Text>
               </TouchableOpacity>
             </View>
+            
+            {/* Actions section at the top when a token is already attached */}
+            {showRemoveButton && tokenMint && onSelectAsset && (
+              <View style={portfolioStyles.actionsContainer}>
+                <Text style={portfolioStyles.actionsText}>
+                  Currently pinned: {tokenName}
+                </Text>
+                <TouchableOpacity 
+                  style={portfolioStyles.removeButton}
+                  onPress={() => {
+                    setShowPortfolioModal(false);
+                    if (onRemoveToken) onRemoveToken();
+                  }}
+                >
+                  <Text style={portfolioStyles.removeButtonText}>Remove Pin</Text>
+                </TouchableOpacity>
+                <View style={portfolioStyles.divider} />
+              </View>
+            )}
             
             {loading ? (
               <View style={portfolioStyles.loadingContainer}>
@@ -455,6 +524,15 @@ const BuyCard: React.FC<BuyCardProps> = ({
                     <Text style={portfolioStyles.solBalanceLabel}>SOL Balance</Text>
                     <Text style={portfolioStyles.solBalanceValue}>
                       {solBalance} SOL
+                    </Text>
+                  </View>
+                )}
+                
+                {/* Token selection instructions for profile modal */}
+                {onSelectAsset && (
+                  <View style={portfolioStyles.instructionsContainer}>
+                    <Text style={portfolioStyles.instructionsText}>
+                      Select a token or NFT to pin to your profile
                     </Text>
                   </View>
                 )}
@@ -530,6 +608,29 @@ const cardStyles = {
     width: '100%' as const,
     height: '100%' as const,
     opacity: 0.2,
+  },
+  pinYourCoinContainer: {
+    borderStyle: 'dashed' as const,
+    borderColor: '#1d9bf0',
+    backgroundColor: 'rgba(29, 155, 240, 0.05)',
+  },
+  arrowButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  pinArrowButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    backgroundColor: '#1d9bf0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  pinButtonText: {
+    color: 'white',
+    fontWeight: '600' as const,
+    fontSize: 14,
+    marginLeft: 6,
   },
 };
 
@@ -829,6 +930,40 @@ const portfolioStyles = StyleSheet.create({
     height: 1,
     backgroundColor: '#f0f2f5',
     marginLeft: 56,
+  },
+  actionsContainer: {
+    padding: 16,
+    backgroundColor: '#f7f9fa',
+    marginBottom: 8,
+  },
+  actionsText: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 8,
+  },
+  removeButton: {
+    alignSelf: 'flex-start' as const,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#f7f7f7',
+    borderWidth: 1,
+    borderColor: '#e0245e',
+    borderRadius: 16,
+    marginBottom: 8,
+  },
+  removeButtonText: {
+    color: '#e0245e',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  instructionsContainer: {
+    marginVertical: 12,
+    paddingHorizontal: 16,
+  },
+  instructionsText: {
+    fontSize: 14,
+    color: '#657786',
+    fontStyle: 'italic',
   },
 });
 
