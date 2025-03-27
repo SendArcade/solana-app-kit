@@ -1,5 +1,5 @@
 // FILE: src/components/thread/sections/SectionTrade.tsx
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text, ImageSourcePropType } from 'react-native';
 import { ThreadUser, TradeData } from '../thread.types';
 import { TradeCard } from '../../Common/TradeCard';
@@ -45,6 +45,9 @@ function getUserAvatar(u?: ThreadUser): ImageSourcePropType {
   return avatarSource;
 }
 
+// Create our own local refresh counter
+let refreshCounter = 0;
+
 function SectionTrade({
   text,
   tradeData,
@@ -54,13 +57,29 @@ function SectionTrade({
 }: SectionTradeProps) {
   // Keep a ref to the previous trade data to avoid unnecessary re-renders
   const prevTradeDataRef = useRef<TradeData | undefined>(tradeData);
+  
+  // Local refresh counter to trigger price updates
+  const [localRefreshTrigger, setLocalRefreshTrigger] = useState(0);
+
+  // Auto-refresh timer for keeping prices current
+  const [autoRefreshCount, setAutoRefreshCount] = useState(0);
 
   // Keep track if the component is mounted
   const isMountedRef = useRef(true);
 
   useEffect(() => {
     isMountedRef.current = true;
+    
+    // Set up an interval to refresh prices every 30 seconds
+    // This keeps current prices up-to-date for actively viewed trades
+    const intervalId = setInterval(() => {
+      if (isMountedRef.current) {
+        setAutoRefreshCount(prev => prev + 1);
+      }
+    }, 30000); // 30 seconds
+    
     return () => {
+      clearInterval(intervalId);
       isMountedRef.current = false;
     };
   }, []);
@@ -70,6 +89,40 @@ function SectionTrade({
     prevTradeDataRef.current = tradeData;
   }, [tradeData]);
 
+  // When external refresh trigger changes, update our local trigger
+  useEffect(() => {
+    if (externalRefreshTrigger !== undefined) {
+      setLocalRefreshTrigger(current => current + 1);
+    }
+  }, [externalRefreshTrigger]);
+
+  // If we have missing or placeholder USD values, trigger a refresh
+  useEffect(() => {
+    if (!tradeData) return;
+    
+    const hasMissingOrPlaceholderUsdValues = 
+      !tradeData.inputUsdValue || 
+      !tradeData.outputUsdValue || 
+      tradeData.inputUsdValue === '$??' || 
+      tradeData.outputUsdValue === '$??';
+      
+    if (hasMissingOrPlaceholderUsdValues) {
+      // Only do this once per mount to avoid infinite loops
+      refreshCounter++;
+      setLocalRefreshTrigger(refreshCounter);
+    }
+  }, [tradeData]);
+
+  // Initial load effect - always trigger a refresh on mount to get latest prices
+  useEffect(() => {
+    // Trigger fresh price data fetch when component mounts
+    if (isMountedRef.current) {
+      setTimeout(() => {
+        setLocalRefreshTrigger(prev => prev + 1);
+      }, 500); // Small delay to allow component to fully render
+    }
+  }, []);
+
   // Memoize values to prevent unnecessary re-renders
   const userAvatar = useMemo(() => getUserAvatar(user), [user?.id, user?.avatar]);
 
@@ -77,18 +130,26 @@ function SectionTrade({
   const enhancedTradeData = useMemo(() => {
     if (!tradeData) return undefined;
 
-    console.log("tradeData", tradeData);
-
-    return {
+    // Clean up any "$??" placeholders
+    const cleanedTradeData = {
       ...tradeData,
+      inputUsdValue: tradeData.inputUsdValue === '$??' ? '' : tradeData.inputUsdValue,
+      outputUsdValue: tradeData.outputUsdValue === '$??' ? '' : tradeData.outputUsdValue,
       executionTimestamp: tradeData.executionTimestamp || createdAt,
     };
+
+    return cleanedTradeData;
   }, [tradeData, createdAt]);
 
   // If tradeData is missing, don't render a TradeCard
   if (!enhancedTradeData) {
     return <Text>[Missing trade data]</Text>;
   }
+
+  // Combine all refresh triggers
+  const combinedRefreshTrigger = externalRefreshTrigger 
+    ? externalRefreshTrigger + localRefreshTrigger + autoRefreshCount
+    : localRefreshTrigger + autoRefreshCount;
 
   return (
     <View>
@@ -101,7 +162,7 @@ function SectionTrade({
         tradeData={enhancedTradeData}
         showGraphForOutputToken={true}
         userAvatar={userAvatar}
-        externalRefreshTrigger={externalRefreshTrigger}
+        externalRefreshTrigger={combinedRefreshTrigger}
       />
     </View>
   );

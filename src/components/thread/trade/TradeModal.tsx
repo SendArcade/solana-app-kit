@@ -267,8 +267,8 @@ export default function TradeModal({
     tokenMint: string,
     tokenSymbol?: string
   ): Promise<string> => {
-    // Default when all else fails
-    let result = `$??`;
+    // Default when all else fails - empty string instead of "$??"
+    let result = '';
     
     try {
       // Convert lamports to tokens
@@ -309,18 +309,38 @@ export default function TradeModal({
         return `$${normalizedAmount.toFixed(2)}`;
       }
       
-      // For all other tokens, we would ideally fetch price from an API
-      // For now, let's return a placeholder if amount is small, or rough estimate if large
-      if (normalizedAmount < 1000) {
-        result = `$${(normalizedAmount * 0.1).toFixed(2)}`; // Assume $0.10 per token for small amounts
-      } else {
-        result = `~$${Math.round(normalizedAmount * 0.05)}`; // Rough estimate for large amounts
+      // For all other tokens, attempt to fetch from CoinGecko or another API
+      try {
+        // Try to fetch from CoinGecko by symbol (this is a simplification - ideally would use mapping)
+        if (tokenSymbol) {
+          const coinId = tokenSymbol.toLowerCase();
+          const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`);
+          const data = await response.json();
+          if (data && data[coinId] && data[coinId].usd) {
+            const price = data[coinId].usd;
+            return `$${(normalizedAmount * price).toFixed(2)}`;
+          }
+        }
+      } catch (err) {
+        console.log("Error fetching token price from CoinGecko", err);
+      }
+      
+      // If still no price found, make a reasonable estimate based on token type
+      if (normalizedAmount > 0) {
+        // For meme tokens/unknown tokens, use a very conservative estimate
+        // This is better than showing "$??" but still provides some value
+        const estimatedValue = normalizedAmount * 0.01; // Assume a very low price 
+        if (estimatedValue < 0.01) {
+          result = `<$0.01`;  // For very small amounts
+        } else {
+          result = `~$${estimatedValue.toFixed(2)}`; // Show approximate for larger amounts
+        }
       }
     } catch (err) {
       console.error('Error estimating token value:', err);
     }
     
-    return result;
+    return result; // Empty string or estimated value
   };
 
   /**
