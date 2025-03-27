@@ -9,6 +9,7 @@ import {useAppNavigation} from './useAppNavigation';
 import {getDynamicClient} from '../services/walletProviders/dynamic';
 import {useAppSelector} from './useReduxHooks';
 import {VersionedTransaction, PublicKey} from '@solana/web3.js';
+import {useLoginWithOAuth} from '@privy-io/expo';
 
 /**
  * Interface for a standardized wallet object returned by useAuth
@@ -64,6 +65,9 @@ export function useAuth() {
       user,
       solanaWallet,
     } = usePrivyWalletLogic();
+    
+    // Get the direct Privy OAuth login hook
+    const {login: loginWithOAuth} = useLoginWithOAuth();
 
     // Create a standardized wallet object for Privy
     const standardWallet: StandardWallet | null = solanaWallet?.wallets?.[0] ? {
@@ -84,34 +88,42 @@ export function useAuth() {
     } : null;
 
     const loginWithGoogle = useCallback(async () => {
-      await handlePrivyLogin({
-        loginMethod: 'google',
-        setStatusMessage: () => {},
-      });
-      await monitorSolanaWallet({
-        selectedProvider: 'privy',
-        setStatusMessage: () => {},
-        onWalletConnected: info => {
-          dispatch(loginSuccess({provider: 'privy', address: info.address}));
-          navigation.navigate('MainTabs');
-        },
-      });
-    }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
+      try {
+        // Use direct OAuth login instead of handlePrivyLogin
+        await loginWithOAuth({ provider: 'google' });
+        
+        // Continue monitoring the wallet after login
+        await monitorSolanaWallet({
+          selectedProvider: 'privy',
+          setStatusMessage: () => {},
+          onWalletConnected: info => {
+            dispatch(loginSuccess({provider: 'privy', address: info.address}));
+            navigation.navigate('MainTabs');
+          },
+        });
+      } catch (error) {
+        console.error('Google login error:', error);
+      }
+    }, [loginWithOAuth, monitorSolanaWallet, dispatch, navigation]);
 
     const loginWithApple = useCallback(async () => {
-      await handlePrivyLogin({
-        loginMethod: 'apple',
-        setStatusMessage: () => {},
-      });
-      await monitorSolanaWallet({
-        selectedProvider: 'privy',
-        setStatusMessage: () => {},
-        onWalletConnected: info => {
-          dispatch(loginSuccess({provider: 'privy', address: info.address}));
-          navigation.navigate('MainTabs');
-        },
-      });
-    }, [handlePrivyLogin, monitorSolanaWallet, dispatch, navigation]);
+      try {
+        // Use direct OAuth login instead of handlePrivyLogin
+        await loginWithOAuth({ provider: 'apple' });
+        
+        // Continue monitoring the wallet after login
+        await monitorSolanaWallet({
+          selectedProvider: 'privy',
+          setStatusMessage: () => {},
+          onWalletConnected: info => {
+            dispatch(loginSuccess({provider: 'privy', address: info.address}));
+            navigation.navigate('MainTabs');
+          },
+        });
+      } catch (error) {
+        console.error('Apple login error:', error);
+      }
+    }, [loginWithOAuth, monitorSolanaWallet, dispatch, navigation]);
 
     const loginWithEmail = useCallback(async () => {
       await handlePrivyLogin({
