@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Platform, TouchableOpacity, View, StyleSheet, Animated, Dimensions, Image, Text } from 'react-native';
+import { Platform, TouchableOpacity, View, StyleSheet, Animated, Dimensions, Image, Text, findNodeHandle, UIManager } from 'react-native';
 import HomeScreen from '../screens/SampleUI/Threads/HomeScreen';
 import { useNavigation, ParamListBase } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -16,6 +16,20 @@ import ChatScreen from '../screens/SampleUI/Chat/ChatScreen/ChatScreen';
 
 const Tab = createBottomTabNavigator();
 const { width } = Dimensions.get('window');
+
+// Calculate tab positions based on 4-tab layout - adjusted for accuracy
+const TAB_WIDTH = width / 4;
+const FEED_TAB_CENTER = TAB_WIDTH * 1.5; // Second tab center (0-based index)
+
+// Adjust tooltip position based on screen size for better accuracy
+let TOOLTIP_OFFSET = -75; // Default offset to center 150px tooltip
+if (width < 375) {
+  TOOLTIP_OFFSET = -70; // Smaller screens need less offset
+} else if (width > 428) {
+  TOOLTIP_OFFSET = -80; // Larger screens need more offset
+}
+
+const TOOLTIP_POSITION = FEED_TAB_CENTER + TOOLTIP_OFFSET;
 
 const iconStyle = {
   shadowColor: '#000',
@@ -243,7 +257,7 @@ export default function MainTabs() {
             borderTopWidth: 0,
           },
         }}>
-        <Tab.Screen
+        {/* <Tab.Screen
           name="Home"
           component={HomeScreen}
           options={{
@@ -267,7 +281,7 @@ export default function MainTabs() {
               />
             ),
           }}
-        />
+        /> */}
         <Tab.Screen
           name="Modules"
           component={ModuleScreen}
@@ -456,7 +470,7 @@ const platformStyles = StyleSheet.create({
   tooltip: {
     position: 'absolute',
     bottom: 75,
-    left: width / 2 - 75, // Center relative to screen width
+    left: TOOLTIP_POSITION,
     width: 150,
     backgroundColor: 'rgba(0,0,0,0.75)',
     borderRadius: 8,
@@ -472,6 +486,7 @@ const platformStyles = StyleSheet.create({
   tooltipArrow: {
     position: 'absolute',
     bottom: -8,
+    left: 75,
     width: 0,
     height: 0,
     backgroundColor: 'transparent',

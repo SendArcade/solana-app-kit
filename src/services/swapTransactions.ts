@@ -255,8 +255,15 @@ export const enrichSwapTransactions = async (swaps: SwapTransaction[]): Promise<
     const inputMetadata = tokenMetadataMap.get(swap.inputToken.mint);
     const outputMetadata = tokenMetadataMap.get(swap.outputToken.mint);
     
+    // Convert timestamp to milliseconds if needed
+    // Most blockchain timestamps are in seconds, not milliseconds
+    const timestamp = swap.timestamp < 10000000000 
+      ? swap.timestamp * 1000  // Convert to milliseconds if in seconds
+      : swap.timestamp;
+      
     return {
       ...swap,
+      timestamp, // Use the converted timestamp
       inputToken: {
         ...swap.inputToken,
         symbol: inputMetadata?.symbol || swap.inputToken.symbol || 'Unknown',

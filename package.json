@@ -60,6 +60,7 @@
     "expo-clipboard": "^7.0.1",
     "expo-constants": "~17.0.5",
     "expo-crypto": "~14.0.2",
+    "expo-image-manipulator": "^13.0.6",
     "expo-image-picker": "^16.0.6",
     "expo-linear-gradient": "^14.0.2",
     "expo-linking": "~7.0.5",
