@@ -29,7 +29,7 @@ interface ThreadProps {
   onRefresh?: () => void;
 
   /**
-   * Callback fired when the user’s avatar/username is pressed
+   * Callback fired when the user's avatar/username is pressed
    */
   onPressUser?: (user: ThreadUser) => void;
 
