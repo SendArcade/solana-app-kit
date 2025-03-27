@@ -1,5 +1,5 @@
 // FILE: src/components/thread/retweet/RetweetModal.tsx
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   Modal,
   View,
@@ -18,8 +18,9 @@ import {ThreadUser, ThreadSection} from '../thread.types';
 import {
   createRetweetAsync,
   addRetweetLocally,
+  updatePostAsync,
 } from '../../../state/thread/reducer';
-import {useAppDispatch} from '../../../hooks/useReduxHooks';
+import {useAppDispatch, useAppSelector} from '../../../hooks/useReduxHooks';
 import {useAuth} from '../../../hooks/useAuth';
 import retweetModalStyles from './RetweetModal.styles';
 import {nanoid} from '@reduxjs/toolkit';
@@ -66,6 +67,41 @@ export default function RetweetModal({
   const [loading, setLoading] = useState(false);
   const [retweetText, setRetweetText] = useState('');
 
+  // Get target post information
+  const targetPost = useAppSelector(state => 
+    state.thread.allPosts.find(p => p.id === retweetOf)
+  );
+  
+  // Check if it's a retweet
+  const isRetweet = targetPost?.retweetOf !== undefined;
+  
+  // If target is a retweet, use the original post ID
+  const originalPostId = isRetweet 
+    ? targetPost?.retweetOf?.id 
+    : retweetOf;
+  
+  // Check if user already retweeted this post
+  const existingRetweet = useAppSelector(state => 
+    state.thread.allPosts.find(p => 
+      p.retweetOf?.id === (originalPostId || retweetOf) && 
+      p.user.id === currentUser.id
+    )
+  );
+
+  // Set initial text if editing an existing quote retweet
+  useEffect(() => {
+    if (visible && existingRetweet && existingRetweet.sections && existingRetweet.sections.length > 0) {
+      const quoteSection = existingRetweet.sections.find(s => s.type === 'TEXT_ONLY');
+      if (quoteSection && quoteSection.text) {
+        setRetweetText(quoteSection.text);
+      } else {
+        setRetweetText('');
+      }
+    } else if (visible) {
+      setRetweetText('');
+    }
+  }, [visible, existingRetweet]);
+
   const handleRetweet = async () => {
     // Build optional sections if user has typed text
     let sections: ThreadSection[] = [];
@@ -80,14 +116,22 @@ export default function RetweetModal({
     try {
       setLoading(true);
 
-      // Attempt server retweet by sending only the userId
-      await dispatch(
-        createRetweetAsync({
-          retweetOf,
-          userId: currentUser.id,
+      // If user already retweeted this post, update the existing retweet
+      if (existingRetweet) {
+        await dispatch(updatePostAsync({
+          postId: existingRetweet.id,
           sections,
-        }),
-      ).unwrap();
+        })).unwrap();
+      } else {
+        // If not, create a new retweet
+        await dispatch(
+          createRetweetAsync({
+            retweetOf: originalPostId || retweetOf,
+            userId: currentUser.id,
+            sections,
+          }),
+        ).unwrap();
+      }
 
       onClose();
       setRetweetText('');
@@ -115,7 +159,7 @@ export default function RetweetModal({
         quoteCount: 0,
         reactions: {},
         retweetOf: {
-          id: retweetOf,
+          id: originalPostId || retweetOf,
           parentId: undefined,
           user: {
             id: 'unknown-user',

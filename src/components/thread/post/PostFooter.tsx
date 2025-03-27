@@ -9,20 +9,273 @@ import {
   Animated,
   TouchableWithoutFeedback,
   Alert,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  TextInput,
+  Dimensions,
 } from 'react-native';
 import Icons from '../../../assets/svgs';
 import {createThreadStyles, getMergedTheme} from '../thread.styles';
-import {ThreadPost, ThreadUser} from '../thread.types';
+import {ThreadPost, ThreadUser, ThreadSection} from '../thread.types';
 import {useAppDispatch, useAppSelector} from '../../../hooks/useReduxHooks';
-import {addReactionAsync} from '../../../state/thread/reducer';
-import RetweetModal from '../retweet/RetweetModal';
+import {
+  addReactionAsync, 
+  createRetweetAsync, 
+  deletePostAsync, 
+  undoRetweetLocally,
+  addRetweetLocally,
+  updatePostAsync,
+} from '../../../state/thread/reducer';
+import {nanoid} from '@reduxjs/toolkit';
 import { DEFAULT_IMAGES } from '../../../config/constants';
+
+// Get window dimensions for animation
+const {height} = Dimensions.get('window');
 
 interface PostFooterProps {
   post: ThreadPost;
   onPressComment?: (post: ThreadPost) => void;
   themeOverrides?: Partial<Record<string, any>>;
   styleOverrides?: {[key: string]: object};
+}
+
+// Add typing interface for the SimpleRetweetDrawer component
+interface SimpleRetweetDrawerProps {
+  visible: boolean;
+  onClose: () => void;
+  retweetOf: string; 
+  currentUser: ThreadUser;
+  hasAlreadyRetweeted: boolean;
+  onDirectRepost: () => Promise<void>;
+  onUndoRepost: () => Promise<void>;
+}
+
+// Simplified inline RetweetDrawer component
+function SimpleRetweetDrawer({
+  visible,
+  onClose,
+  retweetOf,
+  currentUser,
+  hasAlreadyRetweeted,
+  onDirectRepost,
+  onUndoRepost,
+}: SimpleRetweetDrawerProps) {
+  const dispatch = useAppDispatch();
+  const [loading, setLoading] = useState(false);
+  const [retweetText, setRetweetText] = useState('');
+  const [showQuoteInput, setShowQuoteInput] = useState(false);
+  
+  // Get the target post from Redux state
+  const targetPost = useAppSelector(state => 
+    state.thread.allPosts.find(p => p.id === retweetOf)
+  );
+  
+  // Determine if the post is a retweet
+  const isRetweet = targetPost?.retweetOf !== undefined;
+  
+  // If quoting a retweet, we need to quote the original post, not the retweet
+  const originalPostId = isRetweet 
+    ? targetPost?.retweetOf?.id 
+    : retweetOf;
+  
+  // Check if user has already retweeted this post
+  const existingRetweet = useAppSelector(state => 
+    state.thread.allPosts.find(p => 
+      p.retweetOf?.id === (originalPostId || retweetOf) && 
+      p.user.id === currentUser.id
+    )
+  );
+  
+  // Reset state when drawer opens/closes
+  useEffect(() => {
+    if (visible) {
+      setRetweetText('');
+      setShowQuoteInput(false);
+    }
+  }, [visible]);
+  
+  // Handle quote retweet
+  const handleQuoteRetweet = async () => {
+    if (!retweetText.trim()) return;
+    
+    // Use the original post ID for the retweet
+    const targetRetweetId = originalPostId || retweetOf;
+    
+    let sections: ThreadSection[] = [{
+      id: `section-${nanoid()}`,
+      type: 'TEXT_ONLY',
+      text: retweetText.trim(),
+    } as ThreadSection];
+    
+    try {
+      setLoading(true);
+      
+      // If the user already has retweeted this post, update the existing retweet
+      if (existingRetweet) {
+        await dispatch(updatePostAsync({
+          postId: existingRetweet.id,
+          sections: sections
+        })).unwrap();
+      } else {
+        // Create a new retweet
+        await dispatch(createRetweetAsync({
+          retweetOf: targetRetweetId,
+          userId: currentUser.id,
+          sections,
+        })).unwrap();
+      }
+      
+      onClose();
+    } catch (err: any) {
+      console.warn('[RetweetDrawer] Error:', err.message);
+      // Fallback to local retweet
+      const fallbackPost: ThreadPost = {
+        id: 'local-' + nanoid(),
+        parentId: null,
+        user: currentUser,
+        sections,
+        createdAt: new Date().toISOString(),
+        replies: [],
+        reactionCount: 0,
+        retweetCount: 0,
+        quoteCount: 0,
+        reactions: {},
+        retweetOf: {
+          id: targetRetweetId,
+        } as ThreadPost,
+      } as ThreadPost;
+      
+      dispatch(addRetweetLocally(fallbackPost));
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  if (!visible) return null;
+  
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}>
+      <View style={drawerStyles.overlay}>
+        <TouchableOpacity 
+          style={drawerStyles.backdrop} 
+          activeOpacity={1} 
+          onPress={onClose} 
+        />
+        
+        <View style={drawerStyles.drawer}>
+          {!showQuoteInput ? (
+            // Options drawer
+            <View style={drawerStyles.optionsContainer}>
+              <Text style={drawerStyles.drawerTitle}>
+                {hasAlreadyRetweeted ? 'Already Reposted' : 'Repost'}
+              </Text>
+              
+              {hasAlreadyRetweeted ? (
+                // Already retweeted options
+                <>
+                  <TouchableOpacity
+                    style={drawerStyles.option}
+                    onPress={() => setShowQuoteInput(true)}
+                    disabled={loading}
+                  >
+                    <Text style={drawerStyles.optionText}>Quote</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[drawerStyles.option, drawerStyles.undoOption]}
+                    onPress={onUndoRepost}
+                    disabled={loading}
+                  >
+                    <Text style={[drawerStyles.optionText, drawerStyles.undoText]}>
+                      Undo Repost
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                // Not yet retweeted options
+                <>
+                  <TouchableOpacity
+                    style={drawerStyles.option}
+                    onPress={onDirectRepost}
+                    disabled={loading}
+                  >
+                    <Text style={drawerStyles.optionText}>Repost</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={drawerStyles.option}
+                    onPress={() => setShowQuoteInput(true)}
+                    disabled={loading}
+                  >
+                    <Text style={drawerStyles.optionText}>Quote</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              
+              {loading && (
+                <View style={drawerStyles.loader} />
+              )}
+            </View>
+          ) : (
+            // Quote input form
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={drawerStyles.quoteContainer}
+            >
+              <Text style={drawerStyles.quoteTitle}>Add a comment</Text>
+              
+              <TextInput
+                style={drawerStyles.textInput}
+                placeholder="What's on your mind?"
+                multiline
+                value={retweetText}
+                onChangeText={setRetweetText}
+                autoFocus
+              />
+              
+              <View style={drawerStyles.quoteButtons}>
+                <TouchableOpacity
+                  style={drawerStyles.cancelButton}
+                  onPress={() => setShowQuoteInput(false)}
+                  disabled={loading}
+                >
+                  <Text style={drawerStyles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[
+                    drawerStyles.quoteButton,
+                    !retweetText.trim() && drawerStyles.disabledButton,
+                  ]}
+                  onPress={handleQuoteRetweet}
+                  disabled={!retweetText.trim() || loading}
+                >
+                  <Text
+                    style={[
+                      drawerStyles.quoteButtonText,
+                      !retweetText.trim() && drawerStyles.disabledText,
+                    ]}
+                  >
+                    Quote
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              {loading && (
+                <View style={drawerStyles.loader} />
+              )}
+            </KeyboardAvoidingView>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 export default function PostFooter({
@@ -35,7 +288,7 @@ export default function PostFooter({
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const scaleAnim = useRef(new Animated.Value(0)).current;
-  const [showRetweetModal, setShowRetweetModal] = useState(false);
+  const [showRetweetDrawer, setShowRetweetDrawer] = useState(false);
 
   // Grab user info from Redux
   const address = useAppSelector(state => state.auth.address);
@@ -56,6 +309,36 @@ export default function PostFooter({
   };
 
   const dispatch = useAppDispatch();
+
+  // Check if the user has already retweeted this post, and get the retweet post if exists
+  const hasRetweeted = useAppSelector(state => {
+    if (!address) return false;
+    
+    // Case 1: Check if this post is already a retweet by the current user
+    if (post.retweetOf && post.user.id === address) {
+      return true;
+    }
+    
+    // Case 2: Check if any post in the state is a retweet of this post by the current user
+    return state.thread.allPosts.some(p => 
+      p.retweetOf?.id === post.id && p.user.id === address
+    );
+  });
+
+  // Find the user's retweet post object (if it exists)
+  const myRetweet = useAppSelector(state => {
+    if (!address) return null;
+    
+    // Case 1: If this post is already a retweet by the current user
+    if (post.retweetOf && post.user.id === address) {
+      return post; // The current post is the retweet
+    }
+    
+    // Case 2: Check for explicit retweets of this post
+    return state.thread.allPosts.find(p => 
+      p.retweetOf?.id === post.id && p.user.id === address
+    );
+  });
 
   // Instead of relying solely on the passed prop, subscribe to the updated post from Redux.
   const updatedPost =
@@ -114,8 +397,8 @@ export default function PostFooter({
     }).start();
   };
 
-  const handleOpenRetweetModal = () => {
-    setShowRetweetModal(true);
+  const handleOpenRetweetDrawer = () => {
+    setShowRetweetDrawer(true);
   };
 
   // Render existing reactions
@@ -138,6 +421,90 @@ export default function PostFooter({
     );
   };
 
+  // Handle direct repost without quote
+  const handleDirectRepost = async () => {
+    if (post.id.startsWith('local-')) {
+      Alert.alert(
+        'Action not allowed',
+        'You cannot repost unsaved posts.',
+      );
+      return;
+    }
+    
+    // Determine if we're retweeting a retweet - if so, retweet the original instead
+    const isRetweetingRetweet = post.retweetOf !== undefined;
+    const originalPostId = isRetweetingRetweet && post.retweetOf ? post.retweetOf.id : post.id;
+    
+    try {
+      await dispatch(createRetweetAsync({
+        retweetOf: originalPostId,
+        userId: address || 'anonymous-wallet',
+        sections: [], // Empty sections for a direct repost without quote
+      })).unwrap();
+      
+      setShowRetweetDrawer(false);
+    } catch (error) {
+      Alert.alert('Repost Failed', 'Unable to repost. Please try again.');
+    }
+  };
+
+  // Handle undo repost
+  const handleUndoRepost = async () => {
+    try {
+      if (myRetweet) {
+        const isCurrentPostTheRetweet = post.retweetOf && post.user.id === address;
+        
+        // If the current post is itself a retweet by the current user
+        if (isCurrentPostTheRetweet) {
+          // Remember the original post's ID in case we need to navigate
+          const originalPostId = post.retweetOf?.id;
+          
+          if (!originalPostId) {
+            console.warn('Original post ID is missing for retweet');
+            return;
+          }
+          
+          // Delete this post (which is the retweet itself)
+          await dispatch(deletePostAsync(post.id)).unwrap();
+          
+          // After deleting, navigate to the original post if viewing the retweet directly
+          if (onPressComment && post.retweetOf) {
+            // In Twitter, when you undo a retweet while viewing the retweet,
+            // it takes you to the original post
+            onPressComment(post.retweetOf);
+          }
+        } else {
+          // Normal case: delete the retweet post we found
+          await dispatch(deletePostAsync(myRetweet.id)).unwrap();
+        }
+      } else {
+        // If we can't find the retweet, use undoRetweetLocally action as fallback
+        dispatch(undoRetweetLocally({ 
+          userId: address || '', 
+          originalPostId: post.id 
+        }));
+      }
+      
+      setShowRetweetDrawer(false);
+    } catch (error) {
+      Alert.alert('Undo Repost Failed', 'Unable to undo repost. Please try again.');
+    }
+  };
+
+  // Handle comment click - navigate to appropriate post
+  const handleCommentClick = () => {
+    if (onPressComment) {
+      // If this is a retweet and we're viewing the original inside it, navigate to the original
+      if (post.retweetOf && post.sections.length === 0) {
+        // Navigate to the original post that was retweeted
+        onPressComment(post.retweetOf);
+      } else {
+        // Standard behavior - navigate to this post
+        onPressComment(post);
+      }
+    }
+  };
+
   return (
     <View style={styles.footerContainer}>
       {/* Overlay to detect outside clicks on the reaction bubble */}
@@ -155,17 +522,28 @@ export default function PostFooter({
           {/* Comment icon */}
           <TouchableOpacity
             style={styles.itemLeftIcons}
-            onPress={() => onPressComment && onPressComment(post)}>
+            onPress={handleCommentClick}>
             <Icons.CommentIdle width={20} height={20} />
             <Text style={styles.iconText}>{updatedPost.quoteCount || 0}</Text>
           </TouchableOpacity>
 
           {/* Retweet */}
           <View style={styles.itemLeftIcons}>
-            <TouchableOpacity onPress={handleOpenRetweetModal}>
-              <Icons.RetweetIdle width={20} height={20} />
+            <TouchableOpacity 
+              onPress={handleOpenRetweetDrawer}
+            >
+              <Icons.RetweetIdle 
+                width={20} 
+                height={20} 
+                color={hasRetweeted ? '#17BF63' : undefined}
+              />
             </TouchableOpacity>
-            <Text style={styles.iconText}>{updatedPost.retweetCount || 0}</Text>
+            <Text style={[
+              styles.iconText,
+              hasRetweeted && { color: '#17BF63' }
+            ]}>
+              {updatedPost.retweetCount || 0}
+            </Text>
           </View>
 
           {/* Reaction icon */}
@@ -216,16 +594,15 @@ export default function PostFooter({
         </View>
       </View>
 
-      {/* Retweet Modal */}
-      <RetweetModal
-        visible={showRetweetModal}
-        onClose={() => setShowRetweetModal(false)}
+      {/* Use our inline SimpleRetweetDrawer component */}
+      <SimpleRetweetDrawer
+        visible={showRetweetDrawer}
+        onClose={() => setShowRetweetDrawer(false)}
         retweetOf={post.id}
         currentUser={retweeterUser}
-        headerText="Retweet"
-        placeholderText="Add a comment (optional)"
-        buttonText="Retweet"
-        buttonTextWithContent="Quote Retweet"
+        hasAlreadyRetweeted={hasRetweeted}
+        onDirectRepost={handleDirectRepost}
+        onUndoRepost={handleUndoRepost}
       />
     </View>
   );
@@ -309,5 +686,119 @@ const reactionStyles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     fontWeight: '500',
+  },
+});
+
+// Styles for the retweet drawer
+const drawerStyles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    zIndex: 1000,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  drawer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 10,
+  },
+  optionsContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  drawerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 16,
+    color: '#333',
+  },
+  option: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  optionText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  undoOption: {
+    borderBottomWidth: 0,
+  },
+  undoText: {
+    color: '#e0245e',
+  },
+  loader: {
+    marginTop: 16,
+    height: 24,
+    width: 24,
+    alignSelf: 'center',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#1d9bf0',
+    borderTopColor: 'transparent',
+  },
+  quoteContainer: {
+    padding: 16,
+  },
+  quoteTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#333',
+  },
+  textInput: {
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  quoteButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  cancelButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  cancelText: {
+    fontSize: 15,
+    color: '#666',
+    fontWeight: '500',
+  },
+  quoteButton: {
+    backgroundColor: '#1d9bf0',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quoteButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  disabledButton: {
+    backgroundColor: '#8ec5f2',
+  },
+  disabledText: {
+    color: 'rgba(255,255,255,0.8)',
   },
 });

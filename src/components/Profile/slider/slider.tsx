@@ -7,6 +7,7 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
 import {TabView, SceneMap, TabBar} from 'react-native-tab-view';
 import {ThreadPost} from '../../thread/thread.types';
@@ -17,6 +18,8 @@ import ActionsPage from '../actions/ActionsPage';
 import {useAppDispatch, useAppSelector} from '../../../hooks/useReduxHooks';
 import {deletePostAsync} from '../../../state/thread/reducer';
 import {AssetItem, PortfolioData} from '../../../hooks/useFetchTokens';
+import RetweetPreview from '../../thread/retweet/RetweetPreview';
+import Icons from '../../../assets/svgs';
 
 /**
  * Props for the swipeable tabs used on the Profile screen.
@@ -85,6 +88,9 @@ function PostPage({
 
   const renderPost = ({item}: {item: ThreadPost}) => {
     const isReply = !!item.parentId;
+    const isRetweet = !!item.retweetOf;
+    const isQuoteRetweet = isRetweet && item.sections && item.sections.length > 0;
+    
     return (
       <View style={styles.postCard}>
         {isReply ? (
@@ -97,27 +103,82 @@ function PostPage({
             <Text style={styles.replyLabel}>Reply Post</Text>
           </TouchableOpacity>
         ) : null}
+        
+        {/* Twitter style retweet indicator */}
+        {isRetweet && (
+          <View style={retweetStyles.retweetHeader}>
+            <Icons.RetweetIdle width={12} height={12} color="#657786" />
+            <Text style={retweetStyles.retweetHeaderText}>
+              {item.user.username} Retweeted
+            </Text>
+          </View>
+        )}
 
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            onPressPost?.(item);
-          }}>
-          <PostHeader
-            post={item}
-            onDeletePost={handleDeletePost}
-            onEditPost={handleEditPost}
-          />
-          {/**
-           * NOTE: The key fix for the chart’s PanResponder conflict is below in the TabView
-           * (swipeEnabled={false}), so the user can smoothly hover inside the chart.
-           */}
-          <PostBody
-            post={item}
-            externalRefreshTrigger={externalRefreshTrigger}
-          />
-          <PostFooter post={item} />
-        </TouchableOpacity>
+        {/* For retweets, handle differently based on whether it has quote content */}
+        {isRetweet ? (
+          <View style={retweetStyles.retweetedContent}>
+            {/* For quote retweets, show the quote text first */}
+            {isQuoteRetweet && (
+              <View style={retweetStyles.quoteContent}>
+                {item.sections.map(section => (
+                  <Text key={section.id} style={retweetStyles.quoteText}>
+                    {section.text}
+                  </Text>
+                ))}
+              </View>
+            )}
+            
+            {/* Original post content */}
+            {item.retweetOf && (
+              <TouchableOpacity
+                style={retweetStyles.originalPostContainer}
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (onPressPost && item.retweetOf) {
+                    // Navigate to the original post, not the retweet wrapper
+                    onPressPost(item.retweetOf);
+                  }
+                }}
+              >
+                <PostHeader
+                  post={item.retweetOf}
+                  onDeletePost={(p) => handleDeletePost(p)} 
+                  onEditPost={(p) => handleEditPost(p)}
+                />
+                <PostBody
+                  post={item.retweetOf}
+                  externalRefreshTrigger={externalRefreshTrigger}
+                />
+                <PostFooter 
+                  post={item.retweetOf}
+                  onPressComment={() => {
+                    if (onPressPost && item.retweetOf) {
+                      onPressPost(item.retweetOf);
+                    }
+                  }}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              onPressPost?.(item);
+            }}>
+            {/* Regular post */}
+            <PostHeader
+              post={item}
+              onDeletePost={handleDeletePost}
+              onEditPost={handleEditPost}
+            />
+            <PostBody
+              post={item}
+              externalRefreshTrigger={externalRefreshTrigger}
+            />
+            <PostFooter post={item} />
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -283,7 +344,7 @@ function SwipeTabs({
         renderScene={renderScene}
         onIndexChange={handleIndexChange}
         renderTabBar={renderTabBar}
-        // Key fix: Disables horizontal swipe gestures so the chart’s PanResponder
+        // Key fix: Disables horizontal swipe gestures so the chart's PanResponder
         // does not conflict with the tab swipes.
         swipeEnabled={false}
         lazy
@@ -325,4 +386,57 @@ export default memo(SwipeTabs, (prevProps, nextProps) => {
   if (prevProps.onAssetPress !== nextProps.onAssetPress) return false;
 
   return true;
+});
+
+// Additional styles for retweet indicators
+const retweetStyles = StyleSheet.create({
+  retweetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    paddingLeft: 6,
+    paddingTop: 4,
+  },
+  retweetHeaderText: {
+    fontSize: 13,
+    color: '#657786',
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  retweetedContent: {
+    marginTop: 4,
+    width: '100%',
+  },
+  originalPostContainer: {
+    width: '100%',
+    borderRadius: 12,
+    backgroundColor: '#F8F8F8',
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E1E8ED',
+  },
+  retweetIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    paddingLeft: 6,
+  },
+  retweetLabel: {
+    fontSize: 12,
+    color: '#657786',
+    marginLeft: 4,
+    fontWeight: '500',
+  },
+  retweetedPostContainer: {
+    marginTop: 8,
+    marginBottom: 8,
+    marginHorizontal: 4,
+  },
+  quoteContent: {
+    marginBottom: 8,
+  },
+  quoteText: {
+    fontSize: 12,
+    color: '#657786',
+  },
 });
