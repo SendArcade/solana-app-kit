@@ -143,13 +143,55 @@ export default function FeedScreen() {
         onRefresh={onRefresh}
         // onPressPost navigates to the PostThreadScreen with the post's ID.
         onPressPost={post => {
-          navigation.navigate('PostThread', { postId: post.id });
+          // For retweets and quotes, handle navigation correctly:
+          if (post.retweetOf) {
+            // If this is a retweet with no content (direct retweet), navigate to the original
+            if (post.sections.length === 0) {
+              navigation.navigate('PostThread', { postId: post.retweetOf.id });
+            } else {
+              // If it's a quote retweet, navigate to the quote itself
+              navigation.navigate('PostThread', { postId: post.id });
+            }
+          } else {
+            // Regular post
+            navigation.navigate('PostThread', { postId: post.id });
+          }
         }}
-        themeOverrides={{ '--thread-bg-primary': '#F0F0F0' }}
+        themeOverrides={{ 
+          '--thread-bg-primary': '#F0F0F0',
+          '--retweet-border-color': '#E1E8ED',
+          '--retweet-bg-color': '#F8F8F8',
+          '--retweet-text-color': '#657786'
+        }}
         styleOverrides={{
           container: { padding: 6 },
           button: { borderRadius: 8 },
           buttonLabel: { fontWeight: 'bold' },
+          retweetHeader: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: 6,
+            paddingLeft: 6,
+            paddingTop: 4,
+          },
+          retweetHeaderText: {
+            fontSize: 13,
+            color: '#657786',
+            marginLeft: 6,
+            fontWeight: '500',
+          },
+          retweetedContent: {
+            marginTop: 4,
+            width: '100%',
+          },
+          originalPostContainer: {
+            width: '100%',
+            borderRadius: 12,
+            backgroundColor: '#F8F8F8',
+            padding: 10,
+            borderWidth: 1,
+            borderColor: '#E1E8ED',
+          },
         }}
         onPressUser={user => {
           // Check if the tapped user is the current (logged-in) user

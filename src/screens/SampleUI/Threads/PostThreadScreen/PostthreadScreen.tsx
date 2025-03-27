@@ -26,6 +26,8 @@ import { DEFAULT_IMAGES } from '../../../../config/constants';
 import { flattenPosts } from '../../../../components/thread/thread.utils';
 import { deletePostAsync } from '../../../../state/thread/reducer';
 import ThreadEditModal from '../../../../components/thread/ThreadEditModal';
+import RetweetPreview from '../../../../components/thread/retweet/RetweetPreview';
+import Icons from '../../../../assets/svgs';
 
 /**
  * Finds a post in the array by ID.
@@ -152,6 +154,8 @@ export default function PostThreadScreen() {
     const showTopLine = !isRootPost(post);
     const childCount = getDirectChildren(flatPosts, post.id).length;
     const showBottomLine = childCount > 0;
+    const isRetweet = !!post.retweetOf;
+    const isQuoteRetweet = isRetweet && post.sections && post.sections.length > 0;
 
     return (
       <View style={twitterRowStyles.rowContainer} key={post.id}>
@@ -163,16 +167,67 @@ export default function PostThreadScreen() {
           )}
         </View>
         <View style={twitterRowStyles.postContent}>
-          <PostHeader
-            post={post}
-            onDeletePost={() => handleDeletePost(post)}
-            onEditPost={() => handleEditPost(post)}
-            onPressUser={user =>
-              navigation.navigate('OtherProfile', { userId: user.id })
-            }
-          />
-          <PostBody post={post} />
-          <PostFooter post={post} />
+          {/* If it's a retweet, show the retweet indicator */}
+          {isRetweet && (
+            <View style={twitterRowStyles.retweetIndicator}>
+              <Icons.RetweetIdle width={12} height={12} color="#657786" />
+              <Text style={twitterRowStyles.retweetText}>
+                {post.user.username} Retweeted
+              </Text>
+            </View>
+          )}
+
+          {isRetweet ? (
+            <View>
+              {/* For quote retweets, show the quote text first */}
+              {isQuoteRetweet && (
+                <View style={twitterRowStyles.quoteContent}>
+                  {post.sections.map(section => (
+                    <Text key={section.id} style={twitterRowStyles.quoteText}>
+                      {section.text}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            
+              {/* Display original post content for retweets */}
+              {post.retweetOf && (
+                <TouchableOpacity 
+                  style={twitterRowStyles.originalPostContainer}
+                  activeOpacity={0.8}
+                  onPress={() => navigation.push('PostThread', { postId: post.retweetOf!.id })}
+                >
+                  <PostHeader
+                    post={post.retweetOf}
+                    onDeletePost={() => handleDeletePost(post.retweetOf!)}
+                    onEditPost={() => handleEditPost(post.retweetOf!)}
+                    onPressUser={user =>
+                      navigation.navigate('OtherProfile', { userId: user.id })
+                    }
+                  />
+                  <PostBody post={post.retweetOf} />
+                  <PostFooter 
+                    post={post.retweetOf}
+                    onPressComment={() => navigation.push('PostThread', { postId: post.retweetOf!.id })} 
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            // Regular post display
+            <>
+              <PostHeader
+                post={post}
+                onDeletePost={() => handleDeletePost(post)}
+                onEditPost={() => handleEditPost(post)}
+                onPressUser={user =>
+                  navigation.navigate('OtherProfile', { userId: user.id })
+                }
+              />
+              <PostBody post={post} />
+              <PostFooter post={post} />
+            </>
+          )}
         </View>
       </View>
     );
@@ -186,6 +241,8 @@ export default function PostThreadScreen() {
     const showTopLine = !isRootPost(post);
     const childCount = getDirectChildren(flatPosts, post.id).length;
     const showBottomLine = childCount > 0;
+    const isRetweet = !!post.retweetOf;
+    const isQuoteRetweet = isRetweet && post.sections && post.sections.length > 0;
 
     return (
       <TouchableOpacity
@@ -203,16 +260,67 @@ export default function PostThreadScreen() {
           )}
         </View>
         <View style={twitterRowStyles.postContent}>
-          <PostHeader
-            post={post}
-            onDeletePost={() => handleDeletePost(post)}
-            onEditPost={() => handleEditPost(post)}
-            onPressUser={user =>
-              navigation.navigate('OtherProfile', { userId: user.id })
-            }
-          />
-          <PostBody post={post} />
-          <PostFooter post={post} />
+          {/* If it's a retweet, show the retweet indicator */}
+          {isRetweet && (
+            <View style={twitterRowStyles.retweetIndicator}>
+              <Icons.RetweetIdle width={12} height={12} color="#657786" />
+              <Text style={twitterRowStyles.retweetText}>
+                {post.user.username} Retweeted
+              </Text>
+            </View>
+          )}
+
+          {isRetweet ? (
+            <View>
+              {/* For quote retweets, show the quote text first */}
+              {isQuoteRetweet && (
+                <View style={twitterRowStyles.quoteContent}>
+                  {post.sections.map(section => (
+                    <Text key={section.id} style={twitterRowStyles.quoteText}>
+                      {section.text}
+                    </Text>
+                  ))}
+                </View>
+              )}
+              
+              {/* Display original post content for retweets */}
+              {post.retweetOf && (
+                <TouchableOpacity 
+                  style={twitterRowStyles.originalPostContainer}
+                  activeOpacity={0.8}
+                  onPress={() => navigation.push('PostThread', { postId: post.retweetOf!.id })}
+                >
+                  <PostHeader
+                    post={post.retweetOf}
+                    onDeletePost={() => handleDeletePost(post.retweetOf!)}
+                    onEditPost={() => handleEditPost(post.retweetOf!)}
+                    onPressUser={user =>
+                      navigation.navigate('OtherProfile', { userId: user.id })
+                    }
+                  />
+                  <PostBody post={post.retweetOf} />
+                  <PostFooter 
+                    post={post.retweetOf}
+                    onPressComment={() => navigation.push('PostThread', { postId: post.retweetOf!.id })} 
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            // Regular post display
+            <>
+              <PostHeader
+                post={post}
+                onDeletePost={() => handleDeletePost(post)}
+                onEditPost={() => handleEditPost(post)}
+                onPressUser={user =>
+                  navigation.navigate('OtherProfile', { userId: user.id })
+                }
+              />
+              <PostBody post={post} />
+              <PostFooter post={post} />
+            </>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -312,6 +420,32 @@ const twitterRowStyles = {
   postContent: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  retweetIndicator: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginBottom: 4,
+  },
+  retweetText: {
+    fontSize: 12,
+    color: '#657786',
+    marginLeft: 4,
+    fontWeight: '500' as const,
+  },
+  retweetContainer: {
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  originalPostContainer: {
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  quoteContent: {
+    marginBottom: 8,
+  },
+  quoteText: {
+    fontSize: 12,
+    color: '#657786',
   },
 };
 
