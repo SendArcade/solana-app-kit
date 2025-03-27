@@ -279,16 +279,15 @@ function TradeCard({
       <>
         <View style={styles.tradeCardContainer}>
           {/* Output token details row */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.tradeCardCombinedSides}
             onPress={handleOpenOutputTokenDetails}
-            activeOpacity={0.7}
-          >
+            activeOpacity={0.7}>
             <View style={styles.tradeCardLeftSide}>
               <Image
                 source={
                   fallbackOutLogo
-                    ? { uri: fallbackOutLogo }
+                    ? {uri: fallbackOutLogo}
                     : require('../../../assets/images/SENDlogo.png')
                 }
                 style={styles.tradeCardTokenImage}
@@ -301,11 +300,11 @@ function TradeCard({
               </View>
             </View>
             <View style={styles.tradeCardRightSide}>
-              <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
-                {tradeData.outputQuantity}
+              <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
+                {tradeData.outputQuantity + ' ' + tradeData.outputSymbol}
               </Text>
               <Text style={styles.tradeCardUsdPrice}>
-                {tradeData.outputUsdValue || ''}
+                {tradeData.outputUsdValue ?? ''}
               </Text>
             </View>
           </TouchableOpacity>
@@ -317,8 +316,7 @@ function TradeCard({
               alignItems: 'center',
               justifyContent: 'center',
               marginVertical: 8,
-            }}
-          >
+            }}>
             {(['1H', '1D', '1W', '1M', 'All'] as Timeframe[]).map(tf => (
               <TouchableOpacity
                 key={tf}
@@ -328,14 +326,12 @@ function TradeCard({
                   borderRadius: 6,
                   backgroundColor: timeframe === tf ? '#D6FDFF' : 'transparent',
                 }}
-                onPress={() => setTimeframe(tf)}
-              >
+                onPress={() => setTimeframe(tf)}>
                 <Text
                   style={{
                     color: timeframe === tf ? '#32D4DE' : '#666666',
                     fontWeight: timeframe === tf ? '600' : '400',
-                  }}
-                >
+                  }}>
                   {tf}
                 </Text>
               </TouchableOpacity>
@@ -343,12 +339,15 @@ function TradeCard({
 
             {/* Refresh icon => re-fetch coin data */}
             <TouchableOpacity
-              style={{ marginLeft: 16, flexDirection: 'row', alignItems: 'center' }}
+              style={{
+                marginLeft: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
               onPress={handleRefresh}
-              accessibilityLabel="Refresh Chart"
-            >
+              accessibilityLabel="Refresh Chart">
               <Icon.SwapIcon width={20} height={20} />
-              <Text style={{ color: '#1d9bf0', marginLeft: 4 }}>Refresh</Text>
+              <Text style={{color: '#1d9bf0', marginLeft: 4}}>Refresh</Text>
             </TouchableOpacity>
           </View>
 
@@ -362,8 +361,7 @@ function TradeCard({
                 justifyContent: 'center',
                 backgroundColor: '#FFFFFF',
               } as StyleProp<ViewStyle>,
-            ]}
-          >
+            ]}>
             {isLoading ? (
               <ActivityIndicator size="large" color="#1d9bf0" />
             ) : graphData.length > 0 ? (
@@ -382,15 +380,13 @@ function TradeCard({
                     justifyContent: 'center',
                     marginTop: 5,
                     opacity: 0.7,
-                  }}
-                >
+                  }}>
                   <View
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
                       marginRight: 12,
-                    }}
-                  >
+                    }}>
                     <View
                       style={{
                         width: 8,
@@ -400,9 +396,9 @@ function TradeCard({
                         marginRight: 4,
                       }}
                     />
-                    <Text style={{ fontSize: 10 }}>Current</Text>
+                    <Text style={{fontSize: 10}}>Current</Text>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
                     <View
                       style={{
                         width: 8,
@@ -412,16 +408,16 @@ function TradeCard({
                         marginRight: 4,
                       }}
                     />
-                    <Text style={{ fontSize: 10 }}>Trade Execution</Text>
+                    <Text style={{fontSize: 10}}>Trade Execution</Text>
                   </View>
                 </View>
               </>
             ) : coinError ? (
-              <Text style={{ color: 'red', marginTop: 6 }}>
+              <Text style={{color: 'red', marginTop: 6}}>
                 Error: {coinError.toString()}
               </Text>
             ) : (
-              <Text style={{ color: '#999', marginTop: 6 }}>
+              <Text style={{color: '#999', marginTop: 6}}>
                 No chart data found. Try a different timeframe or refresh.
               </Text>
             )}
@@ -450,23 +446,22 @@ function TradeCard({
     <>
       <View style={styles.tradeCardContainer}>
         {loadingMeta ? (
-          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{alignItems: 'center', justifyContent: 'center'}}>
             <ActivityIndicator size="small" color="#1d9bf0" />
           </View>
         ) : (
           <>
-            <View style={{ position: 'relative' }}>
+            <View style={{position: 'relative'}}>
               {/* Input token info */}
-              <TouchableOpacity 
-                style={styles.tradeCardCombinedSides} 
+              <TouchableOpacity
+                style={styles.tradeCardCombinedSides}
                 onPress={handleOpenInputTokenDetails}
-                activeOpacity={0.7}
-              >
+                activeOpacity={0.7}>
                 <View style={styles.tradeCardLeftSide}>
                   <Image
                     source={
                       fallbackInLogo
-                        ? { uri: fallbackInLogo }
+                        ? {uri: fallbackInLogo}
                         : require('../../../assets/images/SENDlogo.png')
                     }
                     style={styles.tradeCardTokenImage}
@@ -481,7 +476,7 @@ function TradeCard({
                   </View>
                 </View>
                 <View style={styles.tradeCardRightSide}>
-                  <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
+                  <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
                     {tradeData.inputQuantity}
                   </Text>
                   <Text style={styles.tradeCardUsdPrice}>
@@ -496,16 +491,15 @@ function TradeCard({
               </View>
 
               {/* Output token info */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.tradeCardCombinedSides}
                 onPress={handleOpenOutputTokenDetails}
-                activeOpacity={0.7}
-              >
+                activeOpacity={0.7}>
                 <View style={styles.tradeCardLeftSide}>
                   <Image
                     source={
                       fallbackOutLogo
-                        ? { uri: fallbackOutLogo }
+                        ? {uri: fallbackOutLogo}
                         : require('../../../assets/images/SENDlogo.png')
                     }
                     style={styles.tradeCardTokenImage}
@@ -520,8 +514,8 @@ function TradeCard({
                   </View>
                 </View>
                 <View style={styles.tradeCardRightSide}>
-                  <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
-                    {tradeData.outputQuantity} {tradeData.outputSymbol}
+                  <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
+                    {tradeData.outputQuantity + ' ' + tradeData.outputSymbol}
                   </Text>
                   <Text style={styles.tradeCardUsdPrice}>
                     {tradeData.outputUsdValue ?? ''}
@@ -540,9 +534,10 @@ function TradeCard({
                   borderRadius: 5,
                   alignItems: 'center',
                 }}
-                onPress={onTrade}
-              >
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Trade Now</Text>
+                onPress={onTrade}>
+                <Text style={{color: '#fff', fontWeight: 'bold'}}>
+                  Trade Now
+                </Text>
               </TouchableOpacity>
             )}
           </>
@@ -560,7 +555,7 @@ function TradeCard({
           logoURI: fallbackInLogo,
         }}
       />
-      
+
       <TokenDetailsDrawer
         visible={showOutputTokenDrawer}
         onClose={() => setShowOutputTokenDrawer(false)}

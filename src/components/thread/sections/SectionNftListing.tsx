@@ -276,7 +276,7 @@ export default function SectionNftListing({ listingData }: SectionNftListingProp
 
             {collectionData?.floorPrice && (
               <Text style={[styles.priceText, { color: '#32D4DE' }]}>
-                Current Floor: {formatSolPrice(collectionData.floorPrice)} SOL
+                Current Floor: <Text>{formatSolPrice(collectionData.floorPrice)}</Text> <Text>SOL</Text>
               </Text>
             )}
 
@@ -325,13 +325,13 @@ export default function SectionNftListing({ listingData }: SectionNftListingProp
 
           {nftData?.listing?.price && (
             <Text style={styles.priceText}>
-              Listed @ {formatSolPrice(nftData.listing.price)} SOL
+              Listed @ <Text>{formatSolPrice(nftData.listing.price)}</Text> <Text>SOL</Text>
             </Text>
           )}
 
           {nftData?.lastSale?.price && (
             <Text style={styles.lastSale}>
-              Last sale: {formatSolPrice(nftData.lastSale.price)} SOL
+              Last sale: <Text>{formatSolPrice(nftData.lastSale.price)}</Text> <Text>SOL</Text>
             </Text>
           )}
 
