@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Image, ActivityIndicator } from 'react-native';
+import { View, Text, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { NftListingData } from '../thread.types';
 import styles from './SectionNftListing.style';
 import { TENSOR_API_KEY } from '@env';
 import { DEFAULT_IMAGES } from '../../../config/constants';
+import TokenDetailsDrawer from '../../Common/TokenDetailsDrawer/TokenDetailsDrawer';
 
 interface SectionNftListingProps {
   listingData?: NftListingData;
@@ -18,6 +19,8 @@ export default function SectionNftListing({ listingData }: SectionNftListingProp
   const [nftData, setNftData] = useState<any>(null);
   const [collectionData, setCollectionData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showNftDetailsDrawer, setShowNftDetailsDrawer] = useState(false);
+  const [drawerLoading, setDrawerLoading] = useState(false);
 
   // Track what we last fetched to avoid redundant fetches
   const lastFetchedRef = useRef<{ mint?: string, collId?: string } | null>(null);
@@ -196,6 +199,35 @@ export default function SectionNftListing({ listingData }: SectionNftListingProp
     }
   };
 
+  // Handle opening the NFT details drawer
+  const handleOpenNftDetails = async () => {
+    // Show loading indicator briefly
+    setDrawerLoading(true);
+
+    // If we need to fetch data, do so before showing the drawer
+    if (!nftData && listingData?.mint) {
+      try {
+        await fetchNftData(listingData.mint);
+      } catch (err) {
+        console.error('Error fetching NFT data for drawer:', err);
+      }
+    }
+
+    if (!collectionData && listingData?.isCollection && listingData?.collId) {
+      try {
+        await fetchCollectionData(listingData.collId);
+      } catch (err) {
+        console.error('Error fetching collection data for drawer:', err);
+      }
+    }
+
+    // Short timeout to ensure smoother opening experience
+    setTimeout(() => {
+      setDrawerLoading(false);
+      setShowNftDetailsDrawer(true);
+    }, 300);
+  };
+
   if (!listingData) {
     return <Text>[Missing listing data]</Text>;
   }
@@ -314,18 +346,55 @@ export default function SectionNftListing({ listingData }: SectionNftListingProp
     );
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        {renderContent()}
+  // Get the appropriate data for the drawer
+  const getNftDetailsForDrawer = () => {
+    if (listingData.isCollection) {
+      return {
+        mint: listingData.collId || '',
+        symbol: '',
+        name: listingData.collectionName || collectionData?.name || 'Collection',
+        logoURI: listingData.image || collectionData?.imageUri || '',
+        isCollection: true,
+        collectionData: collectionData
+      };
+    } else {
+      return {
+        mint: listingData.mint || '',
+        symbol: '',
+        name: nftData?.name || listingData.name || 'NFT',
+        logoURI: nftData?.imageUri || '',
+        nftData: nftData
+      };
+    }
+  };
 
-        {error && (
-          <Text style={{ color: 'red', marginTop: 8, fontSize: 12 }}>
-            {error}
-          </Text>
-        )}
-      </View>
-    </View>
+  return (
+    <>
+      <TouchableOpacity
+        style={styles.container}
+        activeOpacity={0.7}
+        onPress={handleOpenNftDetails}
+      >
+        <View style={styles.card}>
+          {renderContent()}
+
+          {error && (
+            <Text style={{ color: 'red', marginTop: 8, fontSize: 12 }}>
+              {error}
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+
+      {/* NFT Details Drawer */}
+      <TokenDetailsDrawer
+        visible={showNftDetailsDrawer}
+        onClose={() => setShowNftDetailsDrawer(false)}
+        tokenMint={listingData.mint || listingData.collId || ''}
+        initialData={getNftDetailsForDrawer()}
+        loading={drawerLoading}
+      />
+    </>
   );
 }
 
