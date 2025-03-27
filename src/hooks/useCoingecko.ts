@@ -13,6 +13,9 @@ export type Timeframe = '1H' | '1D' | '1W' | '1M' | 'All';
 // Cache data for up to 5 minutes (in milliseconds)
 const CACHE_TTL = 5 * 60 * 1000;
 
+// Shorter cache time for price data to keep it more current
+const PRICE_CACHE_TTL = 1 * 60 * 1000; // 1 minute
+
 // Cache for coin data to avoid refetching
 interface CacheEntry {
   timestamp: number;
@@ -160,7 +163,8 @@ export function useCoingecko() {
     const cacheKey = `market:${coinId}`;
     const cachedData = coinDataCache.get(cacheKey);
     
-    if (cachedData && Date.now() - cachedData.timestamp < CACHE_TTL) {
+    // Use shorter cache TTL for market data since it contains current prices
+    if (cachedData && Date.now() - cachedData.timestamp < PRICE_CACHE_TTL) {
       return cachedData.data;
     }
     
@@ -192,7 +196,9 @@ export function useCoingecko() {
       const cacheKey = `ohlc:${coinId}:${selectedTf}`;
       const cachedData = coinDataCache.get(cacheKey);
       
-      if (cachedData && Date.now() - cachedData.timestamp < CACHE_TTL) {
+      // Use shorter cache TTL for price-related data to keep it current
+      const cacheTtl = selectedTf === '1H' ? PRICE_CACHE_TTL : CACHE_TTL;
+      if (cachedData && Date.now() - cachedData.timestamp < cacheTtl) {
         return cachedData.data;
       }
       
