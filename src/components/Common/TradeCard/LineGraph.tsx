@@ -6,7 +6,14 @@ import React, {
   useCallback,
   useLayoutEffect,
 } from 'react';
-import {View, Dimensions, Animated, Easing, PanResponder} from 'react-native';
+import {
+  View,
+  Dimensions,
+  Animated,
+  Easing,
+  PanResponder,
+  StyleSheet,
+} from 'react-native';
 import {LineChart} from 'react-native-chart-kit';
 import {
   Circle,
@@ -32,6 +39,10 @@ interface LineGraphProps {
   userAvatar?: any;
 }
 
+/**
+ * A line chart that handles its own hover tooltip
+ * without the chart's built-in touch events.
+ */
 const LineGraph: React.FC<LineGraphProps> = ({
   data,
   width,
@@ -41,11 +52,23 @@ const LineGraph: React.FC<LineGraphProps> = ({
   userAvatar,
   executionColor = '#FF5722',
 }) => {
-  const screenWidth = width || Dimensions.get('window').width - 32;
+  // The chart itself is 200px tall
+  const chartHeight = 200;
+
+  // We'll assume the caller either passes a width or we do a default
+  const containerWidth = width || Dimensions.get('window').width - 32;
+
+  // Because we have some internal left/right padding in the chart style
+  // we want to subtract them from the "usable" width for hover calculations
+  const HORIZONTAL_PADDING = 12; // 8 + 4 from chart style
+  const usableChartWidth = containerWidth - HORIZONTAL_PADDING;
+
+  // We'll animate data changes
   const animatedData = useRef(new Animated.Value(0)).current;
   const currentData = useRef(data);
-
   const [displayData, setDisplayData] = useState(data);
+
+  // Our tooltip state
   const [tooltipPos, setTooltipPos] = useState<{
     x: number;
     y: number;
@@ -53,17 +76,10 @@ const LineGraph: React.FC<LineGraphProps> = ({
     price: number;
   } | null>(null);
 
-  // We'll store requestAnimationFrame IDs here so we can cancel on cleanup.
-  const rafIdRef = useRef<number | null>(null);
+  // Keep track of old data length to see if the data truly changed
+  const prevDataLengthRef = useRef(data.length);
 
-  // For easy comparison of old vs new props
-  const prevPropsRef = useRef({
-    dataLength: data.length,
-    executionPrice,
-    executionTimestamp,
-  });
-
-  // Precompute min/max for quick usage
+  // Precompute min/max
   const dataRange = useMemo(() => {
     if (!data || data.length === 0) return {min: 0, max: 0, range: 0};
     const min = Math.min(...data);
@@ -71,187 +87,98 @@ const LineGraph: React.FC<LineGraphProps> = ({
     return {min, max, range: max - min};
   }, [data]);
 
-  // Helper: convert timestamps (various forms) to ms
-  const getTimestampInMs = (
-    timestamp: string | number | Date | undefined,
-  ): number | undefined => {
-    if (!timestamp) return undefined;
-    
-    // If timestamp is a Date object, get its milliseconds
-    if (timestamp instanceof Date) return timestamp.getTime();
-    
-    // If timestamp is a string, try to parse it
-    if (typeof timestamp === 'string') {
-      // Try to parse as ISO date string
-      const parsedDate = new Date(timestamp);
-      if (!isNaN(parsedDate.getTime())) {
-        return parsedDate.getTime();
-      }
-      
-      // If not a valid date string, try parsing as a number
-      const numTimestamp = parseInt(timestamp, 10);
-      if (!isNaN(numTimestamp)) {
-        return convertTimestampToMs(numTimestamp);
-      }
-      
-      return undefined;
-    }
-    
-    // If timestamp is a number, check if it's in seconds and convert if needed
-    if (typeof timestamp === 'number') {
-      return convertTimestampToMs(timestamp);
-    }
-    
-    return undefined;
-  };
-  
-  // Helper to distinguish between second-based and millisecond-based timestamps
+  // Convert potentially second-based timestamps to ms
   const convertTimestampToMs = (timestamp: number): number => {
-    // If timestamp is in seconds (before year 2000), convert to milliseconds
-    // Using a simple heuristic: if timestamp represents a date before year 2000, 
-    // it's likely in seconds not milliseconds
-    const year2000 = 946684800000; // milliseconds since epoch for Jan 1, 2000
-    
+    const year2000 = 946684800000;
     if (timestamp < year2000 / 1000) {
-      console.log(`Converting timestamp ${timestamp} from seconds to milliseconds`);
       return timestamp * 1000;
     }
-    
-    // Heuristic for timestamps in seconds after year 2000
-    // Current time is around 1.7 trillion milliseconds since epoch
-    // If timestamp is much smaller than current time (< 1% of current time in ms)
-    // but still represents a date after 2000, it's likely in seconds
-    const currentTimeMs = Date.now();
-    if (timestamp > 946684800 && timestamp < currentTimeMs / 100) {
-      console.log(`Converting timestamp ${timestamp} from seconds to milliseconds`);
+    const now = Date.now();
+    if (timestamp > 946684800 && timestamp < now / 100) {
       return timestamp * 1000;
     }
-    
     return timestamp;
   };
 
-  // Interpolate the Y position for a given data point
+  // Calculate the Y position for a dataPoint
   const interpolateY = useCallback(
     (dataPoint: number) => {
-      const chartHeight = 200 - 20; // slight offset
+      const availableHeight = chartHeight - 20;
       const ratio =
         (dataPoint - dataRange.min) /
         (dataRange.range === 0 ? 1 : dataRange.range);
-      return chartHeight - ratio * chartHeight + 10;
+      return availableHeight - ratio * availableHeight + 10;
     },
     [dataRange],
   );
 
-  // Calculate tooltip position
+  // Called each time the user moves or presses
   const calculateTooltipPosition = useCallback(
-    (locationX: number) => {
-      if (!data || data.length === 0) return;
+    (rawX: number) => {
+      if (data.length === 0) {
+        return;
+      }
 
-      // chart width minus chart kit's default padding
-      const chartWidth = screenWidth - 40;
-      const segmentWidth = chartWidth / (data.length - 1);
+      // Clamp the X so it doesn't go beyond the chart
+      let clampedX = Math.max(0, Math.min(rawX, usableChartWidth));
 
-      let index = Math.round(locationX / segmentWidth);
+      const segmentWidth = usableChartWidth / (data.length - 1);
+      let index = Math.round(clampedX / segmentWidth);
       index = Math.max(0, Math.min(data.length - 1, index));
 
       const dataPoint = displayData[index];
       const y = interpolateY(dataPoint);
 
-      setTooltipPos({x: locationX, y, index, price: dataPoint});
+      setTooltipPos({x: clampedX, y, index, price: dataPoint});
     },
-    [data, displayData, screenWidth, interpolateY],
+    [data, displayData, usableChartWidth, interpolateY],
   );
 
-  // For the pan responder, we now use requestAnimationFrame for super-smooth updates
-  // and add debounce logic to avoid too many updates
-  const lastUpdateTimeRef = useRef<number>(0);
-  const pendingPositionRef = useRef<number | null>(null);
-  
-  const handleTooltip = useCallback(
-    (e: any) => {
-      if (!data || data.length === 0) return;
-      const locationX = e?.nativeEvent?.locationX;
-      if (locationX == null) return;
-      
-      // Store the latest position
-      pendingPositionRef.current = locationX;
-      
-      // Cancel any existing animation frame
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current);
-      }
-      
-      const now = Date.now();
-      // If we've updated recently, wait a bit before doing another update
-      if (now - lastUpdateTimeRef.current < 16) { // ~60fps timing
-        rafIdRef.current = requestAnimationFrame(() => {
-          // Only calculate position if we still have a pending position
-          if (pendingPositionRef.current !== null) {
-            calculateTooltipPosition(pendingPositionRef.current);
-            lastUpdateTimeRef.current = Date.now();
-            pendingPositionRef.current = null;
-          }
-        });
-      } else {
-        // Update immediately
-        calculateTooltipPosition(locationX);
-        lastUpdateTimeRef.current = now;
-        pendingPositionRef.current = null;
-      }
-    },
-    [calculateTooltipPosition, data],
-  );
-
-  const clearTooltip = useCallback(() => {
-    if (rafIdRef.current) {
-      cancelAnimationFrame(rafIdRef.current);
-      rafIdRef.current = null;
-    }
-    pendingPositionRef.current = null; // Clear any pending position
-    setTooltipPos(null);
-  }, []);
-
+  // PanResponder to track finger movement across the overlay
   const panResponder = useMemo(() => {
     return PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: handleTooltip,
-      onPanResponderMove: handleTooltip,
-      onPanResponderRelease: clearTooltip,
-      onPanResponderTerminate: clearTooltip,
+      onPanResponderGrant: evt => {
+        calculateTooltipPosition(evt.nativeEvent.locationX);
+      },
+      onPanResponderMove: evt => {
+        calculateTooltipPosition(evt.nativeEvent.locationX);
+      },
+      onPanResponderRelease: () => {
+        setTooltipPos(null);
+      },
+      onPanResponderTerminate: () => {
+        setTooltipPos(null);
+      },
     });
-  }, [handleTooltip, clearTooltip]);
+  }, [calculateTooltipPosition]);
 
-  // Smoothly animate from old data to new data
+  // Animate from old data to new data only if the array truly changed
   useLayoutEffect(() => {
     const dataChanged =
-      data.length !== prevPropsRef.current.dataLength ||
+      data.length !== prevDataLengthRef.current ||
       JSON.stringify(data) !== JSON.stringify(currentData.current);
 
-    if (!dataChanged) return;
+    if (!dataChanged) {
+      return;
+    }
+    prevDataLengthRef.current = data.length;
 
-    prevPropsRef.current = {
-      dataLength: data.length,
-      executionPrice,
-      executionTimestamp,
-    };
-
-    // Reset the animation value
+    // Start animation
     animatedData.setValue(0);
-
     const prevData = [...currentData.current];
     currentData.current = data;
 
-    // Kick off a smooth animation
     Animated.timing(animatedData, {
       toValue: 1,
-      duration: 400, // slightly longer for a smoother effect
+      duration: 400,
       easing: Easing.inOut(Easing.cubic),
       useNativeDriver: false,
     }).start();
 
-    // During the animation, linearly interpolate between prevData and new data
-    const animId = animatedData.addListener(({value}) => {
+    // Linear interpolation for the displayed data
+    const id = animatedData.addListener(({value}) => {
       const newData = data.map((target, i) => {
         const start = prevData[i] ?? target;
         return start + (target - start) * value;
@@ -260,32 +187,17 @@ const LineGraph: React.FC<LineGraphProps> = ({
     });
 
     return () => {
-      animatedData.removeListener(animId);
+      animatedData.removeListener(id);
     };
-  }, [data, animatedData, executionPrice, executionTimestamp]);
-
-  // Clean up requestAnimationFrame on unmount
-  useEffect(() => {
-    return () => {
-      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
-    };
-  }, []);
+  }, [data, animatedData]);
 
   // Format date/time
   const formatTimestamp = useCallback((ts: number) => {
     if (!ts) return '';
-    
-    // Make sure ts is in milliseconds
-    const tsInMs = ts < 10000000000 ? ts * 1000 : ts; // Convert if in seconds
-    const date = new Date(tsInMs);
-    
-    // Check if it's a valid date before formatting
-    if (isNaN(date.getTime())) {
-      console.error(`Invalid timestamp: ${ts}`);
-      return '';
-    }
-    
-    return date.toLocaleString(undefined, {
+    const inMs = ts < 10000000000 ? ts * 1000 : ts;
+    const d = new Date(inMs);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleString(undefined, {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -303,7 +215,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
     }).format(price);
   }, []);
 
-  // Avatar logic
+  // Convert userAvatar into a string URI if possible
   const avatarUri = useMemo(() => {
     if (!userAvatar) return null;
     if (typeof userAvatar === 'string') return userAvatar;
@@ -311,85 +223,55 @@ const LineGraph: React.FC<LineGraphProps> = ({
     return null;
   }, [userAvatar]);
 
-  // Figure out which index to place the "execution" marker
+  // Figure out where to place the "execution" marker
   const executionIndex = useMemo(() => {
     if (!executionPrice || data.length === 0) return -1;
 
-    // if we have timestamps & data is time-based
-    if (
-      timestamps &&
-      timestamps.length === data.length &&
-      executionTimestamp != null
-    ) {
-      const parsedExecTs = getTimestampInMs(executionTimestamp);
-      if (!parsedExecTs) return findClosestByPrice();
+    // If we have timestamps
+    if (timestamps && timestamps.length === data.length && executionTimestamp) {
+      let parsedExecTs =
+        typeof executionTimestamp === 'number'
+          ? executionTimestamp
+          : Date.parse(String(executionTimestamp));
 
-      // Convert timestamps array to milliseconds if needed
-      const timeInMs = timestamps.map(t => t < 10000000000 ? t * 1000 : t);
-      
-      const lastTime = timeInMs[timeInMs.length - 1];
-      const firstTime = timeInMs[0];
+      if (Number.isNaN(parsedExecTs)) {
+        // fallback to price-based below if parse failed
+      } else {
+        parsedExecTs = convertTimestampToMs(parsedExecTs);
 
-      console.log("Execution timestamp:", new Date(parsedExecTs).toISOString(), parsedExecTs);
-      console.log("Chart timeframe:", 
-        `${new Date(firstTime).toISOString()} (${firstTime}) to ${new Date(lastTime).toISOString()} (${lastTime})`
-      );
+        const timeInMs = timestamps.map(t => (t < 10000000000 ? t * 1000 : t));
+        const first = timeInMs[0];
+        const last = timeInMs[timeInMs.length - 1];
+        if (parsedExecTs < first) return 0;
+        if (parsedExecTs > last) return data.length - 1;
 
-      // If it's beyond the chart range, clamp to edges
-      if (parsedExecTs > lastTime) {
-        console.log("Execution timestamp is after chart range, clamping to end");
-        return data.length - 1;
-      }
-      if (parsedExecTs < firstTime) {
-        console.log("Execution timestamp is before chart range, clamping to start");
-        return 0;
-      }
-
-      // Logic to find closest timestamp index
-      let closest = 0;
-      let minDiff = Math.abs(timeInMs[0] - parsedExecTs);
-
-      // Find the closest timestamp by iterating through all points
-      for (let i = 1; i < timeInMs.length; i++) {
-        const diff = Math.abs(timeInMs[i] - parsedExecTs);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closest = i;
+        let closest = 0;
+        let minDiff = Math.abs(timeInMs[0] - parsedExecTs);
+        for (let i = 1; i < timeInMs.length; i++) {
+          const diff = Math.abs(timeInMs[i] - parsedExecTs);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = i;
+          }
         }
+        return closest;
       }
-      
-      // If the execution time is very close to start but not exactly,
-      // move it slightly inward to make it more visible
-      if (closest === 0 && timeInMs.length > 2 && 
-          parsedExecTs > firstTime && 
-          parsedExecTs < firstTime + (lastTime - firstTime) * 0.1) {
-        closest = 1;
-      }
-      
-      console.log("Placing execution marker at index:", closest, 
-                 `(${(closest/(timeInMs.length-1)*100).toFixed(1)}% of chart)`);
-      return closest;
     }
 
-    // otherwise do a simple price-based approach
-    return findClosestByPrice();
-
-    function findClosestByPrice() {
-      if (executionPrice === undefined) return -1;
-      let cIdx = 0;
-      let best = Math.abs(data[0] - executionPrice);
-      for (let i = 1; i < data.length; i++) {
-        const diff = Math.abs(data[i] - executionPrice);
-        if (diff < best) {
-          best = diff;
-          cIdx = i;
-        }
+    // fallback: find by price
+    let idx = 0;
+    let best = Math.abs(data[0] - executionPrice);
+    for (let i = 1; i < data.length; i++) {
+      const diff = Math.abs(data[i] - executionPrice);
+      if (diff < best) {
+        best = diff;
+        idx = i;
       }
-      return cIdx;
     }
-  }, [executionPrice, data, timestamps, executionTimestamp]);
+    return idx;
+  }, [data, timestamps, executionPrice, executionTimestamp]);
 
-  // Config for the chart
+  // Chart config
   const chartConfig = useMemo(
     () => ({
       backgroundColor: '#ffffff',
@@ -398,22 +280,16 @@ const LineGraph: React.FC<LineGraphProps> = ({
       decimalPlaces: 2,
       color: () => '#318EF8',
       labelColor: () => '#666666',
-      formatYLabel: (yValue: string) => `$${yValue}`,
+      formatYLabel: (v: string) => `$${v}`,
       style: {borderRadius: 16},
-      propsForDots: {
-        r: '0',
-      },
-      propsForBackgroundLines: {
-        strokeWidth: 0,
-      },
-      propsForLabels: {
-        fontSize: 10,
-      },
+      propsForDots: {r: '0'},
+      propsForBackgroundLines: {strokeWidth: 0},
+      propsForLabels: {fontSize: 10},
     }),
     [],
   );
 
-  // Data passed to the chart
+  // Data to feed to the chart library
   const chartData = useMemo(
     () => ({
       labels: ['', '', '', '', '', ''],
@@ -428,35 +304,34 @@ const LineGraph: React.FC<LineGraphProps> = ({
     [displayData],
   );
 
-  // We'll store each data point's (x, y) so we can build our hover fill
+  // Keep track of each data point's (x, y)
   const pointsRef = useRef<{x: number; y: number}[]>([]);
 
-  // Renders the tooltip above the touched point
+  // Build the tooltip’s SVG elements
   const renderTooltip = useCallback(
     (x: number, y: number, idx: number, price: number) => {
-      // We'll shift the tooltip to avoid edges if needed
+      // Shift tooltip horizontally if near edges
+      const tooltipWidth = 150;
       const isNearLeft = x < 120;
-      const isNearRight = x > screenWidth - 120;
-      const tooltipW = 150;
+      const isNearRight = x > usableChartWidth - 120;
+
       let tX = x;
       let anchor: 'start' | 'middle' | 'end' = 'middle';
 
       if (isNearLeft) {
-        tX = tooltipW / 2 + 10;
-        anchor = 'middle';
+        tX = tooltipWidth / 2 + 10;
       } else if (isNearRight) {
-        tX = screenWidth - 42 - tooltipW / 2;
-        anchor = 'middle';
+        tX = usableChartWidth - tooltipWidth / 2 - 10;
       }
 
       return (
         <React.Fragment key={`tooltip-${idx}`}>
-          {/* vertical dash line */}
+          {/* dashed line */}
           <Line
             x1={x}
             y1={10}
             x2={x}
-            y2={190}
+            y2={chartHeight - 10}
             stroke="#318EF8"
             strokeWidth={1.5}
             strokeDasharray="3,3"
@@ -471,7 +346,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
             stroke="white"
             strokeWidth={2}
           />
-          {/* actual tooltip box */}
+          {/* tooltip rect + text */}
           <G>
             <Defs>
               <LinearGradient id="tooltipBg" x1="0" y1="0" x2="0" y2="1">
@@ -481,9 +356,9 @@ const LineGraph: React.FC<LineGraphProps> = ({
             </Defs>
 
             <Rect
-              x={tX - tooltipW / 2}
+              x={tX - tooltipWidth / 2}
               y={18}
-              width={tooltipW}
+              width={tooltipWidth}
               height={60}
               rx={12}
               fill="url(#tooltipBg)"
@@ -497,17 +372,16 @@ const LineGraph: React.FC<LineGraphProps> = ({
               fill="#1A73E8"
               fontSize="16"
               fontWeight="bold"
-              textAnchor={anchor}>
+              textAnchor="middle">
               {formatPrice(price)}
             </SvgText>
-
-            {timestamps && timestamps.length > idx && (
+            {timestamps && timestamps[idx] && (
               <SvgText
                 x={tX}
                 y={58}
                 fill="#666"
                 fontSize="12"
-                textAnchor={anchor}>
+                textAnchor="middle">
                 {formatTimestamp(timestamps[idx])}
               </SvgText>
             )}
@@ -515,34 +389,19 @@ const LineGraph: React.FC<LineGraphProps> = ({
         </React.Fragment>
       );
     },
-    [formatPrice, formatTimestamp, screenWidth, timestamps],
+    [formatPrice, formatTimestamp, usableChartWidth, chartHeight, timestamps],
   );
 
-  // Called by chart to place custom dot content
+  // Called by the chart for each data point
   const renderDotContent = useCallback(
     ({x, y, index}: {x: number; y: number; index: number}) => {
       pointsRef.current[index] = {x, y};
 
-      const items = [];
+      const elements: JSX.Element[] = [];
 
-      // If this is the last data point, draw a highlight ring
-      if (index === displayData.length - 1) {
-        items.push(
-          <Circle
-            key={`end-dot-${index}`}
-            cx={x}
-            cy={y}
-            r={6}
-            stroke="#318EF8"
-            strokeWidth={4}
-            fill="white"
-          />,
-        );
-      }
-
-      // If we have an execution marker on this index
+      // If we have an execution marker
       if (executionPrice && index === executionIndex) {
-        items.push(
+        elements.push(
           <React.Fragment key={`exec-${index}`}>
             {avatarUri ? (
               <>
@@ -586,15 +445,14 @@ const LineGraph: React.FC<LineGraphProps> = ({
         );
       }
 
-      // If user is hovering at this index, show the tooltip
+      // If user is hovering near this point
       if (tooltipPos && index === tooltipPos.index) {
-        items.push(renderTooltip(x, y, index, tooltipPos.price));
+        elements.push(renderTooltip(x, y, index, tooltipPos.price));
       }
 
-      return items;
+      return elements;
     },
     [
-      displayData,
       executionPrice,
       executionIndex,
       avatarUri,
@@ -604,25 +462,25 @@ const LineGraph: React.FC<LineGraphProps> = ({
     ],
   );
 
-  // Renders the partial fill from left up to the hovered data point
+  // Partial fill from left to hovered point
   const renderHoverFill = useCallback(() => {
     if (!tooltipPos) return null;
     const hoveredIndex = tooltipPos.index;
-    if (!pointsRef.current.length || hoveredIndex >= pointsRef.current.length) {
+    if (!pointsRef.current[hoveredIndex]) {
       return null;
     }
 
-    // build polygon from [0..hoveredIndex], then straight down
     let fillPoints = '';
     for (let i = 0; i <= hoveredIndex; i++) {
       const {x, y} = pointsRef.current[i];
       fillPoints += `${x},${y} `;
     }
-    const lastX = pointsRef.current[hoveredIndex].x;
-    const firstX = pointsRef.current[0].x;
 
-    // bottom edge
-    fillPoints += `${lastX},190 ${firstX},190`;
+    const {x: lastX} = pointsRef.current[hoveredIndex];
+    const {x: firstX} = pointsRef.current[0];
+
+    // go down to bottom
+    fillPoints += `${lastX},${chartHeight - 10} ${firstX},${chartHeight - 10}`;
 
     return (
       <G>
@@ -638,12 +496,19 @@ const LineGraph: React.FC<LineGraphProps> = ({
   }, [tooltipPos]);
 
   return (
-    <View>
-      <View {...panResponder.panHandlers}>
+    <View style={{width: containerWidth}}>
+      {/* This container ensures the chart is displayed but doesn't intercept touches */}
+      <View
+        style={{
+          position: 'relative',
+          width: containerWidth,
+          height: chartHeight,
+        }}>
+        {/* The chart (no pointer events) */}
         <LineChart
           data={chartData}
-          width={screenWidth - 32}
-          height={200}
+          width={containerWidth}
+          height={chartHeight}
           chartConfig={chartConfig}
           bezier
           withDots
@@ -661,13 +526,15 @@ const LineGraph: React.FC<LineGraphProps> = ({
           renderDotContent={renderDotContent}
           decorator={renderHoverFill}
         />
+
+        {/* Transparent overlay that captures all pointer events */}
+        <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers} />
       </View>
     </View>
   );
 };
 
 export default React.memo(LineGraph, (prev, next) => {
-  // If critical props changed, re-render
   if (prev.data.length !== next.data.length) return false;
   if (prev.executionPrice !== next.executionPrice) return false;
   if (prev.executionTimestamp !== next.executionTimestamp) return false;

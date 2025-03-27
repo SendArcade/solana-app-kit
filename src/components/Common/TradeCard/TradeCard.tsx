@@ -305,7 +305,7 @@ function TradeCard({
                 {tradeData.outputQuantity}
               </Text>
               <Text style={styles.tradeCardUsdPrice}>
-                {tradeData.outputUsdValue ?? ''}
+                {tradeData.outputUsdValue || ''}
               </Text>
             </View>
           </TouchableOpacity>
