@@ -5,6 +5,7 @@
  */
 
 import { HELIUS_API_KEY } from '@env';
+import { createAsyncThunk } from '@reduxjs/toolkit';
 
 // Basic action interface
 export interface Action {
@@ -38,6 +39,43 @@ export interface Action {
     decimals?: number;
   };
 }
+
+/**
+ * Redux thunk for fetching wallet actions
+ */
+export const fetchWalletActionsAsync = createAsyncThunk(
+  'profile/fetchWalletActions',
+  async (walletAddress: string, { rejectWithValue }) => {
+    if (!walletAddress) {
+      return rejectWithValue('Wallet address is required');
+    }
+
+    try {
+      console.log('Fetching actions for wallet:', walletAddress);
+      const heliusUrl = `https://api.helius.xyz/v0/addresses/${walletAddress}/transactions?api-key=${HELIUS_API_KEY}&limit=20`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const res = await fetch(heliusUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error(`Helius fetch failed with status ${res.status}`);
+      }
+
+      const data = await res.json();
+      console.log('Data received, items:', data?.length || 0);
+      
+      // Enrich the data with better formatted information
+      const enrichedData = await enrichActionTransactions(data, walletAddress);
+      return enrichedData || [];
+    } catch (err: any) {
+      console.error('Error fetching actions:', err.message);
+      return rejectWithValue(err.message || 'Failed to fetch actions');
+    }
+  }
+);
 
 /**
  * Fetch recent blockchain actions for a wallet
