@@ -15,25 +15,9 @@ import {
 } from 'react-native';
 import tokenModalStyles from './tokenModal.style';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { TokenInfo } from '../../../services/token/tokenService';
 
 const { height } = Dimensions.get('window');
-
-/**
- * Information about a token
- * @interface TokenInfo
- */
-export interface TokenInfo {
-  /** The token's mint address */
-  address: string;
-  /** The token's symbol (e.g., 'SOL', 'USDC') */
-  symbol: string;
-  /** The token's full name */
-  name: string;
-  /** The number of decimal places for the token */
-  decimals: number;
-  /** URL to the token's logo image */
-  logoURI?: string;
-}
 
 /**
  * Props for the SelectTokenModal component
@@ -81,6 +65,16 @@ export default function SelectTokenModal({
   const [loading, setLoading] = useState(false);
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
   const [searchInput, setSearchInput] = useState('');
+  
+  // Keep track of whether the component is mounted
+  const isMounted = React.useRef(true);
+  
+  useEffect(() => {
+    // Clean up function for unmounting
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (visible) {
@@ -107,18 +101,25 @@ export default function SelectTokenModal({
       if (!data || !Array.isArray(data)) {
         throw new Error('Invalid data structure from tokens API');
       }
+      
+      // Add default empty string for logoURI if missing
       const result: TokenInfo[] = data.map((item: any) => ({
         address: item.address,
         symbol: item.symbol,
         name: item.name,
         decimals: item.decimals,
-        logoURI: item.logoURI,
+        logoURI: item.logoURI || '',
       }));
-      setTokens(result);
+      
+      if (isMounted.current) {
+        setTokens(result);
+      }
     } catch (err: any) {
       console.error('fetchTokens error:', err);
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 

@@ -439,8 +439,7 @@ export default function PostCTA({
   }
 
   return (
-    <View
-      style={[styles.threadPostCTAContainer, styleOverrides?.container]}>
+    <View style={[styles.threadPostCTAContainer, styleOverrides?.container]}>
       <TouchableOpacity
         style={[styles.threadPostCTAButton, styleOverrides?.button]}
         onPress={onCtaPress}
@@ -461,6 +460,7 @@ export default function PostCTA({
           onClose={() => setShowTradeModal(false)}
           currentUser={currentUser}
           disableTabs={true}
+          initialActiveTab="TRADE_AND_SHARE"
           initialInputToken={{
             address: tradeData.inputMint,
             symbol: tradeData.inputSymbol,
@@ -472,7 +472,9 @@ export default function PostCTA({
             logoURI:
               tradeData.inputSymbol === 'SOL'
                 ? 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png'
-                : 'https://example.com/default-token.png',
+                : tradeData.inputSymbol === 'USDC'
+                ? 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png'
+                : '', // Empty logoURI will trigger a fetch for complete metadata
           }}
           initialOutputToken={{
             address: tradeData.outputMint,
@@ -480,12 +482,16 @@ export default function PostCTA({
             name:
               tradeData.outputSymbol === 'USDC'
                 ? 'USD Coin'
+                : tradeData.outputSymbol === 'SOL'
+                ? 'Solana'
                 : tradeData.outputSymbol,
-            decimals: tradeData.outputSymbol === 'USDC' ? 6 : 6,
+            decimals: tradeData.outputSymbol === 'USDC' ? 6 : tradeData.outputSymbol === 'SOL' ? 9 : 6,
             logoURI:
               tradeData.outputSymbol === 'USDC'
                 ? 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png'
-                : 'https://example.com/default-token.png',
+                : tradeData.outputSymbol === 'SOL'
+                ? 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png'
+                : '', // Empty logoURI will trigger a fetch for complete metadata
           }}
         />
       )}
@@ -495,7 +501,7 @@ export default function PostCTA({
         visible={nftLoading}
         transparent
         animationType="fade"
-        onRequestClose={() => { }}>
+        onRequestClose={() => {}}>
         <View style={styles.progressOverlay}>
           <View style={styles.progressContainer}>
             <ActivityIndicator size="large" color="#1d9bf0" />

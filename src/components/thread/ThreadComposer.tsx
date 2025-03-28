@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import {
   View,
   Image,
@@ -46,6 +46,8 @@ interface ThreadComposerProps {
   styleOverrides?: { [key: string]: object };
   /** User-provided stylesheet overrides */
   userStyleSheet?: { [key: string]: object };
+  /** Ref to expose the input focus method */
+  ref?: React.Ref<{ focus: () => void }>;
 }
 
 /**
@@ -75,16 +77,26 @@ interface ThreadComposerProps {
  * />
  * ```
  */
-export default function ThreadComposer({
+const ThreadComposer = forwardRef<{ focus: () => void }, ThreadComposerProps>(({
   currentUser,
   parentId,
   onPostCreated,
   themeOverrides,
   styleOverrides,
   userStyleSheet,
-}: ThreadComposerProps) {
+}, ref) => {
   const dispatch = useAppDispatch();
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
+  const inputRef = useRef<TextInput>(null);
+
+  // Expose focus method via ref
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }
+  }));
 
   // Use wallet hook instead of useAuth directly
   const { wallet, address } = useWallet();
@@ -388,6 +400,7 @@ export default function ThreadComposer({
         <View style={styles.composerMiddle}>
           <Text style={styles.composerUsername}>{currentUser.username}</Text>
           <TextInput
+            ref={inputRef}
             style={styles.composerInput}
             placeholder={parentId ? 'Reply...' : "What's happening?"}
             placeholderTextColor="#999"
@@ -502,4 +515,6 @@ export default function ThreadComposer({
       />
     </View>
   );
-}
+});
+
+export default ThreadComposer;
