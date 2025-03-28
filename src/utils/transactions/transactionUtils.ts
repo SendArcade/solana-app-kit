@@ -187,16 +187,27 @@ export async function sendPriorityTransactionMWA(
       onStatusUpdate?.('Confirming transaction...');
       const confirmation = await connection.confirmTransaction(signature, 'confirmed');
       console.log('[sendPriorityTransactionMWA] Confirmation result:', confirmation.value);
-      if (confirmation.value.err) {
-        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      
+      // Check for error
+      if (confirmation.value && confirmation.value.err) {
+        // Create a proper error with logs
+        const error = new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+        // Add logs if they exist
+        if (confirmation.value.err.logs) {
+          error.logs = confirmation.value.err.logs;
+        }
+        TransactionService.showError(error);
+        throw error;
       }
 
       console.log('[sendPriorityTransactionMWA] Transaction confirmed successfully!');
       onStatusUpdate?.('Transaction confirmed successfully!');
+      TransactionService.showSuccess(signature, 'transfer');
       return signature;
     } catch (error: any) {
       console.log('[sendPriorityTransactionMWA] Caught error inside transact callback:', error);
-      onStatusUpdate?.(`Error: ${error.message || 'Unknown error'}`);
+      // Don't send raw error details in status update
+      onStatusUpdate?.('Transaction failed');
       throw error;
     }
   });
@@ -244,32 +255,63 @@ export async function sendTransactionWithPriorityFee({
     allInstructions = [...instructions];
   }
   
-  // 2. Get wallet public key
-  let walletPublicKey: PublicKey;
-  
-  if (wallet.publicKey) {
-    walletPublicKey = new PublicKey(wallet.publicKey);
-  } else if (wallet.address) {
-    walletPublicKey = new PublicKey(wallet.address);
-  } else {
-    throw new Error('No wallet public key or address found');
-  }
-  
-  // 3. Sign and send the transaction using TransactionService
-  onStatusUpdate?.('Preparing transaction...');
-  
-  return await TransactionService.signAndSendTransaction(
-    { 
-      type: 'instructions',
-      instructions: allInstructions,
-      feePayer: walletPublicKey,
-    },
-    wallet,
-    { 
-      connection,
-      statusCallback: onStatusUpdate,
+  try {
+    // 2. Get wallet public key
+    let walletPublicKey: PublicKey;
+    
+    if (wallet.publicKey) {
+      walletPublicKey = new PublicKey(wallet.publicKey);
+    } else if (wallet.address) {
+      walletPublicKey = new PublicKey(wallet.address);
+    } else {
+      throw new Error('No wallet public key or address found');
     }
-  );
+    
+    // 3. Create transaction
+    onStatusUpdate?.('Creating transaction...');
+    const { blockhash } = await connection.getLatestBlockhash();
+    
+    // Use versioned transaction for better compatibility
+    const messageV0 = new TransactionMessage({
+      payerKey: walletPublicKey,
+      recentBlockhash: blockhash,
+      instructions: allInstructions,
+    }).compileToV0Message();
+    
+    const transaction = new VersionedTransaction(messageV0);
+    
+    // 4. Sign and send transaction using TransactionService
+    onStatusUpdate?.('Signing transaction...');
+    
+    // Create a wrapped status callback that filters error messages
+    const statusCallback = onStatusUpdate 
+      ? (status: string) => {
+          if (!status.startsWith('Error:')) {
+            onStatusUpdate(status);
+          } else {
+            onStatusUpdate('Processing transaction...');
+          }
+        }
+      : undefined;
+    
+    const signature = await TransactionService.signAndSendTransaction(
+      { type: 'transaction', transaction },
+      wallet,
+      { 
+        connection,
+        statusCallback
+      }
+    );
+    
+    onStatusUpdate?.(`Transaction sent with signature: ${signature}`);
+    return signature;
+  } catch (error: any) {
+    console.error('[sendTransactionWithPriorityFee] Error:', error);
+    // Only show a generic error in the status update
+    onStatusUpdate?.('Transaction failed');
+    TransactionService.showError(error);
+    throw error;
+  }
 }
 
 /**
@@ -288,67 +330,84 @@ export async function sendSOL({
   connection: Connection;
   onStatusUpdate?: (status: string) => void;
 }): Promise<string> {
+  // Validate inputs
+  if (!wallet) {
+    throw new Error('No wallet provided');
+  }
+  
+  if (!recipientAddress) {
+    throw new Error('No recipient address provided');
+  }
+  
+  if (!amountSol || amountSol <= 0) {
+    throw new Error('Invalid SOL amount');
+  }
+
+  onStatusUpdate?.('Preparing SOL transfer...');
+  
   try {
-    if (!wallet) {
-      throw new Error('No wallet provided');
-    }
+    // Create recipient PublicKey
+    const recipient = new PublicKey(recipientAddress);
     
-    if (!recipientAddress) {
-      throw new Error('No recipient address provided');
-    }
-    
-    // Validate amount
-    const parsedAmount = parseFloat(amountSol.toString());
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      throw new Error('Invalid SOL amount');
-    }
-    
-    // Convert to lamports
-    const lamports = Math.floor(parsedAmount * LAMPORTS_PER_SOL);
-    
-    // Check if this is an MWA wallet
-    if (wallet.provider === 'mwa' && Platform.OS === 'android') {
-      onStatusUpdate?.(`Using Mobile Wallet Adapter to send ${amountSol} SOL to ${recipientAddress}`);
-      
-      // For MWA we use a different flow that uses the external wallet for signing
-      return await sendPriorityTransactionMWA(
-        connection,
-        recipientAddress, 
-        lamports,
-        DEFAULT_FEE_MAPPING,
-        onStatusUpdate,
-      );
-    }
-    
-    // Get wallet public key
-    let walletPublicKey: PublicKey;
-    
-    if (wallet.publicKey) {
-      walletPublicKey = new PublicKey(wallet.publicKey);
-    } else if (wallet.address) {
-      walletPublicKey = new PublicKey(wallet.address);
-    } else {
-      throw new Error('No wallet public key or address found');
-    }
+    // Convert SOL to lamports
+    const lamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
+    onStatusUpdate?.(`Sending ${amountSol} SOL (${lamports} lamports) to ${recipientAddress.slice(0, 6)}...`);
     
     // Create transfer instruction
-    const transferIx = SystemProgram.transfer({
-      fromPubkey: walletPublicKey,
-      toPubkey: new PublicKey(recipientAddress),
+    const transferInstruction = SystemProgram.transfer({
+      fromPubkey: new PublicKey(wallet.address || wallet.publicKey),
+      toPubkey: recipient,
       lamports,
     });
     
-    // Send the transaction with priority fee
-    onStatusUpdate?.(`Sending ${amountSol} SOL to ${recipientAddress}`);
-    return await sendTransactionWithPriorityFee({
+    // Special handling for MWA wallet
+    if (wallet.provider === 'mwa' || Platform.OS === 'android') {
+      onStatusUpdate?.('Using Mobile Wallet Adapter...');
+      try {
+        return await sendPriorityTransactionMWA(
+          connection,
+          recipientAddress,
+          lamports,
+          DEFAULT_FEE_MAPPING,
+          // Filter out error messages from status updates
+          (status) => {
+            if (!status.startsWith('Error:')) {
+              onStatusUpdate?.(status);
+            } else {
+              onStatusUpdate?.('Processing transaction...');
+            }
+          }
+        );
+      } catch (error: any) {
+        console.error('[sendSOL] MWA transaction failed:', error);
+        TransactionService.showError(error);
+        throw error;
+      }
+    }
+    
+    // For non-MWA wallets, use standard flow with priority fees
+    const signature = await sendTransactionWithPriorityFee({
       wallet,
-      instructions: [transferIx],
+      instructions: [transferInstruction],
       connection,
-      shouldUsePriorityFee: true,
-      onStatusUpdate,
+      // Filter out error messages from status updates
+      onStatusUpdate: status => {
+        if (!status.startsWith('Error:')) {
+          onStatusUpdate?.(status);
+        } else {
+          onStatusUpdate?.('Processing transaction...');
+        }
+      },
     });
+    
+    onStatusUpdate?.(`Transaction sent: ${signature.slice(0, 8)}...`);
+    TransactionService.showSuccess(signature, 'transfer');
+    return signature;
   } catch (error: any) {
     console.error('[sendSOL] Error:', error);
+    // Don't send raw error through the status update
+    onStatusUpdate?.('Transaction failed');
+    TransactionService.showError(error);
     throw error;
   }
 }

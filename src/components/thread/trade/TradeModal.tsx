@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useCallback, useRef} from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -23,18 +23,18 @@ import {
   Cluster,
   PublicKey,
 } from '@solana/web3.js';
-import {TENSOR_API_KEY, HELIUS_RPC_URL, CLUSTER} from '@env';
+import { TENSOR_API_KEY, HELIUS_RPC_URL, CLUSTER } from '@env';
 import {
   ThreadPost,
   ThreadSection,
   ThreadUser,
   TradeData,
 } from '../thread.types';
-import SelectTokenModal, {TokenInfo} from './SelectTokenModal';
-import {ENDPOINTS} from '../../../config/constants';
-import {useAppDispatch} from '../../../hooks/useReduxHooks';
-import {useAuth} from '../../../hooks/useAuth';
-import {useWallet} from '../../../hooks/useWallet';
+import SelectTokenModal, { TokenInfo } from './SelectTokenModal';
+import { ENDPOINTS } from '../../../config/constants';
+import { useAppDispatch } from '../../../hooks/useReduxHooks';
+import { useAuth } from '../../../hooks/useAuth';
+import { useWallet } from '../../../hooks/useWallet';
 import {
   addPostLocally,
   createRootPostAsync,
@@ -43,6 +43,7 @@ import styles from './tradeModal.style';
 import PastSwapItem from './PastSwapItem';
 import { SwapTransaction, fetchRecentSwaps, enrichSwapTransactions } from '../../../services/swapTransactions';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { TransactionService } from '../../../services/transaction/transactionService';
 
 /**
  * Available tab options in the TradeModal
@@ -138,7 +139,7 @@ export default function TradeModal({
     useState<number>(0);
   const [pendingBuyOutputLamports, setPendingBuyOutputLamports] =
     useState<number>(0);
-    
+
   // State for selected past swap
   const [selectedPastSwap, setSelectedPastSwap] = useState<SwapTransaction | null>(null);
 
@@ -146,7 +147,7 @@ export default function TradeModal({
   const [swaps, setSwaps] = useState<SwapTransaction[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  
+
   // Ref to prevent multiple refreshes
   const isRefreshingRef = useRef(false);
   const hasLoadedInitialDataRef = useRef(false);
@@ -181,13 +182,13 @@ export default function TradeModal({
    */
   const fetchTokenBalance = useCallback(async () => {
     if (!connected || !userPublicKey) return;
-    
+
     try {
       const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
       const connection = new Connection(rpcUrl, 'confirmed');
-      
-      if (inputToken.symbol === 'SOL' || 
-          inputToken.address === 'So11111111111111111111111111111111111111112') {
+
+      if (inputToken.symbol === 'SOL' ||
+        inputToken.address === 'So11111111111111111111111111111111111111112') {
         // For native SOL
         const balance = await connection.getBalance(userPublicKey);
         // Reserve some SOL for transaction fees
@@ -201,7 +202,7 @@ export default function TradeModal({
             userPublicKey,
             { mint: tokenPubkey }
           );
-          
+
           if (tokenAccounts.value.length > 0) {
             // Get the token amount from the first account
             const tokenBalance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount;
@@ -226,16 +227,16 @@ export default function TradeModal({
    */
   const fetchTokenPrice = useCallback(async () => {
     try {
-      if (inputToken.symbol === 'SOL' || 
-          inputToken.address === 'So11111111111111111111111111111111111111112') {
+      if (inputToken.symbol === 'SOL' ||
+        inputToken.address === 'So11111111111111111111111111111111111111112') {
         // Fetch SOL price from CoinGecko or similar API
         const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
         const data = await response.json();
         if (data && data.solana && data.solana.usd) {
           setCurrentTokenPrice(data.solana.usd);
         }
-      } else if (inputToken.symbol === 'USDC' || 
-                inputToken.address === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') {
+      } else if (inputToken.symbol === 'USDC' ||
+        inputToken.address === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') {
         // Stablecoins
         setCurrentTokenPrice(1);
       } else {
@@ -269,14 +270,14 @@ export default function TradeModal({
   ): Promise<string> => {
     // Default when all else fails - empty string instead of "$??"
     let result = '';
-    
+
     try {
       // Convert lamports to tokens
       const normalizedAmount = tokenAmount / Math.pow(10, decimals);
-      
+
       // SOL special case - use a known price or fetch current price
       if (
-        tokenMint === 'So11111111111111111111111111111111111111112' || 
+        tokenMint === 'So11111111111111111111111111111111111111112' ||
         tokenSymbol?.toUpperCase() === 'SOL'
       ) {
         // Use cached SOL price or fetch if needed
@@ -297,7 +298,7 @@ export default function TradeModal({
         const estimated = normalizedAmount * (solPrice || 150); // Use 150 as fallback if still null
         return `$${estimated.toFixed(2)}`;
       }
-      
+
       // USDC, USDT case
       if (
         tokenMint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' || // USDC
@@ -308,7 +309,7 @@ export default function TradeModal({
         // Stablecoins - approximately $1
         return `$${normalizedAmount.toFixed(2)}`;
       }
-      
+
       // For all other tokens, attempt to fetch from CoinGecko or another API
       try {
         // Try to fetch from CoinGecko by symbol (this is a simplification - ideally would use mapping)
@@ -324,7 +325,7 @@ export default function TradeModal({
       } catch (err) {
         console.log("Error fetching token price from CoinGecko", err);
       }
-      
+
       // If still no price found, make a reasonable estimate based on token type
       if (normalizedAmount > 0) {
         // For meme tokens/unknown tokens, use a very conservative estimate
@@ -339,7 +340,7 @@ export default function TradeModal({
     } catch (err) {
       console.error('Error estimating token value:', err);
     }
-    
+
     return result; // Empty string or estimated value
   };
 
@@ -364,19 +365,19 @@ export default function TradeModal({
       const inputLamports = Number(toBaseUnits(solAmount, inputToken.decimals));
 
       // 1) Get quote from Jupiter
+      setResultMsg('Getting quote...');
       console.log('Getting Jupiter quote...');
-      const quoteUrl = `${ENDPOINTS.jupiter.quote}?inputMint=${
-        inputToken.address
-      }&outputMint=${outputToken.address}&amount=${Math.round(
-        inputLamports,
-      )}&slippageBps=50&swapMode=ExactIn`;
+      const quoteUrl = `${ENDPOINTS.jupiter.quote}?inputMint=${inputToken.address
+        }&outputMint=${outputToken.address}&amount=${Math.round(
+          inputLamports,
+        )}&slippageBps=50&swapMode=ExactIn`;
       const quoteResp = await fetch(quoteUrl);
       if (!quoteResp.ok) {
         throw new Error(`Jupiter quote failed: ${quoteResp.status}`);
       }
       const quoteData = await quoteResp.json();
       console.log('Jupiter quote received');
-      
+
       let firstRoute;
       if (
         quoteData.data &&
@@ -397,6 +398,7 @@ export default function TradeModal({
       const outLamports = parseFloat(firstRoute.outAmount) || 0;
 
       // 2) Build swap Tx from server
+      setResultMsg('Building transaction...');
       console.log('Building swap transaction from server...');
       const body = {
         quoteResponse: quoteData,
@@ -404,7 +406,7 @@ export default function TradeModal({
       };
       const swapResp = await fetch(ENDPOINTS.jupiter.swap, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       const swapData = await swapResp.json();
@@ -415,7 +417,7 @@ export default function TradeModal({
       }
       console.log('Swap transaction received from server');
 
-      const {swapTransaction} = swapData;
+      const { swapTransaction } = swapData;
       const txBuffer = Buffer.from(swapTransaction, 'base64');
       let transaction: Transaction | VersionedTransaction;
       try {
@@ -424,7 +426,7 @@ export default function TradeModal({
       } catch {
         transaction = Transaction.from(txBuffer);
         console.log('Deserialized as legacy Transaction');
-        
+
         // Ensure feePayer is set for legacy transactions
         if (!transaction.feePayer) {
           transaction.feePayer = new PublicKey(userPublicKey.toString());
@@ -435,21 +437,32 @@ export default function TradeModal({
       const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
       console.log('Using RPC URL:', rpcUrl);
       const connection = new Connection(rpcUrl, 'confirmed');
-      
-      // Use wallet hook to send the transaction
+
+      // Use wallet hook to send the transaction with status updates
+      setResultMsg('Please approve the transaction...');
       console.log('Sending transaction...');
       try {
         const signature = await sendTransaction(
           transaction,
           connection,
-          { 
-            statusCallback: (status) => console.log(`[JupiterSwap] ${status}`),
+          {
+            statusCallback: (status) => {
+              console.log(`[JupiterSwap] ${status}`);
+              // Filter raw errors using TransactionService
+              TransactionService.filterStatusUpdate(status, (filteredStatus) => {
+                setResultMsg(filteredStatus);
+              });
+            },
             confirmTransaction: true
           }
         );
 
         console.log('Transaction successfully sent with signature:', signature);
-        setResultMsg(`Swap successful! Tx: ${signature}`);
+
+        // Show success notification
+        TransactionService.showSuccess(signature, 'swap');
+
+        setResultMsg(`Swap successful!`);
 
         // Show the share prompt modal
         setPendingBuyInputLamports(inputLamports);
@@ -457,19 +470,21 @@ export default function TradeModal({
         setShowSharePrompt(true);
       } catch (txError: any) {
         console.error('Transaction sending error:', txError);
-        
-        // Extract useful error information
-        let errorMessage = txError.message || 'Unknown transaction error';
-        if (txError.logs) {
-          console.error('Transaction logs:', txError.logs);
-          errorMessage += '\n\nTransaction logs: ' + txError.logs.slice(0, 2).join('\n');
-        }
-        
-        throw new Error('Transaction failed: ' + errorMessage);
+
+        // Use TransactionService to show error notification
+        TransactionService.showError(txError);
+
+        // Set a simple error message in the UI
+        setErrorMsg('Transaction failed');
+        throw new Error('Transaction failed');
       }
     } catch (err: any) {
       console.error('Trade error:', err);
-      setErrorMsg(err.message);
+      // Don't show raw error in UI, use a generic message
+      setErrorMsg('Trade failed. Please try again.');
+
+      // But log the detailed error to console
+      console.error('Detailed error:', err.message);
     } finally {
       setLoading(false);
     }
@@ -489,6 +504,8 @@ export default function TradeModal({
    */
   const shareTradeInFeed = useCallback(
     async (inputLamports: number, outputLamports: number, inputTokenInfo: TokenInfo, outputTokenInfo: TokenInfo) => {
+      setLoading(true);
+      setResultMsg('Creating post...');
       try {
         // Prepare post content
         const localId = 'local-' + Math.random().toString(36).substr(2, 9);
@@ -504,7 +521,7 @@ export default function TradeModal({
           inputTokenInfo.address,
           inputTokenInfo.symbol
         );
-        
+
         const outputUsdValue = await estimateTokenUsdValue(
           outputLamports,
           outputTokenInfo.decimals,
@@ -531,9 +548,8 @@ export default function TradeModal({
             id: 'swap-post-' + Math.random().toString(36).substr(2, 9),
             type: 'TEXT_TRADE',
             tradeData,
-            text: `I just executed a trade: ${localInputQty.toFixed(4)} ${
-              inputTokenInfo.symbol
-            } → ${outputTokenInfo.symbol}!`,
+            text: `I just executed a trade: ${localInputQty.toFixed(4)} ${inputTokenInfo.symbol
+              } → ${outputTokenInfo.symbol}!`,
           },
         ];
 
@@ -566,7 +582,12 @@ export default function TradeModal({
         onPostCreated && onPostCreated();
       } catch (err: any) {
         console.error('[shareTradeInFeed] Error =>', err);
-        setErrorMsg(err.message || 'Failed to create trade post');
+        setErrorMsg('Failed to create post');
+
+        // Show error notification
+        TransactionService.showError(err);
+      } finally {
+        setLoading(false);
       }
     },
     [dispatch, currentUser, onPostCreated],
@@ -578,16 +599,19 @@ export default function TradeModal({
   const sharePastSwapInFeed = useCallback(
     async (swap: SwapTransaction) => {
       try {
+        setLoading(true);
+        setResultMsg('Creating post...');
+
         // Format amounts properly
         console.log("swap", swap);
         const inputQty = swap.inputToken.amount / Math.pow(10, swap.inputToken.decimals);
         const outputQty = swap.outputToken.amount / Math.pow(10, swap.outputToken.decimals);
 
         // Convert timestamp to milliseconds if needed (Helius provides timestamps in seconds)
-        const timestampMs = swap.timestamp < 10000000000 
+        const timestampMs = swap.timestamp < 10000000000
           ? swap.timestamp * 1000  // Convert to milliseconds if in seconds
           : swap.timestamp;
-        
+
         console.log("Original swap timestamp:", swap.timestamp);
         console.log("Converted timestamp:", timestampMs, "->", new Date(timestampMs).toISOString());
 
@@ -598,7 +622,7 @@ export default function TradeModal({
           swap.inputToken.mint,
           swap.inputToken.symbol
         );
-        
+
         const outputUsdValue = await estimateTokenUsdValue(
           swap.outputToken.amount,
           swap.outputToken.decimals,
@@ -629,9 +653,8 @@ export default function TradeModal({
             id: 'swap-post-' + Math.random().toString(36).substr(2, 9),
             type: 'TEXT_TRADE',
             tradeData,
-            text: `I executed a trade: ${inputQty.toFixed(4)} ${
-              swap.inputToken.symbol || 'tokens'
-            } → ${outputQty.toFixed(4)} ${swap.outputToken.symbol || 'tokens'}!`,
+            text: `I executed a trade: ${inputQty.toFixed(4)} ${swap.inputToken.symbol || 'tokens'
+              } → ${outputQty.toFixed(4)} ${swap.outputToken.symbol || 'tokens'}!`,
           },
         ];
 
@@ -660,12 +683,17 @@ export default function TradeModal({
 
         setResultMsg('Past swap shared successfully!');
         onPostCreated && onPostCreated();
-        
+
         // Close the modal after successful share
         setTimeout(() => handleClose(), 1500);
       } catch (err: any) {
         console.error('[sharePastSwapInFeed] Error =>', err);
-        setErrorMsg(err.message || 'Failed to share past swap');
+        setErrorMsg('Failed to share past swap');
+
+        // Show error notification
+        TransactionService.showError(err);
+      } finally {
+        setLoading(false);
       }
     },
     [dispatch, currentUser, onPostCreated, handleClose],
@@ -697,7 +725,7 @@ export default function TradeModal({
       return;
     }
     setLoading(true);
-    setResultMsg('');
+    setResultMsg('Preparing to share transaction...');
     setErrorMsg('');
 
     try {
@@ -717,10 +745,15 @@ export default function TradeModal({
         }),
       ).unwrap();
 
-      setResultMsg('Post created referencing your transaction!');
+      setResultMsg('Post created successfully!');
       onPostCreated && onPostCreated();
     } catch (err: any) {
-      setErrorMsg(err.message);
+      console.error('Error sharing transaction:', err);
+      // Don't show raw error in UI
+      setErrorMsg('Failed to create post');
+
+      // Show error notification
+      TransactionService.showError(err);
     } finally {
       setLoading(false);
     }
@@ -739,13 +772,13 @@ export default function TradeModal({
   const handleRefresh = useCallback(async () => {
     // Prevent concurrent refreshes
     if (!userPublicKey || isRefreshingRef.current) return;
-    
+
     isRefreshingRef.current = true;
-    
+
     if (!initialLoading) {
       setRefreshing(true);
     }
-    
+
     try {
       // Fetch raw swap transactions
       const rawSwaps = await fetchRecentSwaps(userPublicKey.toString());
@@ -753,11 +786,11 @@ export default function TradeModal({
         setSwaps([]);
         return;
       }
-      
+
       // Enrich with token metadata
       const enrichedSwaps = await enrichSwapTransactions(rawSwaps);
       setSwaps(enrichedSwaps);
-      
+
       // If no swap is selected yet and we have swaps, select the first one
       if (!selectedPastSwap && enrichedSwaps.length > 0) {
         setSelectedPastSwap(enrichedSwaps[0]);
@@ -788,9 +821,9 @@ export default function TradeModal({
       Alert.alert('No swap selected', 'Please select a swap to share.');
       return;
     }
-    
+
     setLoading(true);
-    
+
     sharePastSwapInFeed(selectedPastSwap)
       .finally(() => setLoading(false));
   }, [selectedPastSwap, sharePastSwapInFeed]);
@@ -819,11 +852,11 @@ export default function TradeModal({
                       name="sync"
                       size={14}
                       color="#4B5563"
-                      style={(refreshing || initialLoading) ? {transform: [{rotate: '45deg'}]} : undefined}
+                      style={(refreshing || initialLoading) ? { transform: [{ rotate: '45deg' }] } : undefined}
                     />
                   </TouchableOpacity>
                 </View>
-                
+
                 {initialLoading ? (
                   <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#3871DD" />
@@ -848,7 +881,7 @@ export default function TradeModal({
                 ) : (
                   <FlatList
                     data={swaps}
-                    renderItem={({item}) => (
+                    renderItem={({ item }) => (
                       <View style={styles.swapItemContainer}>
                         <PastSwapItem
                           swap={item}
@@ -866,7 +899,7 @@ export default function TradeModal({
                   />
                 )}
               </View>
-              
+
               {selectedPastSwap && !loading && !initialLoading && (
                 <TouchableOpacity
                   style={styles.swapButton}
@@ -887,7 +920,7 @@ export default function TradeModal({
               </Text>
             </View>
           )}
-          
+
           {loading && selectedPastSwap && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#3871DD" />
@@ -915,7 +948,7 @@ export default function TradeModal({
                 <View style={styles.tokenSelectorInner}>
                   {inputToken.logoURI && (
                     <Image
-                      source={{uri: inputToken.logoURI}}
+                      source={{ uri: inputToken.logoURI }}
                       style={styles.tokenIcon}
                       resizeMode="contain"
                     />
@@ -943,7 +976,7 @@ export default function TradeModal({
                 <View style={styles.tokenSelectorInner}>
                   {outputToken.logoURI && (
                     <Image
-                      source={{uri: outputToken.logoURI}}
+                      source={{ uri: outputToken.logoURI }}
                       style={styles.tokenIcon}
                       resizeMode="contain"
                     />
@@ -996,9 +1029,9 @@ export default function TradeModal({
           </View>
 
           {loading ? (
-            <View style={{alignItems: 'center', marginVertical: 24}}>
+            <View style={{ alignItems: 'center', marginVertical: 24 }}>
               <ActivityIndicator size="large" color="#3871DD" />
-              <Text style={{marginTop: 12, color: '#4B5563'}}>
+              <Text style={{ marginTop: 12, color: '#4B5563' }}>
                 Preparing your swap...
               </Text>
             </View>
@@ -1049,14 +1082,14 @@ export default function TradeModal({
                       style={[
                         styles.tabButton,
                         selectedTab === 'PAST_SWAPS' &&
-                          styles.tabButtonActive,
+                        styles.tabButtonActive,
                       ]}
                       onPress={() => setSelectedTab('PAST_SWAPS')}>
                       <Text
                         style={[
                           styles.tabButtonText,
                           selectedTab === 'PAST_SWAPS' &&
-                            styles.tabButtonTextActive,
+                          styles.tabButtonTextActive,
                         ]}>
                         History
                       </Text>
@@ -1066,14 +1099,14 @@ export default function TradeModal({
                       style={[
                         styles.tabButton,
                         selectedTab === 'TRADE_AND_SHARE' &&
-                          styles.tabButtonActive,
+                        styles.tabButtonActive,
                       ]}
                       onPress={() => setSelectedTab('TRADE_AND_SHARE')}>
                       <Text
                         style={[
                           styles.tabButtonText,
                           selectedTab === 'TRADE_AND_SHARE' &&
-                            styles.tabButtonTextActive,
+                          styles.tabButtonTextActive,
                         ]}>
                         Swap
                       </Text>

@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Text,
   TextInput,
@@ -7,10 +7,12 @@ import {
   StyleProp,
   ViewStyle,
   TextStyle,
+  ActivityIndicator,
 } from 'react-native';
-import {usePumpFun} from '../../hooks/usePumpFun';
-import {PumpfunSellStyles} from './Pumpfun.styles';
+import { usePumpFun } from '../../hooks/usePumpFun';
+import { PumpfunSellStyles } from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
+import { TransactionService } from '../../services/transaction/transactionService';
 
 /**
  * Interface representing a token selected for selling
@@ -82,11 +84,13 @@ export const PumpfunSellSection: React.FC<PumpfunSellSectionProps> = ({
   buttonStyle,
   sellButtonLabel = 'Sell Token',
 }) => {
-  const {sellToken} = usePumpFun();
+  const { sellToken } = usePumpFun();
 
   const [tokenAddress, setTokenAddress] = useState('');
   const [tokenAmount, setTokenAmount] = useState('0.0');
   const [estimatedFee, setEstimatedFee] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedToken) {
@@ -101,7 +105,7 @@ export const PumpfunSellSection: React.FC<PumpfunSellSectionProps> = ({
     setEstimatedFee(estimateSol);
   }, [tokenAmount]);
 
-  const handleSell = () => {
+  const handleSell = async () => {
     if (!tokenAddress) {
       Alert.alert('Error', 'Please enter or select a token address');
       return;
@@ -110,10 +114,33 @@ export const PumpfunSellSection: React.FC<PumpfunSellSectionProps> = ({
       Alert.alert('Error', 'Please enter a valid token amount');
       return;
     }
-    sellToken({
-      tokenAddress,
-      tokenAmount: Number(tokenAmount),
-    });
+
+    setIsLoading(true);
+    setStatus('Preparing transaction...');
+
+    try {
+      await sellToken({
+        tokenAddress,
+        tokenAmount: Number(tokenAmount),
+        onStatusUpdate: (newStatus) => {
+          console.log('Sell token status:', newStatus);
+          // Use TransactionService to filter raw error messages
+          TransactionService.filterStatusUpdate(newStatus, setStatus);
+        }
+      });
+      setStatus('Sale successful!');
+      // Success message will be handled by TransactionService
+    } catch (error) {
+      console.error('Error selling token:', error);
+      // Don't show raw error in UI
+      setStatus('Transaction failed');
+      // Error notification will be handled by TransactionService
+    } finally {
+      setTimeout(() => {
+        setIsLoading(false);
+        setStatus(null);
+      }, 2000);
+    }
   };
 
   const handleMax = () => {
@@ -134,6 +161,7 @@ export const PumpfunSellSection: React.FC<PumpfunSellSectionProps> = ({
             placeholder="e.g. 5tMi..."
             value={tokenAddress}
             onChangeText={setTokenAddress}
+            editable={!isLoading}
           />
         </>
       )}
@@ -145,11 +173,13 @@ export const PumpfunSellSection: React.FC<PumpfunSellSectionProps> = ({
         value={tokenAmount}
         onChangeText={setTokenAmount}
         keyboardType="decimal-pad"
+        editable={!isLoading}
       />
       {selectedToken && (
         <TouchableOpacity
-          style={PumpfunSellStyles.maxButton}
-          onPress={handleMax}>
+          style={[PumpfunSellStyles.maxButton, isLoading && { opacity: 0.5 }]}
+          onPress={handleMax}
+          disabled={isLoading}>
           <Text style={PumpfunSellStyles.maxButtonText}>Max</Text>
         </TouchableOpacity>
       )}
@@ -160,10 +190,19 @@ export const PumpfunSellSection: React.FC<PumpfunSellSectionProps> = ({
         </Text>
       )}
 
+      {status && (
+        <Text style={PumpfunSellStyles.statusText}>{status}</Text>
+      )}
+
       <TouchableOpacity
-        style={[PumpfunSellStyles.sellButton, buttonStyle]}
-        onPress={handleSell}>
-        <Text style={PumpfunSellStyles.sellButtonText}>{sellButtonLabel}</Text>
+        style={[PumpfunSellStyles.sellButton, buttonStyle, isLoading && { opacity: 0.7 }]}
+        onPress={handleSell}
+        disabled={isLoading}>
+        {isLoading ? (
+          <ActivityIndicator color="#FFFFFF" size="small" />
+        ) : (
+          <Text style={PumpfunSellStyles.sellButtonText}>{sellButtonLabel}</Text>
+        )}
       </TouchableOpacity>
     </PumpfunCard>
   );

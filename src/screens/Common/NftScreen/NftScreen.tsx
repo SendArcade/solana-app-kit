@@ -5,6 +5,7 @@ import SellSection from './SellSection';
 import { styles } from './styles';
 import { useAuth } from '../../../hooks/useAuth';
 import { useAppSelector } from '../../../hooks/useReduxHooks';
+import { TransactionService } from '../../../services/transaction/transactionService';
 
 
 

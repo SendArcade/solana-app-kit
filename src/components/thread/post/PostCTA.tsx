@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   View,
   TouchableOpacity,
@@ -10,17 +10,18 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import type {ThreadPost, ThreadUser} from '../thread.types';
-import {createThreadStyles, getMergedTheme} from '../thread.styles';
-import {useSelector} from 'react-redux';
-import {RootState} from '../../../state/store';
-import {Cluster, clusterApiUrl, Connection, Transaction, VersionedTransaction, PublicKey} from '@solana/web3.js';
-import {Buffer} from 'buffer';
-import {TENSOR_API_KEY, HELIUS_RPC_URL, CLUSTER} from '@env';
-import {useWallet} from '../../../hooks/useWallet';
+import type { ThreadPost, ThreadUser } from '../thread.types';
+import { createThreadStyles, getMergedTheme } from '../thread.styles';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../state/store';
+import { Cluster, clusterApiUrl, Connection, Transaction, VersionedTransaction, PublicKey } from '@solana/web3.js';
+import { Buffer } from 'buffer';
+import { TENSOR_API_KEY, HELIUS_RPC_URL, CLUSTER } from '@env';
+import { useWallet } from '../../../hooks/useWallet';
 import TradeModal from '../trade/TradeModal';
-import {useAppSelector} from '../../../hooks/useReduxHooks';
+import { useAppSelector } from '../../../hooks/useReduxHooks';
 import { DEFAULT_IMAGES, ENDPOINTS } from '../../../config/constants';
+import { TransactionService } from '../../../services/transaction/transactionService';
 
 /**
  * Determines the type of CTA to display based on the post's sections
@@ -132,10 +133,10 @@ export default function PostCTA({
   const selectedFeeTier = useSelector(
     (state: RootState) => state.transaction.selectedFeeTier,
   );
-  
+
   // Use the useWallet hook instead of direct useAuth
   const { wallet, address, publicKey, sendTransaction } = useWallet();
-  
+
   // Get the wallet address as a string
   const userPublicKey = address || null;
 
@@ -146,14 +147,14 @@ export default function PostCTA({
       ? '@' + userPublicKey.slice(0, 6) + '...' + userPublicKey.slice(-4)
       : '@anonymous',
     verified: true,
-    avatar: storedProfilePic ? {uri: storedProfilePic} : DEFAULT_IMAGES.user,
+    avatar: storedProfilePic ? { uri: storedProfilePic } : DEFAULT_IMAGES.user,
   };
 
   const mergedTheme = getMergedTheme(themeOverrides);
   const styles = createThreadStyles(
     mergedTheme,
-    styleOverrides as {[key: string]: object} | undefined,
-    userStyleSheet as {[key: string]: object} | undefined,
+    styleOverrides as { [key: string]: object } | undefined,
+    userStyleSheet as { [key: string]: object } | undefined,
   );
 
   function getCollectionData(post: ThreadPost) {
@@ -176,7 +177,7 @@ export default function PostCTA({
     try {
       setLoadingFloor(true);
       setNftStatusMsg('Fetching collection floor...');
-      
+
       const options = {
         method: 'GET',
         headers: {
@@ -184,16 +185,16 @@ export default function PostCTA({
           'x-tensor-api-key': TENSOR_API_KEY,
         },
       };
-      
+
       const url = `https://api.mainnet.tensordev.io/api/v1/mint/collection?collId=${encodeURIComponent(
         collId
       )}&sortBy=ListingPriceAsc&limit=1`;
-      
+
       const resp = await fetch(url, options);
       if (!resp.ok) {
         throw new Error(`Failed to fetch collection floor: ${resp.status}`);
       }
-      
+
       const data = await resp.json();
       if (data.mints && data.mints.length > 0) {
         const floor = data.mints[0];
@@ -207,7 +208,7 @@ export default function PostCTA({
           return { mint: floor.mint, owner, maxPrice };
         }
       }
-      
+
       throw new Error('No floor NFT found for this collection');
     } catch (err: any) {
       console.error('Error fetching floor NFT:', err);
@@ -262,7 +263,7 @@ export default function PostCTA({
 
       const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
       const connection = new Connection(rpcUrl, 'confirmed');
-      const {blockhash} = await connection.getRecentBlockhash();
+      const { blockhash } = await connection.getRecentBlockhash();
       setNftStatusMsg(`Blockhash: ${blockhash} fetched.\nPreparing buy tx ...`);
 
       const maxPriceInLamports = listingPriceSol * 1_000_000_000;
@@ -316,12 +317,16 @@ export default function PostCTA({
         }
 
         setNftStatusMsg(`TX #${i + 1} signature: ${signature}`);
+
+        // Show success notification
+        TransactionService.showSuccess(signature, 'nft');
       }
       setNftConfirmationMsg('NFT purchased successfully!');
       setNftConfirmationVisible(true);
     } catch (err: any) {
       console.error('Error during buy transaction:', err);
-      Alert.alert('Error', err.message || 'Failed to buy NFT.');
+      // Show error notification instead of alert
+      TransactionService.showError(err);
     } finally {
       setNftLoading(false);
       setNftStatusMsg('');
@@ -333,30 +338,30 @@ export default function PostCTA({
       Alert.alert('Error', 'No collection data available for this post.');
       return;
     }
-    
+
     if (!publicKey) {
       Alert.alert('Error', 'Wallet not connected.');
       return;
     }
-    
+
     try {
       setNftLoading(true);
       setNftStatusMsg('Fetching collection floor...');
-      
+
       // Get the floor NFT for this collection
       const floorDetails = await fetchFloorNFTForCollection(collectionData.collId);
       if (!floorDetails) {
         throw new Error('No floor NFT found for this collection.');
       }
-      
+
       setNftStatusMsg('Fetching blockhash ...');
       const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
       const connection = new Connection(rpcUrl, 'confirmed');
-      const {blockhash} = await connection.getRecentBlockhash();
-      
+      const { blockhash } = await connection.getRecentBlockhash();
+
       setNftStatusMsg(`Preparing to buy floor NFT at ${floorDetails.maxPrice.toFixed(5)} SOL...`);
       const maxPriceInLamports = floorDetails.maxPrice * 1_000_000_000;
-      
+
       const buyUrl = `https://api.mainnet.tensordev.io/api/v1/tx/buy?buyer=${userPublicKey}&mint=${floorDetails.mint}&owner=${floorDetails.owner}&maxPrice=${maxPriceInLamports}&blockhash=${blockhash}`;
 
       const resp = await fetch(buyUrl, {
@@ -364,7 +369,7 @@ export default function PostCTA({
           'x-tensor-api-key': TENSOR_API_KEY,
         },
       });
-      
+
       const rawText = await resp.text();
       let data: any;
       try {
@@ -372,7 +377,7 @@ export default function PostCTA({
       } catch (parseErr) {
         throw new Error('Tensor returned non-JSON response.');
       }
-      
+
       if (!data.txs || data.txs.length === 0) {
         throw new Error('No transactions returned from Tensor buy endpoint.');
       }
@@ -409,12 +414,12 @@ export default function PostCTA({
 
         setNftStatusMsg(`TX #${i + 1} signature: ${signature}`);
       }
-      
+
       setNftConfirmationMsg(`Successfully purchased floor NFT from ${collectionData.name} collection!`);
       setNftConfirmationVisible(true);
     } catch (err: any) {
       console.error('Error during buy transaction:', err);
-      Alert.alert('Error', err.message || 'Failed to buy floor NFT.');
+      TransactionService.showError(err);
     } finally {
       setNftLoading(false);
       setNftStatusMsg('');
@@ -424,7 +429,7 @@ export default function PostCTA({
   // Set CTA label and onPress based on section type
   let ctaLabel = 'Copy Trade';
   let onCtaPress = handleOpenTradeModal;
-  
+
   if (sectionType === 'nft') {
     ctaLabel = 'Buy NFT';
     onCtaPress = handleBuyListedNft;
@@ -490,7 +495,7 @@ export default function PostCTA({
         visible={nftLoading}
         transparent
         animationType="fade"
-        onRequestClose={() => {}}>
+        onRequestClose={() => { }}>
         <View style={styles.progressOverlay}>
           <View style={styles.progressContainer}>
             <ActivityIndicator size="large" color="#1d9bf0" />

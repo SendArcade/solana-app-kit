@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   Text,
   TextInput,
@@ -11,9 +11,10 @@ import {
   TextStyle,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import {usePumpFun} from '../../hooks/usePumpFun';
-import {PumpfunLaunchStyles} from './Pumpfun.styles';
+import { usePumpFun } from '../../hooks/usePumpFun';
+import { PumpfunLaunchStyles } from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
+import { TransactionService } from '../../services/transaction/transactionService';
 
 /**
  * Props for the PumpfunLaunchSection component
@@ -67,7 +68,7 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
   buttonStyle,
   launchButtonLabel = 'Launch Token',
 }) => {
-  const {launchToken} = usePumpFun();
+  const { launchToken } = usePumpFun();
 
   const [tokenName, setTokenName] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
@@ -78,6 +79,7 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [solAmount, setSolAmount] = useState('0.001');
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -99,6 +101,8 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
     }
 
     setLoading(true);
+    setStatus('Preparing token launch...');
+
     try {
       await launchToken({
         tokenName,
@@ -109,12 +113,24 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
         website,
         imageUri,
         solAmount: Number(solAmount),
+        onStatusUpdate: (newStatus) => {
+          console.log('Launch token status:', newStatus);
+          // Use TransactionService to filter raw error messages
+          TransactionService.filterStatusUpdate(newStatus, setStatus);
+        }
       });
+      setStatus('Token launched successfully!');
+      // Success message will be handled by TransactionService
     } catch (error: any) {
       console.error('Launch error:', error);
-      Alert.alert('Launch Error', error.message);
+      // Don't show raw error in UI
+      setStatus('Transaction failed');
+      // Error notification will be handled by TransactionService
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+        setStatus(null);
+      }, 2000);
     }
   };
 
@@ -127,37 +143,43 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
         placeholder="Token Name"
         value={tokenName}
         onChangeText={setTokenName}
+        editable={!loading}
       />
       <TextInput
         style={[PumpfunLaunchStyles.input, inputStyle]}
         placeholder="Token Symbol"
         value={tokenSymbol}
         onChangeText={setTokenSymbol}
+        editable={!loading}
       />
       <TextInput
-        style={[PumpfunLaunchStyles.input, inputStyle, {height: 60}]}
+        style={[PumpfunLaunchStyles.input, inputStyle, { height: 60 }]}
         placeholder="Description"
         multiline
         value={description}
         onChangeText={setDescription}
+        editable={!loading}
       />
       <TextInput
         style={[PumpfunLaunchStyles.input, inputStyle]}
         placeholder="Twitter (optional)"
         value={twitter}
         onChangeText={setTwitter}
+        editable={!loading}
       />
       <TextInput
         style={[PumpfunLaunchStyles.input, inputStyle]}
         placeholder="Telegram (optional)"
         value={telegram}
         onChangeText={setTelegram}
+        editable={!loading}
       />
       <TextInput
         style={[PumpfunLaunchStyles.input, inputStyle]}
         placeholder="Website (optional)"
         value={website}
         onChangeText={setWebsite}
+        editable={!loading}
       />
       <TextInput
         style={[PumpfunLaunchStyles.input, inputStyle]}
@@ -165,11 +187,13 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
         keyboardType="decimal-pad"
         value={solAmount}
         onChangeText={setSolAmount}
+        editable={!loading}
       />
 
       <TouchableOpacity
         onPress={pickImage}
-        style={PumpfunLaunchStyles.imageButton}>
+        style={[PumpfunLaunchStyles.imageButton, loading && { opacity: 0.5 }]}
+        disabled={loading}>
         <Text style={PumpfunLaunchStyles.imageButtonText}>
           {imageUri ? 'Change Image' : 'Pick Image'}
         </Text>
@@ -177,9 +201,13 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
 
       {imageUri && (
         <Image
-          source={{uri: imageUri}}
+          source={{ uri: imageUri }}
           style={PumpfunLaunchStyles.imagePreview}
         />
+      )}
+
+      {status && (
+        <Text style={PumpfunLaunchStyles.statusText}>{status}</Text>
       )}
 
       <TouchableOpacity

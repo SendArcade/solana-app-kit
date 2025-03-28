@@ -15,6 +15,7 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { navigationRef } from './src/hooks/useAppNavigation';
 import { store } from './src/state/store';
 import './src/utils/polyfills';
+import TransactionNotification from './src/components/Common/TransactionNotification';
 
 import { PrivyProvider, PrivyElements } from '@privy-io/expo';
 
@@ -55,6 +56,13 @@ export default function App() {
     }
   };
 
+  // Component to render notification and any other global UI elements
+  const GlobalUIElements = () => (
+    <>
+      <TransactionNotification />
+    </>
+  );
+
   return (
     <CustomizationProvider config={config}>
       <SafeAreaProvider>
@@ -75,13 +83,17 @@ export default function App() {
                 <RootNavigator />
               </NavigationContainer>
               {getDynamicWebView()}
+              <GlobalUIElements />
               <PrivyElements />
             </PrivyProvider>
           ) : (
-            <NavigationContainer ref={navigationRef}>
-              <RootNavigator />
+            <>
+              <NavigationContainer ref={navigationRef}>
+                <RootNavigator />
+              </NavigationContainer>
               {getDynamicWebView()}
-            </NavigationContainer>
+              <GlobalUIElements />
+            </>
           )}
         </ReduxProvider>
       </SafeAreaProvider>
