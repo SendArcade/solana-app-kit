@@ -12,43 +12,63 @@ export const styles = StyleSheet.create({
         paddingVertical:10,
         borderColor:COLORS.greyBorderdark,
         borderRadius:12,
-        borderWidth:2
-
+        borderWidth:1
     },
     contentContainer:{
         display:"flex",
         flexDirection:"row",
-        alignItems:"center",gap:8
+        alignItems:"center",
+        gap:8
     },
     imgContainer: {
         width: 38,
         height: 38,
         borderRadius: 8,
-        
         overflow: "hidden", 
-      },
-      img: {
+    },
+    img: {
         width: "100%",
         height: "100%",
-      },
-      buyButton: {
-        width: 69,
+    },
+    buyButton: {
+        paddingHorizontal: 16,
         height: 36,
         borderRadius: 12,
         backgroundColor: COLORS.greyLight, 
         alignItems: "center",
-
         justifyContent: "center",
-      },
-      buyButtonText: {
+    },
+    buyButtonText: {
         color: "black",
         fontSize: 12,
-        fontWeight: 600,
-      },
-      buyButtonContainer:{
-                  display: 'flex',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4,
-                }
+        fontWeight: "600",
+    },
+    buyButtonContainer:{
+        display: 'flex',
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    pinYourCoinContainer: {
+        borderStyle: "dashed",
+        borderColor: "#1d9bf0",
+        backgroundColor: "rgba(29, 155, 240, 0.05)",
+    },
+    arrowButton: {
+        padding: 8,
+        marginLeft: 8,
+    },
+    pinArrowButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#1d9bf0',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 16,
+    },
+    pinButtonText: {
+        color: 'white',
+        fontWeight: '600',
+        fontSize: 14,
+        marginLeft: 6,
+    },
 })

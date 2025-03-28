@@ -8,25 +8,16 @@ import {
   FlatList,
   Image,
   ActivityIndicator,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
+  Dimensions,
 } from 'react-native';
 import tokenModalStyles from './tokenModal.style';
+import { FontAwesome5 } from '@expo/vector-icons';
+import { TokenInfo } from '../../../services/token/tokenService';
 
-/**
- * Information about a token
- * @interface TokenInfo
- */
-export interface TokenInfo {
-  /** The token's mint address */
-  address: string;
-  /** The token's symbol (e.g., 'SOL', 'USDC') */
-  symbol: string;
-  /** The token's full name */
-  name: string;
-  /** The number of decimal places for the token */
-  decimals: number;
-  /** URL to the token's logo image */
-  logoURI?: string;
-}
+const { height } = Dimensions.get('window');
 
 /**
  * Props for the SelectTokenModal component
@@ -74,10 +65,23 @@ export default function SelectTokenModal({
   const [loading, setLoading] = useState(false);
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
   const [searchInput, setSearchInput] = useState('');
+  
+  // Keep track of whether the component is mounted
+  const isMounted = React.useRef(true);
+  
+  useEffect(() => {
+    // Clean up function for unmounting
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (visible) {
       fetchTokens();
+    } else {
+      // Clear search when modal closes
+      setSearchInput('');
     }
   }, [visible]);
 
@@ -97,18 +101,25 @@ export default function SelectTokenModal({
       if (!data || !Array.isArray(data)) {
         throw new Error('Invalid data structure from tokens API');
       }
+      
+      // Add default empty string for logoURI if missing
       const result: TokenInfo[] = data.map((item: any) => ({
         address: item.address,
         symbol: item.symbol,
         name: item.name,
         decimals: item.decimals,
-        logoURI: item.logoURI,
+        logoURI: item.logoURI || '',
       }));
-      setTokens(result);
+      
+      if (isMounted.current) {
+        setTokens(result);
+      }
     } catch (err: any) {
       console.error('fetchTokens error:', err);
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -130,21 +141,29 @@ export default function SelectTokenModal({
   const renderItem = ({item}: {item: TokenInfo}) => (
     <TouchableOpacity
       style={tokenModalStyles.tokenItem}
-      onPress={() => onTokenSelected(item)}>
+      onPress={() => onTokenSelected(item)}
+      activeOpacity={0.7}>
       <View style={tokenModalStyles.tokenItemContent}>
         {item.logoURI ? (
           <Image
             source={{uri: item.logoURI}}
             style={tokenModalStyles.tokenLogo}
+            resizeMode="contain"
           />
         ) : (
-          <View
-            style={[tokenModalStyles.tokenLogo, {backgroundColor: '#ccc'}]}
-          />
+          <View style={[tokenModalStyles.tokenLogo, {backgroundColor: '#F3F4F6'}]}>
+            <Text style={{color: '#6B7280', fontWeight: '600', fontSize: 12}}>
+              {item.symbol.charAt(0)}
+            </Text>
+          </View>
         )}
         <View style={tokenModalStyles.tokenTextContainer}>
-          <Text style={tokenModalStyles.tokenSymbol}>{item.symbol}</Text>
-          <Text style={tokenModalStyles.tokenName}>{item.name}</Text>
+          <Text style={tokenModalStyles.tokenSymbol} numberOfLines={1} ellipsizeMode="tail">
+            {item.symbol}
+          </Text>
+          <Text style={tokenModalStyles.tokenName} numberOfLines={1} ellipsizeMode="tail">
+            {item.name}
+          </Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -152,36 +171,70 @@ export default function SelectTokenModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View style={tokenModalStyles.modalOverlay}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={tokenModalStyles.modalOverlay} />
+      </TouchableWithoutFeedback>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={tokenModalStyles.modalOverlay}>
         <View style={tokenModalStyles.modalContainer}>
-          <Text style={tokenModalStyles.modalTitle}>Select a Token</Text>
-          <TextInput
-            style={tokenModalStyles.searchInput}
-            placeholder="Search by symbol, name, or address"
-            value={searchInput}
-            onChangeText={setSearchInput}
-          />
+          <View style={tokenModalStyles.modalHeader}>
+            <Text style={tokenModalStyles.modalTitle}>Select a Token</Text>
+            <TouchableOpacity 
+              style={tokenModalStyles.modalCloseButton}
+              onPress={onClose}
+            >
+              <Text style={tokenModalStyles.modalCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={tokenModalStyles.searchContainer}>
+            <FontAwesome5 name="search" size={14} color="#9CA3AF" style={tokenModalStyles.searchIcon} />
+            <TextInput
+              style={tokenModalStyles.searchInput}
+              placeholder="Search by name, symbol, or address"
+              placeholderTextColor="#9CA3AF"
+              value={searchInput}
+              onChangeText={setSearchInput}
+              clearButtonMode="while-editing"
+            />
+          </View>
+          
           {loading ? (
-            <ActivityIndicator
-              size="large"
-              color="#4A90E2"
-              style={{marginTop: 20}}
-            />
+            <View style={tokenModalStyles.loadingContainer}>
+              <ActivityIndicator
+                size="large"
+                color="#3871DD"
+              />
+              <Text style={tokenModalStyles.loadingText}>Loading tokens...</Text>
+            </View>
           ) : (
-            <FlatList
-              data={filteredTokens}
-              keyExtractor={item => item.address}
-              renderItem={renderItem}
-              contentContainerStyle={{paddingBottom: 20, marginTop: 10}}
-            />
+            <>
+              <FlatList
+                data={filteredTokens}
+                keyExtractor={item => item.address}
+                renderItem={renderItem}
+                contentContainerStyle={tokenModalStyles.listContentContainer}
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="handled"
+                ListEmptyComponent={
+                  <View style={tokenModalStyles.emptyContainer}>
+                    <Text style={tokenModalStyles.emptyText}>
+                      No tokens found matching "{searchInput}"
+                    </Text>
+                  </View>
+                }
+              />
+              
+              <TouchableOpacity
+                style={tokenModalStyles.closeButton}
+                onPress={onClose}>
+                <Text style={tokenModalStyles.closeButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </>
           )}
-          <TouchableOpacity
-            style={tokenModalStyles.closeButton}
-            onPress={onClose}>
-            <Text style={tokenModalStyles.closeButtonText}>Cancel</Text>
-          </TouchableOpacity>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

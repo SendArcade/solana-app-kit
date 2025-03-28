@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -16,8 +16,7 @@ import { Cluster, clusterApiUrl, Connection, Transaction, VersionedTransaction }
 import { buyStyles as styles } from './buySection.styles';
 import { CLUSTER, HELIUS_RPC_URL, TENSOR_API_KEY } from '@env';
 import { ENDPOINTS } from '../../../config/constants';
-
-
+import { TransactionService } from '../../../services/transaction/transactionService';
 
 const SOL_TO_LAMPORTS = 1_000_000_000;
 
@@ -52,7 +51,7 @@ interface BuySectionProps {
   userWallet: any;
 }
 
-const BuySection: React.FC<BuySectionProps> = ({userPublicKey, userWallet}) => {
+const BuySection: React.FC<BuySectionProps> = ({ userPublicKey, userWallet }) => {
   const [collectionName, setCollectionName] = useState('madlads');
   const [searchResults, setSearchResults] = useState<CollectionResult[]>([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
@@ -65,6 +64,10 @@ const BuySection: React.FC<BuySectionProps> = ({userPublicKey, userWallet}) => {
   // State for the floor NFT details.
   const [floorNFT, setFloorNFT] = useState<FloorNFT | null>(null);
   const [loadingFloorNFT, setLoadingFloorNFT] = useState(false);
+
+  // Add status state for transaction progress
+  const [status, setStatus] = useState<string | null>(null);
+  const [isProcessingTx, setIsProcessingTx] = useState(false);
 
   // ------------------------------------------------------------------------
   // 1) Search collections by name
@@ -145,8 +148,8 @@ const BuySection: React.FC<BuySectionProps> = ({userPublicKey, userWallet}) => {
           console.log(
             `Floor NFT: mint=${floor.mint}, owner=${owner}, maxPrice=${maxPrice}`,
           );
-          setFloorNFT({mint: floor.mint, owner, maxPrice});
-          return {mint: floor.mint, owner, maxPrice};
+          setFloorNFT({ mint: floor.mint, owner, maxPrice });
+          return { mint: floor.mint, owner, maxPrice };
         }
       }
       Alert.alert('Info', 'No tokens found for the collection floor.');
@@ -167,29 +170,41 @@ const BuySection: React.FC<BuySectionProps> = ({userPublicKey, userWallet}) => {
     console.log('Confirm Buy clicked for collection:', coll);
     if (!coll) return;
     const collId = coll.collId;
+
+    setStatus('Fetching floor NFT details...');
+    setIsProcessingTx(true);
+
     // Use the floorNFT from state if available.
     const floorDetails = floorNFT
       ? floorNFT
       : await fetchFloorNFTForCollection(collId);
     if (!floorDetails) {
       console.log('No floor NFT to buy. Aborting.');
+      setStatus(null);
+      setIsProcessingTx(false);
       return;
     }
     console.log('Proceeding to buy with floor NFT:', floorDetails);
     if (!userPublicKey || !userWallet) {
       Alert.alert('Error', 'Wallet not connected.');
+      setStatus(null);
+      setIsProcessingTx(false);
       return;
     }
     try {
       const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
       const connection = new Connection(rpcUrl, 'confirmed');
-      const {blockhash} = await connection.getRecentBlockhash();
+
+      setStatus('Getting recent blockhash...');
+      const { blockhash } = await connection.getRecentBlockhash();
       const maxPriceInLamports = floorDetails.maxPrice * SOL_TO_LAMPORTS;
       console.log('Obtained blockhash:', blockhash);
+
+      setStatus('Building buy transaction...');
       const buyUrl = `https://api.mainnet.tensordev.io/api/v1/tx/buy?buyer=${userPublicKey}&mint=${floorDetails.mint}&owner=${floorDetails.owner}&maxPrice=${maxPriceInLamports}&blockhash=${blockhash}`;
       console.log('Buy URL:', buyUrl);
       const resp = await fetch(buyUrl, {
-        headers: {'x-tensor-api-key': TENSOR_API_KEY},
+        headers: { 'x-tensor-api-key': TENSOR_API_KEY },
       });
       const rawText = await resp.text();
       console.log('Raw response from buy endpoint:', rawText);
@@ -205,6 +220,8 @@ const BuySection: React.FC<BuySectionProps> = ({userPublicKey, userWallet}) => {
         throw new Error('No transactions returned from Tensor API for buying.');
       }
       console.log('Transactions received:', data.txs);
+
+      setStatus('Preparing to sign transactions...');
       for (let i = 0; i < data.txs.length; i++) {
         const txObj = data.txs[i];
         let transaction: Transaction | VersionedTransaction;
@@ -219,34 +236,49 @@ const BuySection: React.FC<BuySectionProps> = ({userPublicKey, userWallet}) => {
         } else {
           throw new Error(`Transaction #${i + 1} is in an unknown format.`);
         }
+
+        setStatus(`Signing transaction ${i + 1} of ${data.txs.length}...`);
         const provider = await userWallet.getProvider();
-        const {signature} = await provider.request({
+        const { signature } = await provider.request({
           method: 'signAndSendTransaction',
-          params: {transaction, connection},
+          params: { transaction, connection },
         });
         console.log(`Transaction #${i + 1} signature: ${signature}`);
+
+        // Show success notification for the last transaction
+        if (i === data.txs.length - 1) {
+          TransactionService.showSuccess(signature, 'nft');
+        }
       }
-      Alert.alert('Success', 'Floor NFT purchased successfully!');
+
+      setStatus('NFT purchased successfully!');
     } catch (err: any) {
       console.error('Error during buy transaction:', err);
-      Alert.alert('Error', err.message || 'Failed to buy floor NFT.');
+      // Use TransactionService to show error notification
+      TransactionService.showError(err);
+      setStatus('Transaction failed');
     } finally {
-      setShowBuyModal(false);
-      setSelectedCollection(null);
-      setFloorNFT(null);
+      // Reset modal after a delay
+      setTimeout(() => {
+        setIsProcessingTx(false);
+        setStatus(null);
+        setShowBuyModal(false);
+        setSelectedCollection(null);
+        setFloorNFT(null);
+      }, 2000);
     }
   };
 
   // ------------------------------------------------------------------------
   // 4) Render each collection card
   // ------------------------------------------------------------------------
-  const renderCollectionCard = ({item}: {item: CollectionResult}) => {
+  const renderCollectionCard = ({ item }: { item: CollectionResult }) => {
     return (
       <View style={styles.collectionCard}>
         <View style={styles.imageContainer}>
           {item.imageUri ? (
             <Image
-              source={{uri: fixImageUrl(item.imageUri)}}
+              source={{ uri: fixImageUrl(item.imageUri) }}
               style={styles.collectionImage}
               resizeMode="cover"
             />
@@ -299,9 +331,11 @@ const BuySection: React.FC<BuySectionProps> = ({userPublicKey, userWallet}) => {
         <Pressable
           style={styles.modalOverlay}
           onPress={() => {
-            setShowBuyModal(false);
-            setSelectedCollection(null);
-            setFloorNFT(null);
+            if (!isProcessingTx) {
+              setShowBuyModal(false);
+              setSelectedCollection(null);
+              setFloorNFT(null);
+            }
           }}>
           <Pressable
             style={styles.modalContent}
@@ -319,14 +353,35 @@ const BuySection: React.FC<BuySectionProps> = ({userPublicKey, userWallet}) => {
             ) : (
               <Text style={styles.modalText}>Price: Loading...</Text>
             )}
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={() => {
-                console.log('Confirm Buy clicked');
-                handleBuyFloor(selectedCollection);
-              }}>
-              <Text style={styles.confirmButtonText}>Confirm Buy</Text>
-            </TouchableOpacity>
+
+            {/* Add status display */}
+            {status && (
+              <Text style={{
+                textAlign: 'center',
+                marginVertical: 10,
+                padding: 8,
+                backgroundColor: '#f0f0f0',
+                borderRadius: 4,
+                color: '#333'
+              }}>{status}</Text>
+            )}
+
+            {/* Show activity indicator or button based on processing state */}
+            {isProcessingTx ? (
+              <View style={styles.confirmButton}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={() => {
+                  console.log('Confirm Buy clicked');
+                  handleBuyFloor(selectedCollection);
+                }}
+                disabled={!floorNFT || loadingFloorNFT}>
+                <Text style={styles.confirmButtonText}>Confirm Buy</Text>
+              </TouchableOpacity>
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -337,7 +392,7 @@ const BuySection: React.FC<BuySectionProps> = ({userPublicKey, userWallet}) => {
   // Main render
   // ------------------------------------------------------------------------
   return (
-    <View style={{flex: 1}}>
+    <View style={{ flex: 1 }}>
       <Text style={styles.label}>Collection Name</Text>
       <TextInput
         style={styles.input}
@@ -354,14 +409,14 @@ const BuySection: React.FC<BuySectionProps> = ({userPublicKey, userWallet}) => {
         <ActivityIndicator
           size="large"
           color="#32D4DE"
-          style={{marginVertical: 16}}
+          style={{ marginVertical: 16 }}
         />
       )}
       <FlatList
         data={searchResults}
         keyExtractor={item => item.collId}
         renderItem={renderCollectionCard}
-        contentContainerStyle={{paddingVertical: 8}}
+        contentContainerStyle={{ paddingVertical: 8 }}
         ListEmptyComponent={
           !loadingSearch ? (
             <View style={styles.emptyContainer}>

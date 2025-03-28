@@ -2,7 +2,6 @@
 import {createSlice, createAsyncThunk, PayloadAction} from '@reduxjs/toolkit';
 import type {
   ThreadPost,
-  ThreadUser,
   ThreadSection,
 } from '../../components/thread/thread.types';
 import {allposts as fallbackPosts} from '../../mocks/posts';
@@ -31,14 +30,22 @@ export const fetchAllPosts = createAsyncThunk(
 /**
  * createRootPostAsync
  * Instead of passing a full user object, we pass userId only.
+ *
+ * NOTE: We now also support an optional `localId` that references the local post's ID.
+ * This helps remove any local duplicates if we already inserted a local post.
  */
 export const createRootPostAsync = createAsyncThunk(
   'thread/createRootPost',
-  async (payload: {userId: string; sections: ThreadSection[]}) => {
+  async (payload: {
+    userId: string;
+    sections: ThreadSection[];
+    localId?: string;
+  }) => {
+    const {userId, sections} = payload;
     const res = await fetch(`${SERVER_BASE_URL}/api/posts`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
+      body: JSON.stringify({userId, sections}),
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to create post');
@@ -71,6 +78,7 @@ export const createReplyAsync = createAsyncThunk(
 /**
  * createRetweetAsync
  * Pass userId, retweetOf, and optionally sections.
+ * If sections are included, it's a quote retweet.
  */
 export const createRetweetAsync = createAsyncThunk(
   'thread/createRetweet',
@@ -78,7 +86,62 @@ export const createRetweetAsync = createAsyncThunk(
     retweetOf: string;
     userId: string;
     sections?: ThreadSection[];
-  }) => {
+  }, { getState }) => {
+    const state = getState() as { thread: ThreadState };
+    
+    // Get the target post
+    const targetPost = state.thread.allPosts.find(p => p.id === payload.retweetOf);
+    
+    // Error checks
+    
+    // Check if user already retweeted this post
+    const existingRetweet = state.thread.allPosts.find(
+      p => p.retweetOf?.id === payload.retweetOf && p.user.id === payload.userId
+    );
+    
+    const hasAlreadyRetweeted = existingRetweet !== undefined;
+    
+    // Check if target post is the user's own retweet (direct retweet, not quote)
+    const isTargetPostOwnRetweet = 
+      targetPost?.retweetOf && 
+      targetPost.user.id === payload.userId && 
+      (!targetPost.sections || targetPost.sections.length === 0);
+    
+    // For quote retweets, different rules apply
+    const isQuoteRetweet = payload.sections && payload.sections.length > 0;
+    
+    // If already retweeted and we're doing a direct retweet again, prevent duplicate
+    if (hasAlreadyRetweeted && !isQuoteRetweet) {
+      throw new Error('You have already retweeted this post');
+    }
+    
+    // If retweeting own retweet (direct retweet), suggest using the original post
+    if (isTargetPostOwnRetweet && !isQuoteRetweet) {
+      throw new Error('This is already your retweet. Try retweeting the original post instead.');
+    }
+    
+    // If we're quoting an already retweeted post, update the existing retweet
+    if (hasAlreadyRetweeted && isQuoteRetweet && existingRetweet) {
+      // For API, we should update the existing retweet instead of creating a new one
+      const updateRes = await fetch(`${SERVER_BASE_URL}/api/posts/update`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          postId: existingRetweet.id,
+          sections: payload.sections
+        }),
+      });
+      
+      const updateData = await updateRes.json();
+      if (!updateData.success) {
+        throw new Error(updateData.error || 'Failed to update quote retweet');
+      }
+      
+      // Return the updated post
+      return updateData.data as ThreadPost;
+    }
+    
+    // Normal case: create a new retweet
     const res = await fetch(`${SERVER_BASE_URL}/api/posts/retweet`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -111,13 +174,26 @@ export const updatePostAsync = createAsyncThunk(
  */
 export const deletePostAsync = createAsyncThunk(
   'thread/deletePost',
-  async (postId: string) => {
+  async (postId: string, { getState }) => {
+    // Get post info before deleting for proper state updates
+    const state = getState() as { thread: ThreadState };
+    const postToDelete = state.thread.allPosts.find(p => p.id === postId);
+    const retweetOf = postToDelete?.retweetOf?.id;
+    const parentId = postToDelete?.parentId;
+    
     const res = await fetch(`${SERVER_BASE_URL}/api/posts/${postId}`, {
       method: 'DELETE',
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'Failed to delete post');
-    return data; // Expected shape: { success: true, postId, retweetOf, parentId }
+    
+    // Return with explicit post information for reducer handling
+    return { 
+      ...data, 
+      postId, 
+      retweetOf, 
+      parentId 
+    };
   },
 );
 
@@ -162,6 +238,63 @@ function removePostRecursive(
     });
 }
 
+/**
+ * Utility to check if a user has already retweeted a post
+ */
+function checkIfAlreadyRetweeted(
+  state: ThreadState,
+  userId: string,
+  postId: string
+): boolean {
+  // 1. Check if any post is a retweet of the target post by this user
+  return state.allPosts.some(
+    p => p.retweetOf?.id === postId && p.user.id === userId
+  );
+}
+
+/**
+ * Utility to find a user's retweet of a specific post
+ */
+function findRetweetByUser(
+  state: ThreadState,
+  userId: string,
+  postId: string
+): ThreadPost | undefined {
+  return state.allPosts.find(
+    p => p.retweetOf?.id === postId && p.user.id === userId
+  );
+}
+
+/**
+ * Update retweet count on a post
+ */
+function updateRetweetCount(
+  posts: ThreadPost[],
+  postId: string,
+  increment: boolean
+): boolean {
+  for (const p of posts) {
+    if (p.id === postId) {
+      if (increment) {
+        // Increment count (default to 0 if undefined)
+        p.retweetCount = (p.retweetCount || 0) + 1;
+      } else {
+        // Decrement count (but never below 0)
+        p.retweetCount = Math.max(0, (p.retweetCount || 0) - 1);
+      }
+      return true;
+    }
+    
+    // Check in replies
+    if (p.replies.length > 0) {
+      if (updateRetweetCount(p.replies, postId, increment)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export const threadSlice = createSlice({
   name: 'thread',
   initialState,
@@ -199,22 +332,62 @@ export const threadSlice = createSlice({
      * Allows adding a retweet locally.
      */
     addRetweetLocally: (state, action: PayloadAction<ThreadPost>) => {
-      state.allPosts.unshift(action.payload);
-      if (action.payload.retweetOf) {
-        const originalId = action.payload.retweetOf.id;
-        const updateRetweetCount = (posts: ThreadPost[]) => {
-          for (const p of posts) {
-            if (p.id === originalId) {
-              p.retweetCount += 1;
-              return true;
-            }
-            if (p.replies.length) {
-              if (updateRetweetCount(p.replies)) return true;
-            }
-          }
-          return false;
-        };
-        updateRetweetCount(state.allPosts);
+      // First check if this user already retweeted this post to prevent duplicates
+      const newRetweet = action.payload;
+      const originalPostId = newRetweet.retweetOf?.id;
+      const userId = newRetweet.user.id;
+      
+      if (!originalPostId || !userId) {
+        return; // Invalid data, don't proceed
+      }
+      
+      // Determine if this is a quote retweet
+      const isQuoteRetweet = newRetweet.sections && newRetweet.sections.length > 0;
+      
+      // Check if user already retweeted this post
+      const alreadyRetweeted = checkIfAlreadyRetweeted(state, userId, originalPostId);
+      
+      // Check if target post is the user's own retweet
+      const targetPost = state.allPosts.find(p => p.id === originalPostId);
+      const isTargetPostOwnRetweet = 
+        targetPost?.retweetOf && targetPost.user.id === userId;
+      
+      // If it's a direct retweet and user already retweeted, don't add duplicate 
+      if (alreadyRetweeted && !isQuoteRetweet) {
+        return;
+      }
+      
+      // Don't allow retweeting own retweets
+      if (isTargetPostOwnRetweet && !isQuoteRetweet) {
+        return;
+      }
+      
+      // Add the retweet to the posts
+      state.allPosts.unshift(newRetweet);
+      
+      // Update the original post's retweet count
+      if (originalPostId) {
+        updateRetweetCount(state.allPosts, originalPostId, true);
+      }
+    },
+    /**
+     * Manually undo a retweet (when Redux direct access is needed)
+     */
+    undoRetweetLocally: (
+      state, 
+      action: PayloadAction<{ userId: string; originalPostId: string }>
+    ) => {
+      const { userId, originalPostId } = action.payload;
+      
+      // Find the retweet post to remove
+      const retweet = findRetweetByUser(state, userId, originalPostId);
+      
+      if (retweet) {
+        // Remove the retweet
+        state.allPosts = state.allPosts.filter(p => p.id !== retweet.id);
+        
+        // Decrement the original post's retweet count
+        updateRetweetCount(state.allPosts, originalPostId, false);
       }
     },
   },
@@ -235,6 +408,12 @@ export const threadSlice = createSlice({
 
     // createRootPostAsync
     builder.addCase(createRootPostAsync.fulfilled, (state, action) => {
+      // If there's a local ID, remove the local post to avoid duplication
+      const localId = action.meta.arg.localId;
+      if (localId && localId.startsWith('local-')) {
+        state.allPosts = state.allPosts.filter(p => p.id !== localId);
+      }
+      // Now unshift the new "official" post from server
       state.allPosts.unshift(action.payload);
     });
 
@@ -261,22 +440,46 @@ export const threadSlice = createSlice({
     // createRetweetAsync
     builder.addCase(createRetweetAsync.fulfilled, (state, action) => {
       const newRetweet = action.payload;
-      state.allPosts.unshift(newRetweet);
-      if (newRetweet.retweetOf?.id) {
-        function updateRetweetCount(posts: ThreadPost[]): boolean {
-          for (const p of posts) {
-            if (p.id === newRetweet?.retweetOf?.id) {
-              p.retweetCount += 1;
-              return true;
-            }
-            if (p.replies.length > 0) {
-              if (updateRetweetCount(p.replies)) return true;
-            }
-          }
-          return false;
-        }
-        updateRetweetCount(state.allPosts);
+      
+      // If there's no retweetOf property, something is wrong
+      if (!newRetweet.retweetOf?.id) {
+        return;
       }
+      
+      // Determine if this is a quote retweet (has sections)
+      const isQuoteRetweet = newRetweet.sections.length > 0;
+      
+      // Check if we're updating an existing retweet (for quotes)
+      const existingRetweetIndex = state.allPosts.findIndex(
+        p => p.id === newRetweet.id
+      );
+      
+      if (existingRetweetIndex >= 0) {
+        // Update the existing retweet with new sections
+        state.allPosts[existingRetweetIndex] = newRetweet;
+      } else {
+        // For direct retweets, check if the user already retweeted this post
+        if (!isQuoteRetweet) {
+          const existingRetweet = findRetweetByUser(
+            state, 
+            newRetweet.user.id, 
+            newRetweet.retweetOf.id
+          );
+          
+          if (existingRetweet) {
+            // If there's a duplicate, remove it first (handles edge cases)
+            state.allPosts = state.allPosts.filter(p => p.id !== existingRetweet.id);
+          }
+        }
+        
+        // Add the new retweet
+        state.allPosts.unshift(newRetweet);
+        
+        // For both quote and direct retweets, increment the retweetCount
+        updateRetweetCount(state.allPosts, newRetweet.retweetOf.id, true);
+      }
+      
+      // We no longer increment quoteCount for quote retweets, as they are not considered replies
     });
     builder.addCase(createRetweetAsync.rejected, (state, action) => {
       state.error = action.error.message || 'Failed to retweet.';
@@ -288,6 +491,14 @@ export const threadSlice = createSlice({
       function updatePostRecursively(posts: ThreadPost[]): ThreadPost[] {
         return posts.map(p => {
           if (p.id === updatedPost.id) {
+            // If this is updating a retweet post with a quote, preserve all other fields
+            if (p.retweetOf) {
+              return {
+                ...p,
+                sections: updatedPost.sections
+              };
+            }
+            // Normal case - just update sections
             return {...p, sections: updatedPost.sections};
           }
           if (p.replies.length > 0) {
@@ -302,26 +513,16 @@ export const threadSlice = createSlice({
     // deletePostAsync
     builder.addCase(deletePostAsync.fulfilled, (state, action) => {
       const {postId, retweetOf, parentId} = action.payload;
+      
+      // Remove the post
       state.allPosts = removePostRecursive(state.allPosts, postId);
 
-      // If this post is a retweet, decrement the original post's retweetCount.
+      // If this post is a retweet, decrement the original post's retweetCount
       if (retweetOf) {
-        function decrementRetweet(posts: ThreadPost[]): boolean {
-          for (const p of posts) {
-            if (p.id === retweetOf) {
-              if (p.retweetCount > 0) p.retweetCount -= 1;
-              return true;
-            }
-            if (p.replies.length > 0) {
-              if (decrementRetweet(p.replies)) return true;
-            }
-          }
-          return false;
-        }
-        decrementRetweet(state.allPosts);
+        updateRetweetCount(state.allPosts, retweetOf, false);
       }
 
-      // If this post is a reply, decrement the parent's quoteCount.
+      // If this post is a reply, decrement the parent's quoteCount
       if (parentId) {
         function decrementQuote(posts: ThreadPost[]): boolean {
           for (const p of posts) {
@@ -362,6 +563,6 @@ export const threadSlice = createSlice({
   },
 });
 
-export const {addPostLocally, addReplyLocally, addRetweetLocally} =
+export const {addPostLocally, addReplyLocally, addRetweetLocally, undoRetweetLocally} =
   threadSlice.actions;
 export default threadSlice.reducer;

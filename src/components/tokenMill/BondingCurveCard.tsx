@@ -1,10 +1,11 @@
-import React, {useState} from 'react';
-import {View, Text, TouchableOpacity, Alert} from 'react-native';
-import {Connection} from '@solana/web3.js';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { Connection } from '@solana/web3.js';
 import BN from 'bn.js';
-import {setBondingCurve} from '../../services/tokenMill/tokenMillService';
-import {BondingCurveCardStyles as defaultStyles} from './BondingCurveCard.style';
+import { setBondingCurve } from '../../services/tokenMill/tokenMillService';
+import { BondingCurveCardStyles as defaultStyles } from './BondingCurveCard.style';
 import BondingCurveConfigurator from './BondingCurveConfigurator';
+import { StandardWallet } from '../../hooks/useAuth';
 
 /**
  * Props for the BondingCurveCard component
@@ -18,7 +19,7 @@ interface BondingCurveCardProps {
   /** The public key of the user setting the curve */
   publicKey: string;
   /** The Solana wallet instance for signing transactions */
-  solanaWallet: any;
+  solanaWallet: StandardWallet | any;
   /** Callback function to set loading state */
   setLoading: (val: boolean) => void;
   /** Optional style overrides for the component */
@@ -64,9 +65,10 @@ export default function BondingCurveCard({
   // Local states for BN arrays from configurator
   const [askPrices, setAskPrices] = useState<BN[]>([]);
   const [bidPrices, setBidPrices] = useState<BN[]>([]);
+  const [status, setStatus] = useState<string | null>(null);
 
   // Merge style overrides
-  const styles = {...defaultStyles, ...styleOverrides};
+  const styles = { ...defaultStyles, ...styleOverrides };
 
   /**
    * Handles the process of setting the bonding curve on-chain
@@ -79,7 +81,7 @@ export default function BondingCurveCard({
     }
     try {
       setLoading(true);
-      const provider = await solanaWallet.getProvider();
+      setStatus('Preparing bonding curve...');
 
       // Convert BN => number before passing
       const askNumbers = askPrices.map(p => p.toNumber());
@@ -91,13 +93,24 @@ export default function BondingCurveCard({
         bidPrices: bidNumbers,
         userPublicKey: publicKey,
         connection,
-        provider,
+        solanaWallet,
+        onStatusUpdate: (newStatus) => {
+          console.log('Bonding curve status:', newStatus);
+          setStatus(newStatus);
+        }
       });
+
+      setStatus('Bonding curve set successfully!');
       Alert.alert('Curve Set', `Tx: ${txSig}`);
     } catch (err: any) {
-      Alert.alert('Error setting curve', err.message);
+      console.error('Bonding curve error:', err);
+      // Don't show raw error in UI
+      setStatus('Transaction failed');
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+        setStatus(null);
+      }, 2000);
     }
   };
 
@@ -110,9 +123,19 @@ export default function BondingCurveCard({
           setAskPrices(newAsk);
           setBidPrices(newBid);
         }}
+        disabled={!!status}
       />
 
-      <TouchableOpacity style={styles.button} onPress={onPressSetCurve}>
+      {status && (
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>{status}</Text>
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={[styles.button, status ? { opacity: 0.7 } : {}]}
+        onPress={onPressSetCurve}
+        disabled={!!status}>
         <Text style={styles.buttonText}>Set Curve On-Chain</Text>
       </TouchableOpacity>
     </View>

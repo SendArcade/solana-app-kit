@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   Text,
   TextInput,
@@ -8,10 +8,12 @@ import {
   StyleProp,
   ViewStyle,
   TextStyle,
+  ActivityIndicator,
 } from 'react-native';
-import {usePumpFun} from '../../hooks/usePumpFun';
-import {PumpfunBuyStyles} from './Pumpfun.styles';
+import { usePumpFun } from '../../hooks/usePumpFun';
+import { PumpfunBuyStyles } from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
+import { TransactionService } from '../../services/transaction/transactionService';
 
 /**
  * Props for the PumpfunBuySection component
@@ -61,20 +63,44 @@ export const PumpfunBuySection: React.FC<PumpfunBuySectionProps> = ({
   buttonStyle,
   buyButtonLabel = 'Buy via Pump.fun',
 }) => {
-  const {buyToken} = usePumpFun();
+  const { buyToken } = usePumpFun();
 
   const [tokenAddress, setTokenAddress] = useState('');
   const [solAmount, setSolAmount] = useState('0.001');
+  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
-  const handleBuy = () => {
+  const handleBuy = async () => {
     if (!tokenAddress) {
       Alert.alert('Error', 'Please enter a token address');
       return;
     }
-    buyToken({
-      tokenAddress,
-      solAmount: Number(solAmount),
-    });
+
+    setIsLoading(true);
+    setStatus('Preparing transaction...');
+    try {
+      await buyToken({
+        tokenAddress,
+        solAmount: Number(solAmount),
+        onStatusUpdate: (newStatus) => {
+          console.log('Buy token status:', newStatus);
+          // Use TransactionService to filter raw error messages
+          TransactionService.filterStatusUpdate(newStatus, setStatus);
+        }
+      });
+      setStatus('Purchase successful!');
+      // Success message will be handled by TransactionService
+    } catch (error) {
+      console.error('Error buying token:', error);
+      // Don't show raw error in UI
+      setStatus('Transaction failed');
+      // Error notification will be handled by TransactionService
+    } finally {
+      setTimeout(() => {
+        setIsLoading(false);
+        setStatus(null);
+      }, 2000);
+    }
   };
 
   const pasteFromClipboard = async (field: 'token' | 'amount') => {
@@ -101,10 +127,12 @@ export const PumpfunBuySection: React.FC<PumpfunBuySectionProps> = ({
         value={tokenAddress}
         onChangeText={setTokenAddress}
         textAlignVertical="center"
+        editable={!isLoading}
       />
       <TouchableOpacity
-        style={PumpfunBuyStyles.pasteButton}
-        onPress={() => pasteFromClipboard('token')}>
+        style={[PumpfunBuyStyles.pasteButton, isLoading && { opacity: 0.5 }]}
+        onPress={() => pasteFromClipboard('token')}
+        disabled={isLoading}>
         <Text style={PumpfunBuyStyles.pasteButtonText}>Paste</Text>
       </TouchableOpacity>
 
@@ -116,17 +144,32 @@ export const PumpfunBuySection: React.FC<PumpfunBuySectionProps> = ({
         onChangeText={setSolAmount}
         keyboardType="decimal-pad"
         textAlignVertical="center"
+        editable={!isLoading}
       />
       <TouchableOpacity
-        style={PumpfunBuyStyles.pasteButton}
-        onPress={() => pasteFromClipboard('amount')}>
+        style={[PumpfunBuyStyles.pasteButton, isLoading && { opacity: 0.5 }]}
+        onPress={() => pasteFromClipboard('amount')}
+        disabled={isLoading}>
         <Text style={PumpfunBuyStyles.pasteButtonText}>Paste</Text>
       </TouchableOpacity>
 
+      {status && (
+        <Text style={PumpfunBuyStyles.statusText}>{status}</Text>
+      )}
+
       <TouchableOpacity
-        style={[PumpfunBuyStyles.buyButton, buttonStyle]}
-        onPress={handleBuy}>
-        <Text style={PumpfunBuyStyles.buyButtonText}>{buyButtonLabel}</Text>
+        style={[
+          PumpfunBuyStyles.buyButton,
+          buttonStyle,
+          isLoading && { opacity: 0.7 }
+        ]}
+        onPress={handleBuy}
+        disabled={isLoading}>
+        {isLoading ? (
+          <ActivityIndicator color="#FFFFFF" size="small" />
+        ) : (
+          <Text style={PumpfunBuyStyles.buyButtonText}>{buyButtonLabel}</Text>
+        )}
       </TouchableOpacity>
     </PumpfunCard>
   );

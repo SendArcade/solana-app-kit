@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useCallback} from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,36 +11,41 @@ import {
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
   Platform,
-  StyleSheet,
+  Image,
+  Clipboard,
+  FlatList,
 } from 'react-native';
+import { PublicKey, Connection, clusterApiUrl, Cluster } from '@solana/web3.js';
 import {
-  Transaction,
-  VersionedTransaction,
-  Connection,
-  clusterApiUrl,
-  Cluster,
-} from '@solana/web3.js';
-import {TENSOR_API_KEY, HELIUS_RPC_URL, CLUSTER} from '@env';
-import {ThreadPost, ThreadSection, ThreadUser, TradeData} from '../thread.types';
-import styles from './tradeModal.style'; // Keep using your existing style definitions for everything else
-import SelectTokenModal, {TokenInfo} from './SelectTokenModal';
-import {ENDPOINTS} from '../../../config/constants';
+  ThreadUser,
+  TradeData,
+  ThreadSection,
+  ThreadSectionType,
+  ThreadPost
+} from '../thread.types';
+import SelectTokenModal from './SelectTokenModal';
+import { ENDPOINTS } from '../../../config/constants';
+import { CLUSTER } from '@env';
 import { useAppDispatch } from '../../../hooks/useReduxHooks';
-import { useAuth } from '../../../hooks/useAuth';
-import { addPostLocally, createRootPostAsync } from '../../../state/thread/reducer';
-
-const JUPITER_SWAP_ENDPOINT = ENDPOINTS.jupiter.swap;
+import { useWallet } from '../../../hooks/useWallet';
+import {
+  addPostLocally,
+  createRootPostAsync,
+} from '../../../state/thread/reducer';
+import styles from './tradeModal.style';
+import PastSwapItem from './PastSwapItem';
+import { SwapTransaction, fetchRecentSwaps, enrichSwapTransactions } from '../../../services/swapTransactions';
+import { FontAwesome5 } from '@expo/vector-icons';
+import { TransactionService } from '../../../services/transaction/transactionService';
+import { TokenInfo, TokenService } from '../../../services/token/tokenService';
+import { TradeService } from '../../../services/trade/tradeService';
 
 /**
  * Available tab options in the TradeModal
- * @type {'TRADE_AND_SHARE' | 'PICK_TX_SHARE'}
+ * @type {'TRADE_AND_SHARE' | 'PAST_SWAPS'}
  */
-type TabOption = 'TRADE_AND_SHARE' | 'PICK_TX_SHARE';
+type TabOption = 'TRADE_AND_SHARE' | 'PAST_SWAPS';
 
-/**
- * Props for the TradeModal component
- * @interface TradeModalProps
- */
 interface TradeModalProps {
   /** Whether the modal is visible */
   visible: boolean;
@@ -51,41 +56,24 @@ interface TradeModalProps {
   /** Callback fired when a trade post is created */
   onPostCreated?: () => void;
   /** Initial input token for the trade */
-  initialInputToken?: TokenInfo;
+  initialInputToken?: Partial<TokenInfo>;
   /** Initial output token for the trade */
-  initialOutputToken?: TokenInfo;
+  initialOutputToken?: Partial<TokenInfo>;
   /** Whether to disable tab switching */
   disableTabs?: boolean;
+  /** Initial active tab to show */
+  initialActiveTab?: TabOption;
 }
 
 /**
- * A modal component for executing token trades and sharing them on the feed
+ * A modal component for executing token trades and sharing them on the feed.
  *
- * @component
- * @description
- * TradeModal provides a user interface for executing token swaps using Jupiter aggregator
- * and sharing the trade details on the social feed. It supports token selection, amount input,
- * and automatic post creation after successful trades.
+ * It handles three main flows:
+ * 1. Swap & Share (posts a trade summary on success)
+ * 2. Pick an existing Tx signature & share it
+ * 3. Select from past swaps & share them
  *
- * Features:
- * - Token selection for input and output
- * - Real-time price quotes
- * - Trade execution via Jupiter aggregator
- * - Automatic trade post creation
- * - USD value calculation
- * - Customizable appearance
- *
- * @example
- * ```tsx
- * <TradeModal
- *   visible={showTradeModal}
- *   onClose={() => setShowTradeModal(false)}
- *   currentUser={user}
- *   onPostCreated={() => refetchPosts()}
- *   initialInputToken={solToken}
- *   initialOutputToken={usdcToken}
- * />
- * ```
+ * UI inspired by Jupiter with a clean, modern aesthetic.
  */
 export default function TradeModal({
   visible,
@@ -95,208 +83,224 @@ export default function TradeModal({
   initialInputToken,
   initialOutputToken,
   disableTabs,
+  initialActiveTab,
 }: TradeModalProps) {
   const dispatch = useAppDispatch();
-  const {solanaWallet} = useAuth();
-  const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
-  const userWallet = solanaWallet?.wallets?.[0] || null;
+  // Use our wallet hook
+  const { publicKey: userPublicKey, connected, sendTransaction } = useWallet();
 
-  const [selectedTab, setSelectedTab] = useState<TabOption>('TRADE_AND_SHARE');
+  const [selectedTab, setSelectedTab] = useState<TabOption>(() => 
+    initialActiveTab ?? 'PAST_SWAPS'
+  );
 
-  const [inputToken, setInputToken] = useState<TokenInfo>(
-    initialInputToken ?? {
-      address: 'So11111111111111111111111111111111111111112',
-      symbol: 'SOL',
-      name: 'Solana',
-      decimals: 9,
-      logoURI:
-        'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png',
-    },
-  );
-  const [outputToken, setOutputToken] = useState<TokenInfo>(
-    initialOutputToken ?? {
-      address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-      symbol: 'USDC',
-      name: 'USD Coin',
-      decimals: 6,
-      logoURI:
-        'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png',
-    },
-  );
+  // Initialize tokens with pending flag until we have complete data
+  const [inputToken, setInputToken] = useState<TokenInfo>(TokenService.DEFAULT_SOL_TOKEN);
+  const [outputToken, setOutputToken] = useState<TokenInfo>(TokenService.DEFAULT_USDC_TOKEN);
+  
+  // Track token initialization status
+  const [tokensInitialized, setTokensInitialized] = useState(false);
 
   const [selectingWhichSide, setSelectingWhichSide] = useState<
     'input' | 'output'
   >('input');
   const [showSelectTokenModal, setShowSelectTokenModal] = useState(false);
 
-  const [solAmount, setSolAmount] = useState('0.01');
+  const [solAmount, setSolAmount] = useState('0');
   const [loading, setLoading] = useState(false);
   const [resultMsg, setResultMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [solscanTxSig, setSolscanTxSig] = useState('');
+  const [currentTokenPrice, setCurrentTokenPrice] = useState<number | null>(null);
+  const [currentBalance, setCurrentBalance] = useState<number | null>(null);
 
+  // State to handle "Share your trade?" prompt
+  const [showSharePrompt, setShowSharePrompt] = useState(false);
+  // Store lamports for creating the post
+  const [pendingBuyInputLamports, setPendingBuyInputLamports] =
+    useState<number>(0);
+  const [pendingBuyOutputLamports, setPendingBuyOutputLamports] =
+    useState<number>(0);
+
+  // State for selected past swap
+  const [selectedPastSwap, setSelectedPastSwap] = useState<SwapTransaction | null>(null);
+
+  // State for past swaps
+  const [swaps, setSwaps] = useState<SwapTransaction[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  // Ref to prevent multiple refreshes
+  const isRefreshingRef = useRef(false);
+  const hasLoadedInitialDataRef = useRef(false);
+  
+  // Keep track of whether the component is mounted
+  const isMounted = useRef(true);
+  
+  // Track pending token operations
+  const pendingTokenOps = useRef<{input: boolean, output: boolean}>({input: false, output: false});
+
+  // Create a memo-ized user wallet address string for dependencies
+  const walletAddress = useMemo(() => 
+    userPublicKey ? userPublicKey.toString() : null,
+    [userPublicKey]
+  );
+
+  /**
+   * Cleanup on unmount
+   */
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+  
+  /**
+   * Fetches the user's balance for the current input token
+   */
+  const fetchTokenBalance = useCallback(async (tokenToUse?: TokenInfo) => {
+    if (!connected || !userPublicKey) return null;
+
+    const tokenForBalance = tokenToUse || inputToken;
+    
+    try {
+      console.log(`[TradeModal] Fetching balance for ${tokenForBalance.symbol}...`);
+      const balance = await TokenService.fetchTokenBalance(userPublicKey, tokenForBalance);
+      if (isMounted.current) {
+        console.log(`[TradeModal] Token balance fetched for ${tokenForBalance.symbol}: ${balance}`);
+        setCurrentBalance(balance);
+        return balance;
+      }
+    } catch (err) {
+      console.error('Error fetching balance:', err);
+      if (isMounted.current) {
+        setCurrentBalance(0);
+      }
+    }
+    return null;
+  }, [connected, userPublicKey, inputToken]);
+
+  /**
+   * Fetches current price of the input token
+   */
+  const fetchTokenPrice = useCallback(async (tokenToUse?: TokenInfo) => {
+    const tokenForPrice = tokenToUse || inputToken;
+    
+    try {
+      console.log(`[TradeModal] Fetching price for ${tokenForPrice.symbol}...`);
+      const price = await TokenService.fetchTokenPrice(tokenForPrice);
+      if (isMounted.current) {
+        console.log(`[TradeModal] Token price fetched for ${tokenForPrice.symbol}: ${price}`);
+        setCurrentTokenPrice(price);
+        return price;
+      }
+    } catch (err) {
+      console.error('Error fetching token price:', err);
+      if (isMounted.current) {
+        setCurrentTokenPrice(null);
+      }
+    }
+    return null;
+  }, [inputToken]);
+
+  /**
+   * Complete token initialization by fetching complete metadata
+   */
+  const initializeTokens = useCallback(async () => {
+    // Don't initialize if already initializing or completed
+    if (!isMounted.current) return;
+    
+    try {
+      // Initialize input token
+      let completeInputToken: TokenInfo;
+      let completeOutputToken: TokenInfo;
+      
+      // Mark operations as pending
+      pendingTokenOps.current = {input: true, output: true};
+      
+      // If initialInputToken is provided, ensure it's a complete TokenInfo
+      if (initialInputToken?.address) {
+        completeInputToken = await TokenService.ensureCompleteTokenInfo(initialInputToken);
+        console.log('[TradeModal] Initialized input token:', completeInputToken.symbol);
+      } else {
+        // Default to SOL
+        completeInputToken = TokenService.DEFAULT_SOL_TOKEN;
+      }
+      
+      // Initialize output token
+      if (initialOutputToken?.address) {
+        completeOutputToken = await TokenService.ensureCompleteTokenInfo(initialOutputToken);
+        console.log('[TradeModal] Initialized output token:', completeOutputToken.symbol);
+      } else {
+        // Default to USDC
+        completeOutputToken = TokenService.DEFAULT_USDC_TOKEN;
+      }
+      
+      if (isMounted.current) {
+        setInputToken(completeInputToken);
+        setOutputToken(completeOutputToken);
+        pendingTokenOps.current.input = false;
+        pendingTokenOps.current.output = false;
+        setTokensInitialized(true);
+        
+        // Force a balance fetch and price fetch for the input token
+        setTimeout(() => {
+          fetchTokenBalance(completeInputToken).then(() => {
+            console.log('[TradeModal] Fetching price after balance update');
+            fetchTokenPrice(completeInputToken);
+          });
+        }, 100);
+      }
+    } catch (error) {
+      console.error('[TradeModal] Error initializing tokens:', error);
+      pendingTokenOps.current = {input: false, output: false};
+    }
+  }, [initialInputToken, initialOutputToken, fetchTokenBalance, fetchTokenPrice]);
+
+  /**
+   * Handle visibility changes to reset states
+   */
+  useEffect(() => {
+    if (visible) {
+      // Reset states when modal opens
+      setResultMsg('');
+      setErrorMsg('');
+      setSolscanTxSig('');
+      
+      // Initialize tokens when modal becomes visible
+      if (!tokensInitialized) {
+        initializeTokens();
+      } else if (connected && userPublicKey) {
+        // If tokens are already initialized, fetch both balance and price
+        console.log('[TradeModal] Modal visible, fetching balance and price for initialized tokens');
+        fetchTokenBalance().then(() => {
+          fetchTokenPrice();
+        });
+      }
+    }
+  }, [visible, tokensInitialized, initializeTokens, connected, userPublicKey, fetchTokenBalance, fetchTokenPrice]);
+
+  /**
+   * Resets states and closes the entire modal
+   */
   const handleClose = useCallback(() => {
-    setSelectedTab('TRADE_AND_SHARE');
+    setSelectedTab(initialActiveTab ?? 'PAST_SWAPS');
     setResultMsg('');
     setErrorMsg('');
     setSolscanTxSig('');
+    setShowSharePrompt(false);
+    setSelectedPastSwap(null);
+    setSwaps([]);
+    setInitialLoading(true);
+    hasLoadedInitialDataRef.current = false;
     onClose();
-  }, [onClose]);
+  }, [onClose, initialActiveTab]);
 
   /**
-   * Converts a decimal amount to base units (e.g., SOL to lamports)
-   * @param {string} amount - The decimal amount to convert
-   * @param {number} decimals - The number of decimal places for the token
-   * @returns {number} The amount in base units
+   * This method triggers a Jupiter swap, returning a transaction that we sign & send.
+   * On success, we ask user if they want to share the trade on the feed.
    */
-  function toBaseUnits(amount: string, decimals: number): number {
-    const val = parseFloat(amount);
-    if (isNaN(val)) return 0;
-    return val * Math.pow(10, decimals);
-  }
-
-  /**
-   * Fetches token details and current USD price from Jupiter and CoinGecko
-   * @param {string} mint - The token's mint address
-   * @returns {Promise<{symbol: string; decimals: number; usdPrice: number}>} Token details and price
-   */
-  async function getTokenDetailsAndPrice(
-    mint: string,
-  ): Promise<{symbol: string; decimals: number; usdPrice: number}> {
-    const tokenResp = await fetch(`https://api.jup.ag/tokens/v1/token/${mint}`);
-    if (!tokenResp.ok) {
-      throw new Error(`Failed to load token ${mint}: ${tokenResp.status}`);
-    }
-    const tokenData = await tokenResp.json();
-    const symbol = tokenData.symbol || tokenData.name || '???';
-    const decimals = tokenData.decimals || 0;
-    let usdPrice = 0;
-    if (tokenData.extensions && tokenData.extensions.coingeckoId) {
-      const cgId = tokenData.extensions.coingeckoId;
-      try {
-        const cgResp = await fetch(
-          `https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd`,
-        );
-        if (cgResp.ok) {
-          const cgData = await cgResp.json();
-          if (
-            cgData[cgId] &&
-            cgData[cgId].usd !== undefined &&
-            typeof cgData[cgId].usd === 'number'
-          ) {
-            usdPrice = cgData[cgId].usd;
-          }
-        }
-      } catch (err) {
-        console.warn('Coingecko price fetch failed', err);
-      }
-    }
-    return {symbol, decimals, usdPrice};
-  }
-
-  const promptPostSwap = useCallback(
-    async ({
-      inputLamports,
-      outputLamports,
-    }: {
-      inputLamports: number;
-      outputLamports: number;
-    }) => {
-      Alert.alert(
-        'Trade Successful',
-        'Your trade was successful! Would you like to share your trade on your feed?',
-        [
-          {
-            text: 'No',
-            style: 'cancel',
-          },
-          {
-            text: 'Yes',
-            onPress: async () => {
-              try {
-                const [inputInfo, outputInfo] = await Promise.all([
-                  getTokenDetailsAndPrice(inputToken.address),
-                  getTokenDetailsAndPrice(outputToken.address),
-                ]);
-
-                const finalInputQty =
-                  inputLamports / Math.pow(10, inputInfo.decimals);
-                const finalOutputQty =
-                  outputLamports / Math.pow(10, outputInfo.decimals);
-
-                const totalInputUsd = finalInputQty * inputInfo.usdPrice;
-                const totalOutputUsd = finalOutputQty * outputInfo.usdPrice;
-
-                const finalInputQtyStr = finalInputQty
-                  .toFixed(4)
-                  .replace(/\.?0+$/, '');
-                const finalOutputQtyStr = finalOutputQty
-                  .toFixed(4)
-                  .replace(/\.?0+$/, '');
-
-                const inputUsdValStr =
-                  totalInputUsd > 0 ? `$${totalInputUsd.toFixed(2)}` : '$0.00';
-                const outputUsdValStr =
-                  totalOutputUsd > 0
-                    ? `$${totalOutputUsd.toFixed(2)}`
-                    : '$0.00';
-
-                const tradeData: TradeData = {
-                  inputMint: inputToken.address,
-                  outputMint: outputToken.address,
-                  aggregator: 'Jupiter',
-                  inputSymbol: inputInfo.symbol,
-                  inputQuantity: finalInputQtyStr,
-                  inputUsdValue: inputUsdValStr,
-                  outputSymbol: outputInfo.symbol,
-                  outputQuantity: finalOutputQtyStr,
-                  outputUsdValue: outputUsdValStr,
-                };
-
-                const postSections: ThreadSection[] = [
-                  {
-                    id: 'swap-post-' + Math.random().toString(36).substr(2, 9),
-                    type: 'TEXT_TRADE',
-                    tradeData,
-                    text: `I just executed a trade: ${solAmount} ${inputToken.symbol} for ${outputToken.symbol}!`,
-                  },
-                ];
-
-                const newPost: ThreadPost = {
-                  id: 'local-' + Math.random().toString(36).substr(2, 9),
-                  user: currentUser,
-                  sections: postSections,
-                  createdAt: new Date().toISOString(),
-                  parentId: undefined,
-                  replies: [],
-                  reactionCount: 0,
-                  retweetCount: 0,
-                  quoteCount: 0,
-                };
-
-                dispatch(addPostLocally(newPost));
-                setResultMsg('Trade post created successfully!');
-                onPostCreated && onPostCreated();
-
-                await dispatch(
-                  createRootPostAsync({
-                    userId: currentUser.id,
-                    sections: postSections,
-                  }),
-                ).unwrap();
-              } catch (err: any) {
-                setErrorMsg(err?.message || 'Failed to create post.');
-              }
-            },
-          },
-        ],
-      );
-    },
-    [dispatch, onPostCreated, currentUser, solAmount, inputToken, outputToken],
-  );
-
   const handleTradeAndShare = useCallback(async () => {
-    if (!userPublicKey) {
+    if (!connected || !userPublicKey) {
       Alert.alert('Wallet not connected', 'Please connect your wallet first.');
       return;
     }
@@ -304,103 +308,292 @@ export default function TradeModal({
       Alert.alert('Invalid amount', 'Please enter a valid amount to swap.');
       return;
     }
+    
     setLoading(true);
     setResultMsg('');
     setErrorMsg('');
 
     try {
-      const inputLamports = Number(toBaseUnits(solAmount, inputToken.decimals));
+      // Execute the swap using the trade service
+      const response = await TradeService.executeSwap(
+        inputToken,
+        outputToken,
+        solAmount,
+        userPublicKey,
+        sendTransaction,
+        {
+          statusCallback: (status) => {
+            if (isMounted.current) {
+              setResultMsg(status);
+            }
+          }
+        }
+      );
 
-      // Get quote
-      const quoteUrl = `${ENDPOINTS.jupiter.quote}?inputMint=${
-        inputToken.address
-      }&outputMint=${outputToken.address}&amount=${Math.round(
-        inputLamports,
-      )}&slippageBps=50&swapMode=ExactIn`;
-      const quoteResp = await fetch(quoteUrl);
-      if (!quoteResp.ok) {
-        throw new Error(`Jupiter quote failed: ${quoteResp.status}`);
-      }
-      const quoteData = await quoteResp.json();
-      let firstRoute;
-      if (
-        quoteData.data &&
-        Array.isArray(quoteData.data) &&
-        quoteData.data.length > 0
-      ) {
-        firstRoute = quoteData.data[0];
-      } else if (
-        quoteData.routePlan &&
-        Array.isArray(quoteData.routePlan) &&
-        quoteData.routePlan.length > 0
-      ) {
-        firstRoute = quoteData;
+      if (response.success && response.signature) {
+        if (isMounted.current) {
+          setResultMsg(`Swap successful!`);
+          
+          // Show the share prompt modal
+          setPendingBuyInputLamports(response.inputAmount);
+          setPendingBuyOutputLamports(response.outputAmount);
+          setShowSharePrompt(true);
+        }
       } else {
-        throw new Error('No routes returned by Jupiter.');
+        throw new Error(response.error?.toString() || 'Transaction failed');
       }
-
-      const outLamports = parseFloat(firstRoute.outAmount) || 0;
-
-      // Build swap Tx from server
-      const body = {
-        quoteResponse: quoteData,
-        userPublicKey: userPublicKey.toString(),
-      };
-      const swapResp = await fetch(JUPITER_SWAP_ENDPOINT, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body),
-      });
-
-      const swapData = await swapResp.json();
-      if (!swapResp.ok || !swapData.swapTransaction) {
-        throw new Error(
-          swapData.error || 'Failed to get Jupiter swapTransaction.',
-        );
-      }
-
-      const {swapTransaction} = swapData;
-      const txBuffer = Buffer.from(swapTransaction, 'base64');
-      let transaction: Transaction | VersionedTransaction;
-      try {
-        transaction = VersionedTransaction.deserialize(txBuffer);
-      } catch {
-        transaction = Transaction.from(txBuffer);
-      }
-
-      if (!userWallet) {
-        throw new Error('No wallet found to sign transaction.');
-      }
-      const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
-      const connection = new Connection(rpcUrl, 'confirmed');
-      const provider = await userWallet.getProvider();
-      const {signature} = await provider.request({
-        method: 'signAndSendTransaction',
-        params: {transaction, connection},
-      });
-      if (!signature) {
-        throw new Error('No signature returned from signAndSendTransaction');
-      }
-
-      setResultMsg(`Swap successful! Tx: ${signature}`);
-
-      // Prompt user to create a post about it
-      await promptPostSwap({inputLamports, outputLamports: outLamports});
     } catch (err: any) {
       console.error('Trade error:', err);
-      setErrorMsg(err.message);
+      if (isMounted.current) {
+        setErrorMsg('Trade failed. Please try again.');
+        console.error('Detailed error:', err.message);
+      }
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   }, [
+    connected,
     userPublicKey,
     solAmount,
     inputToken,
     outputToken,
-    userWallet,
-    promptPostSwap,
+    sendTransaction,
   ]);
 
+  /**
+   * Create the post in Redux after a successful swap
+   */
+  const shareTradeInFeed = useCallback(
+    async (inputLamports: number, outputLamports: number, inputTokenInfo: TokenInfo, outputTokenInfo: TokenInfo) => {
+      if (isMounted.current) {
+        setLoading(true);
+        setResultMsg('Creating post...');
+      }
+      
+      try {
+        // Prepare post content
+        const localId = 'local-' + Math.random().toString(36).substr(2, 9);
+
+        // Calculate token quantities
+        const localInputQty = inputLamports / Math.pow(10, inputTokenInfo.decimals);
+        const localOutputQty = outputLamports / Math.pow(10, outputTokenInfo.decimals);
+
+        // Estimate USD values
+        const inputUsdValue = await TokenService.estimateTokenUsdValue(
+          inputLamports,
+          inputTokenInfo.decimals,
+          inputTokenInfo.address,
+          inputTokenInfo.symbol
+        );
+
+        const outputUsdValue = await TokenService.estimateTokenUsdValue(
+          outputLamports,
+          outputTokenInfo.decimals,
+          outputTokenInfo.address,
+          outputTokenInfo.symbol
+        );
+
+        const tradeData: TradeData = {
+          inputMint: inputTokenInfo.address,
+          outputMint: outputTokenInfo.address,
+          aggregator: 'Jupiter',
+          inputSymbol: inputTokenInfo.symbol,
+          inputQuantity: localInputQty.toFixed(4),
+          inputUsdValue,
+          outputSymbol: outputTokenInfo.symbol,
+          outputQuantity: localOutputQty.toFixed(4),
+          outputUsdValue,
+          // For new trades, use current timestamp in milliseconds
+          executionTimestamp: Date.now(),
+        };
+
+        const postSections: ThreadSection[] = [
+          {
+            id: 'swap-post-' + Math.random().toString(36).substr(2, 9),
+            type: 'TEXT_TRADE' as ThreadSectionType,
+            tradeData,
+            text: `I just executed a trade: ${localInputQty.toFixed(4)} ${inputTokenInfo.symbol
+              } → ${outputTokenInfo.symbol}!`,
+          },
+        ];
+
+        // local post
+        const newLocalPost: ThreadPost = {
+          id: localId,
+          user: currentUser,
+          sections: postSections,
+          createdAt: new Date().toISOString(),
+          parentId: undefined,
+          replies: [],
+          reactionCount: 0,
+          retweetCount: 0,
+          quoteCount: 0,
+        };
+
+        // Insert a local placeholder post
+        dispatch(addPostLocally(newLocalPost));
+
+        // Then do server post
+        await dispatch(
+          createRootPostAsync({
+            userId: currentUser.id,
+            sections: postSections,
+            localId,
+          }),
+        ).unwrap();
+
+        if (isMounted.current) {
+          setResultMsg('Trade post created successfully!');
+        }
+        
+        onPostCreated && onPostCreated();
+      } catch (err: any) {
+        console.error('[shareTradeInFeed] Error =>', err);
+        if (isMounted.current) {
+          setErrorMsg('Failed to create post');
+        }
+
+        // Show error notification
+        TransactionService.showError(err);
+      } finally {
+        if (isMounted.current) {
+          setLoading(false);
+        }
+      }
+    },
+    [dispatch, currentUser, onPostCreated],
+  );
+
+  /**
+   * Create post from a past swap transaction
+   */
+  const sharePastSwapInFeed = useCallback(
+    async (swap: SwapTransaction) => {
+      try {
+        if (isMounted.current) {
+          setLoading(true);
+          setResultMsg('Creating post...');
+        }
+
+        // Format amounts properly
+        const inputQty = swap.inputToken.amount / Math.pow(10, swap.inputToken.decimals);
+        const outputQty = swap.outputToken.amount / Math.pow(10, swap.outputToken.decimals);
+
+        // Convert timestamp to milliseconds if needed (Helius provides timestamps in seconds)
+        const timestampMs = swap.timestamp < 10000000000
+          ? swap.timestamp * 1000  // Convert to milliseconds if in seconds
+          : swap.timestamp;
+
+        // Estimate USD values
+        const inputUsdValue = await TokenService.estimateTokenUsdValue(
+          swap.inputToken.amount,
+          swap.inputToken.decimals,
+          swap.inputToken.mint,
+          swap.inputToken.symbol
+        );
+
+        const outputUsdValue = await TokenService.estimateTokenUsdValue(
+          swap.outputToken.amount,
+          swap.outputToken.decimals,
+          swap.outputToken.mint,
+          swap.outputToken.symbol
+        );
+
+        // Create trade data object
+        const tradeData: TradeData = {
+          inputMint: swap.inputToken.mint,
+          outputMint: swap.outputToken.mint,
+          aggregator: 'Jupiter',
+          inputSymbol: swap.inputToken.symbol || 'Unknown',
+          inputQuantity: inputQty.toFixed(4),
+          inputUsdValue,
+          outputSymbol: swap.outputToken.symbol || 'Unknown',
+          inputAmountLamports: swap.inputToken.amount.toString(),
+          outputAmountLamports: swap.outputToken.amount.toString(),
+          outputQuantity: outputQty.toFixed(4),
+          outputUsdValue,
+          executionTimestamp: timestampMs,
+        };
+
+        // Generate a post with the trade data
+        const localId = 'local-' + Math.random().toString(36).substr(2, 9);
+        const postSections: ThreadSection[] = [
+          {
+            id: 'swap-post-' + Math.random().toString(36).substr(2, 9),
+            type: 'TEXT_TRADE' as ThreadSectionType,
+            tradeData,
+            text: `I executed a trade: ${inputQty.toFixed(4)} ${swap.inputToken.symbol || 'tokens'
+              } → ${outputQty.toFixed(4)} ${swap.outputToken.symbol || 'tokens'}!`,
+          },
+        ];
+
+        // Create local post
+        const newLocalPost: ThreadPost = {
+          id: localId,
+          user: currentUser,
+          sections: postSections,
+          createdAt: new Date().toISOString(),
+          parentId: undefined,
+          replies: [],
+          reactionCount: 0,
+          retweetCount: 0,
+          quoteCount: 0,
+        };
+
+        // Insert locally and then dispatch to server
+        dispatch(addPostLocally(newLocalPost));
+        await dispatch(
+          createRootPostAsync({
+            userId: currentUser.id,
+            sections: postSections,
+            localId,
+          }),
+        ).unwrap();
+
+        if (isMounted.current) {
+          setResultMsg('Past swap shared successfully!');
+        }
+        
+        onPostCreated && onPostCreated();
+
+        // Close the modal after successful share
+        setTimeout(() => handleClose(), 1500);
+      } catch (err: any) {
+        console.error('[sharePastSwapInFeed] Error =>', err);
+        if (isMounted.current) {
+          setErrorMsg('Failed to share past swap');
+        }
+
+        // Show error notification
+        TransactionService.showError(err);
+      } finally {
+        if (isMounted.current) {
+          setLoading(false);
+        }
+      }
+    },
+    [dispatch, currentUser, onPostCreated, handleClose],
+  );
+
+  /**
+   * Allow user to paste from clipboard
+   */
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await Clipboard.getString();
+      if (text) {
+        setSolscanTxSig(text.trim());
+      }
+    } catch (error) {
+      console.error('Failed to paste from clipboard:', error);
+    }
+  };
+
+  /**
+   * Share a transaction by its signature
+   */
   const handlePickTxAndShare = useCallback(async () => {
     if (!solscanTxSig.trim()) {
       Alert.alert(
@@ -409,16 +602,19 @@ export default function TradeModal({
       );
       return;
     }
-    setLoading(true);
-    setResultMsg('');
-    setErrorMsg('');
+    
+    if (isMounted.current) {
+      setLoading(true);
+      setResultMsg('Preparing to share transaction...');
+      setErrorMsg('');
+    }
 
     try {
       const solscanLink = `https://solscan.io/tx/${solscanTxSig}?cluster=mainnet`;
       const postSections: ThreadSection[] = [
         {
           id: 'solscan-' + Math.random().toString(36).substr(2, 9),
-          type: 'TEXT_ONLY',
+          type: 'TEXT_ONLY' as ThreadSectionType,
           text: `Check out this interesting transaction: ${solscanLink}`,
         },
       ];
@@ -430,19 +626,277 @@ export default function TradeModal({
         }),
       ).unwrap();
 
-      setResultMsg('Post created referencing your transaction!');
+      if (isMounted.current) {
+        setResultMsg('Post created successfully!');
+      }
+      
       onPostCreated && onPostCreated();
     } catch (err: any) {
-      setErrorMsg(err.message);
+      console.error('Error sharing transaction:', err);
+      if (isMounted.current) {
+        setErrorMsg('Failed to create post');
+      }
+
+      // Show error notification
+      TransactionService.showError(err);
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   }, [dispatch, solscanTxSig, currentUser, onPostCreated]);
 
+  /**
+   * Handle selection of a past swap from the PastSwapsTab
+   */
+  const handlePastSwapSelected = useCallback((swap: SwapTransaction) => {
+    setSelectedPastSwap(swap);
+  }, []);
+
+  /**
+   * Handle refresh for past swaps
+   */
+  const handleRefresh = useCallback(async () => {
+    // Prevent concurrent refreshes
+    if (!walletAddress || isRefreshingRef.current) return;
+
+    isRefreshingRef.current = true;
+
+    if (!initialLoading && isMounted.current) {
+      setRefreshing(true);
+    }
+
+    try {
+      // Fetch raw swap transactions
+      const rawSwaps = await fetchRecentSwaps(walletAddress);
+      if (rawSwaps.length === 0) {
+        if (isMounted.current) {
+          setSwaps([]);
+        }
+        return;
+      }
+
+      // Enrich with token metadata
+      const enrichedSwaps = await enrichSwapTransactions(rawSwaps);
+      if (isMounted.current) {
+        setSwaps(enrichedSwaps);
+
+        // If no swap is selected yet and we have swaps, select the first one
+        if (!selectedPastSwap && enrichedSwaps.length > 0) {
+          setSelectedPastSwap(enrichedSwaps[0]);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error fetching past swaps:', err);
+    } finally {
+      if (isMounted.current) {
+        setRefreshing(false);
+        setInitialLoading(false);
+      }
+      isRefreshingRef.current = false;
+      hasLoadedInitialDataRef.current = true;
+      
+      // Always fetch balance when swaps are loaded, as a fallback
+      fetchTokenBalance();
+    }
+  }, [walletAddress, selectedPastSwap, fetchTokenBalance]);
+
+  // Fetch past swaps when modal becomes visible - only once
+  useEffect(() => {
+    if (visible && walletAddress && !hasLoadedInitialDataRef.current) {
+      if (isMounted.current) {
+        setInitialLoading(true);
+      }
+      handleRefresh();
+    }
+  }, [visible, walletAddress, handleRefresh]);
+
+  /**
+   * Share the selected past swap
+   */
+  const handleSharePastSwap = useCallback(() => {
+    if (!selectedPastSwap) {
+      Alert.alert('No swap selected', 'Please select a swap to share.');
+      return;
+    }
+
+    if (isMounted.current) {
+      setLoading(true);
+    }
+
+    sharePastSwapInFeed(selectedPastSwap)
+      .finally(() => {
+        if (isMounted.current) {
+          setLoading(false);
+        }
+      });
+  }, [selectedPastSwap, sharePastSwapInFeed]);
+
+  /**
+   * Handle max button click - directly fetches the balance if needed
+   */
+  const handleMaxButtonClick = useCallback(async () => {
+    console.log("[TradeModal] MAX button clicked, current balance:", currentBalance);
+    
+    if (currentBalance !== null && currentBalance > 0) {
+      setSolAmount(String(currentBalance));
+    } else {
+      // Force balance refresh and use the returned value directly
+      setResultMsg("Fetching your balance...");
+      const balance = await fetchTokenBalance();
+      setResultMsg("");
+      
+      if (balance !== null && balance > 0 && isMounted.current) {
+        console.log("[TradeModal] Setting max amount from fetched balance:", balance);
+        setSolAmount(String(balance));
+      } else {
+        if (isMounted.current) {
+          Alert.alert(
+            "Balance Unavailable", 
+            `Could not fetch your ${inputToken.symbol} balance. Make sure your wallet is connected and try again.`
+          );
+        }
+      }
+    }
+  }, [currentBalance, fetchTokenBalance, inputToken.symbol]);
+
+  /**
+   * When token selection changes, update the balance and price
+   */
+  const handleTokenSelected = useCallback(async (token: any) => {
+    try {
+      // Ensure we have complete token info
+      const completeToken = await TokenService.ensureCompleteTokenInfo(token);
+      
+      if (selectingWhichSide === 'input') {
+        setInputToken(completeToken);
+        // When input token changes, immediately fetch new balance and price
+        console.log('[TradeModal] Input token changed to', completeToken.symbol);
+        
+        // Small delay to ensure state update before fetch
+        setTimeout(async () => {
+          await fetchTokenBalance(completeToken);
+          await fetchTokenPrice(completeToken);
+        }, 100);
+      } else {
+        setOutputToken(completeToken);
+        console.log('[TradeModal] Output token changed to', completeToken.symbol);
+      }
+      
+      setShowSelectTokenModal(false);
+    } catch (error) {
+      console.error('[TradeModal] Error selecting token:', error);
+    }
+  }, [selectingWhichSide, fetchTokenBalance, fetchTokenPrice]);
+
+  /**
+   * Render the content of the selected tab
+   */
   const renderTabContent = () => {
-    if (selectedTab === 'TRADE_AND_SHARE') {
+    if (selectedTab === 'PAST_SWAPS') {
+      // PAST_SWAPS tab (History)
       return (
-        <ScrollView style={{width: '100%'}} keyboardShouldPersistTaps="handled">
+        <View style={styles.pastSwapsContainer}>
+          {walletAddress ? (
+            <>
+              <View style={styles.pastSwapsContent}>
+                <View style={styles.pastSwapsHeader}>
+                  <Text style={styles.pastSwapsHeaderText}>
+                    Recent Swaps
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.refreshButton}
+                    onPress={handleRefresh}
+                    disabled={refreshing || initialLoading}
+                  >
+                    <FontAwesome5
+                      name="sync"
+                      size={14}
+                      color="#4B5563"
+                      style={(refreshing || initialLoading) ? { transform: [{ rotate: '45deg' }] } : undefined}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {initialLoading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#3871DD" />
+                    <Text style={styles.loadingText}>
+                      Loading your transaction history...
+                    </Text>
+                  </View>
+                ) : refreshing ? (
+                  <View style={styles.refreshingOverlay}>
+                    <ActivityIndicator size="small" color="#3871DD" />
+                  </View>
+                ) : swaps.length === 0 ? (
+                  <View style={styles.emptySwapsList}>
+                    <View style={styles.emptySwapsIcon}>
+                      <FontAwesome5 name="exchange-alt" size={24} color="#FFFFFF" />
+                    </View>
+                    <Text style={styles.emptySwapsText}>No Swap History</Text>
+                    <Text style={styles.emptySwapsSubtext}>
+                      Complete a token swap to see it here
+                    </Text>
+                  </View>
+                ) : (
+                  <FlatList
+                    data={swaps}
+                    renderItem={({ item }) => (
+                      <View style={styles.swapItemContainer}>
+                        <PastSwapItem
+                          swap={item}
+                          onSelect={handlePastSwapSelected}
+                          selected={selectedPastSwap?.signature === item.signature}
+                        />
+                      </View>
+                    )}
+                    keyExtractor={item => item.signature}
+                    contentContainerStyle={styles.swapsList}
+                    showsVerticalScrollIndicator={true}
+                    initialNumToRender={5}
+                    onRefresh={handleRefresh}
+                    refreshing={refreshing}
+                  />
+                )}
+              </View>
+
+              {selectedPastSwap && !loading && !initialLoading && (
+                <TouchableOpacity
+                  style={styles.swapButton}
+                  onPress={handleSharePastSwap}>
+                  <Text style={styles.swapButtonText}>
+                    Share Selected Swap
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
+          ) : (
+            <View style={styles.walletNotConnected}>
+              <View style={styles.connectWalletIcon}>
+                <FontAwesome5 name="wallet" size={20} color="#9CA3AF" />
+              </View>
+              <Text style={styles.walletNotConnectedText}>
+                Please connect your wallet to view your past swaps
+              </Text>
+            </View>
+          )}
+
+          {loading && selectedPastSwap && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color="#3871DD" />
+              <Text style={styles.loadingText}>Sharing selected swap...</Text>
+            </View>
+          )}
+        </View>
+      );
+    } else {
+      // TRADE_AND_SHARE tab (Swap)
+      return (
+        <ScrollView
+          style={styles.fullWidthScroll}
+          keyboardShouldPersistTaps="handled">
+          {/* Token Selection Area */}
           <View style={styles.tokenRow}>
             <View style={styles.tokenColumn}>
               <Text style={styles.inputLabel}>From</Text>
@@ -452,14 +906,30 @@ export default function TradeModal({
                   setSelectingWhichSide('input');
                   setShowSelectTokenModal(true);
                 }}>
-                <Text style={styles.tokenSelectorText}>
-                  {inputToken.symbol}
-                </Text>
+                <View style={styles.tokenSelectorInner}>
+                  {inputToken.logoURI ? (
+                    <Image
+                      source={{ uri: inputToken.logoURI }}
+                      style={styles.tokenIcon}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View style={[styles.tokenIcon, {backgroundColor: '#ddd', justifyContent: 'center', alignItems: 'center'}]}>
+                      <Text style={{color: '#666', fontWeight: 'bold', fontSize: 10}}>
+                        {inputToken.symbol?.charAt(0) || '?'}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={styles.tokenSelectorText}>
+                    {inputToken.symbol}
+                  </Text>
+                </View>
+                <FontAwesome5 name="chevron-down" size={12} color="#9CA3AF" />
               </TouchableOpacity>
             </View>
 
             <View style={styles.arrowContainer}>
-              <Text style={styles.arrowText}>→</Text>
+              <FontAwesome5 name="arrow-right" size={12} color="#3871DD" />
             </View>
 
             <View style={styles.tokenColumn}>
@@ -470,24 +940,64 @@ export default function TradeModal({
                   setSelectingWhichSide('output');
                   setShowSelectTokenModal(true);
                 }}>
-                <Text style={styles.tokenSelectorText}>
-                  {outputToken.symbol}
-                </Text>
+                <View style={styles.tokenSelectorInner}>
+                  {outputToken.logoURI ? (
+                    <Image
+                      source={{ uri: outputToken.logoURI }}
+                      style={styles.tokenIcon}
+                      resizeMode="contain" 
+                    />
+                  ) : (
+                    <View style={[styles.tokenIcon, {backgroundColor: '#ddd', justifyContent: 'center', alignItems: 'center'}]}>
+                      <Text style={{color: '#666', fontWeight: 'bold', fontSize: 10}}>
+                        {outputToken.symbol?.charAt(0) || '?'}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={styles.tokenSelectorText}>
+                    {outputToken.symbol}
+                  </Text>
+                </View>
+                <FontAwesome5 name="chevron-down" size={12} color="#9CA3AF" />
               </TouchableOpacity>
             </View>
           </View>
 
-          <Text style={styles.inputLabel}>Amount ({inputToken.symbol})</Text>
-          <TextInput
-            style={styles.textInput}
-            value={solAmount}
-            onChangeText={setSolAmount}
-            keyboardType="decimal-pad"
-            placeholder={`Enter amount in ${inputToken.symbol}`}
-          />
+          {/* Amount Input Area */}
+          <View style={styles.amountInputContainer}>
+            <Text style={styles.inputLabel}>Amount ({inputToken.symbol})</Text>
+            <View style={styles.amountInputRow}>
+              <TextInput
+                style={styles.amountInput}
+                value={solAmount}
+                onChangeText={setSolAmount}
+                keyboardType="decimal-pad"
+                placeholder={`0.0`}
+              />
+              <TouchableOpacity
+                style={styles.maxButton}
+                onPress={handleMaxButtonClick}>
+                <Text style={styles.maxButtonText}>MAX</Text>
+              </TouchableOpacity>
+            </View>
+            {currentTokenPrice !== null && !isNaN(parseFloat(solAmount)) ? (
+              <Text style={styles.amountUsdValue}>
+                ~ ${(parseFloat(solAmount) * currentTokenPrice).toFixed(2)}
+              </Text>
+            ) : (
+              <Text style={styles.amountUsdValue}>
+                {parseFloat(solAmount) > 0 ? '~ Fetching price...' : '~ $0.00'}
+              </Text>
+            )}
+          </View>
 
           {loading ? (
-            <ActivityIndicator size="large" style={{marginTop: 16}} />
+            <View style={{ alignItems: 'center', marginVertical: 24 }}>
+              <ActivityIndicator size="large" color="#3871DD" />
+              <Text style={{ marginTop: 12, color: '#4B5563' }}>
+                Preparing your swap...
+              </Text>
+            </View>
           ) : (
             <TouchableOpacity
               style={styles.swapButton}
@@ -498,29 +1008,6 @@ export default function TradeModal({
         </ScrollView>
       );
     }
-
-    // PICK_TX_SHARE tab
-    return (
-      <View style={{width: '100%'}}>
-        <Text style={styles.inputLabel}>Transaction Signature</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Paste Solscan Tx Sig"
-          value={solscanTxSig}
-          onChangeText={setSolscanTxSig}
-          autoCapitalize="none"
-        />
-        {loading ? (
-          <ActivityIndicator size="large" style={{marginTop: 16}} />
-        ) : (
-          <TouchableOpacity
-            style={styles.swapButton}
-            onPress={handlePickTxAndShare}>
-            <Text style={styles.swapButtonText}>Share Tx</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
   };
 
   return (
@@ -529,35 +1016,19 @@ export default function TradeModal({
       transparent
       animationType="fade"
       onRequestClose={handleClose}>
-      {/* Container for the entire screen (background + modal) */}
-      <View style={{flex: 1}}>
-        {/* Background overlay that closes the modal when tapped */}
+      {/* Container for the entire screen */}
+      <View style={styles.flexFill}>
+        {/* Dark overlay that closes the modal when tapped */}
         <TouchableWithoutFeedback onPress={handleClose}>
-          <View
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-            }}
-          />
+          <View style={styles.darkOverlay} />
         </TouchableWithoutFeedback>
 
         {/* Centered wrapper for the modal content */}
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}>
+        <View style={styles.centeredWrapper}>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={{
-              width: '90%',
-              maxHeight: '90%',
-              backgroundColor: '#fff',
-              borderRadius: 12,
-              padding: 16,
-            }}>
-            <TouchableWithoutFeedback onPress={() => {}}>
+            style={styles.modalContentContainer}>
+            <TouchableWithoutFeedback>
               <View>
                 <View style={styles.header}>
                   <Text style={styles.headerTitle}>Token Swap</Text>
@@ -573,34 +1044,34 @@ export default function TradeModal({
                     <TouchableOpacity
                       style={[
                         styles.tabButton,
-                        selectedTab === 'TRADE_AND_SHARE' &&
-                          styles.tabButtonActive,
+                        selectedTab === 'PAST_SWAPS' &&
+                        styles.tabButtonActive,
                       ]}
-                      onPress={() => setSelectedTab('TRADE_AND_SHARE')}>
+                      onPress={() => setSelectedTab('PAST_SWAPS')}>
                       <Text
                         style={[
                           styles.tabButtonText,
-                          selectedTab === 'TRADE_AND_SHARE' &&
-                            styles.tabButtonTextActive,
+                          selectedTab === 'PAST_SWAPS' &&
+                          styles.tabButtonTextActive,
                         ]}>
-                        Swap & Share
+                        History
                       </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                       style={[
                         styles.tabButton,
-                        selectedTab === 'PICK_TX_SHARE' &&
-                          styles.tabButtonActive,
+                        selectedTab === 'TRADE_AND_SHARE' &&
+                        styles.tabButtonActive,
                       ]}
-                      onPress={() => setSelectedTab('PICK_TX_SHARE')}>
+                      onPress={() => setSelectedTab('TRADE_AND_SHARE')}>
                       <Text
                         style={[
                           styles.tabButtonText,
-                          selectedTab === 'PICK_TX_SHARE' &&
-                            styles.tabButtonTextActive,
+                          selectedTab === 'TRADE_AND_SHARE' &&
+                          styles.tabButtonTextActive,
                         ]}>
-                        Pick Tx & Share
+                        Swap
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -617,20 +1088,56 @@ export default function TradeModal({
                 <SelectTokenModal
                   visible={showSelectTokenModal}
                   onClose={() => setShowSelectTokenModal(false)}
-                  onTokenSelected={token => {
-                    if (selectingWhichSide === 'input') {
-                      setInputToken(token);
-                    } else {
-                      setOutputToken(token);
-                    }
-                    setShowSelectTokenModal(false);
-                  }}
+                  onTokenSelected={handleTokenSelected}
                 />
               </View>
             </TouchableWithoutFeedback>
           </KeyboardAvoidingView>
         </View>
       </View>
+
+      {/**
+       * "Share your trade?" confirmation modal
+       */}
+      <Modal
+        visible={showSharePrompt}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSharePrompt(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowSharePrompt(false)}>
+          <View style={styles.sharePromptBackdrop} />
+        </TouchableWithoutFeedback>
+        <View style={styles.sharePromptContainer}>
+          <View style={styles.sharePromptBox}>
+            <Text style={styles.sharePromptTitle}>Share Your Trade?</Text>
+            <Text style={styles.sharePromptDescription}>
+              Your swap was successful! Would you like to create a post about
+              it?
+            </Text>
+            <View style={styles.sharePromptButtonRow}>
+              <TouchableOpacity
+                style={[styles.sharePromptBtn, styles.sharePromptBtnCancel]}
+                onPress={() => setShowSharePrompt(false)}>
+                <Text style={styles.sharePromptBtnText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.sharePromptBtn, styles.sharePromptBtnConfirm]}
+                onPress={() => {
+                  setShowSharePrompt(false);
+                  // Actually share in feed
+                  shareTradeInFeed(
+                    pendingBuyInputLamports,
+                    pendingBuyOutputLamports,
+                    inputToken,
+                    outputToken,
+                  );
+                }}>
+                <Text style={[styles.sharePromptBtnText, styles.sharePromptConfirmText]}>Yes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }

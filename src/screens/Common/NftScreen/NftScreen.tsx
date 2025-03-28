@@ -4,6 +4,8 @@ import BuySection from './BuySection';
 import SellSection from './SellSection';
 import { styles } from './styles';
 import { useAuth } from '../../../hooks/useAuth';
+import { useAppSelector } from '../../../hooks/useReduxHooks';
+import { TransactionService } from '../../../services/transaction/transactionService';
 
 
 
@@ -14,9 +16,11 @@ import { useAuth } from '../../../hooks/useAuth';
  */
 const NftScreen: React.FC = () => {
   const { solanaWallet } = useAuth();
+  const myWallet = useAppSelector(state => state.auth.address);
+
 
   // For simplicity, using the first connected wallet
-  const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
+  const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || myWallet || null;
   const userWallet = solanaWallet?.wallets?.[0] || null;
 
   const [activeTab, setActiveTab] = useState<'buy' | 'sell'>('buy');

@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -7,25 +7,31 @@ import {
   TouchableOpacity,
   Platform,
   Alert,
+  TextInput,
+  Animated,
+  Easing,
 } from 'react-native';
-import {RouteProp, useRoute} from '@react-navigation/native';
+import { RouteProp, useRoute } from '@react-navigation/native';
 
-import {RootStackParamList} from '../../../../navigation/RootNavigator';
+import { RootStackParamList } from '../../../../navigation/RootNavigator';
 import PostHeader from '../../../../components/thread/post/PostHeader';
 import PostBody from '../../../../components/thread/post/PostBody';
 import PostFooter from '../../../../components/thread/post/PostFooter';
+import PostCTA from '../../../../components/thread/post/PostCTA';
 import ThreadComposer from '../../../../components/thread/ThreadComposer';
-import {useAppSelector, useAppDispatch} from '../../../../hooks/useReduxHooks';
-import {useAppNavigation} from '../../../../hooks/useAppNavigation';
+import { useAppSelector, useAppDispatch } from '../../../../hooks/useReduxHooks';
+import { useAppNavigation } from '../../../../hooks/useAppNavigation';
 
 import {
   ThreadPost,
   ThreadUser,
 } from '../../../../components/thread/thread.types';
-import {DEFAULT_IMAGES} from '../../../../config/constants';
-import {flattenPosts} from '../../../../components/thread/thread.utils';
-import {deletePostAsync} from '../../../../state/thread/reducer';
+import { DEFAULT_IMAGES } from '../../../../config/constants';
+import { flattenPosts } from '../../../../components/thread/thread.utils';
+import { deletePostAsync } from '../../../../state/thread/reducer';
 import ThreadEditModal from '../../../../components/thread/ThreadEditModal';
+import RetweetPreview from '../../../../components/thread/retweet/RetweetPreview';
+import Icons from '../../../../assets/svgs';
 
 /**
  * Finds a post in the array by ID.
@@ -76,7 +82,15 @@ export default function PostThreadScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'PostThread'>>();
   const navigation = useAppNavigation();
   const dispatch = useAppDispatch();
-  const {postId} = route.params;
+  const { postId } = route.params;
+
+  // Add ref for the comment input
+  const commentInputRef = useRef<{ focus: () => void }>(null);
+  // Add ref for the ScrollView
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [isCommentHighlighted, setIsCommentHighlighted] = useState(false);
+  const backgroundOpacity = useRef(new Animated.Value(0)).current;
+  const composerTranslateY = useRef(new Animated.Value(0)).current;
 
   const allPosts = useAppSelector(state => state.thread.allPosts);
   const flatPosts = useMemo(() => flattenPosts(allPosts), [allPosts]);
@@ -98,8 +112,64 @@ export default function PostThreadScreen() {
     handle: userWallet
       ? '@' + userWallet.slice(0, 6) + '...' + userWallet.slice(-4)
       : '@anonymous',
-    avatar: profilePicUrl ? {uri: profilePicUrl} : {uri: DEFAULT_IMAGES.user},
+    avatar: profilePicUrl && profilePicUrl.length > 0
+      ? { uri: profilePicUrl }
+      : DEFAULT_IMAGES.user,
     verified: true,
+  };
+
+  // Function to focus the comment input and highlight it
+  const focusCommentInput = () => {
+    if (commentInputRef.current) {
+      // Set the highlighted state
+      setIsCommentHighlighted(true);
+      
+      // Scroll to the bottom first
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      }
+      
+      // Animate the background dimming effect
+      Animated.timing(backgroundOpacity, {
+        toValue: 1,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true
+      }).start();
+      
+      // Animate a subtle lift effect on the composer
+      Animated.timing(composerTranslateY, {
+        toValue: -3,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true
+      }).start();
+      
+      // Focus the input with a slight delay
+      setTimeout(() => {
+        commentInputRef.current?.focus();
+      }, 250);
+      
+      // Reset the highlight after a delay
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(backgroundOpacity, {
+            toValue: 0,
+            duration: 200,
+            easing: Easing.in(Easing.cubic),
+            useNativeDriver: true
+          }),
+          Animated.timing(composerTranslateY, {
+            toValue: 0,
+            duration: 200,
+            easing: Easing.in(Easing.cubic),
+            useNativeDriver: true
+          })
+        ]).start(() => {
+          setIsCommentHighlighted(false);
+        });
+      }, 300);
+    }
   };
 
   // Gather ancestors and direct children only if currentPost exists
@@ -119,7 +189,7 @@ export default function PostThreadScreen() {
       return;
     }
     Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
-      {text: 'Cancel', style: 'cancel'},
+      { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
@@ -150,6 +220,8 @@ export default function PostThreadScreen() {
     const showTopLine = !isRootPost(post);
     const childCount = getDirectChildren(flatPosts, post.id).length;
     const showBottomLine = childCount > 0;
+    const isRetweet = !!post.retweetOf;
+    const isQuoteRetweet = isRetweet && post.sections && post.sections.length > 0;
 
     return (
       <View style={twitterRowStyles.rowContainer} key={post.id}>
@@ -161,16 +233,80 @@ export default function PostThreadScreen() {
           )}
         </View>
         <View style={twitterRowStyles.postContent}>
-          <PostHeader
-            post={post}
-            onDeletePost={() => handleDeletePost(post)}
-            onEditPost={() => handleEditPost(post)}
-            onPressUser={user =>
-              navigation.navigate('OtherProfile', {userId: user.id})
-            }
-          />
-          <PostBody post={post} />
-          <PostFooter post={post} />
+          {/* If it's a retweet, show the retweet indicator */}
+          {isRetweet && (
+            <View style={twitterRowStyles.retweetIndicator}>
+              <Icons.RetweetIdle width={12} height={12} color="#657786" />
+              <Text style={twitterRowStyles.retweetText}>
+                {post.user.username} Retweeted
+              </Text>
+            </View>
+          )}
+
+          {isRetweet ? (
+            <View>
+              {/* For quote retweets, show the quote text first */}
+              {isQuoteRetweet && (
+                <View style={twitterRowStyles.quoteContent}>
+                  {post.sections.map(section => (
+                    <Text key={section.id} style={twitterRowStyles.quoteText}>
+                      {section.text}
+                    </Text>
+                  ))}
+                </View>
+              )}
+            
+              {/* Display original post content for retweets */}
+              {post.retweetOf && (
+                <TouchableOpacity 
+                  style={twitterRowStyles.originalPostContainer}
+                  activeOpacity={0.8}
+                  onPress={() => navigation.push('PostThread', { postId: post.retweetOf!.id })}
+                >
+                  <PostHeader
+                    post={post.retweetOf}
+                    onDeletePost={() => handleDeletePost(post.retweetOf!)}
+                    onEditPost={() => handleEditPost(post.retweetOf!)}
+                    onPressUser={user =>
+                      navigation.navigate('OtherProfile', { userId: user.id })
+                    }
+                  />
+                  <PostBody post={post.retweetOf} />
+                  <PostCTA
+                    post={post.retweetOf}
+                    themeOverrides={{}}
+                    styleOverrides={{}}
+                  />
+                  <PostFooter 
+                    post={post.retweetOf}
+                    onPressComment={focusCommentInput} 
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            // Regular post display
+            <>
+              <PostHeader
+                post={post}
+                onDeletePost={() => handleDeletePost(post)}
+                onEditPost={() => handleEditPost(post)}
+                onPressUser={user =>
+                  navigation.navigate('OtherProfile', { userId: user.id })
+                }
+              />
+              <PostBody post={post} />
+              <PostCTA
+                post={post}
+                themeOverrides={{}}
+                styleOverrides={{}}
+              />
+              <PostFooter 
+                post={post} 
+                onPressComment={focusCommentInput}
+              />
+            </>
+          )}
         </View>
       </View>
     );
@@ -184,6 +320,8 @@ export default function PostThreadScreen() {
     const showTopLine = !isRootPost(post);
     const childCount = getDirectChildren(flatPosts, post.id).length;
     const showBottomLine = childCount > 0;
+    const isRetweet = !!post.retweetOf;
+    const isQuoteRetweet = isRetweet && post.sections && post.sections.length > 0;
 
     return (
       <TouchableOpacity
@@ -191,7 +329,7 @@ export default function PostThreadScreen() {
         style={twitterRowStyles.rowContainer}
         activeOpacity={0.8}
         onPress={() => {
-          navigation.push('PostThread', {postId: post.id});
+          navigation.push('PostThread', { postId: post.id });
         }}>
         <View style={twitterRowStyles.leftCol}>
           {showTopLine && <View style={twitterRowStyles.verticalLineTop} />}
@@ -201,16 +339,80 @@ export default function PostThreadScreen() {
           )}
         </View>
         <View style={twitterRowStyles.postContent}>
-          <PostHeader
-            post={post}
-            onDeletePost={() => handleDeletePost(post)}
-            onEditPost={() => handleEditPost(post)}
-            onPressUser={user =>
-              navigation.navigate('OtherProfile', {userId: user.id})
-            }
-          />
-          <PostBody post={post} />
-          <PostFooter post={post} />
+          {/* If it's a retweet, show the retweet indicator */}
+          {isRetweet && (
+            <View style={twitterRowStyles.retweetIndicator}>
+              <Icons.RetweetIdle width={12} height={12} color="#657786" />
+              <Text style={twitterRowStyles.retweetText}>
+                {post.user.username} Retweeted
+              </Text>
+            </View>
+          )}
+
+          {isRetweet ? (
+            <View>
+              {/* For quote retweets, show the quote text first */}
+              {isQuoteRetweet && (
+                <View style={twitterRowStyles.quoteContent}>
+                  {post.sections.map(section => (
+                    <Text key={section.id} style={twitterRowStyles.quoteText}>
+                      {section.text}
+                    </Text>
+                  ))}
+                </View>
+              )}
+              
+              {/* Display original post content for retweets */}
+              {post.retweetOf && (
+                <TouchableOpacity 
+                  style={twitterRowStyles.originalPostContainer}
+                  activeOpacity={0.8}
+                  onPress={() => navigation.push('PostThread', { postId: post.retweetOf!.id })}
+                >
+                  <PostHeader
+                    post={post.retweetOf}
+                    onDeletePost={() => handleDeletePost(post.retweetOf!)}
+                    onEditPost={() => handleEditPost(post.retweetOf!)}
+                    onPressUser={user =>
+                      navigation.navigate('OtherProfile', { userId: user.id })
+                    }
+                  />
+                  <PostBody post={post.retweetOf} />
+                  <PostCTA
+                    post={post.retweetOf}
+                    themeOverrides={{}}
+                    styleOverrides={{}}
+                  />
+                  <PostFooter 
+                    post={post.retweetOf}
+                    onPressComment={focusCommentInput} 
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            // Regular post display
+            <>
+              <PostHeader
+                post={post}
+                onDeletePost={() => handleDeletePost(post)}
+                onEditPost={() => handleEditPost(post)}
+                onPressUser={user =>
+                  navigation.navigate('OtherProfile', { userId: user.id })
+                }
+              />
+              <PostBody post={post} />
+              <PostCTA
+                post={post}
+                themeOverrides={{}}
+                styleOverrides={{}}
+              />
+              <PostFooter 
+                post={post} 
+                onPressComment={focusCommentInput}
+              />
+            </>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -218,7 +420,7 @@ export default function PostThreadScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, Platform.OS === 'android' && {paddingTop: 30}]}>
+      style={[styles.container, Platform.OS === 'android' && { paddingTop: 30 }]}>
       {/* Screen Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -227,10 +429,12 @@ export default function PostThreadScreen() {
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Thread</Text>
-        <View style={{width: 40}} />
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        ref={scrollViewRef}
+        contentContainerStyle={styles.scrollContent}>
         {currentPost ? (
           <>
             {ancestorChain.map(p => renderNonClickablePost(p))}
@@ -238,7 +442,7 @@ export default function PostThreadScreen() {
               <>
                 <Text style={styles.repliesLabel}>Replies</Text>
                 {directChildren.map(child => (
-                  <View key={child.id} style={{marginLeft: 10}}>
+                  <View key={child.id} style={{ marginLeft: 10 }}>
                     {renderClickableChildPost(child)}
                   </View>
                 ))}
@@ -255,15 +459,49 @@ export default function PostThreadScreen() {
       </ScrollView>
 
       {currentPost && (
-        <View style={styles.composerContainer}>
-          <ThreadComposer
-            currentUser={localUser}
-            parentId={currentPost.id}
-            onPostCreated={() => {
-              console.log('Reply created successfully');
-            }}
-          />
-        </View>
+        <>
+          {/* Semi-transparent overlay for dimming effect */}
+          {isCommentHighlighted && (
+            <Animated.View 
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.3)',
+                opacity: backgroundOpacity,
+                zIndex: 1
+              }}
+            />
+          )}
+          
+          <Animated.View 
+            style={[
+              styles.composerContainer,
+              {
+                transform: [{ translateY: composerTranslateY }],
+                zIndex: 2,
+                // Subtle elevation when focused
+                ...(isCommentHighlighted ? {
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: -2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 5,
+                  elevation: 5,
+                } : {})
+              }
+            ]}>
+            <ThreadComposer
+              ref={commentInputRef}
+              currentUser={localUser}
+              parentId={currentPost.id}
+              onPostCreated={() => {
+                console.log('Reply created successfully');
+              }}
+            />
+          </Animated.View>
+        </>
       )}
 
       {postToEdit && (
@@ -278,7 +516,7 @@ export default function PostThreadScreen() {
   );
 }
 
-/** Styles for the post “twitter style” layout. */
+/** Styles for the post "twitter style" layout. */
 const twitterRowStyles = {
   rowContainer: {
     flexDirection: 'row' as const,
@@ -310,6 +548,32 @@ const twitterRowStyles = {
   postContent: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  retweetIndicator: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginBottom: 4,
+  },
+  retweetText: {
+    fontSize: 12,
+    color: '#657786',
+    marginLeft: 4,
+    fontWeight: '500' as const,
+  },
+  retweetContainer: {
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  originalPostContainer: {
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  quoteContent: {
+    marginBottom: 8,
+  },
+  quoteText: {
+    fontSize: 12,
+    color: '#657786',
   },
 };
 

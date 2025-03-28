@@ -45,6 +45,16 @@ export const PumpfunBuyStyles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
   },
+  statusText: {
+    backgroundColor: '#f8f8f8',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 12,
+    color: '#333',
+    fontSize: 14,
+    textAlign: 'center',
+  },
 });
 
 export const PumpfunSellStyles = StyleSheet.create({
@@ -99,6 +109,16 @@ export const PumpfunSellStyles = StyleSheet.create({
     color: '#666',
     marginBottom: 12,
   },
+  statusText: {
+    backgroundColor: '#f8f8f8',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 12,
+    color: '#333',
+    fontSize: 14,
+    textAlign: 'center',
+  },
 });
 
 export const PumpfunLaunchStyles = StyleSheet.create({
@@ -146,5 +166,15 @@ export const PumpfunLaunchStyles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 16,
+  },
+  statusText: {
+    backgroundColor: '#f8f8f8',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 12,
+    color: '#333',
+    fontSize: 14,
+    textAlign: 'center',
   },
 });

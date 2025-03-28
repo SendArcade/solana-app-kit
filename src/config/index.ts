@@ -43,6 +43,7 @@ export interface AuthProviderConfig {
 
 /** Transaction config (unchanged) */
 export interface TransactionProviderConfig {
+  defaultFeeTier: string;
   defaultMode: 'priority' | 'jito';
   feeTiers: {
     low: number;
@@ -74,8 +75,8 @@ export const DefaultAuthConfig: AuthProviderConfig = {
 
   dynamic: {
     environmentId: DYNAMIC_ENVIRONMENT_ID || '',
-    appName: 'MyDynamicApp',
-    appLogoUrl: '',
+    appName: 'Solana App Kit',
+    appLogoUrl: 'https://solana.com/src/img/branding/solanaLogoMark.svg',
   },
 
   turnkey: {
@@ -95,6 +96,7 @@ export const DefaultTransactionConfig: TransactionProviderConfig = {
     'very-high': 2000000000,
   },
   network: 'mainnet-beta',
+  defaultFeeTier: ''
 };
 
 /** Provide default mock data config. */
