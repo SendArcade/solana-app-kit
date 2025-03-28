@@ -7,14 +7,15 @@ import process from 'process';
 global.process = process;
 
 import 'react-native-gesture-handler';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Provider as ReduxProvider } from 'react-redux';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RootNavigator from './src/navigation/RootNavigator';
-import {navigationRef} from './src/hooks/useAppNavigation';
-import {store} from './src/state/store';
+import { navigationRef } from './src/hooks/useAppNavigation';
+import { store } from './src/state/store';
 import './src/utils/polyfills';
+import TransactionNotification from './src/components/Common/TransactionNotification';
 
 import { PrivyProvider, PrivyElements } from '@privy-io/expo';
 
@@ -25,23 +26,42 @@ import { DefaultCustomizationConfig } from './src/config';
 
 export default function App() {
   const config = DefaultCustomizationConfig;
+  const [dynamicInitialized, setDynamicInitialized] = useState(false);
 
   useEffect(() => {
     if (config.auth.provider === 'dynamic') {
-      initDynamicClient(
-        config.auth.dynamic.environmentId,
-        config.auth.dynamic.appName,
-        config.auth.dynamic.appLogoUrl
-      );
+      try {
+        initDynamicClient(
+          config.auth.dynamic.environmentId,
+          config.auth.dynamic.appName,
+          config.auth.dynamic.appLogoUrl
+        );
+        setDynamicInitialized(true);
+      } catch (error) {
+        console.error("Failed to initialize Dynamic client:", error);
+      }
     }
   }, [config.auth.provider]);
 
-  let dynamicClient: any;
-  try {
-    dynamicClient = getDynamicClient();
-  } catch {
-    dynamicClient = null;
-  }
+  // Get Dynamic client after initialization is complete
+  const getDynamicWebView = () => {
+    if (!dynamicInitialized) return null;
+
+    try {
+      const client = getDynamicClient();
+      return client?.reactNative?.WebView ? <client.reactNative.WebView /> : null;
+    } catch (error) {
+      console.error("Error getting Dynamic WebView:", error);
+      return null;
+    }
+  };
+
+  // Component to render notification and any other global UI elements
+  const GlobalUIElements = () => (
+    <>
+      <TransactionNotification />
+    </>
+  );
 
   return (
     <CustomizationProvider config={config}>
@@ -62,14 +82,18 @@ export default function App() {
               <NavigationContainer ref={navigationRef}>
                 <RootNavigator />
               </NavigationContainer>
-              {dynamicClient?.reactNative && <dynamicClient.reactNative.WebView />}
+              {getDynamicWebView()}
+              <GlobalUIElements />
               <PrivyElements />
             </PrivyProvider>
           ) : (
-            <NavigationContainer ref={navigationRef}>
-              <RootNavigator />
-              {dynamicClient?.reactNative && <dynamicClient.reactNative.WebView />}
-            </NavigationContainer>
+            <>
+              <NavigationContainer ref={navigationRef}>
+                <RootNavigator />
+              </NavigationContainer>
+              {getDynamicWebView()}
+              <GlobalUIElements />
+            </>
           )}
         </ReduxProvider>
       </SafeAreaProvider>

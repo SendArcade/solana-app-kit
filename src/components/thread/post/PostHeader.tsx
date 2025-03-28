@@ -1,4 +1,4 @@
-// FILE: src/components/thread/PostHeader.tsx
+// FILE: src/components/thread/post/PostHeader.tsx
 
 import React, { useState, useRef } from 'react';
 import {
@@ -12,9 +12,10 @@ import {
   StyleSheet,
 } from 'react-native';
 import Icons from '../../../assets/svgs';
-import {createThreadStyles, getMergedTheme} from '../thread.styles';
-import {ThreadPost, ThreadUser} from '../thread.types';
-import {DEFAULT_IMAGES} from '../../../config/constants';
+import { createThreadStyles, getMergedTheme } from '../thread.styles';
+import { ThreadPost, ThreadUser } from '../thread.types';
+import { DEFAULT_IMAGES } from '../../../config/constants';
+import { useWallet } from '../../../hooks/useWallet';
 
 interface PostHeaderProps {
   /** The post data to display in the header */
@@ -26,10 +27,10 @@ interface PostHeaderProps {
   /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
   /** Style overrides for specific components */
-  styleOverrides?: {[key: string]: object};
+  styleOverrides?: { [key: string]: object };
 
   /**
-   * NEW: callback if user taps on the user’s avatar/username
+   * NEW: callback if user taps on the user's avatar/username
    */
   onPressUser?: (user: ThreadUser) => void;
 }
@@ -44,9 +45,17 @@ export default function PostHeader({
   onPressUser,
 }: PostHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const {user, createdAt} = post;
+  const { user, createdAt } = post;
   const mergedTheme = getMergedTheme(themeOverrides);
   const styles = createThreadStyles(mergedTheme, styleOverrides);
+
+  // Get current user's wallet address to check post ownership
+  const { address: currentUserAddress } = useWallet();
+
+  // Check if post belongs to current user
+  const isMyPost = currentUserAddress &&
+    user.id &&
+    currentUserAddress.toLowerCase() === user.id.toLowerCase();
 
   // Convert date to a short HH:mm string for display
   const timeString = new Date(createdAt).toLocaleTimeString([], {
@@ -88,7 +97,7 @@ export default function PostHeader({
   function getUserAvatar(u: ThreadUser): ImageSourcePropType {
     if (u.avatar) {
       if (typeof u.avatar === 'string') {
-        return {uri: u.avatar};
+        return { uri: u.avatar };
       }
       return u.avatar;
     }
@@ -114,7 +123,7 @@ export default function PostHeader({
         {/* Wrap the avatar in a Touchable to press user */}
         <TouchableOpacity
           onPress={handleUserPress}
-          style={{position: 'relative'}}>
+          style={{ position: 'relative' }}>
           <Image
             source={getUserAvatar(user)}
             style={styles.threadItemAvatar}
@@ -134,11 +143,11 @@ export default function PostHeader({
           />
         </TouchableOpacity>
 
-        <View style={{marginLeft: 8}}>
+        <View style={{ marginLeft: 8 }}>
           {/* Also wrap the username in a Touchable */}
           <TouchableOpacity
             onPress={handleUserPress}
-            style={{flexDirection: 'row', alignItems: 'center'}}>
+            style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={styles.threadItemUsername}>{user.username}</Text>
             {user.verified && (
               <Icons.BlueCheck
@@ -154,13 +163,15 @@ export default function PostHeader({
         </View>
       </View>
 
-      {/* 3-dot menu */}
-      <TouchableOpacity onPress={handleToggleMenu}>
-        <Icons.DotsThree width={20} height={20} />
-      </TouchableOpacity>
+      {/* Only show 3-dot menu if this is the current user's post */}
+      {isMyPost && (
+        <TouchableOpacity onPress={handleToggleMenu}>
+          <Icons.DotsThree width={20} height={20} />
+        </TouchableOpacity>
+      )}
 
       {/* The small drop-down menu if menuOpen */}
-      {menuOpen && (
+      {menuOpen && isMyPost && (
         <View style={localHeaderStyles.menuContainer}>
           <TouchableOpacity
             style={localHeaderStyles.menuItem}
@@ -172,7 +183,7 @@ export default function PostHeader({
             style={localHeaderStyles.menuItem}
             onPress={handleDelete}
           >
-            <Text style={[localHeaderStyles.menuItemText, {color: '#d00'}]}>
+            <Text style={[localHeaderStyles.menuItemText, { color: '#d00' }]}>
               Delete
             </Text>
           </TouchableOpacity>
@@ -205,7 +216,7 @@ const localHeaderStyles = StyleSheet.create({
     paddingVertical: 4,
     width: 100,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 5,

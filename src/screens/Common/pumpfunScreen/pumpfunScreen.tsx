@@ -15,6 +15,7 @@ import { fetchSolBalance, fetchTokenAccounts, TokenEntry } from '../../../utils/
 import PumpfunBuySection from '../../../components/pumpfun/PumpfunBuySection';
 import PumpfunSellSection from '../../../components/pumpfun/PumpfunSellSection';
 import PumpfunLaunchSection from '../../../components/pumpfun/PumpfunLaunchSection';
+import { useAppSelector } from '../../../hooks/useReduxHooks';
 
 const customStyles = StyleSheet.create({
   customCardContainer: {
@@ -44,7 +45,10 @@ const customStyles = StyleSheet.create({
 
 export default function PumpfunScreen() {
   const {solanaWallet} = useAuth();
-  const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
+  const myWallet = useAppSelector(state => state.auth.address);
+
+  const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || myWallet || null;
+  // console.log('userPublicKey', userPublicKey);
 
   const [activeTab, setActiveTab] = useState<'buy' | 'sell' | 'launch'>('buy');
   const [solBalance, setSolBalance] = useState<number | null>(null);

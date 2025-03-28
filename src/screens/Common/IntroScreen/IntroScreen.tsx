@@ -1,8 +1,9 @@
-import React, {useEffect, useRef} from 'react';
-import {View, TouchableOpacity, Animated, Easing} from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, TouchableOpacity, Animated, Easing } from 'react-native';
 import Icons from '../../../assets/svgs/index';
 import styles from './IntroScreen.styles';
-import {useAppNavigation} from '../../../hooks/useAppNavigation';
+import { useAppNavigation } from '../../../hooks/useAppNavigation';
+import { getDynamicClient } from '../../../services/walletProviders/dynamic';
 
 export default function IntroScreen() {
   const navigation = useAppNavigation();
@@ -11,6 +12,21 @@ export default function IntroScreen() {
   const splashTextOpacity = useRef(new Animated.Value(0)).current;
   const smileScale = useRef(new Animated.Value(0.5)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Check if user is already authenticated
+    try {
+      const client = getDynamicClient();
+      const authUser = client?.auth?.authenticatedUser;
+
+      if (authUser) {
+        console.log('User already authenticated, skipping login screen');
+        navigation.navigate('MainTabs' as never);
+      }
+    } catch (e) {
+      console.log('Dynamic client not initialized yet:', e);
+    }
+  }, [navigation]);
 
   useEffect(() => {
     Animated.sequence([
@@ -58,7 +74,7 @@ export default function IntroScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.svgContainer}>
-        <Animated.View style={{opacity: solanaDotOpacity}}>
+        <Animated.View style={{ opacity: solanaDotOpacity }}>
           <Icons.SolanaDot />
         </Animated.View>
 
@@ -76,7 +92,7 @@ export default function IntroScreen() {
           style={[
             styles.smileFaceContainer,
             {
-              transform: [{scale: smileScale}],
+              transform: [{ scale: smileScale }],
             },
           ]}>
           <Icons.SmileFace />
@@ -89,7 +105,7 @@ export default function IntroScreen() {
         onPress={() => {
           navigation.navigate('LoginOptions');
         }}>
-        <Animated.View style={{transform: [{scale: buttonScale}]}}>
+        <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
           <Icons.GettingStartedButton />
         </Animated.View>
       </TouchableOpacity>

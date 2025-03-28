@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useCallback, useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import {
   View,
   Image,
@@ -11,24 +11,23 @@ import {
   Alert,
 } from 'react-native';
 import Icons from '../../assets/svgs';
-import {useAppDispatch, useAppSelector} from '../../hooks/useReduxHooks';
+import { useAppDispatch, useAppSelector } from '../../hooks/useReduxHooks';
 import {
   createRootPostAsync,
   createReplyAsync,
   addPostLocally,
   addReplyLocally,
 } from '../../state/thread/reducer';
-import {createThreadStyles, getMergedTheme} from './thread.styles';
-import {ThreadSection, ThreadSectionType, ThreadUser} from './thread.types';
-import {
-  ImageLibraryOptions,
-  launchImageLibrary,
-} from 'react-native-image-picker';
-import {TENSOR_API_KEY} from '@env';
-import {useAuth} from '../../hooks/useAuth';
+import { createThreadStyles, getMergedTheme } from './thread.styles';
+import { ThreadSection, ThreadSectionType, ThreadUser } from './thread.types';
+import * as ImagePicker from 'expo-image-picker';
+import { TENSOR_API_KEY } from '@env';
+import { useWallet } from '../../hooks/useWallet';
 import TradeModal from './/trade/TradeModal';
-import {DEFAULT_IMAGES} from '../../config/constants';
-import {NftItem, useFetchNFTs} from '../../hooks/useFetchNFTs';
+import { DEFAULT_IMAGES } from '../../config/constants';
+import { NftItem, useFetchNFTs } from '../../hooks/useFetchNFTs';
+import NftListingModal from './NftListingModal';
+import { uploadThreadImage } from '../../services/threadImageService';
 
 /**
  * Props for the ThreadComposer component
@@ -44,9 +43,11 @@ interface ThreadComposerProps {
   /** Theme overrides for customizing appearance */
   themeOverrides?: Partial<Record<string, any>>;
   /** Style overrides for specific components */
-  styleOverrides?: {[key: string]: object};
+  styleOverrides?: { [key: string]: object };
   /** User-provided stylesheet overrides */
-  userStyleSheet?: {[key: string]: object};
+  userStyleSheet?: { [key: string]: object };
+  /** Ref to expose the input focus method */
+  ref?: React.Ref<{ focus: () => void }>;
 }
 
 /**
@@ -76,31 +77,50 @@ interface ThreadComposerProps {
  * />
  * ```
  */
-export default function ThreadComposer({
+const ThreadComposer = forwardRef<{ focus: () => void }, ThreadComposerProps>(({
   currentUser,
   parentId,
   onPostCreated,
   themeOverrides,
   styleOverrides,
   userStyleSheet,
-}: ThreadComposerProps) {
+}, ref) => {
   const dispatch = useAppDispatch();
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
-  const {solanaWallet} = useAuth();
-  const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
+  const inputRef = useRef<TextInput>(null);
+
+  // Expose focus method via ref
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }
+  }));
+
+  // Use wallet hook instead of useAuth directly
+  const { wallet, address } = useWallet();
+
+  // Use the wallet address from useWallet
+  const userPublicKey = address || null;
 
   // Basic composer state
   const [textValue, setTextValue] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // NFT listing states
   const [showListingModal, setShowListingModal] = useState(false);
   const [selectedListingNft, setSelectedListingNft] = useState<NftItem | null>(
     null,
   );
+  const [activeListings, setActiveListings] = useState<NftItem[]>([]);
+  const [loadingActiveListings, setLoadingActiveListings] = useState(false);
+  const [activeListingsError, setActiveListingsError] = useState<string | null>(null);
 
   // Show/hide the TradeModal
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const SOL_TO_LAMPORTS = 1_000_000_000;
 
   // Merged theme
   const mergedTheme = getMergedTheme(themeOverrides);
@@ -111,11 +131,73 @@ export default function ThreadComposer({
   );
 
   // Reuse shared NFT hook
-  const {
-    nfts: listingItems,
-    loading: loadingListings,
-    error: fetchNftsError,
-  } = useFetchNFTs(userPublicKey || undefined);
+  const fixImageUrl = (url: string): string => {
+    if (!url) return '';
+    if (url.startsWith('ipfs://'))
+      return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
+    if (url.startsWith('ar://'))
+      return url.replace('ar://', 'https://arweave.net/');
+    if (url.startsWith('/')) return `https://arweave.net${url}`;
+    if (!url.startsWith('http') && !url.startsWith('data:'))
+      return `https://${url}`;
+    return url;
+  };
+
+  // Add this function to fetch active listings
+  const fetchActiveListings = useCallback(async () => {
+    if (!userPublicKey) return;
+    setLoadingActiveListings(true);
+    setActiveListingsError(null);
+
+    try {
+      const url = `https://api.mainnet.tensordev.io/api/v1/user/active_listings?wallets=${userPublicKey}&sortBy=PriceAsc&limit=50`;
+      const options = {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          'x-tensor-api-key': TENSOR_API_KEY,
+        },
+      };
+
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch active listings: ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.listings && Array.isArray(data.listings)) {
+        const mappedListings = data.listings.map((item: any) => {
+          const mintObj = item.mint || {};
+          const mintAddress = typeof item.mint === 'object' && item.mint.onchainId
+            ? item.mint.onchainId
+            : item.mint;
+          const nftName = mintObj?.name || 'Unnamed NFT';
+          const nftImage = fixImageUrl(mintObj?.imageUri || '');
+          const nftCollection = mintObj?.collName || '';
+          const lamports = parseInt(item.grossAmount || '0', 10);
+          const priceSol = lamports / SOL_TO_LAMPORTS;
+
+          return {
+            mint: mintAddress,
+            name: nftName,
+            collection: nftCollection,
+            image: nftImage,
+            priceSol,
+            isCompressed: item.compressed || false
+          } as NftItem;
+        });
+
+        setActiveListings(mappedListings);
+      } else {
+        setActiveListings([]);
+      }
+    } catch (err: any) {
+      console.error('Error fetching active listings:', err);
+      setActiveListingsError(err.message || 'Failed to fetch active listings');
+    } finally {
+      setLoadingActiveListings(false);
+    }
+  }, [userPublicKey]);
 
   /**
    * Post creation logic
@@ -123,56 +205,71 @@ export default function ThreadComposer({
   const handlePost = async () => {
     if (!textValue.trim() && !selectedImage && !selectedListingNft) return;
 
-    const sections: ThreadSection[] = [];
-
-    // Text section
-    if (textValue.trim()) {
-      sections.push({
-        id: 'section-' + Math.random().toString(36).substr(2, 9),
-        type: 'TEXT_ONLY' as ThreadSectionType,
-        text: textValue.trim(),
-      });
-    }
-
-    // Image section
-    if (selectedImage) {
-      sections.push({
-        id: 'section-' + Math.random().toString(36).substr(2, 9),
-        type: 'TEXT_IMAGE',
-        imageUrl: {uri: selectedImage},
-      });
-    }
-
-    // NFT listing
-    if (selectedListingNft) {
-      sections.push({
-        id: 'section-' + Math.random().toString(36).substr(2, 9),
-        type: 'NFT_LISTING',
-        listingData: {
-          mint: selectedListingNft.mint,
-          owner: currentUser.id, // wallet address
-          priceSol: undefined, // or logic if you have a price
-          name: selectedListingNft.name,
-          image: selectedListingNft.image,
-        },
-      });
-    }
-
-    // Fallback post if network fails
-    const fallbackPost = {
-      id: 'local-' + Math.random().toString(36).substr(2, 9),
-      userId: currentUser.id,
-      user: currentUser,
-      sections,
-      createdAt: new Date().toISOString(),
-      parentId: parentId ?? undefined,
-      replies: [],
-      reactionCount: 0,
-      retweetCount: 0,
-      quoteCount: 0,
-    };
+    // Show loading indicator
+    setIsSubmitting(true);
 
     try {
+      const sections: ThreadSection[] = [];
+
+      // Text section
+      if (textValue.trim()) {
+        sections.push({
+          id: 'section-' + Math.random().toString(36).substr(2, 9),
+          type: 'TEXT_ONLY' as ThreadSectionType,
+          text: textValue.trim(),
+        });
+      }
+
+      // Image section - upload image to IPFS first
+      if (selectedImage) {
+        try {
+          // First upload the image to IPFS
+          const uploadedImageUrl = await uploadThreadImage(currentUser.id, selectedImage);
+
+          // Once we have the IPFS URL, add it to sections
+          sections.push({
+            id: 'section-' + Math.random().toString(36).substr(2, 9),
+            type: 'TEXT_IMAGE',
+            text: '', // Can be empty or contain caption text
+            imageUrl: { uri: uploadedImageUrl },
+          });
+        } catch (error) {
+          console.error('Failed to upload image:', error);
+          Alert.alert('Image Upload Error', 'Failed to upload image. Please try again.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // NFT listing
+      if (selectedListingNft) {
+        sections.push({
+          id: 'section-' + Math.random().toString(36).substr(2, 9),
+          type: 'NFT_LISTING',
+          listingData: {
+            mint: selectedListingNft.mint,
+            owner: currentUser.id, // wallet address
+            priceSol: undefined, // or logic if you have a price
+            name: selectedListingNft.name,
+            image: selectedListingNft.image,
+          },
+        });
+      }
+
+      // Fallback post if network fails
+      const fallbackPost = {
+        id: 'local-' + Math.random().toString(36).substr(2, 9),
+        userId: currentUser.id,
+        user: currentUser,
+        sections,
+        createdAt: new Date().toISOString(),
+        parentId: parentId ?? undefined,
+        replies: [],
+        reactionCount: 0,
+        retweetCount: 0,
+        quoteCount: 0,
+      };
+
       if (parentId) {
         // create a reply by passing only the user id
         await dispatch(
@@ -202,48 +299,81 @@ export default function ThreadComposer({
         'Network request failed, adding post locally:',
         error.message,
       );
+
+      // Create a local fallback post with the sections we have
+      const fallbackPost = {
+        id: 'local-' + Math.random().toString(36).substr(2, 9),
+        userId: currentUser.id,
+        user: currentUser,
+        sections: [], // We can't add the sections here because we don't have the image URLs
+        createdAt: new Date().toISOString(),
+        parentId: parentId ?? undefined,
+        replies: [],
+        reactionCount: 0,
+        retweetCount: 0,
+        quoteCount: 0,
+      };
+
       if (parentId) {
-        dispatch(addReplyLocally({parentId, reply: fallbackPost}));
+        dispatch(addReplyLocally({ parentId, reply: fallbackPost }));
       } else {
         dispatch(addPostLocally(fallbackPost));
       }
+
       setTextValue('');
       setSelectedImage(null);
       setSelectedListingNft(null);
       onPostCreated && onPostCreated();
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (userPublicKey) {
+      fetchActiveListings();
+    }
+  }, [userPublicKey, fetchActiveListings]);
 
   /**
    * Media picking
    */
-  const handleMediaPress = () => {
-    const options: ImageLibraryOptions = {
-      mediaType: 'photo',
-      quality: 1,
-      includeBase64: true,
-    };
-    launchImageLibrary(options, response => {
-      if (response.didCancel) {
-        console.log('User cancelled image picker');
-      } else if (response.errorCode) {
-        console.log('ImagePicker Error:', response.errorMessage);
-      } else if (response.assets && response.assets.length > 0) {
-        const asset = response.assets[0];
-        if (asset.base64 && asset.type) {
-          setSelectedImage(`data:${asset.type};base64,${asset.base64}`);
-        } else if (asset.uri) {
-          setSelectedImage(asset.uri);
-        }
+  const handleMediaPress = useCallback(async () => {
+    try {
+      // Request permissions first
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow access to your photo library to attach images.');
+        return;
       }
-    });
-  };
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: false,
+        quality: 0.8,
+        allowsEditing: true,
+        aspect: [1, 1]
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const pickedUri = result.assets[0].uri;
+        setSelectedImage(pickedUri);
+      }
+    } catch (error: any) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error picking image', error.message);
+    }
+  }, []);
 
   /**
    * Listing Flow
    */
   const handleNftListingPress = () => {
-    setShowListingModal(true);
+    // Refresh listings when the modal is opened
+    fetchActiveListings().then(() => {
+      setShowListingModal(true);
+    });
   };
 
   const handleSelectListing = (item: NftItem) => {
@@ -258,10 +388,10 @@ export default function ThreadComposer({
           <Image
             source={
               storedProfilePic
-                ? {uri: storedProfilePic}
+                ? { uri: storedProfilePic }
                 : currentUser.avatar
-                ? currentUser.avatar
-                : DEFAULT_IMAGES.user
+                  ? currentUser.avatar
+                  : DEFAULT_IMAGES.user
             }
             style={styles.composerAvatar}
           />
@@ -270,6 +400,7 @@ export default function ThreadComposer({
         <View style={styles.composerMiddle}>
           <Text style={styles.composerUsername}>{currentUser.username}</Text>
           <TextInput
+            ref={inputRef}
             style={styles.composerInput}
             placeholder={parentId ? 'Reply...' : "What's happening?"}
             placeholderTextColor="#999"
@@ -280,20 +411,28 @@ export default function ThreadComposer({
 
           {/* Selected image preview */}
           {selectedImage && (
-            <Image
-              source={{uri: selectedImage}}
-              style={{width: 100, height: 100, marginTop: 10}}
-            />
+            <View style={styles.imagePreviewContainer}>
+              <Image
+                source={{ uri: selectedImage }}
+                style={styles.imagePreview}
+                resizeMode="cover"
+              />
+              <TouchableOpacity
+                style={styles.removeImageButton}
+                onPress={() => setSelectedImage(null)}>
+                <Text style={styles.removeImageButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {/* NFT listing preview */}
           {selectedListingNft && (
             <View style={styles.composerTradePreview}>
               <Image
-                source={{uri: selectedListingNft.image}}
+                source={{ uri: selectedListingNft.image }}
                 style={styles.composerTradeImage}
               />
-              <View style={{marginLeft: 8, flex: 1}}>
+              <View style={{ marginLeft: 8, flex: 1 }}>
                 <Text style={styles.composerTradeName} numberOfLines={1}>
                   {selectedListingNft.name}
                 </Text>
@@ -302,7 +441,7 @@ export default function ThreadComposer({
               <TouchableOpacity
                 style={styles.composerTradeRemove}
                 onPress={() => setSelectedListingNft(null)}>
-                <Text style={{color: '#fff', fontWeight: '600'}}>X</Text>
+                <Text style={{ color: '#fff', fontWeight: '600' }}>X</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -316,86 +455,56 @@ export default function ThreadComposer({
 
               <TouchableOpacity
                 onPress={handleNftListingPress}
-                style={{marginLeft: 8}}>
-                <Text style={{fontSize: 12, color: '#666666'}}>
+                style={{ marginLeft: 8 }}>
+                <Text style={{ fontSize: 12, color: '#666666' }}>
                   NFT Listing
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => setShowTradeModal(true)}
-                style={{marginLeft: 8}}>
-                <Text style={{fontSize: 12, color: '#333333'}}>
+                style={{ marginLeft: 8 }}>
+                <Text style={{ fontSize: 12, color: '#333333' }}>
                   Trade/Share
                 </Text>
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity onPress={handlePost}>
-              <Text style={{color: '#1d9bf0', fontWeight: '600'}}>
-                {parentId ? 'Reply' : 'Post'}
-              </Text>
+            <TouchableOpacity
+              onPress={handlePost}
+              disabled={isSubmitting}
+              style={{
+                opacity: isSubmitting ? 0.6 : 1,
+                flexDirection: 'row',
+                alignItems: 'center'
+              }}>
+              {isSubmitting ? (
+                <>
+                  <ActivityIndicator size="small" color="#1d9bf0" style={{ marginRight: 5 }} />
+                  <Text style={{ color: '#1d9bf0', fontWeight: '600' }}>
+                    {parentId ? 'Replying...' : 'Posting...'}
+                  </Text>
+                </>
+              ) : (
+                <Text style={{ color: '#1d9bf0', fontWeight: '600' }}>
+                  {parentId ? 'Reply' : 'Post'}
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
       </View>
 
       {/* Listing Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
+      <NftListingModal
         visible={showListingModal}
-        onRequestClose={() => setShowListingModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>NFT Listing Modal</Text>
-
-            {loadingListings ? (
-              <ActivityIndicator
-                size="large"
-                color="#1d9bf0"
-                style={{marginTop: 20}}
-              />
-            ) : fetchNftsError ? (
-              <Text style={{marginTop: 16, color: '#666', textAlign: 'center'}}>
-                {fetchNftsError}
-              </Text>
-            ) : listingItems.length === 0 ? (
-              <Text style={{marginTop: 16, color: '#666', textAlign: 'center'}}>
-                No NFTs found.
-              </Text>
-            ) : (
-              <FlatList
-                data={listingItems}
-                keyExtractor={item => item.mint}
-                renderItem={({item}) => (
-                  <TouchableOpacity
-                    style={styles.listingCard}
-                    onPress={() => handleSelectListing(item)}>
-                    <Image
-                      source={{uri: item.image}}
-                      style={styles.listingImage}
-                    />
-                    <View style={{flex: 1, marginLeft: 10}}>
-                      <Text style={styles.listingName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      {/* Optional: show item.collection */}
-                    </View>
-                  </TouchableOpacity>
-                )}
-                style={{marginTop: 10, width: '100%'}}
-              />
-            )}
-
-            <TouchableOpacity
-              onPress={() => setShowListingModal(false)}
-              style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowListingModal(false)}
+        onSelectListing={handleSelectListing}
+        listingItems={activeListings}
+        loadingListings={loadingActiveListings}
+        fetchNftsError={activeListingsError}
+        styles={styles} // Pass your existing styles
+      />
 
       {/* Trade Modal */}
       <TradeModal
@@ -406,4 +515,6 @@ export default function ThreadComposer({
       />
     </View>
   );
-}
+});
+
+export default ThreadComposer;

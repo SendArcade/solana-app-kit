@@ -1,5 +1,5 @@
 // File: src/screens/TokenMillScreen/components/SwapCard.tsx
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,15 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
-import {Connection} from '@solana/web3.js';
+import { Connection } from '@solana/web3.js';
 import { swapTokens } from '../../services/tokenMill/tokenMillService';
+import { StandardWallet } from '../../hooks/useAuth';
 
 interface Props {
   marketAddress: string;
   connection: Connection;
   publicKey: string;
-  solanaWallet: any;
+  solanaWallet: StandardWallet | any;
   setLoading: (val: boolean) => void;
 }
 
@@ -26,70 +27,99 @@ export default function SwapCard({
   solanaWallet,
   setLoading,
 }: Props) {
+  const [amount, setAmount] = useState('1');
   const [swapType, setSwapType] = useState<'buy' | 'sell'>('buy');
-  const [swapAmount, setSwapAmount] = useState('1000000');
+  const [status, setStatus] = useState<string | null>(null);
 
   const onPressSwap = async () => {
     if (!marketAddress) {
-      Alert.alert('Error', 'Market address is required.');
+      Alert.alert('No market', 'Please enter or create a market first!');
       return;
     }
     try {
       setLoading(true);
-      const provider = await solanaWallet.getProvider();
+      setStatus('Preparing transaction...');
+
       const txSig = await swapTokens({
         marketAddress,
         swapType,
-        swapAmount: parseFloat(swapAmount),
+        swapAmount: parseFloat(amount),
         userPublicKey: publicKey,
         connection,
-        provider,
+        solanaWallet,
+        onStatusUpdate: (newStatus) => {
+          console.log('Swap status:', newStatus);
+          setStatus(newStatus);
+        }
       });
-      Alert.alert('Swap Success', `Signature: ${txSig}`);
+
+      setStatus('Swap completed successfully!');
+      Alert.alert('Swap Complete', `Tx: ${txSig}`);
     } catch (err: any) {
-      Alert.alert('Swap Error', err.message);
+      console.error('Swap error:', err);
+      // Don't show raw error in UI
+      setStatus('Transaction failed');
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+        setStatus(null);
+      }, 2000);
     }
   };
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Swap (Buy/Sell)</Text>
-      <View style={styles.row}>
+      <Text style={styles.sectionTitle}>Swap</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Amount"
+        value={amount}
+        onChangeText={setAmount}
+        keyboardType="decimal-pad"
+        editable={!status}
+      />
+
+      <View style={styles.tabContainer}>
         <TouchableOpacity
-          style={[styles.swapBtn, swapType === 'buy' && styles.swapBtnActive]}
-          onPress={() => setSwapType('buy')}>
+          style={[styles.tab, swapType === 'buy' && styles.selectedTab]}
+          onPress={() => setSwapType('buy')}
+          disabled={!!status}>
           <Text
             style={[
-              styles.swapBtnText,
-              swapType === 'buy' && styles.swapBtnTextActive,
+              styles.tabText,
+              swapType === 'buy' && styles.selectedTabText,
             ]}>
             Buy
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.swapBtn, swapType === 'sell' && styles.swapBtnActive]}
-          onPress={() => setSwapType('sell')}>
+          style={[styles.tab, swapType === 'sell' && styles.selectedTab]}
+          onPress={() => setSwapType('sell')}
+          disabled={!!status}>
           <Text
             style={[
-              styles.swapBtnText,
-              swapType === 'sell' && styles.swapBtnTextActive,
+              styles.tabText,
+              swapType === 'sell' && styles.selectedTabText,
             ]}>
             Sell
           </Text>
         </TouchableOpacity>
       </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Swap Amount"
-        value={swapAmount}
-        onChangeText={setSwapAmount}
-      />
+      {status && (
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>{status}</Text>
+        </View>
+      )}
 
-      <TouchableOpacity style={styles.button} onPress={onPressSwap}>
-        <Text style={styles.buttonText}>Swap</Text>
+      <TouchableOpacity
+        style={[styles.button, status ? { opacity: 0.7 } : {}]}
+        onPress={onPressSwap}
+        disabled={!!status}>
+        <Text style={styles.buttonText}>
+          {swapType === 'buy' ? 'Buy Tokens' : 'Sell Tokens'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -109,29 +139,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: '#2a2a2a',
   },
-  row: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    justifyContent: 'space-between',
-  },
-  swapBtn: {
-    flex: 1,
-    backgroundColor: '#eee',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  swapBtnActive: {
-    backgroundColor: '#2a2a2a',
-  },
-  swapBtnText: {
-    color: '#2a2a2a',
-    fontWeight: '600',
-  },
-  swapBtnTextActive: {
-    color: '#fff',
-  },
   input: {
     backgroundColor: '#fafafa',
     paddingHorizontal: 12,
@@ -140,6 +147,42 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderWidth: 1,
     marginBottom: 12,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 6,
+    marginHorizontal: 2,
+  },
+  selectedTab: {
+    backgroundColor: '#2a2a2a',
+    borderColor: '#2a2a2a',
+  },
+  tabText: {
+    color: '#2a2a2a',
+    fontWeight: '600',
+  },
+  selectedTabText: {
+    color: '#fff',
+  },
+  statusContainer: {
+    backgroundColor: '#f8f8f8',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  statusText: {
+    color: '#333',
+    fontSize: 14,
+    textAlign: 'center',
   },
   button: {
     backgroundColor: '#2a2a2a',

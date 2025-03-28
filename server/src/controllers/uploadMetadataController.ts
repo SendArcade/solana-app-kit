@@ -26,7 +26,16 @@ export async function UploadMetadataController(
     }
 
     // Upload image and metadata to IPFS via Pump.fun
-    const imagePath = req.file.path;
+    // Use buffer instead of path since we're using memory storage
+    const imageBuffer = req.file.buffer;
+    if (!imageBuffer) {
+      res.status(400).json({
+        success: false,
+        error: 'Image buffer is missing from the uploaded file',
+      });
+      return;
+    }
+
     const metadataObj = {
       name: tokenName,
       symbol: tokenSymbol,
@@ -36,7 +45,7 @@ export async function UploadMetadataController(
       telegram: telegram || '',
       website: website || '',
     };
-    const metadataUri = await uploadToIpfs(imagePath, metadataObj);
+    const metadataUri = await uploadToIpfs(imageBuffer, metadataObj);
 
     res.json({
       success: true,

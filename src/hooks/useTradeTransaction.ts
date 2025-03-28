@@ -1,138 +1,70 @@
-// FILE: src/hooks/useTradeTransaction.ts
-
-import {useSelector} from 'react-redux';
-import {Alert} from 'react-native';
-import {useEmbeddedSolanaWallet} from '@privy-io/expo';
+// File: src/hooks/useTradeTransaction.ts
+import { useSelector } from 'react-redux';
+import { Alert } from 'react-native';
 import {
   Connection,
   clusterApiUrl,
-  SystemProgram,
-  PublicKey,
-  TransactionInstruction,
-  LAMPORTS_PER_SOL,
-  VersionedTransaction,
-  Transaction,
   Cluster,
 } from '@solana/web3.js';
-import {sendPriorityTransaction} from '../utils/transactions/sendPriorityTx';
-import {sendJitoBundleTransaction} from '../utils/transactions/sendJitoBundleTx';
-import {RootState} from '../state/store';
-import {useCustomization} from '../CustomizationProvider';
-import {CLUSTER, HELIUS_RPC_URL, SERVER_URL} from '@env';
-import {ENDPOINTS, PUBLIC_KEYS} from '../config/constants';
+
+import { RootState } from '../state/store';
+import { useCustomization } from '../CustomizationProvider';
+import { useAuth } from '../hooks/useAuth';
+import { ENDPOINTS } from '../config/constants';
+import { CLUSTER, SERVER_URL } from '@env';
+import { 
+  sendSOL, 
+  sendTransactionWithPriorityFee 
+} from '../utils/transactions/transactionUtils';
+import { TransactionService } from '../services/transaction/transactionService';
 
 /**
- * Hook to handle trade transactions.
- *
- * Now, sendTrade accepts a mode ('priority' | 'jito'),
- * a recipient address, and an amount in SOL.
+ * Hook to handle trade transactions for both Privy & Dynamic.
+ * This hook provides backward compatibility with existing code.
  */
 export function useTradeTransaction() {
-  const solanaWallet = useEmbeddedSolanaWallet();
-  const {transaction: transactionConfig} = useCustomization();
-  const selectedFeeTier = useSelector(
-    (state: RootState) => state.transaction.selectedFeeTier,
-  );
+  const { transaction: transactionConfig } = useCustomization();
+  const currentProvider = useSelector((state: RootState) => state.auth.provider);
+  const { wallet } = useAuth();
 
-  /**
-   * sendTrade:
-   * 1. Accepts additional parameters: recipient (string) and amountSol (number).
-   * 2. Constructs a SystemProgram.transfer instruction for the given recipient and amount.
-   * 3. Uses the priority or Jito transaction method based on the mode.
-   *
-   * @param mode - Either 'priority' or 'jito'
-   * @param recipient - SOL address to send funds to.
-   * @param amountSol - Amount in SOL to send.
-   */
   const sendTrade = async (
     mode: 'priority' | 'jito',
     recipient: string,
     amountSol: number,
   ) => {
-    const walletPublicKey =
-      solanaWallet.wallets && solanaWallet.wallets.length > 0
-        ? solanaWallet.wallets[0].publicKey
-        : null;
-    if (!solanaWallet || !walletPublicKey) {
-      Alert.alert('Wallet Error', 'Wallet not connected');
-      return;
-    }
+    console.log(
+      `[useTradeTransaction] Called sendTrade with mode=${mode}, recipient=${recipient}, amountSol=${amountSol}, provider=${currentProvider}`
+    );
+
+    // Force devnet in code
+    const connection = new Connection(clusterApiUrl(CLUSTER as Cluster), 'confirmed');
 
     try {
-      const provider = solanaWallet.getProvider
-        ? await solanaWallet.getProvider()
-        : null;
-      if (!provider || typeof provider.request !== 'function') {
-        Alert.alert(
-          'Provider Error',
-          'Provider does not support signing transactions.',
-        );
+      if (!wallet) {
+        Alert.alert('Error', 'Wallet not connected');
         return;
       }
 
-      // Determine the RPC endpoint.
-      const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
-      const connection = new Connection(rpcUrl, 'confirmed');
-      const senderPubkey = new PublicKey(walletPublicKey);
-      console.log('senderPubkey', senderPubkey);
-      console.log('walletPublicKey', walletPublicKey);
-      const receiverPubkey = new PublicKey(recipient.trim());
-      console.log('receiverPubkey', receiverPubkey);
-
-      const balance = await connection.getBalance(senderPubkey);
-      // Convert the SOL amount to lamports.
-      const transferLamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
-      const estimatedFee = 500000; // Estimated fee in lamports..
-      const totalRequired = transferLamports + estimatedFee;
-
-      console.log('balance', balance);
-      if (balance < totalRequired) {
-        Alert.alert(
-          'Insufficient Balance',
-          `Your wallet has ${balance} lamports, but the transaction requires ${totalRequired} lamports (including fees).`,
-        );
-        return;
-      }
-
-   
-
-      let txSignature: string;
-      const transferInstruction = SystemProgram.transfer({
-        fromPubkey: senderPubkey,
-        toPubkey: receiverPubkey,
-        lamports: transferLamports,
+      // Use our centralized sendSOL function 
+      const signature = await sendSOL({
+        wallet,
+        recipientAddress: recipient,
+        amountSol,
+        connection,
+        onStatusUpdate: (status) => console.log(`[TradeTransaction] ${status}`),
       });
-      const instructions: TransactionInstruction[] = [transferInstruction];
-
-      if (mode === 'priority') {
-        txSignature = await sendPriorityTransaction(
-          provider,
-          selectedFeeTier,
-          instructions,
-          connection,
-          senderPubkey,
-          transactionConfig.feeTiers,
-        );
-      } else if (mode === 'jito') {
-        txSignature = await sendJitoBundleTransaction(
-          provider,
-          selectedFeeTier,
-          instructions,
-          senderPubkey,
-          connection,
-          transactionConfig.feeTiers,
-        );
-      } else {
-        throw new Error('Invalid mode');
-      }
-
-      Alert.alert('Transaction Sent', `Signature: ${txSignature}`);
-      console.log('[Trade] Transaction sent successfully', txSignature);
-    } catch (error: any) {
-      Alert.alert('Transaction Error', error.message);
+      
+      Alert.alert('Transaction Sent', `Signature: ${signature}`);
+      return signature;
+    } catch (err: any) {
+      console.error('[useTradeTransaction] Error in sendTrade:', err);
+      Alert.alert('Transaction Error', err.message || String(err));
     }
   };
 
+  /**
+   * replicateJupiterTrade example
+   */
   async function replicateJupiterTrade(
     tradeData: {
       token1Avatar?: any;
@@ -149,23 +81,18 @@ export function useTradeTransaction() {
       aggregator?: string;
     },
     mode: 'priority' | 'jito',
-  ): Promise<void> {
-    const walletPublicKey =
-      solanaWallet.wallets && solanaWallet.wallets.length > 0
-        ? solanaWallet.wallets[0].publicKey
-        : null;
-    if (!solanaWallet || !walletPublicKey) {
-      throw new Error('Wallet not connected');
-    }
-
-    if (
-      !tradeData.inputMint ||
-      !tradeData.outputMint ||
-      !tradeData.inputAmountLamports
-    ) {
+  ): Promise<string | void> {
+    if (!tradeData.inputMint ||
+        !tradeData.outputMint ||
+        !tradeData.inputAmountLamports) {
       throw new Error('Insufficient tradeData to replicate Jupiter swap.');
     }
-
+    
+    // Exit early if wallet is not available
+    if (!wallet) {
+      throw new Error('Wallet not connected');
+    }
+    
     try {
       // 1) Re-quote from Jupiter
       const quoteUrl = `https://api.jup.ag/swap/v1/quote?inputMint=${tradeData.inputMint}&outputMint=${tradeData.outputMint}&amount=${tradeData.inputAmountLamports}&slippageBps=50&swapMode=ExactIn`;
@@ -182,7 +109,7 @@ export function useTradeTransaction() {
       // 2) Call server endpoint to get the swap transaction
       const serverBody = {
         quoteResponse: quoteData,
-        userPublicKey: walletPublicKey.toString(),
+        userPublicKey: wallet.address || wallet.publicKey,
       };
       const swapResp = await fetch(`${SERVER_URL}/api/jupiter/swap`, {
         method: 'POST',
@@ -197,37 +124,26 @@ export function useTradeTransaction() {
         );
       }
 
-      // 3) Deserialize and sign the transaction
-      const {swapTransaction} = swapData;
-      const txBuffer = Buffer.from(swapTransaction, 'base64');
-      let transaction;
-      try {
-        transaction = VersionedTransaction.deserialize(txBuffer);
-      } catch (e) {
-        transaction = Transaction.from(txBuffer);
-      }
-
-      const provider = solanaWallet.wallets && solanaWallet.wallets.length > 0
-        ? await solanaWallet.wallets[0].getProvider()
-        : null;
-      if (!provider) {
-        throw new Error('Provider not available');
-      }
+      // 3) Use the transaction service to sign and send the base64 transaction
       const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
       const connection = new Connection(rpcUrl, 'confirmed');
-      const {signature} = await provider.request({
-        method: 'signAndSendTransaction',
-        params: {transaction, connection},
-      });
-      if (!signature) {
-        throw new Error('No signature returned from replicateJupiterTrade');
-      }
+      
+      // Use TransactionService through our centralized utility
+      const signature = await TransactionService.signAndSendTransaction(
+        { type: 'base64', data: swapData.swapTransaction },
+        wallet,
+        {
+          connection,
+          statusCallback: (status: string) => console.log(`[JupiterTrade] ${status}`),
+        }
+      );
 
       Alert.alert('Trade Copied!', `Tx Signature: ${signature}`);
+      return signature;
     } catch (err: any) {
       throw err;
     }
   }
 
-  return {sendTrade, replicateJupiterTrade};
+  return { sendTrade, replicateJupiterTrade };
 }

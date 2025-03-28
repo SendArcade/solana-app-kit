@@ -1,47 +1,128 @@
 // File: src/screens/SampleUI/Threads/OtherProfileScreen/OtherProfileScreen.tsx
-import React, {useEffect, useState, useMemo} from 'react';
-import {View, StyleSheet, Platform} from 'react-native';
-import {useRoute, RouteProp, useNavigation} from '@react-navigation/native';
-import {RootStackParamList} from '../../../../navigation/RootNavigator';
-import {useAppDispatch, useAppSelector} from '../../../../hooks/useReduxHooks';
-import {fetchUserProfile} from '../../../../state/auth/reducer';
+import React, { useEffect, useState, useMemo } from 'react';
+import { View, StyleSheet, Platform, Alert, ActivityIndicator, Text } from 'react-native';
+import { useRoute, RouteProp, useNavigation, useFocusEffect } from '@react-navigation/native';
+import { RootStackParamList } from '../../../../navigation/RootNavigator';
+import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks';
 import Profile from '../../../../components/Profile/profile';
-import {ThreadPost} from '../../../../components/thread/thread.types';
-import {fetchAllPosts} from '../../../../state/thread/reducer';
-import {NftItem, useFetchNFTs} from '../../../../hooks/useFetchNFTs';
+import { ThreadPost } from '../../../../components/thread/thread.types';
+import { fetchAllPosts } from '../../../../state/thread/reducer';
+import { NftItem, useFetchNFTs } from '../../../../hooks/useFetchNFTs';
 import COLORS from '../../../../assets/colors';
+import { SERVER_URL } from '@env';
+import { flattenPosts } from '../../../../components/thread/thread.utils';
+
+const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 
 type OtherProfileRouteProp = RouteProp<RootStackParamList, 'OtherProfile'>;
 
 export default function OtherProfileScreen() {
   const route = useRoute<OtherProfileRouteProp>();
-  const {userId} = route.params; // The user's wallet address or ID from the route
+  const { userId } = route.params; // The user's wallet address or ID from the route
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
+
+  // Get current wallet provider from Redux
+  const provider = useAppSelector(state => state.auth.provider);
+  const myWallet = useAppSelector(state => state.auth.address);
 
   // Data from Redux
   const allPosts = useAppSelector(state => state.thread.allPosts);
   const [myPosts, setMyPosts] = useState<ThreadPost[]>([]);
   const [username, setUsername] = useState('Loading...');
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
+  const [attachmentData, setAttachmentData] = useState<any>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  // Track the current profile ID to handle navigation between profiles
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
 
-  // Fetch user profile from server (like we do in ProfileScreen)
+  // Check if the user we're trying to view is ourselves
+  const isOwnProfile = useMemo(() => {
+    if (!myWallet || !userId) return false;
+    return myWallet.toLowerCase() === userId.toLowerCase();
+  }, [myWallet, userId]);
+
+  // If it's our own profile, redirect to ProfileScreen
   useEffect(() => {
-    if (!userId) return;
-    dispatch(fetchUserProfile(userId))
-      .unwrap()
-      .then(value => {
-        if (value.profilePicUrl) {
-          setProfilePicUrl(value.profilePicUrl);
+    if (isOwnProfile) {
+      navigation.navigate('ProfileScreen' as never);
+    }
+  }, [isOwnProfile, navigation]);
+
+  // Reset user data when userId changes, especially when navigating between different users
+  useEffect(() => {
+    if (userId !== currentProfileId) {
+      // Clear previous user data when viewing a different user
+      setUsername('Loading...');
+      setProfilePicUrl(null);
+      setAttachmentData({});
+      setCurrentProfileId(userId);
+      setLoading(true);
+    }
+  }, [userId, currentProfileId]);
+
+  // Refetch when screen comes into focus to ensure fresh data
+  useFocusEffect(
+    React.useCallback(() => {
+      // Only fetch if we have a userId and it doesn't match the current profile
+      if (userId && (!currentProfileId || userId !== currentProfileId)) {
+        const fetchUserData = async () => {
+          setLoading(true);
+          await fetchData();
+        };
+        fetchUserData();
+      }
+      return () => {
+        // Cleanup if needed
+      };
+    }, [userId, currentProfileId])
+  );
+
+  // Fetch user profile from server directly, not through auth reducer
+  const fetchData = async () => {
+    if (!userId) {
+      setError('No user ID provided');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      // Fetch profile directly from API instead of using auth reducer
+      const response = await fetch(
+        `${SERVER_BASE_URL}/api/profile?userId=${userId}`,
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        if (data.url) {
+          setProfilePicUrl(data.url);
         }
-        if (value.username) {
-          setUsername(value.username);
+        if (data.username) {
+          setUsername(data.username);
         }
-      })
-      .catch(err => {
-        console.warn('Failed to fetch user profile for other user:', err);
-      });
-  }, [userId, dispatch]);
+        if (data.attachmentData) {
+          setAttachmentData(data.attachmentData);
+        }
+      } else {
+        throw new Error(data.error || 'Failed to fetch user profile');
+      }
+    } catch (err: any) {
+      console.warn('Failed to fetch user profile for other user:', err);
+      setError(`Couldn't load profile data: ${err.message || 'Unknown error'}`);
+      // Don't show the error to the user, just set default values
+      setUsername('Unknown User');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial profile fetch
+  useEffect(() => {
+    fetchData();
+  }, [userId]); // Remove provider dependency
 
   // Fetch all posts so we can filter
   useEffect(() => {
@@ -56,16 +137,51 @@ export default function OtherProfileScreen() {
       setMyPosts([]);
       return;
     }
-    const userPosts = allPosts.filter(
-      p => p.user.id.toLowerCase() === userId.toLowerCase(),
-    );
-    // sort by createdAt desc
-    userPosts.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
-    setMyPosts(userPosts);
+
+    try {
+      // Use the flattenPosts utility to get all posts including nested replies
+      const flattenedPosts = flattenPosts(allPosts);
+      
+      // Filter for posts by this user
+      const userPosts = flattenedPosts.filter(
+        (p: ThreadPost) => p.user?.id?.toLowerCase() === userId.toLowerCase()
+      );
+      
+      // Sort by creation date, newest first
+      userPosts.sort((a: ThreadPost, b: ThreadPost) => (new Date(b.createdAt) > new Date(a.createdAt) ? 1 : -1));
+      
+      setMyPosts(userPosts);
+    } catch (error) {
+      console.error('Error filtering posts:', error);
+      setMyPosts([]);
+    }
   }, [allPosts, userId]);
 
-  // Also fetch NFTs using the custom hook
-  const {nfts, loading: loadingNfts, error: nftsError} = useFetchNFTs(userId);
+  // Custom useFetchNFTs hook with error handling for Dynamic wallet
+  const {
+    nfts,
+    loading: loadingNfts,
+    error: nftsError
+  } = useFetchNFTs(userId, { providerType: provider });
+
+  // Show a loading spinner while profile data is being fetched
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#1d9bf0" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
+
+  // Show error message if something went wrong
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
 
   return (
     <View
@@ -79,10 +195,11 @@ export default function OtherProfileScreen() {
           address: userId,
           profilePicUrl: profilePicUrl || '',
           username: username,
+          attachmentData: attachmentData,
         }}
         posts={myPosts}
         nfts={nfts}
-        loadingNfts={loadingNfts}
+        loadingNfts={loadingNfts || loading}
         fetchNftsError={nftsError}
       />
     </View>
@@ -96,5 +213,20 @@ const styles = StyleSheet.create({
   },
   androidSafeArea: {
     paddingTop: 30,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#555',
+  },
+  errorText: {
+    fontSize: 16,
+    color: 'red',
+    textAlign: 'center',
+    padding: 20,
   },
 });

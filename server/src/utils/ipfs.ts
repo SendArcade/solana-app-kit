@@ -5,12 +5,21 @@ import path from 'path';
 import FormData from 'form-data';
 
 export async function uploadToIpfs(
-  imagePath: string,
+  imagePathOrBuffer: string | Buffer,
   metadata: Record<string, any>,
 ): Promise<string> {
   const { default: fetch } = await import('node-fetch');
-  const resolvedPath = path.resolve(imagePath);
-  const fileBuffer = fs.readFileSync(resolvedPath);
+  
+  // Get file buffer either from path or directly from buffer
+  let fileBuffer: Buffer;
+  if (typeof imagePathOrBuffer === 'string') {
+    // It's a file path, read the file
+    const resolvedPath = path.resolve(imagePathOrBuffer);
+    fileBuffer = fs.readFileSync(resolvedPath);
+  } else {
+    // It's already a buffer
+    fileBuffer = imagePathOrBuffer;
+  }
 
   // 2) Create FormData with all required fields
   const formData = new FormData();

@@ -1,5 +1,5 @@
 // File: src/screens/TokenMillScreen/components/MarketCreationCard.tsx
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,14 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
-import {Connection} from '@solana/web3.js';
+import { Connection } from '@solana/web3.js';
 import { createMarket } from '../../services/tokenMill/tokenMillService';
+import { StandardWallet } from '../../hooks/useAuth';
 
 interface Props {
   connection: Connection;
   publicKey: string;
-  solanaWallet: any;
+  solanaWallet: StandardWallet | any;
   setLoading: (val: boolean) => void;
   onMarketCreated: (marketAddr: string, baseMint: string) => void;
 }
@@ -32,12 +33,14 @@ export default function MarketCreationCard({
   const [totalSupply, setTotalSupply] = useState('1000000');
   const [creatorFee, setCreatorFee] = useState('3300');
   const [stakingFee, setStakingFee] = useState('6200');
+  const [status, setStatus] = useState<string | null>(null);
 
   const onPressCreateMarket = async () => {
     try {
       setLoading(true);
-      const provider = await solanaWallet.getProvider();
-      const {txSignature, marketAddress, baseTokenMint} = await createMarket({
+      setStatus('Preparing market creation...');
+
+      const { txSignature, marketAddress, baseTokenMint } = await createMarket({
         tokenName,
         tokenSymbol,
         metadataUri,
@@ -46,17 +49,28 @@ export default function MarketCreationCard({
         stakingFee: parseInt(stakingFee, 10),
         userPublicKey: publicKey,
         connection,
-        provider,
+        solanaWallet,
+        onStatusUpdate: (newStatus) => {
+          console.log('Create market status:', newStatus);
+          setStatus(newStatus);
+        }
       });
+
+      setStatus('Market created successfully!');
       Alert.alert(
         'Market Created',
         `Market: ${marketAddress}\nTx: ${txSignature}`,
       );
       onMarketCreated(marketAddress, baseTokenMint);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      console.error('Create market error:', err);
+      // Don't show raw error in UI
+      setStatus('Transaction failed');
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+        setStatus(null);
+      }, 2000);
     }
   };
 
@@ -68,39 +82,54 @@ export default function MarketCreationCard({
         placeholder="Token Name"
         value={tokenName}
         onChangeText={setTokenName}
+        editable={!status}
       />
       <TextInput
         style={styles.input}
         placeholder="Token Symbol"
         value={tokenSymbol}
         onChangeText={setTokenSymbol}
+        editable={!status}
       />
       <TextInput
         style={styles.input}
         placeholder="Metadata URI"
         value={metadataUri}
         onChangeText={setMetadataUri}
+        editable={!status}
       />
       <TextInput
         style={styles.input}
         placeholder="Total Supply"
         value={totalSupply}
         onChangeText={setTotalSupply}
+        editable={!status}
       />
       <TextInput
         style={styles.input}
         placeholder="Creator Fee BPS"
         value={creatorFee}
         onChangeText={setCreatorFee}
+        editable={!status}
       />
       <TextInput
         style={styles.input}
         placeholder="Staking Fee BPS"
         value={stakingFee}
         onChangeText={setStakingFee}
+        editable={!status}
       />
 
-      <TouchableOpacity style={styles.button} onPress={onPressCreateMarket}>
+      {status && (
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>{status}</Text>
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={[styles.button, status ? { opacity: 0.7 } : {}]}
+        onPress={onPressCreateMarket}
+        disabled={!!status}>
         <Text style={styles.buttonText}>Create Market</Text>
       </TouchableOpacity>
     </View>
@@ -129,6 +158,18 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderWidth: 1,
     marginBottom: 12,
+  },
+  statusContainer: {
+    backgroundColor: '#f8f8f8',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  statusText: {
+    color: '#333',
+    fontSize: 14,
+    textAlign: 'center',
   },
   button: {
     backgroundColor: '#2a2a2a',

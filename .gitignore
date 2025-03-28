@@ -76,3 +76,12 @@ yarn-error.log
 .expo
 .bundle
 .env.local
+
+# Cursor IDE
+.cursor/
+.cursor-server/
+.cursor-workspace/
+.cursor-settings.json
+
+# Project specific
+.cursor/rules/solana-app-kit-coding-rules.mdc

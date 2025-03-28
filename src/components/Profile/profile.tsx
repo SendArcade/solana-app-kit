@@ -1,4 +1,5 @@
-import React, {useEffect, useState} from 'react';
+// File: src/components/Profile/profile.tsx
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   SafeAreaView,
@@ -14,19 +15,32 @@ import {
   TextInput,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import {useAppSelector, useAppDispatch} from '../../hooks/useReduxHooks';
+import { setStatusBarStyle } from 'expo-status-bar';
+import { useAppSelector, useAppDispatch } from '../../hooks/useReduxHooks';
 import {
   fetchUserProfile,
   updateProfilePic,
   updateUsername,
+  updateDescription,
 } from '../../state/auth/reducer';
-import {fetchAllPosts} from '../../state/thread/reducer';
-import {SERVER_URL} from '@env';
-import {ThreadPost} from '../thread/thread.types';
-import {NftItem, useFetchNFTs} from '../../hooks/useFetchNFTs';
+import { fetchAllPosts } from '../../state/thread/reducer';
+import { ThreadPost } from '../thread/thread.types';
+import { NftItem, useFetchNFTs } from '../../hooks/useFetchNFTs';
+import { useWallet } from '../../hooks/useWallet';
+import {
+  uploadProfileAvatar,
+  fetchFollowers,
+  fetchFollowing,
+  checkIfUserFollowsMe,
+} from '../../services/profileService';
+import { fetchWalletActionsWithCache, pruneOldActionData } from '../../state/profile/reducer';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { followUser, unfollowUser } from '../../state/users/reducer';
+import { useFetchPortfolio, AssetItem } from '../../hooks/useFetchTokens';
+import COLORS from '../../assets/colors';
 
-import ProfileInfo from './ProfileInfo/profileInfo';
-import SwipeTabs from './slider/slider';
+import ProfileView, { UserProfileData } from './ProfileView';
 import {
   styles,
   modalStyles,
@@ -34,38 +48,21 @@ import {
   inlineConfirmStyles,
   editNameModalStyles,
 } from './profile.style';
-import {flattenPosts} from '../thread/thread.utils';
-import {setStatusBarStyle} from 'expo-status-bar';
-import {useAppNavigation} from '../../hooks/useAppNavigation';
-import {followUser, unfollowUser} from '../../state/users/reducer';
+import { flattenPosts } from '../thread/thread.utils';
 
-/**
- * Data about the user whose profile we’re showing
- */
-export interface UserProfileData {
-  address: string;
-  profilePicUrl: string;
-  username: string;
-}
-
-/**
- * Props for the Profile component
- */
 export interface ProfileProps {
-  /** If true => show the "Edit Profile" flow, etc. */
   isOwnProfile?: boolean;
-  /** The user data (wallet address, profile image, display name) */
-  user: UserProfileData;
-  /** Pre-fetched posts (optional) */
+  user: {
+    address: string;
+    profilePicUrl?: string;
+    username?: string;
+    description?: string;
+    attachmentData?: any;
+  };
   posts?: ThreadPost[];
-  /** Pre-fetched NFTs (optional) */
   nfts?: NftItem[];
-  /** Whether NFT data is loading */
   loadingNfts?: boolean;
-  /** Any NFT fetch error */
   fetchNftsError?: string | null;
-
-  /** Optional styling for container */
   containerStyle?: object;
 }
 
@@ -80,208 +77,204 @@ export default function Profile({
 }: ProfileProps) {
   const dispatch = useAppDispatch();
   const allReduxPosts = useAppSelector(state => state.thread.allPosts);
-  const navigation = useAppNavigation();
-
-  // The “I am the logged-in user” wallet from Redux
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { address: currentWalletAddress } = useWallet();
   const myWallet = useAppSelector(state => state.auth.address);
 
-  // The user whose profile we are displaying
-  const userWallet = user?.address || null;
+  // Get profile actions from Redux state
+  const profileActions = useAppSelector(state => state.profile.actions);
 
-  // Local states for profile image & name
-  const [profilePicUrl, setProfilePicUrl] = useState<string>(
-    user?.profilePicUrl || '',
-  );
-  const [localUsername, setLocalUsername] = useState<string>(
-    user?.username || 'Anonymous',
-  );
+  const currentUserWallet = currentWalletAddress || myWallet;
+  const userWallet = user?.address || '';
+  const storedProfilePic = user?.profilePicUrl || '';
+  const customizationData = user?.attachmentData || {};
 
-  // Flattened posts for the user (including replies)
-  const [myPosts, setMyPosts] = useState<ThreadPost[]>(posts);
+  // Local states for profile data
+  const [profilePicUrl, setProfilePicUrl] = useState<string>(storedProfilePic);
+  const [localUsername, setLocalUsername] = useState<string>(user?.username || 'Anonymous');
+  const [localDescription, setLocalDescription] = useState<string>(user?.description || '');
 
-  // Real followers/following arrays
+  // Followers/following state
   const [followersList, setFollowersList] = useState<any[]>([]);
   const [followingList, setFollowingList] = useState<any[]>([]);
-
-  // If not my own profile, track if "I" am following them, and if they follow me
   const [amIFollowing, setAmIFollowing] = useState(false);
   const [areTheyFollowingMe, setAreTheyFollowingMe] = useState(false);
 
-  // NFT fetch logic
+  // NFT fetch hook - use it only when nfts are not provided via props
   const {
     nfts: fetchedNfts,
     loading: defaultNftLoading,
     error: defaultNftError,
   } = useFetchNFTs(userWallet || undefined);
+
+  // Portfolio fetch hook
+  const {
+    portfolio,
+    loading: loadingPortfolio,
+    error: portfolioError,
+  } = useFetchPortfolio(userWallet || undefined);
+
+  // For refreshing the portfolio data
+  const [refreshingPortfolio, setRefreshingPortfolio] = useState(false);
+
+  // Extract values with fallbacks
   const resolvedNfts = nfts.length > 0 ? nfts : fetchedNfts;
   const resolvedLoadingNfts = loadingNfts || defaultNftLoading;
   const resolvedNftError = fetchNftsError || defaultNftError;
 
-  // For picking an avatar or editing username (only if my own profile)
-  const [avatarOptionModalVisible, setAvatarOptionModalVisible] =
-    useState(false);
-  const [localFileUri, setLocalFileUri] = useState<string | null>(null);
-  const [selectedSource, setSelectedSource] = useState<
-    'library' | 'nft' | null
-  >(null);
-  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  // Get actions data from Redux
+  const myActions = useMemo(() => 
+    userWallet ? (profileActions.data[userWallet] || []) : [],
+    [userWallet, profileActions.data]
+  );
+  
+  const loadingActions = useMemo(() => 
+    !!userWallet && !!profileActions.loading[userWallet],
+    [userWallet, profileActions.loading]
+  );
+  
+  const fetchActionsError = useMemo(() => 
+    userWallet ? profileActions.error[userWallet] : null,
+    [userWallet, profileActions.error]
+  );
 
-  const [editNameModalVisible, setEditNameModalVisible] = useState(false);
-  const [tempName, setTempName] = useState(localUsername || '');
-
+  // --- Fetch Actions ---
   useEffect(() => {
-    setStatusBarStyle('dark');
-  }, []);
+    if (!userWallet) return;
+    
+    // Check if we have recent data to avoid unnecessary fetches
+    const lastFetched = profileActions.lastFetched[userWallet] || 0;
+    const currentTime = Date.now();
+    const isFresh = currentTime - lastFetched < 60000; // 1 minute
+    
+    // Only fetch if we don't have fresh data
+    if (!profileActions.data[userWallet]?.length || !isFresh) {
+      dispatch(fetchWalletActionsWithCache({ walletAddress: userWallet }));
+    }
+  }, [userWallet, dispatch, profileActions.data, profileActions.lastFetched]);
 
-  // Sync if external user data changes
+  // --- Fetch user profile if needed ---
   useEffect(() => {
-    setProfilePicUrl(user?.profilePicUrl || '');
-    setLocalUsername(user?.username || 'Anonymous');
-  }, [user]);
+    if (!userWallet) return;
+    dispatch(fetchUserProfile(userWallet))
+      .unwrap()
+      .then(value => {
+        if (value.profilePicUrl) setProfilePicUrl(value.profilePicUrl);
+        if (value.username) setLocalUsername(value.username);
+        if (value.description) setLocalDescription(value.description);
+      })
+      .catch(err => {
+        console.error('Failed to fetch user profile:', err);
+      });
+  }, [userWallet, dispatch]);
 
-  /**
-   * If we are viewing our own profile => fetch profile, followers, following
-   */
+  // --- Followers/Following logic ---
   useEffect(() => {
     if (!userWallet || !isOwnProfile) return;
-    // 1) fetch the profile from server
-    dispatch(fetchUserProfile(userWallet)).catch(err => {
-      console.error('Failed to fetch user profile:', err);
-    });
+    fetchFollowers(userWallet).then(list => setFollowersList(list));
+    fetchFollowing(userWallet).then(list => setFollowingList(list));
+  }, [userWallet, isOwnProfile]);
 
-    // 2) fetch my followers
-    if (SERVER_URL && userWallet) {
-      fetch(`${SERVER_URL}/api/profile/followers?userId=${userWallet}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.followers)) {
-            setFollowersList(data.followers);
-          }
-        })
-        .catch(e => console.warn('Error fetching my followers:', e));
-
-      // 3) fetch my following
-      fetch(`${SERVER_URL}/api/profile/following?userId=${userWallet}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.following)) {
-            setFollowingList(data.following);
-          }
-        })
-        .catch(e => console.warn('Error fetching my following:', e));
-    }
-  }, [dispatch, userWallet, isOwnProfile]);
-
-  /**
-   * If we are viewing someone else’s profile => fetch that user’s followers/following
-   * and check if I'm among them.
-   */
   useEffect(() => {
     if (!userWallet || isOwnProfile) return;
-    // fetch target user’s followers
-    if (SERVER_URL) {
-      fetch(`${SERVER_URL}/api/profile/followers?userId=${userWallet}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.followers)) {
-            setFollowersList(data.followers);
-            // Check if *I* am in there => amIFollowing = true
-            if (
-              myWallet &&
-              data.followers.findIndex((x: any) => x.id === myWallet) >= 0
-            ) {
-              setAmIFollowing(true);
-            } else {
-              setAmIFollowing(false);
-            }
-          }
-        })
-        .catch(e => console.warn('Error fetching target user followers:', e));
-
-      // fetch target user’s following
-      fetch(`${SERVER_URL}/api/profile/following?userId=${userWallet}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.following)) {
-            setFollowingList(data.following);
-          }
-        })
-        .catch(e => console.warn('Error fetching target user following:', e));
+    fetchFollowers(userWallet).then(followers => {
+      setFollowersList(followers);
+      if (currentUserWallet && followers.findIndex((x: any) => x.id === currentUserWallet) >= 0) {
+        setAmIFollowing(true);
+      } else {
+        setAmIFollowing(false);
+      }
+    });
+    fetchFollowing(userWallet).then(following => {
+      setFollowingList(following);
+    });
+    if (currentUserWallet) {
+      checkIfUserFollowsMe(currentUserWallet, userWallet).then(result => {
+        setAreTheyFollowingMe(result);
+      });
     }
+  }, [userWallet, isOwnProfile, currentUserWallet]);
 
-    // Also check if user is in *my* followers => do they follow me
-    if (SERVER_URL && myWallet) {
-      fetch(`${SERVER_URL}/api/profile/followers?userId=${myWallet}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.success && Array.isArray(data.followers)) {
-            if (data.followers.some((f: any) => f.id === userWallet)) {
-              setAreTheyFollowingMe(true);
-            } else {
-              setAreTheyFollowingMe(false);
-            }
-          }
-        })
-        .catch(e => console.warn('Error checking if they follow me:', e));
-    }
-  }, [userWallet, isOwnProfile, myWallet]);
-
-  /**
-   * Possibly fetch all posts if not provided
-   */
+  // --- Fetch posts if not provided ---
   useEffect(() => {
     if (!posts || posts.length === 0) {
-      dispatch(fetchAllPosts()).catch(err =>
-        console.error('Failed to fetch all posts:', err),
-      );
+      dispatch(fetchAllPosts()).catch(err => {
+        console.error('Failed to fetch posts:', err);
+      });
     }
   }, [posts, dispatch]);
 
-  /**
-   * Flatten all posts => filter for the user => show both root & replies
-   */
-  useEffect(() => {
-    if (!userWallet) {
-      setMyPosts([]);
-      return;
-    }
-    const basePosts = posts && posts.length > 0 ? posts : allReduxPosts;
-    const flattened = flattenPosts(basePosts);
-    // Show all posts belonging to this user
-    const userAllPosts = flattened.filter(
+  // --- Flatten & filter user posts ---
+  const myPosts = useMemo(() => {
+    if (!userWallet) return [];
+    
+    // Choose base posts from props or Redux
+    const base = posts && posts.length > 0 ? posts : allReduxPosts;
+    
+    // Use flattenPosts to extract all posts including nested replies
+    const flat = flattenPosts(base);
+    
+    // Filter for all posts where the user is the author
+    const userAll = flat.filter(
       p => p.user.id.toLowerCase() === userWallet.toLowerCase(),
     );
-    // Sort newest-first
-    userAllPosts.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
-    setMyPosts(userAllPosts);
-  }, [allReduxPosts, userWallet, posts]);
+    
+    // Sort by most recent first
+    userAll.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+    
+    return userAll;
+  }, [userWallet, posts, allReduxPosts]);
 
-  // ============== Follow / Unfollow ================
-  const handleFollow = async () => {
-    if (!myWallet || !userWallet) {
+  // --- Refresh Portfolio handler ---
+  const handleRefreshPortfolio = useCallback(async () => {
+    if (!userWallet) return;
+    setRefreshingPortfolio(true);
+    
+    try {
+      // Refresh actions with force refresh
+      await dispatch(fetchWalletActionsWithCache({ 
+        walletAddress: userWallet,
+        forceRefresh: true 
+      })).unwrap();
+      
+      // Wait for additional data refreshes
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (err) {
+      console.error('Error refreshing profile data:', err);
+    } finally {
+      setRefreshingPortfolio(false);
+    }
+  }, [userWallet, dispatch]);
+
+  // --- Asset press handler ---
+  const handleAssetPress = useCallback((asset: AssetItem) => {
+    console.log('Asset pressed:', asset);
+    // For NFTs, show detail view
+    if (asset.interface === 'V1_NFT' || asset.interface === 'ProgrammableNFT') {
+      // navigation.navigate('NFTDetail', { asset });
+    }
+    // For tokens, show transaction history
+    else if (asset.interface === 'V1_TOKEN' || asset.token_info) {
+      // navigation.navigate('TokenDetail', { asset });
+    }
+  }, []);
+
+  // --- Follow / Unfollow handlers ---
+  const handleFollow = useCallback(async () => {
+    if (!currentUserWallet || !userWallet) {
       Alert.alert('Cannot Follow', 'Missing user or my address');
       return;
     }
     try {
       await dispatch(
-        followUser({
-          followerId: myWallet,
-          followingId: userWallet,
-        }),
+        followUser({ followerId: currentUserWallet, followingId: userWallet }),
       ).unwrap();
-
-      // Update local state for immediate UI response
       setAmIFollowing(true);
       setFollowersList(prev => {
-        if (!prev.some(u => u.id === myWallet)) {
+        if (!prev.some(u => u.id === currentUserWallet)) {
           return [
             ...prev,
-            {
-              id: myWallet,
-              username: 'Me',
-              handle: '@me',
-              profile_picture_url: '',
-            },
+            { id: currentUserWallet, username: 'Me', profile_picture_url: '' },
           ];
         }
         return prev;
@@ -289,35 +282,45 @@ export default function Profile({
     } catch (err: any) {
       Alert.alert('Follow Error', err.message);
     }
-  };
+  }, [dispatch, currentUserWallet, userWallet]);
 
-  const handleUnfollow = async () => {
-    if (!myWallet || !userWallet) {
+  const handleUnfollow = useCallback(async () => {
+    if (!currentUserWallet || !userWallet) {
       Alert.alert('Cannot Unfollow', 'Missing user or my address');
       return;
     }
     try {
       await dispatch(
-        unfollowUser({
-          followerId: myWallet,
-          followingId: userWallet,
-        }),
+        unfollowUser({ followerId: currentUserWallet, followingId: userWallet }),
       ).unwrap();
-
       setAmIFollowing(false);
-      setFollowersList(prev => prev.filter(u => u.id !== myWallet));
+      setFollowersList(prev => prev.filter(u => u.id !== currentUserWallet));
     } catch (err: any) {
       Alert.alert('Unfollow Error', err.message);
     }
-  };
+  }, [dispatch, currentUserWallet, userWallet]);
 
-  // ============== Avatar picking flow ================
-  const handleAvatarPress = () => {
+  // --- Avatar modals state ---
+  const [avatarOptionModalVisible, setAvatarOptionModalVisible] = useState(false);
+  const [localFileUri, setLocalFileUri] = useState<string | null>(null);
+  const [selectedSource, setSelectedSource] = useState<'library' | 'nft' | null>(null);
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [nftsModalVisible, setNftsModalVisible] = useState(false);
+  const [editNameModalVisible, setEditNameModalVisible] = useState(false);
+  const [tempName, setTempName] = useState(localUsername || '');
+  const [tempDescription, setTempDescription] = useState(localDescription || '');
+
+  useEffect(() => {
+    setStatusBarStyle('dark');
+  }, []);
+
+  // --- Avatar selection handlers ---
+  const handleAvatarPress = useCallback(() => {
     if (!isOwnProfile) return;
     setAvatarOptionModalVisible(true);
-  };
+  }, [isOwnProfile]);
 
-  const handlePickProfilePicture = async () => {
+  const handlePickProfilePicture = useCallback(async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -332,21 +335,22 @@ export default function Profile({
     } catch (error: any) {
       Alert.alert('Error picking image', error.message);
     }
-  };
+  }, []);
 
-  const handleSelectNftOption = () => {
+  const handleSelectNftOption = useCallback(() => {
     setAvatarOptionModalVisible(false);
-    setConfirmModalVisible(true);
+    setNftsModalVisible(true);
+  }, []);
+
+  const handleSelectNftAsAvatar = useCallback((nft: NftItem) => {
+    setLocalFileUri(nft.image);
     setSelectedSource('nft');
-  };
+    setNftsModalVisible(false);
+    setConfirmModalVisible(true);
+  }, []);
 
-  const handleCancelUpload = () => {
-    setConfirmModalVisible(false);
-    setLocalFileUri(null);
-    setSelectedSource(null);
-  };
-
-  const handleConfirmUpload = async () => {
+  // --- Avatar upload/confirm handlers ---
+  const handleConfirmUpload = useCallback(async () => {
     if (!isOwnProfile) {
       Alert.alert('Permission Denied', 'Cannot change avatar for other user');
       setConfirmModalVisible(false);
@@ -354,34 +358,18 @@ export default function Profile({
       setSelectedSource(null);
       return;
     }
-    if (!userWallet || !localFileUri || !SERVER_URL) {
+    if (!userWallet || !localFileUri) {
       Alert.alert('Missing Data', 'No valid image or user to upload to');
       setConfirmModalVisible(false);
       setLocalFileUri(null);
       setSelectedSource(null);
       return;
     }
-    try {
-      const formData = new FormData();
-      formData.append('userId', userWallet);
-      formData.append('profilePic', {
-        uri: localFileUri,
-        type: 'image/jpeg',
-        name: `profile_${Date.now()}.jpg`,
-      } as any);
 
-      const response = await fetch(`${SERVER_URL}/api/profile/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await response.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Upload failed');
-      }
-      if (isOwnProfile) {
-        dispatch(updateProfilePic(data.url));
-      }
-      setProfilePicUrl(data.url);
+    try {
+      const newUrl = await uploadProfileAvatar(userWallet, localFileUri);
+      dispatch(updateProfilePic(newUrl));
+      setProfilePicUrl(newUrl);
     } catch (err: any) {
       Alert.alert('Upload Error', err.message);
       console.log('>>> handleConfirmUpload error:', err);
@@ -390,34 +378,67 @@ export default function Profile({
       setLocalFileUri(null);
       setSelectedSource(null);
     }
-  };
+  }, [dispatch, userWallet, localFileUri, isOwnProfile]);
 
-  // ============== Name editing flow ================
-  const handleOpenEditModal = () => {
+  const handleCancelUpload = useCallback(() => {
+    setConfirmModalVisible(false);
+    setLocalFileUri(null);
+    setSelectedSource(null);
+  }, []);
+
+  // --- Profile edit handlers ---
+  const handleOpenEditModal = useCallback(() => {
     if (!isOwnProfile) return;
     setTempName(localUsername || '');
+    setTempDescription(localDescription || '');
     setEditNameModalVisible(true);
-  };
+  }, [isOwnProfile, localUsername, localDescription]);
 
-  const handleSaveName = async () => {
-    if (!isOwnProfile || !userWallet || !tempName.trim() || !SERVER_URL) {
+  const handleSaveName = useCallback(async () => {
+    if (!isOwnProfile || !userWallet) {
       setEditNameModalVisible(false);
       return;
     }
+
     try {
-      await dispatch(
-        updateUsername({userId: userWallet, newUsername: tempName.trim()}),
-      ).unwrap();
-      setLocalUsername(tempName.trim());
+      let updatedUsername = false;
+      let updatedDescription = false;
+
+      // Only dispatch if name changed
+      if (tempName.trim() && tempName.trim() !== localUsername) {
+        await dispatch(
+          updateUsername({ userId: userWallet, newUsername: tempName.trim() }),
+        ).unwrap();
+        setLocalUsername(tempName.trim());
+        updatedUsername = true;
+      }
+
+      // Only dispatch if description changed  
+      if (tempDescription !== localDescription) {
+        await dispatch(
+          updateDescription({ userId: userWallet, newDescription: tempDescription.trim() }),
+        ).unwrap();
+        setLocalDescription(tempDescription.trim());
+        updatedDescription = true;
+      }
+
+      if (updatedUsername && updatedDescription) {
+        Alert.alert('Profile Updated', 'Your name and description have been updated.');
+      } else if (updatedUsername) {
+        Alert.alert('Name Updated', 'Your display name has been updated.');
+      } else if (updatedDescription) {
+        Alert.alert('Description Updated', 'Your bio has been updated.');
+      }
+
     } catch (err: any) {
-      Alert.alert('Update Name Failed', err.message || 'Unknown error');
+      Alert.alert('Update Failed', err.message || 'Unknown error');
     } finally {
       setEditNameModalVisible(false);
     }
-  };
+  }, [dispatch, tempName, tempDescription, isOwnProfile, userWallet, localUsername, localDescription]);
 
-  // Stats presses
-  const handlePressFollowers = () => {
+  // --- Follow navigation handlers ---
+  const handlePressFollowers = useCallback(() => {
     if (followersList.length === 0) {
       Alert.alert('No Followers', 'This user has no followers yet.');
       return;
@@ -427,9 +448,9 @@ export default function Profile({
       userId: userWallet,
       userList: followersList,
     } as never);
-  };
+  }, [followersList, navigation, userWallet]);
 
-  const handlePressFollowing = () => {
+  const handlePressFollowing = useCallback(() => {
     if (followingList.length === 0) {
       Alert.alert('No Following', 'This user is not following anyone yet.');
       return;
@@ -439,12 +460,55 @@ export default function Profile({
       userId: userWallet,
       userList: followingList,
     } as never);
-  };
+  }, [followingList, navigation, userWallet]);
 
-  // (Optional) "Send to wallet"
-  const handleSendToWallet = () => {
-    console.log('Send to wallet was clicked!');
-  };
+  // Memoize follow/unfollow callbacks
+  const memoizedFollowProps = useMemo(() => ({
+    amIFollowing,
+    areTheyFollowingMe,
+    onFollowPress: handleFollow,
+    onUnfollowPress: handleUnfollow,
+    followersCount: followersList.length,
+    followingCount: followingList.length,
+    onPressFollowers: handlePressFollowers,
+    onPressFollowing: handlePressFollowing
+  }), [
+    followersList.length,
+    followingList.length,
+    handleFollow,
+    handleUnfollow,
+    handlePressFollowers,
+    handlePressFollowing,
+    amIFollowing,
+    areTheyFollowingMe
+  ]);
+
+  // Create resolved user data
+  const resolvedUser: UserProfileData = useMemo(
+    () => ({
+      address: userWallet || '',
+      profilePicUrl,
+      username: localUsername,
+      description: localDescription,
+      attachmentData: customizationData,
+    }),
+    [userWallet, profilePicUrl, localUsername, localDescription, customizationData],
+  );
+
+  // Handle post navigation
+  const handlePostPress = useCallback((post: ThreadPost) => {
+    navigation.navigate('PostThread', { postId: post.id });
+  }, [navigation]);
+
+  // This will clean up old action data periodically
+  useEffect(() => {
+    // Cleanup timer to prevent state bloat
+    const cleanupTimer = setInterval(() => {
+      dispatch(pruneOldActionData());
+    }, 5 * 60 * 1000); // Every 5 minutes
+    
+    return () => clearInterval(cleanupTimer);
+  }, [dispatch]);
 
   return (
     <SafeAreaView
@@ -453,35 +517,27 @@ export default function Profile({
         containerStyle,
         Platform.OS === 'android' && androidStyles.safeArea,
       ]}>
-      <ProfileInfo
-        profilePicUrl={profilePicUrl}
-        username={localUsername}
-        userWallet={userWallet || ''}
+      {/* Main profile view */}
+      <ProfileView
         isOwnProfile={isOwnProfile}
+        user={resolvedUser}
+        myPosts={myPosts}
+        myNFTs={resolvedNfts}
+        loadingNfts={resolvedLoadingNfts}
+        fetchNftsError={resolvedNftError}
         onAvatarPress={handleAvatarPress}
         onEditProfile={handleOpenEditModal}
-        amIFollowing={amIFollowing}
-        areTheyFollowingMe={areTheyFollowingMe}
-        onFollowPress={handleFollow}
-        onUnfollowPress={handleUnfollow}
-        followersCount={followersList.length}
-        followingCount={followingList.length}
-        onPressFollowers={handlePressFollowers}
-        onPressFollowing={handlePressFollowing}
+        {...memoizedFollowProps}
+        onPressPost={handlePostPress}
+        containerStyle={containerStyle}
+        myActions={myActions}
+        loadingActions={loadingActions}
+        fetchActionsError={fetchActionsError}
+        portfolioData={portfolio}
+        onRefreshPortfolio={handleRefreshPortfolio}
+        refreshingPortfolio={refreshingPortfolio}
+        onAssetPress={handleAssetPress}
       />
-
-      <View style={{flex: 1}}>
-        <SwipeTabs
-          myPosts={myPosts}
-          myNFTs={resolvedNfts}
-          loadingNfts={resolvedLoadingNfts}
-          fetchNftsError={resolvedNftError}
-          // Added onPressPost => navigate to PostThread
-          onPressPost={post => {
-            navigation.navigate('PostThread', {postId: post.id});
-          }}
-        />
-      </View>
 
       {/* Avatar Option Modal */}
       {isOwnProfile && (
@@ -504,7 +560,7 @@ export default function Profile({
                 <Text style={modalStyles.optionButtonText}>My NFTs</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[modalStyles.optionButton, {backgroundColor: 'gray'}]}
+                style={[modalStyles.optionButton, { backgroundColor: COLORS.greyMid }]}
                 onPress={() => setAvatarOptionModalVisible(false)}>
                 <Text style={modalStyles.optionButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -513,7 +569,84 @@ export default function Profile({
         </Modal>
       )}
 
-      {/* Confirm NFT if selected */}
+      {/* NFT Selection Modal */}
+      {isOwnProfile && (
+        <Modal
+          animationType="slide"
+          transparent
+          visible={nftsModalVisible}
+          onRequestClose={() => setNftsModalVisible(false)}>
+          <View style={modalStyles.nftOverlay}>
+            <View style={modalStyles.nftContainer}>
+              <Text style={modalStyles.nftTitle}>Select an NFT</Text>
+              {resolvedLoadingNfts ? (
+                <View style={{ marginTop: 20 }}>
+                  <ActivityIndicator size="large" color={COLORS.brandPrimary} />
+                  <Text style={{ marginTop: 8, color: COLORS.greyDark, textAlign: 'center' }}>
+                    Loading your NFTs...
+                  </Text>
+                </View>
+              ) : resolvedNftError ? (
+                <Text style={modalStyles.nftError}>{resolvedNftError}</Text>
+              ) : (
+                <FlatList
+                  data={resolvedNfts}
+                  keyExtractor={item =>
+                    item.mint ||
+                    `random-${Math.random().toString(36).substr(2, 9)}`
+                  }
+                  style={{ marginVertical: 10 }}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={modalStyles.nftItem}
+                      onPress={() => handleSelectNftAsAvatar(item)}>
+                      <View style={modalStyles.nftImageContainer}>
+                        {item.image ? (
+                          <Image
+                            source={{ uri: item.image }}
+                            style={modalStyles.nftImage}
+                          />
+                        ) : (
+                          <View style={modalStyles.nftPlaceholder}>
+                            <Text style={{ color: COLORS.greyDark }}>No Image</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={modalStyles.nftName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        {item.collection ? (
+                          <Text style={modalStyles.nftCollection}>
+                            {item.collection}
+                          </Text>
+                        ) : null}
+                        {item.mint && (
+                          <Text style={modalStyles.nftMint} numberOfLines={1}>
+                            {item.mint.slice(0, 8) + '...' + item.mint.slice(-4)}
+                          </Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  ListEmptyComponent={
+                    <Text style={modalStyles.nftError}>
+                      You have no NFTs in this wallet.
+                    </Text>
+                  }
+                />
+              )}
+              <TouchableOpacity
+                style={[modalStyles.closeButton, { marginTop: 10 }]}
+                onPress={() => setNftsModalVisible(false)}>
+                <Text style={modalStyles.closeButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* NFT Confirm Modal */}
       {isOwnProfile && selectedSource === 'nft' && confirmModalVisible && (
         <Modal
           animationType="fade"
@@ -527,7 +660,7 @@ export default function Profile({
               </Text>
               {localFileUri ? (
                 <Image
-                  source={{uri: localFileUri}}
+                  source={{ uri: localFileUri }}
                   style={confirmModalStyles.preview}
                   onError={err => {
                     Alert.alert(
@@ -537,7 +670,7 @@ export default function Profile({
                   }}
                 />
               ) : (
-                <Text style={{marginVertical: 20, color: '#666'}}>
+                <Text style={{ marginVertical: 20, color: COLORS.greyDark }}>
                   No pending image
                 </Text>
               )}
@@ -545,7 +678,7 @@ export default function Profile({
                 <TouchableOpacity
                   style={[
                     confirmModalStyles.modalButton,
-                    {backgroundColor: '#aaa'},
+                    { backgroundColor: COLORS.greyMid },
                   ]}
                   onPress={handleCancelUpload}>
                   <Text style={confirmModalStyles.buttonText}>Cancel</Text>
@@ -553,7 +686,7 @@ export default function Profile({
                 <TouchableOpacity
                   style={[
                     confirmModalStyles.modalButton,
-                    {backgroundColor: '#1d9bf0'},
+                    { backgroundColor: COLORS.brandPrimary },
                   ]}
                   onPress={handleConfirmUpload}>
                   <Text style={confirmModalStyles.buttonText}>Confirm</Text>
@@ -564,12 +697,12 @@ export default function Profile({
         </Modal>
       )}
 
-      {/* Inline confirmation if user picks from “Library” */}
+      {/* Library image confirmation */}
       {isOwnProfile && selectedSource === 'library' && localFileUri && (
         <View style={inlineConfirmStyles.container}>
           <Text style={inlineConfirmStyles.title}>Confirm Profile Picture</Text>
           <Image
-            source={{uri: localFileUri}}
+            source={{ uri: localFileUri }}
             style={inlineConfirmStyles.preview}
             onError={err => {
               Alert.alert('Image Load Error', JSON.stringify(err.nativeEvent));
@@ -577,12 +710,12 @@ export default function Profile({
           />
           <View style={inlineConfirmStyles.buttonRow}>
             <TouchableOpacity
-              style={[inlineConfirmStyles.button, {backgroundColor: '#aaa'}]}
+              style={[inlineConfirmStyles.button, { backgroundColor: COLORS.greyMid }]}
               onPress={handleCancelUpload}>
               <Text style={inlineConfirmStyles.buttonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[inlineConfirmStyles.button, {backgroundColor: '#1d9bf0'}]}
+              style={[inlineConfirmStyles.button, { backgroundColor: COLORS.brandPrimary }]}
               onPress={handleConfirmUpload}>
               <Text style={inlineConfirmStyles.buttonText}>Confirm</Text>
             </TouchableOpacity>
@@ -590,7 +723,7 @@ export default function Profile({
         </View>
       )}
 
-      {/* Edit Name Modal */}
+      {/* Edit Profile Modal */}
       {isOwnProfile && (
         <Modal
           animationType="slide"
@@ -599,18 +732,26 @@ export default function Profile({
           onRequestClose={() => setEditNameModalVisible(false)}>
           <View style={editNameModalStyles.overlay}>
             <View style={editNameModalStyles.container}>
-              <Text style={editNameModalStyles.title}>Edit Profile Name</Text>
+              <Text style={editNameModalStyles.title}>Edit Profile</Text>
               <TextInput
                 style={editNameModalStyles.input}
                 placeholder="Enter your display name"
                 value={tempName}
                 onChangeText={setTempName}
               />
+              <TextInput
+                style={[editNameModalStyles.input, { height: 80 }]}
+                placeholder="Enter your bio"
+                value={tempDescription}
+                onChangeText={setTempDescription}
+                multiline
+                numberOfLines={3}
+              />
               <View style={editNameModalStyles.btnRow}>
                 <TouchableOpacity
                   style={[
                     editNameModalStyles.button,
-                    {backgroundColor: 'gray'},
+                    { backgroundColor: COLORS.greyMid },
                   ]}
                   onPress={() => setEditNameModalVisible(false)}>
                   <Text style={editNameModalStyles.btnText}>Cancel</Text>
@@ -618,7 +759,7 @@ export default function Profile({
                 <TouchableOpacity
                   style={[
                     editNameModalStyles.button,
-                    {backgroundColor: '#1d9bf0'},
+                    { backgroundColor: COLORS.brandPrimary },
                   ]}
                   onPress={handleSaveName}>
                   <Text style={editNameModalStyles.btnText}>Save</Text>
@@ -637,4 +778,5 @@ const androidStyles = StyleSheet.create({
     paddingTop: 30,
   },
 });
+
 
