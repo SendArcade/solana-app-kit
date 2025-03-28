@@ -9,6 +9,7 @@ import {
   sellTokenViaPumpfun,
   createAndBuyTokenViaPumpfun,
 } from '../services/pumpfun/pumpfunService';
+import { TransactionService } from '../services/transaction/transactionService';
 
 /**
  * usePumpfun hook: centralizes buy, sell, and launch logic for Pumpfun tokens.
@@ -33,9 +34,11 @@ export function usePumpFun() {
     async ({
       tokenAddress,
       solAmount,
+      onStatusUpdate,
     }: {
       tokenAddress: string;
       solAmount: number;
+      onStatusUpdate?: (status: string) => void;
     }) => {
       // Use the best available wallet - prefer StandardWallet
       const availableWallet = wallet || solanaWallet;
@@ -50,17 +53,25 @@ export function usePumpFun() {
           solAmount,
           walletProvider: wallet?.provider || 'privy' // Default to privy for legacy wallet
         });
-        await buyTokenViaPumpfun({
+        
+        onStatusUpdate?.('Preparing buy transaction...');
+        
+        const txSignature = await buyTokenViaPumpfun({
           // Use the best available address
           buyerPublicKey: address || solanaWallet?.wallets?.[0]?.publicKey || '',
           tokenAddress,
           solAmount,
           solanaWallet: availableWallet,
+          onStatusUpdate,
         });
-        Alert.alert('Success', `Bought token: ${tokenAddress}`);
+        
+        // Show success notification via TransactionService
+        TransactionService.showSuccess(txSignature, 'token');
       } catch (error: any) {
         console.error('[usePumpfun.buyToken] Error:', error);
-        Alert.alert('Error Buying Token', error?.message || String(error));
+        // Show error notification via TransactionService
+        TransactionService.showError(error);
+        throw error; // Re-throw for component-level handling
       }
     },
     [wallet, solanaWallet, address],
@@ -73,9 +84,11 @@ export function usePumpFun() {
     async ({
       tokenAddress,
       tokenAmount,
+      onStatusUpdate,
     }: {
       tokenAddress: string;
       tokenAmount: number;
+      onStatusUpdate?: (status: string) => void;
     }) => {
       // Use the best available wallet - prefer StandardWallet
       const availableWallet = wallet || solanaWallet;
@@ -90,17 +103,25 @@ export function usePumpFun() {
           tokenAmount,
           walletProvider: wallet?.provider || 'privy' // Default to privy for legacy wallet
         });
-        await sellTokenViaPumpfun({
+        
+        onStatusUpdate?.('Preparing sell transaction...');
+        
+        const txSignature = await sellTokenViaPumpfun({
           // Use the best available address
           sellerPublicKey: address || solanaWallet?.wallets?.[0]?.publicKey || '',
           tokenAddress,
           tokenAmount,
           solanaWallet: availableWallet,
+          onStatusUpdate,
         });
-        Alert.alert('Success', `Sold ${tokenAmount} tokens: ${tokenAddress}`);
+        
+        // Show success notification via TransactionService
+        TransactionService.showSuccess(txSignature, 'token');
       } catch (error: any) {
         console.error('[usePumpfun.sellToken] Error:', error);
-        Alert.alert('Error Selling Token', error?.message || String(error));
+        // Show error notification via TransactionService
+        TransactionService.showError(error);
+        throw error; // Re-throw for component-level handling
       }
     },
     [wallet, solanaWallet, address],
@@ -120,6 +141,7 @@ export function usePumpFun() {
       website = '',
       imageUri,
       solAmount,
+      onStatusUpdate,
     }: {
       tokenName: string;
       tokenSymbol: string;
@@ -129,6 +151,7 @@ export function usePumpFun() {
       website?: string;
       imageUri: string;
       solAmount: number;
+      onStatusUpdate?: (status: string) => void;
     }) => {
       // Use the best available wallet - prefer StandardWallet
       const availableWallet = wallet || solanaWallet;
@@ -153,6 +176,9 @@ export function usePumpFun() {
           solAmount,
           walletProvider: wallet?.provider || 'privy' // Default to privy for legacy wallet
         });
+        
+        onStatusUpdate?.('Preparing token launch...');
+        
         const result = await createAndBuyTokenViaPumpfun({
           userPublicKey,
           tokenName,
@@ -164,16 +190,18 @@ export function usePumpFun() {
           imageUri,
           solAmount,
           solanaWallet: availableWallet,
+          onStatusUpdate,
         });
+        
         if (result) {
-          Alert.alert(
-            'Success',
-            `Launched token!\nMint: ${result.mint}\nTx: ${result.txSignature}`,
-          );
+          // Show success notification via TransactionService
+          TransactionService.showSuccess(result.txSignature, 'token');
         }
       } catch (error: any) {
         console.error('[usePumpfun.launchToken] Error:', error);
-        Alert.alert('Error Launching Token', error?.message || String(error));
+        // Show error notification via TransactionService
+        TransactionService.showError(error);
+        throw error; // Re-throw for component-level handling
       }
     },
     [wallet, solanaWallet, address],

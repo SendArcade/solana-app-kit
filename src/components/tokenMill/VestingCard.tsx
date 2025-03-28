@@ -1,5 +1,5 @@
 // File: src/screens/TokenMillScreen/components/VestingCard.tsx
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
-import {Connection} from '@solana/web3.js';
+import { Connection } from '@solana/web3.js';
 import {
   createVesting,
   releaseVesting,
@@ -37,6 +37,8 @@ export default function VestingCard({
   setLoading,
 }: Props) {
   const [vestingAmount, setVestingAmount] = useState('10000');
+  const [createStatus, setCreateStatus] = useState<string | null>(null);
+  const [releaseStatus, setReleaseStatus] = useState<string | null>(null);
 
   const onPressCreateVesting = async () => {
     if (!marketAddress) {
@@ -49,23 +51,36 @@ export default function VestingCard({
     }
     try {
       setLoading(true);
-      const {txSignature, ephemeralVestingPubkey} = await createVesting({
+      setCreateStatus('Preparing vesting transaction...');
+
+      const { txSignature, ephemeralVestingPubkey } = await createVesting({
         marketAddress,
         baseTokenMint,
         vestingAmount: parseInt(vestingAmount, 10),
         userPublicKey: publicKey,
         connection,
         solanaWallet,
+        onStatusUpdate: (newStatus) => {
+          console.log('Create vesting status:', newStatus);
+          setCreateStatus(newStatus);
+        }
       });
+
+      setCreateStatus('Vesting plan created successfully!');
       setVestingPlanAddress(ephemeralVestingPubkey);
       Alert.alert(
         'Vesting Plan Created',
         `Vesting Plan: ${ephemeralVestingPubkey}\nTx: ${txSignature}`,
       );
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      console.error('Create vesting error:', err);
+      // Don't show raw error in UI
+      setCreateStatus('Transaction failed');
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+        setCreateStatus(null);
+      }, 2000);
     }
   };
 
@@ -84,6 +99,8 @@ export default function VestingCard({
     }
     try {
       setLoading(true);
+      setReleaseStatus('Preparing release transaction...');
+
       const txSig = await releaseVesting({
         marketAddress,
         vestingPlanAddress,
@@ -91,12 +108,23 @@ export default function VestingCard({
         userPublicKey: publicKey,
         connection,
         solanaWallet,
+        onStatusUpdate: (newStatus) => {
+          console.log('Release vesting status:', newStatus);
+          setReleaseStatus(newStatus);
+        }
       });
+
+      setReleaseStatus('Vesting released successfully!');
       Alert.alert('Vesting Released', `Tx: ${txSig}`);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      console.error('Release vesting error:', err);
+      // Don't show raw error in UI
+      setReleaseStatus('Transaction failed');
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+        setReleaseStatus(null);
+      }, 2000);
     }
   };
 
@@ -108,8 +136,19 @@ export default function VestingCard({
         placeholder="Vesting Amount"
         value={vestingAmount}
         onChangeText={setVestingAmount}
+        editable={!createStatus && !releaseStatus}
       />
-      <TouchableOpacity style={styles.button} onPress={onPressCreateVesting}>
+
+      {createStatus && (
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>{createStatus}</Text>
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={[styles.button, createStatus ? { opacity: 0.7 } : {}]}
+        onPress={onPressCreateVesting}
+        disabled={!!createStatus || !!releaseStatus}>
         <Text style={styles.buttonText}>Create Vesting Plan</Text>
       </TouchableOpacity>
 
@@ -118,9 +157,17 @@ export default function VestingCard({
           <Text style={styles.vestingDetailsText}>
             Vesting Plan: {vestingPlanAddress.slice(0, 12)}...
           </Text>
+
+          {releaseStatus && (
+            <View style={styles.statusContainer}>
+              <Text style={styles.statusText}>{releaseStatus}</Text>
+            </View>
+          )}
+
           <TouchableOpacity
-            style={styles.releaseButton}
-            onPress={onPressReleaseVesting}>
+            style={[styles.releaseButton, releaseStatus ? { opacity: 0.7 } : {}]}
+            onPress={onPressReleaseVesting}
+            disabled={!!createStatus || !!releaseStatus}>
             <Text style={styles.buttonText}>Release Vesting</Text>
           </TouchableOpacity>
         </View>
@@ -151,6 +198,18 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderWidth: 1,
     marginBottom: 12,
+  },
+  statusContainer: {
+    backgroundColor: '#f8f8f8',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  statusText: {
+    color: '#333',
+    fontSize: 14,
+    textAlign: 'center',
   },
   button: {
     backgroundColor: '#2a2a2a',

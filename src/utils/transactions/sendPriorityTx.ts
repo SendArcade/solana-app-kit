@@ -10,6 +10,7 @@ import {
 } from '@solana/web3.js';
 import type {TransactionInstruction} from '@solana/web3.js';
 import { CLUSTER } from '@env';
+import { TransactionService } from '../../services/transaction/transactionService';
 
 export async function sendPriorityTransaction(
   provider: any,
@@ -71,13 +72,25 @@ export async function sendPriorityTransaction(
     console.log('[sendPriorityTransaction] Confirming transaction...');
     const confirmation = await connection.confirmTransaction(signature, 'confirmed');
     console.log('[sendPriorityTransaction] Confirmation result:', confirmation.value);
-    if (confirmation.value.err) {
-      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+    
+    // Check for confirmation error
+    if (confirmation.value && confirmation.value.err) {
+      // Create a proper error object with logs if available
+      const error = new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      // Add logs if they exist on the err object
+      if (confirmation.value.err.logs) {
+        error.logs = confirmation.value.err.logs;
+      }
+      TransactionService.showError(error);
+      throw error;
     }
 
+    // Show success notification
+    TransactionService.showSuccess(signature);
     return signature;
   } catch (error) {
     console.error('[sendPriorityTransaction] Error during transaction:', error);
+    TransactionService.showError(error);
     throw error;
   }
 }
@@ -188,14 +201,25 @@ export async function sendPriorityTransactionMWA(
       console.log('[sendPriorityTransactionMWA] Confirming transaction on-chain...');
       const confirmation = await connection.confirmTransaction(signature, 'confirmed');
       console.log('[sendPriorityTransactionMWA] Confirmation result:', confirmation.value);
-      if (confirmation.value.err) {
-        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      
+      // Check for error
+      if (confirmation.value && confirmation.value.err) {
+        // Create a proper error with logs
+        const error = new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+        // Add logs if they exist
+        if (confirmation.value.err.logs) {
+          error.logs = confirmation.value.err.logs;
+        }
+        TransactionService.showError(error);
+        throw error;
       }
 
       console.log('[sendPriorityTransactionMWA] Transaction confirmed successfully!');
+      TransactionService.showSuccess(signature, 'transfer');
       return signature;
     } catch (error) {
       console.log('[sendPriorityTransactionMWA] Caught error inside transact callback:', error);
+      TransactionService.showError(error);
       throw error;
     }
   });

@@ -20,6 +20,7 @@ import {
   setTransactionMode as setMode
 } from '../../../state/transaction/reducer';
 import { CLUSTER } from '@env';
+import { TransactionService } from '../../../services/transaction/transactionService';
 
 export interface AddButtonProps {
   amIFollowing: boolean;
@@ -141,25 +142,39 @@ const AddButton: React.FC<AddButtonProps> = ({
         amountSol: parsedAmount,
         connection,
         onStatusUpdate: (status) => {
-          console.log(`[AddButton] ${status}`);
-          setTransactionStatus(status);
+          // Only update status if it's not an error message
+          if (!status.startsWith('Error:')) {
+            console.log(`[AddButton] ${status}`);
+            setTransactionStatus(status);
+          } else {
+            // For errors, just set a generic message
+            setTransactionStatus('Transaction failed');
+          }
         },
       });
 
       // Success, transaction was sent and confirmed
       setTransactionStatus(`Transaction successful! Signature: ${signature.slice(0, 8)}...`);
+
+      // Use TransactionService instead of Alert
+      TransactionService.showSuccess(signature, 'transfer');
+
       setTimeout(() => {
         setSendModalVisible(false);
         setSelectedMode(null);
         setAmountSol('');
         setTransactionStatus(null);
-        Alert.alert('Success', 'Transaction completed!');
       }, 2000);
     } catch (err: any) {
       console.error('Error sending transaction:', err);
-      setTransactionStatus(`Error: ${err.message || 'Unknown error'}`);
+
+      // Don't set the raw error message, just use a generic one
+      setTransactionStatus('Transaction failed');
+
+      // Use TransactionService instead of Alert for the detailed error
+      TransactionService.showError(err);
+
       setTimeout(() => {
-        Alert.alert('Transaction Failed', err.message || String(err));
         setSendModalVisible(false);
         setTransactionStatus(null);
       }, 2000);

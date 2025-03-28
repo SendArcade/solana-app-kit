@@ -10,6 +10,7 @@ import {
 } from '@solana/web3.js';
 import type {TransactionInstruction} from '@solana/web3.js';
 import { CLUSTER } from '@env';
+import { TransactionService } from '../../services/transaction/transactionService';
 
 export async function sendJitoBundleTransaction(
   provider: any,
@@ -53,12 +54,24 @@ export async function sendJitoBundleTransaction(
     console.log('[sendJitoBundleTransaction] Confirming transaction...');
     const confirmation = await connection.confirmTransaction(signature, 'confirmed');
     console.log('[sendJitoBundleTransaction] Confirmation result:', confirmation.value);
-    if (confirmation.value.err) {
-      throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+    
+    // Check for error
+    if (confirmation.value && confirmation.value.err) {
+      // Create a proper error with logs
+      const error = new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      // Add logs if they exist
+      if (confirmation.value.err.logs) {
+        error.logs = confirmation.value.err.logs;
+      }
+      TransactionService.showError(error);
+      throw error;
     }
+     
+    TransactionService.showSuccess(signature);
     return signature;
   } catch (error) {
     console.error('[sendJitoBundleTransaction] Error during transaction:', error);
+    TransactionService.showError(error);
     throw error;
   }
 }
@@ -142,14 +155,25 @@ export async function sendJitoBundleTransactionMWA(
       console.log('[sendJitoBundleTransactionMWA] confirming on-chain...');
       const confirmation = await connection.confirmTransaction(signature, 'confirmed');
       console.log('[sendJitoBundleTransactionMWA] confirmation result:', confirmation.value);
-      if (confirmation.value.err) {
-        throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+      
+      // Check for error
+      if (confirmation.value && confirmation.value.err) {
+        // Create a proper error with logs
+        const error = new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
+        // Add logs if they exist
+        if (confirmation.value.err.logs) {
+          error.logs = confirmation.value.err.logs;
+        }
+        TransactionService.showError(error);
+        throw error;
       }
 
       console.log('[sendJitoBundleTransactionMWA] Transaction confirmed successfully!');
+      TransactionService.showSuccess(signature, 'transfer');
       return signature;
     } catch (error) {
       console.log('[sendJitoBundleTransactionMWA] Caught error inside transact callback:', error);
+      TransactionService.showError(error);
       throw error;
     }
   });

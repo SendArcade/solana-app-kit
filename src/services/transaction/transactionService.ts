@@ -12,6 +12,11 @@ import { useAppSelector } from '../../hooks/useReduxHooks';
 import { StandardWallet } from '../../hooks/useAuth';
 import { Platform } from 'react-native';
 import { CLUSTER } from '@env';
+import base58 from 'bs58';
+import { transact } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
+import { store } from '../../state/store';
+import { parseTransactionError, getSuccessMessage } from '../../utils/transactions/errorParser';
+import { showSuccessNotification, showErrorNotification } from '../../state/notification/reducer';
 
 /**
  * Transaction type that can be either a Transaction or VersionedTransaction
@@ -67,6 +72,37 @@ export class TransactionService {
   }
 
   /**
+   * Display a transaction success notification
+   */
+  static showSuccess(signature: string, type?: 'swap' | 'transfer' | 'stake' | 'nft' | 'token'): void {
+    const message = getSuccessMessage(signature, type);
+    store.dispatch(showSuccessNotification({ message, signature }));
+  }
+
+  /**
+   * Display a transaction error notification with parsed message
+   */
+  static showError(error: any): void {
+    const message = parseTransactionError(error);
+    store.dispatch(showErrorNotification({ message }));
+  }
+
+  /**
+   * Helper to filter error messages from status updates
+   * This prevents raw error messages from showing in the UI
+   */
+  static filterStatusUpdate(status: string, callback?: (status: string) => void): void {
+    if (!callback) return;
+    
+    // Don't pass error messages to the UI status
+    if (status.startsWith('Error:') || status.includes('failed:') || status.includes('Transaction failed')) {
+      callback('Transaction failed');
+    } else {
+      callback(status);
+    }
+  }
+
+  /**
    * Signs and sends a transaction using the provided wallet provider
    * @param txFormat - The transaction format (transaction object, base64 encoded, or instructions)
    * @param walletProvider - The wallet provider to use for signing
@@ -81,197 +117,219 @@ export class TransactionService {
     const { connection, confirmTransaction = true, maxRetries = 3, statusCallback } = options;
     let transaction: AnyTransaction;
 
+    // Create a filtered status callback that won't show raw errors
+    const filteredStatusCallback = statusCallback 
+      ? (status: string) => this.filterStatusUpdate(status, statusCallback)
+      : undefined;
+
     // Normalize the wallet provider to a standard format
     const normalizedProvider = this.normalizeWalletProvider(walletProvider);
     this.log("Normalized provider type:", normalizedProvider.type);
 
-    // 1. Process transaction format
-    if (txFormat.type === 'base64') {
-      const txBuffer = Buffer.from(txFormat.data, 'base64');
-      try {
-        transaction = VersionedTransaction.deserialize(txBuffer);
-      } catch {
-        transaction = Transaction.from(txBuffer);
-      }
-    } else if (txFormat.type === 'instructions') {
-      // Create a transaction from instructions
-      const { instructions, feePayer, signers = [] } = txFormat;
-      const tx = new Transaction();
-      tx.add(...instructions);
-      const { blockhash } = await connection.getLatestBlockhash();
-      tx.recentBlockhash = blockhash;
-      tx.feePayer = feePayer;
-      
-      // If there are additional signers, sign with them first
-      if (signers.length > 0) {
-        tx.sign(...signers);
-      }
-      
-      transaction = tx;
-    } else {
-      transaction = txFormat.transaction;
-    }
-
-    // 2. Process wallet provider and sign the transaction
-    statusCallback?.('Sending transaction to wallet for signing...');
-    let signature: string;
-
+    // 1. Normalize transaction format
     try {
-      // MWA wallet needs special handling - check it first
-      if (normalizedProvider.type === 'mwa') {
-        statusCallback?.('Opening mobile wallet for transaction approval...');
-        this.log("Using MWA transaction flow");
-        signature = await this.signAndSendWithMWA(
-          transaction,
-          connection,
-          normalizedProvider.walletAddress
-        );
-      }
-      // Handle StandardWallet type 
-      else if (normalizedProvider.type === 'standard') {
-        const wallet = normalizedProvider.wallet;
-        if (!wallet) {
-          throw new Error('No wallet provided for standard wallet provider');
+      // 1. Process transaction format
+      if (txFormat.type === 'base64') {
+        const txBuffer = Buffer.from(txFormat.data, 'base64');
+        try {
+          transaction = VersionedTransaction.deserialize(txBuffer);
+        } catch {
+          transaction = Transaction.from(txBuffer);
+        }
+      } else if (txFormat.type === 'instructions') {
+        // Create a transaction from instructions
+        const { instructions, feePayer, signers = [] } = txFormat;
+        const tx = new Transaction();
+        tx.add(...instructions);
+        const { blockhash } = await connection.getLatestBlockhash();
+        tx.recentBlockhash = blockhash;
+        tx.feePayer = feePayer;
+        
+        // If there are additional signers, sign with them first
+        if (signers.length > 0) {
+          tx.sign(...signers);
         }
         
-        // Don't try to get provider for MWA wallets
-        if (wallet.provider === 'mwa') {
-          statusCallback?.('Opening mobile wallet for transaction approval...');
-          this.log("Standard wallet with MWA provider, using MWA flow");
-          const walletAddress = wallet.address || wallet.publicKey;
-          if (!walletAddress) {
-            throw new Error('No wallet address found for MWA wallet');
-          }
-          signature = await this.signAndSendWithMWA(
-            transaction,
-            connection,
-            walletAddress
-          );
-        } else {
-          // Normal standard wallet flow
-          const provider = await wallet.getProvider();
-          if (!provider) {
-            throw new Error(`No provider available for ${wallet.provider} wallet`);
-          }
-          
-          signature = await this.signAndSendWithProvider(
-            transaction,
-            connection,
-            provider,
-            wallet.getWalletInfo?.()
-          );
-        }
+        transaction = tx;
+      } else {
+        transaction = txFormat.transaction;
       }
-      else if (normalizedProvider.type === 'privy') {
-        signature = await this.signAndSendWithPrivy(
-          transaction,
-          connection,
-          normalizedProvider.provider
-        );
-      } else if (normalizedProvider.type === 'dynamic') {
-        signature = await this.signAndSendWithDynamic(
-          transaction,
-          connection,
-          normalizedProvider.walletAddress
-        );
-      } else if (normalizedProvider.type === 'turnkey') {
-        // Implementation for Turnkey would go here
-        throw new Error('Turnkey provider not yet implemented');
-      } else if (normalizedProvider.type === 'autodetect') {
-        // Auto-detect provider type based on the currentProvider value
-        if (normalizedProvider.currentProvider === 'mwa') {
-          statusCallback?.('Opening mobile wallet for transaction approval...');
-          this.log("Autodetected MWA provider");
-          const walletAddress = 
-            normalizedProvider.provider.address || 
-            normalizedProvider.provider.publicKey;
-          
-          if (!walletAddress) {
-            throw new Error('No wallet address found for MWA provider');
-          }
-          
+    } catch (error: any) {
+      this.showError(error);
+      throw error;
+    }
+
+    // 2. Sign and send transaction
+    let signature: string;
+    try {
+      // 2. Process wallet provider and sign the transaction
+      filteredStatusCallback?.('Sending transaction to wallet for signing...');
+
+      switch (normalizedProvider.type) {
+        case 'mwa':
+          filteredStatusCallback?.('Opening mobile wallet for transaction approval...');
+          this.log("Using MWA transaction flow");
           signature = await this.signAndSendWithMWA(
             transaction,
             connection,
-            walletAddress
+            normalizedProvider.walletAddress
           );
-        }
-        else if (normalizedProvider.currentProvider === 'privy') {
+          break;
+        case 'standard':
+          const wallet = normalizedProvider.wallet;
+          if (!wallet) {
+            throw new Error('No wallet provided for standard wallet provider');
+          }
+          
+          // Don't try to get provider for MWA wallets
+          if (wallet.provider === 'mwa') {
+            filteredStatusCallback?.('Opening mobile wallet for transaction approval...');
+            this.log("Standard wallet with MWA provider, using MWA flow");
+            const walletAddress = wallet.address || wallet.publicKey;
+            if (!walletAddress) {
+              throw new Error('No wallet address found for MWA wallet');
+            }
+            signature = await this.signAndSendWithMWA(
+              transaction,
+              connection,
+              walletAddress
+            );
+          } else {
+            // Normal standard wallet flow
+            const provider = await wallet.getProvider();
+            if (!provider) {
+              throw new Error(`No provider available for ${wallet.provider} wallet`);
+            }
+            
+            signature = await this.signAndSendWithProvider(
+              transaction,
+              connection,
+              provider,
+              wallet.getWalletInfo?.()
+            );
+          }
+          break;
+        case 'privy':
           signature = await this.signAndSendWithPrivy(
             transaction,
             connection,
             normalizedProvider.provider
           );
-        } else if (normalizedProvider.currentProvider === 'dynamic') {
-          // For dynamic, we need to get the wallet address from the provider
-          if (normalizedProvider.provider && normalizedProvider.provider.address) {
-            // If provider has address directly (our standardized object)
-            signature = await this.signAndSendWithDynamic(
-              transaction,
-              connection,
-              normalizedProvider.provider.address
-            );
-          } else {
-            // Try to get from Dynamic client
-            const dynamicClient = getDynamicClient();
-            const wallets = dynamicClient.wallets?.userWallets || [];
-            if (!wallets || wallets.length === 0) {
-              throw new Error('No Dynamic wallet found');
-            }
-            const address = wallets[0].address;
-            
-            signature = await this.signAndSendWithDynamic(
-              transaction,
-              connection,
-              address
-            );
-          }
-        } else if (normalizedProvider.currentProvider === 'mwa') {
-          statusCallback?.('Opening mobile wallet for transaction approval...');
-          const walletAddress = 
-            normalizedProvider.provider.address || 
-            normalizedProvider.provider.publicKey;
-          
-          if (!walletAddress) {
-            throw new Error('No wallet address found for MWA provider');
-          }
-          
-          signature = await this.signAndSendWithMWA(
+          break;
+        case 'dynamic':
+          signature = await this.signAndSendWithDynamic(
             transaction,
             connection,
-            walletAddress
+            normalizedProvider.walletAddress
           );
-        } else {
-          throw new Error(`Unsupported provider type: ${normalizedProvider.currentProvider}`);
-        }
-      } else {
-        throw new Error('Unsupported wallet provider type');
+          break;
+        case 'turnkey':
+          // Implementation for Turnkey would go here
+          throw new Error('Turnkey provider not yet implemented');
+          break;
+        case 'autodetect':
+          // Auto-detect provider type based on the currentProvider value
+          if (normalizedProvider.currentProvider === 'mwa') {
+            filteredStatusCallback?.('Opening mobile wallet for transaction approval...');
+            this.log("Autodetected MWA provider");
+            const walletAddress = 
+              normalizedProvider.provider.address || 
+              normalizedProvider.provider.publicKey;
+            
+            if (!walletAddress) {
+              throw new Error('No wallet address found for MWA provider');
+            }
+            
+            signature = await this.signAndSendWithMWA(
+              transaction,
+              connection,
+              walletAddress
+            );
+          }
+          else if (normalizedProvider.currentProvider === 'privy') {
+            signature = await this.signAndSendWithPrivy(
+              transaction,
+              connection,
+              normalizedProvider.provider
+            );
+          } else if (normalizedProvider.currentProvider === 'dynamic') {
+            // For dynamic, we need to get the wallet address from the provider
+            if (normalizedProvider.provider && normalizedProvider.provider.address) {
+              // If provider has address directly (our standardized object)
+              signature = await this.signAndSendWithDynamic(
+                transaction,
+                connection,
+                normalizedProvider.provider.address
+              );
+            } else {
+              // Try to get from Dynamic client
+              const dynamicClient = getDynamicClient();
+              const wallets = dynamicClient.wallets?.userWallets || [];
+              if (!wallets || wallets.length === 0) {
+                throw new Error('No Dynamic wallet found');
+              }
+              const address = wallets[0].address;
+              
+              signature = await this.signAndSendWithDynamic(
+                transaction,
+                connection,
+                address
+              );
+            }
+          } else if (normalizedProvider.currentProvider === 'mwa') {
+            filteredStatusCallback?.('Opening mobile wallet for transaction approval...');
+            const walletAddress = 
+              normalizedProvider.provider.address || 
+              normalizedProvider.provider.publicKey;
+            
+            if (!walletAddress) {
+              throw new Error('No wallet address found for MWA provider');
+            }
+            
+            signature = await this.signAndSendWithMWA(
+              transaction,
+              connection,
+              walletAddress
+            );
+          } else {
+            throw new Error(`Unsupported provider type: ${normalizedProvider.currentProvider}`);
+          }
+          break;
+        default:
+          this.showError(new Error('Unsupported wallet provider type'));
+          throw new Error('Unsupported wallet provider type');
       }
     } catch (error: any) {
-      statusCallback?.(`Transaction signing failed: ${error.message}`);
+      filteredStatusCallback?.(`Transaction signing failed: ${error.message}`);
+      this.showError(error);
       throw error;
     }
 
     // 3. Confirm transaction if needed
     if (confirmTransaction) {
-      statusCallback?.('Confirming transaction...');
+      filteredStatusCallback?.('Confirming transaction...');
       let retries = 0;
       while (retries < maxRetries) {
         try {
           await connection.confirmTransaction(signature, 'confirmed');
-          statusCallback?.('Transaction confirmed!');
+          filteredStatusCallback?.('Transaction confirmed!');
+          this.showSuccess(signature);
           break;
         } catch (error) {
           retries++;
           if (retries >= maxRetries) {
-            statusCallback?.('Transaction confirmation failed after maximum retries.');
+            filteredStatusCallback?.('Transaction failed');
+            this.showError(new Error('Transaction confirmation failed after maximum retries.'));
             throw new Error('Transaction confirmation failed after maximum retries.');
           }
-          statusCallback?.(`Retrying confirmation (${retries}/${maxRetries})...`);
+          filteredStatusCallback?.(`Retrying confirmation (${retries}/${maxRetries})...`);
           // Wait before retrying
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
+    } else {
+      // Show success even if we don't wait for confirmation
+      this.showSuccess(signature);
     }
 
     return signature;
