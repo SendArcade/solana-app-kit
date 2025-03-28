@@ -11,7 +11,7 @@ import {
 import ActionDetailModal from './ActionDetailModal';
 import {FontAwesome5} from '@expo/vector-icons';
 import {LinearGradient} from 'expo-linear-gradient';
-import { Action } from '../../../services/profileActions';
+import {Action} from '../../../services/profileActions';
 
 interface RawTokenAmount {
   tokenAmount: string;
@@ -71,64 +71,71 @@ interface ActionsPageProps {
 function formatSolAmount(lamports: number): string {
   // 1 SOL = 1,000,000,000 lamports (9 decimal places)
   const sol = lamports / 1_000_000_000;
-  
+
   console.log('Converting lamports to SOL:', lamports, '→', sol);
-  
+
   // For small amounts, show more decimal places
   if (Math.abs(sol) < 0.001) {
     // For very small amounts, show enough decimal places
-    return sol.toLocaleString('en-US', { 
+    return sol.toLocaleString('en-US', {
       minimumFractionDigits: 9,
       maximumFractionDigits: 9,
-      useGrouping: false
+      useGrouping: false,
     });
   } else if (Math.abs(sol) < 0.01) {
-    return sol.toLocaleString('en-US', { 
+    return sol.toLocaleString('en-US', {
       minimumFractionDigits: 6,
       maximumFractionDigits: 6,
-      useGrouping: false
+      useGrouping: false,
     });
   }
-  
-  return sol.toLocaleString('en-US', { 
+
+  return sol.toLocaleString('en-US', {
     minimumFractionDigits: 4,
     maximumFractionDigits: 4,
-    useGrouping: false
+    useGrouping: false,
   });
 }
 
 /** Format token amounts with appropriate decimal places */
 function formatTokenAmount(amount: number, decimals: number = 0): string {
   console.log('Formatting token amount:', amount, 'with decimals:', decimals);
-  
+
   if (amount === 0 || decimals === 0) {
     return amount.toString();
   }
-  
+
   const divisor = Math.pow(10, decimals);
   const convertedAmount = amount / divisor;
-  
-  console.log('Converted token amount:', amount, '÷', divisor, '=', convertedAmount);
-  
+
+  console.log(
+    'Converted token amount:',
+    amount,
+    '÷',
+    divisor,
+    '=',
+    convertedAmount,
+  );
+
   // Adjust decimal places based on amount size
   if (Math.abs(convertedAmount) < 0.001) {
     return convertedAmount.toLocaleString('en-US', {
       minimumFractionDigits: Math.min(8, decimals),
       maximumFractionDigits: Math.min(8, decimals),
-      useGrouping: false
+      useGrouping: false,
     });
   } else if (Math.abs(convertedAmount) < 0.01) {
     return convertedAmount.toLocaleString('en-US', {
       minimumFractionDigits: Math.min(6, decimals),
       maximumFractionDigits: Math.min(6, decimals),
-      useGrouping: false
+      useGrouping: false,
     });
   }
-  
+
   return convertedAmount.toLocaleString('en-US', {
     minimumFractionDigits: Math.min(4, decimals),
     maximumFractionDigits: Math.min(4, decimals),
-    useGrouping: false
+    useGrouping: false,
   });
 }
 
@@ -162,82 +169,88 @@ function getTimeAgo(timestampSeconds: number): string {
 /**
  * Extract a transaction amount from the description if possible
  */
-function extractAmountFromDescription(description?: string): {amount: number; symbol: string} | null {
+function extractAmountFromDescription(
+  description?: string,
+): {amount: number; symbol: string} | null {
   if (!description) return null;
-  
+
   // Match patterns like "0.0001 SOL" or "5 tokens"
   const amountMatch = description.match(/(\d+\.?\d*)\s+([A-Za-z]+)/);
   if (amountMatch && amountMatch.length >= 3) {
     const amount = parseFloat(amountMatch[1]);
     const symbol = amountMatch[2];
-    
+
     if (!isNaN(amount)) {
       return {amount, symbol};
     }
   }
-  
+
   return null;
 }
 
 /**
  * Get icon name and color for transaction type
  */
-function getTransactionTypeInfo(type: string): {icon: string; color: string; label: string} {
+function getTransactionTypeInfo(type: string): {
+  icon: string;
+  color: string;
+  label: string;
+} {
   const lowerType = type.toLowerCase();
-  
+
   if (lowerType.includes('transfer')) {
     return {
       icon: 'exchange-alt',
       color: '#3871DD',
-      label: 'Transfer'
+      label: 'Transfer',
     };
   }
-  
+
   if (lowerType.includes('swap')) {
     return {
       icon: 'sync-alt',
       color: '#9945FF',
-      label: 'Swap'
+      label: 'Swap',
     };
   }
-  
+
   if (lowerType.includes('buy')) {
     return {
       icon: 'shopping-cart',
       color: '#14F195',
-      label: 'Buy'
+      label: 'Buy',
     };
   }
-  
+
   if (lowerType.includes('sell')) {
     return {
       icon: 'tag',
       color: '#F43860',
-      label: 'Sell'
+      label: 'Sell',
     };
   }
-  
+
   if (lowerType.includes('stake')) {
     return {
       icon: 'certificate',
       color: '#FF9C2A',
-      label: 'Stake'
+      label: 'Stake',
     };
   }
-  
+
   if (lowerType.includes('nft')) {
     return {
       icon: 'image',
       color: '#673ab7',
-      label: 'NFT'
+      label: 'NFT',
     };
   }
-  
+
   // Default case
   return {
     icon: 'receipt',
     color: '#607d8b',
-    label: 'Transaction'
+    label: 'Transaction',
   };
 }
 
@@ -260,34 +273,34 @@ function getTransactionDetails(
 
   // First try to extract from description
   const descriptionAmount = extractAmountFromDescription(action.description);
-  
+
   // For native transfers (SOL)
   if (action.nativeTransfers && action.nativeTransfers.length > 0) {
     const transfer = action.nativeTransfers[0];
-    
+
     // Debug the native transfer amount
     console.log('Native transfer amount:', transfer.amount, 'lamports');
-    
+
     if (transfer.fromUserAccount === walletAddress) {
       return {
         direction: 'out',
         amount: transfer.amount,
         symbol: 'SOL',
         counterparty: truncateAddress(transfer.toUserAccount),
-        rawData: transfer
+        rawData: transfer,
       };
-    } 
-    
+    }
+
     if (transfer.toUserAccount === walletAddress) {
       return {
         direction: 'in',
         amount: transfer.amount,
         symbol: 'SOL',
         counterparty: truncateAddress(transfer.fromUserAccount),
-        rawData: transfer
+        rawData: transfer,
       };
     }
-    
+
     // If this wallet is not directly involved but we have a description amount
     if (descriptionAmount && descriptionAmount.symbol.toUpperCase() === 'SOL') {
       return {
@@ -295,21 +308,23 @@ function getTransactionDetails(
         amount: descriptionAmount.amount * 1_000_000_000, // Convert to lamports
         symbol: 'SOL',
         counterparty: truncateAddress(
-          transfer.fromUserAccount === action.feePayer 
-            ? transfer.toUserAccount 
-            : transfer.fromUserAccount
+          transfer.fromUserAccount === action.feePayer
+            ? transfer.toUserAccount
+            : transfer.fromUserAccount,
         ),
-        rawData: transfer
+        rawData: transfer,
       };
     }
-    
+
     // For any wallet, just show the transfer - make sure we use the amount directly
     return {
       direction: 'neutral',
       amount: transfer.amount,
       symbol: 'SOL',
-      counterparty: `${truncateAddress(transfer.fromUserAccount)} → ${truncateAddress(transfer.toUserAccount)}`,
-      rawData: transfer
+      counterparty: `${truncateAddress(
+        transfer.fromUserAccount,
+      )} → ${truncateAddress(transfer.toUserAccount)}`,
+      rawData: transfer,
     };
   }
 
@@ -317,73 +332,80 @@ function getTransactionDetails(
   if (action.tokenTransfers && action.tokenTransfers.length > 0) {
     const transfer = action.tokenTransfers[0];
     const symbol = transfer.symbol || truncateAddress(transfer.mint);
-    
+
     if (transfer.fromUserAccount === walletAddress) {
       return {
         direction: 'out',
         amount: transfer.tokenAmount,
         symbol,
         counterparty: truncateAddress(transfer.toUserAccount),
-        rawData: transfer
+        rawData: transfer,
       };
-    } 
-    
+    }
+
     if (transfer.toUserAccount === walletAddress) {
       return {
         direction: 'in',
         amount: transfer.tokenAmount,
         symbol,
         counterparty: truncateAddress(transfer.fromUserAccount),
-        rawData: transfer
+        rawData: transfer,
       };
     }
-    
+
     // For any wallet, just show the transfer
     return {
       direction: 'neutral',
       amount: transfer.tokenAmount,
       symbol,
-      counterparty: `${truncateAddress(transfer.fromUserAccount)} → ${truncateAddress(transfer.toUserAccount)}`,
-      rawData: transfer
+      counterparty: `${truncateAddress(
+        transfer.fromUserAccount,
+      )} → ${truncateAddress(transfer.toUserAccount)}`,
+      rawData: transfer,
     };
   }
 
   // Check account data changes for balance changes
   if (action.accountData && action.accountData.length > 0) {
-    const walletData = action.accountData.find(data => data.account === walletAddress);
+    const walletData = action.accountData.find(
+      data => data.account === walletAddress,
+    );
     if (walletData) {
       if (walletData.nativeBalanceChange > 0) {
         return {
           direction: 'in',
           amount: walletData.nativeBalanceChange,
           symbol: 'SOL',
-          rawData: walletData
+          rawData: walletData,
         };
-      } 
-      
+      }
+
       if (walletData.nativeBalanceChange < 0) {
         // Exclude fee payments as direction indicator
-        if (action.fee !== undefined && walletData.nativeBalanceChange === -action.fee) {
+        if (
+          action.fee !== undefined &&
+          walletData.nativeBalanceChange === -action.fee
+        ) {
           return {direction: 'neutral', amount: 0, symbol: 'SOL'};
         }
-        
+
         return {
           direction: 'out',
           amount: Math.abs(walletData.nativeBalanceChange),
           symbol: 'SOL',
-          rawData: walletData
+          rawData: walletData,
         };
       }
     }
-    
+
     // If this wallet isn't in accountData but we have a description amount
     if (descriptionAmount && descriptionAmount.symbol.toUpperCase() === 'SOL') {
       const isOutgoing = action.feePayer === walletAddress;
-      
+
       return {
         direction: isOutgoing ? 'out' : 'in',
         amount: descriptionAmount.amount * 1_000_000_000, // Convert to lamports
-        symbol: 'SOL'
+        symbol: 'SOL',
       };
     }
   }
@@ -391,67 +413,81 @@ function getTransactionDetails(
   // For swap events
   if (action.events?.swap) {
     const swap = action.events.swap;
-    
+
     // Check for SOL involved in swap
     if (swap.nativeInput && swap.nativeInput.account === walletAddress) {
-      const amount = typeof swap.nativeInput.amount === 'string' 
-        ? parseInt(swap.nativeInput.amount, 10)
-        : swap.nativeInput.amount;
-        
-      const outputSymbol = swap.tokenOutputs && swap.tokenOutputs.length > 0
-        ? (swap.tokenOutputs[0].rawTokenAmount.tokenAmount 
-           ? `${formatTokenAmount(
-               parseFloat(swap.tokenOutputs[0].rawTokenAmount.tokenAmount),
-               parseInt(String(swap.tokenOutputs[0].rawTokenAmount.decimals), 10)
-             )} ${truncateAddress(swap.tokenOutputs[0].mint)}`
-           : truncateAddress(swap.tokenOutputs[0].mint))
-        : 'tokens';
-        
+      const amount =
+        typeof swap.nativeInput.amount === 'string'
+          ? parseInt(swap.nativeInput.amount, 10)
+          : swap.nativeInput.amount;
+
+      const outputSymbol =
+        swap.tokenOutputs && swap.tokenOutputs.length > 0
+          ? swap.tokenOutputs[0].rawTokenAmount.tokenAmount
+            ? `${formatTokenAmount(
+                parseFloat(swap.tokenOutputs[0].rawTokenAmount.tokenAmount),
+                parseInt(
+                  String(swap.tokenOutputs[0].rawTokenAmount.decimals),
+                  10,
+                ),
+              )} ${truncateAddress(swap.tokenOutputs[0].mint)}`
+            : truncateAddress(swap.tokenOutputs[0].mint)
+          : 'tokens';
+
       return {
         direction: 'out',
         amount,
         symbol: 'SOL',
         counterparty: outputSymbol,
-        rawData: swap
+        rawData: swap,
       };
-    } 
-    
+    }
+
     if (swap.nativeOutput && swap.nativeOutput.account === walletAddress) {
-      const amount = typeof swap.nativeOutput.amount === 'string' 
-        ? parseInt(swap.nativeOutput.amount, 10)
-        : swap.nativeOutput.amount;
-        
-      const inputSymbol = swap.tokenInputs && swap.tokenInputs.length > 0
-        ? (swap.tokenInputs[0].rawTokenAmount.tokenAmount 
-           ? `${formatTokenAmount(
-               parseFloat(swap.tokenInputs[0].rawTokenAmount.tokenAmount),
-               parseInt(String(swap.tokenInputs[0].rawTokenAmount.decimals), 10)
-             )} ${truncateAddress(swap.tokenInputs[0].mint)}`
-           : truncateAddress(swap.tokenInputs[0].mint))
-        : 'tokens';
-        
+      const amount =
+        typeof swap.nativeOutput.amount === 'string'
+          ? parseInt(swap.nativeOutput.amount, 10)
+          : swap.nativeOutput.amount;
+
+      const inputSymbol =
+        swap.tokenInputs && swap.tokenInputs.length > 0
+          ? swap.tokenInputs[0].rawTokenAmount.tokenAmount
+            ? `${formatTokenAmount(
+                parseFloat(swap.tokenInputs[0].rawTokenAmount.tokenAmount),
+                parseInt(
+                  String(swap.tokenInputs[0].rawTokenAmount.decimals),
+                  10,
+                ),
+              )} ${truncateAddress(swap.tokenInputs[0].mint)}`
+            : truncateAddress(swap.tokenInputs[0].mint)
+          : 'tokens';
+
       return {
         direction: 'in',
         amount,
         symbol: 'SOL',
         counterparty: inputSymbol,
-        rawData: swap
+        rawData: swap,
       };
     }
-    
+
     // Check for tokens involved in swap
     if (swap.tokenInputs && swap.tokenInputs.length > 0) {
       const input = swap.tokenInputs[0];
       if (input.userAccount === walletAddress) {
-        const outputSymbol = swap.tokenOutputs && swap.tokenOutputs.length > 0
-          ? (swap.tokenOutputs[0].rawTokenAmount.tokenAmount 
-             ? `${formatTokenAmount(
-                 parseFloat(swap.tokenOutputs[0].rawTokenAmount.tokenAmount),
-                 parseInt(String(swap.tokenOutputs[0].rawTokenAmount.decimals), 10)
-               )} ${truncateAddress(swap.tokenOutputs[0].mint)}`
-             : truncateAddress(swap.tokenOutputs[0].mint))
-          : 'tokens';
-          
+        const outputSymbol =
+          swap.tokenOutputs && swap.tokenOutputs.length > 0
+            ? swap.tokenOutputs[0].rawTokenAmount.tokenAmount
+              ? `${formatTokenAmount(
+                  parseFloat(swap.tokenOutputs[0].rawTokenAmount.tokenAmount),
+                  parseInt(
+                    String(swap.tokenOutputs[0].rawTokenAmount.decimals),
+                    10,
+                  ),
+                )} ${truncateAddress(swap.tokenOutputs[0].mint)}`
+              : truncateAddress(swap.tokenOutputs[0].mint)
+            : 'tokens';
+
         return {
           direction: 'out',
           amount: parseFloat(input.rawTokenAmount.tokenAmount),
@@ -459,24 +495,28 @@ function getTransactionDetails(
           counterparty: outputSymbol,
           rawData: {
             input,
-            decimals: parseInt(String(input.rawTokenAmount.decimals), 10)
-          }
+            decimals: parseInt(String(input.rawTokenAmount.decimals), 10),
+          },
         };
       }
     }
-    
+
     if (swap.tokenOutputs && swap.tokenOutputs.length > 0) {
       const output = swap.tokenOutputs[0];
       if (output.userAccount === walletAddress) {
-        const inputSymbol = swap.tokenInputs && swap.tokenInputs.length > 0
-          ? (swap.tokenInputs[0].rawTokenAmount.tokenAmount 
-             ? `${formatTokenAmount(
-                 parseFloat(swap.tokenInputs[0].rawTokenAmount.tokenAmount),
-                 parseInt(String(swap.tokenInputs[0].rawTokenAmount.decimals), 10)
-               )} ${truncateAddress(swap.tokenInputs[0].mint)}`
-             : truncateAddress(swap.tokenInputs[0].mint))
-          : 'tokens';
-          
+        const inputSymbol =
+          swap.tokenInputs && swap.tokenInputs.length > 0
+            ? swap.tokenInputs[0].rawTokenAmount.tokenAmount
+              ? `${formatTokenAmount(
+                  parseFloat(swap.tokenInputs[0].rawTokenAmount.tokenAmount),
+                  parseInt(
+                    String(swap.tokenInputs[0].rawTokenAmount.decimals),
+                    10,
+                  ),
+                )} ${truncateAddress(swap.tokenInputs[0].mint)}`
+              : truncateAddress(swap.tokenInputs[0].mint)
+            : 'tokens';
+
         return {
           direction: 'in',
           amount: parseFloat(output.rawTokenAmount.tokenAmount),
@@ -484,22 +524,22 @@ function getTransactionDetails(
           counterparty: inputSymbol,
           rawData: {
             output,
-            decimals: parseInt(String(output.rawTokenAmount.decimals), 10)
-          }
+            decimals: parseInt(String(output.rawTokenAmount.decimals), 10),
+          },
         };
       }
     }
-    
+
     // If we have a swap but couldn't determine direction
     if (descriptionAmount) {
       return {
         direction: 'neutral',
         amount: descriptionAmount.amount,
         symbol: descriptionAmount.symbol,
-        rawData: swap
+        rawData: swap,
       };
     }
-    
+
     return {direction: 'neutral', amount: 0, symbol: 'SWAP', rawData: swap};
   }
 
@@ -507,10 +547,11 @@ function getTransactionDetails(
   if (descriptionAmount) {
     return {
       direction: 'neutral',
-      amount: descriptionAmount.symbol.toUpperCase() === 'SOL' 
-        ? descriptionAmount.amount * 1_000_000_000 // Convert to lamports
-        : descriptionAmount.amount,
-      symbol: descriptionAmount.symbol
+      amount:
+        descriptionAmount.symbol.toUpperCase() === 'SOL'
+          ? descriptionAmount.amount * 1_000_000_000 // Convert to lamports
+          : descriptionAmount.amount,
+      symbol: descriptionAmount.symbol,
     };
   }
 
@@ -524,12 +565,12 @@ function getTransactionDetails(
 function getSimpleDescription(action: Action): string {
   // Check for enriched data first
   if (action.enrichedData) {
-    const { direction, counterparty } = action.enrichedData;
-    
+    const {direction, counterparty} = action.enrichedData;
+
     // For swap transactions
     if (action.enrichedType === 'SWAP') {
-      const { swapType, inputSymbol, outputSymbol } = action.enrichedData;
-      
+      const {swapType, inputSymbol, outputSymbol} = action.enrichedData;
+
       if (swapType === 'TOKEN_TO_TOKEN') {
         return `Swapped ${inputSymbol} → ${outputSymbol}`;
       } else if (swapType === 'SOL_TO_TOKEN') {
@@ -537,26 +578,25 @@ function getSimpleDescription(action: Action): string {
       } else if (swapType === 'TOKEN_TO_SOL') {
         return `Swapped ${inputSymbol} → SOL`;
       }
-      
+
       return 'Token Swap';
     }
-    
+
     // For transfer transactions
-    if (action.enrichedType === 'TRANSFER' || action.enrichedType === 'TOKEN_TRANSFER') {
+    if (
+      action.enrichedType === 'TRANSFER' ||
+      action.enrichedType === 'TOKEN_TRANSFER'
+    ) {
       if (direction === 'IN') {
-        return counterparty ? 
-          `Received from ${counterparty}` : 
-          'Received';
+        return counterparty ? `Received from ${counterparty}` : 'Received';
       }
-      
+
       if (direction === 'OUT') {
-        return counterparty ? 
-          `Sent to ${counterparty}` : 
-          'Sent';
+        return counterparty ? `Sent to ${counterparty}` : 'Sent';
       }
     }
   }
-  
+
   // Fall back to previous logic if enriched data not available
   if (action.description) {
     const desc = action.description.toLowerCase();
@@ -566,30 +606,36 @@ function getSimpleDescription(action: Action): string {
     if (desc.includes('sell')) return 'Sell';
     if (desc.includes('stake')) return 'Stake';
   }
-  
+
   return 'Transaction';
 }
 
 /**
  * Format amount to display with proper units
  */
-function displayAmount(action: Action): { amount: string, symbol: string, color: string } {
+function displayAmount(action: Action): {
+  amount: string;
+  symbol: string;
+  color: string;
+} {
   // Default values
   let amount = '0';
   let symbol = 'SOL';
   let color = '#333'; // Neutral color
-  
+
   // Check for enriched data
   if (action.enrichedData) {
-    const { direction } = action.enrichedData;
-    
+    const {direction} = action.enrichedData;
+
     // Set color based on direction
-    color = direction === 'IN' ? '#14F195' : direction === 'OUT' ? '#F43860' : '#333';
-    
+    color =
+      direction === 'IN' ? '#14F195' : direction === 'OUT' ? '#F43860' : '#333';
+
     // For swap transactions
     if (action.enrichedType === 'SWAP') {
-      const { swapType, inputAmount, outputAmount, inputSymbol, outputSymbol } = action.enrichedData;
-      
+      const {swapType, inputAmount, outputAmount, inputSymbol, outputSymbol} =
+        action.enrichedData;
+
       // Display relevant amount based on direction (what user gained or lost)
       if (direction === 'IN') {
         amount = outputAmount ? outputAmount.toFixed(4) : '?';
@@ -599,11 +645,19 @@ function displayAmount(action: Action): { amount: string, symbol: string, color:
         symbol = inputSymbol || 'tokens';
       }
     }
-    
+
     // For transfer transactions
-    else if (action.enrichedType === 'TRANSFER' || action.enrichedType === 'TOKEN_TRANSFER') {
-      const { transferType, amount: txAmount, tokenSymbol, decimals } = action.enrichedData;
-      
+    else if (
+      action.enrichedType === 'TRANSFER' ||
+      action.enrichedType === 'TOKEN_TRANSFER'
+    ) {
+      const {
+        transferType,
+        amount: txAmount,
+        tokenSymbol,
+        decimals,
+      } = action.enrichedData;
+
       if (transferType === 'SOL') {
         // Format SOL amount
         amount = txAmount ? txAmount.toFixed(4) : '?';
@@ -614,7 +668,7 @@ function displayAmount(action: Action): { amount: string, symbol: string, color:
         symbol = tokenSymbol || 'tokens';
       }
     }
-  } 
+  }
   // Fall back to previous logic if enriched data not available
   else if (action.nativeTransfers && action.nativeTransfers.length > 0) {
     const transfer = action.nativeTransfers[0];
@@ -625,8 +679,8 @@ function displayAmount(action: Action): { amount: string, symbol: string, color:
     amount = transfer.tokenAmount.toString();
     symbol = transfer.symbol || truncateAddress(transfer.mint);
   }
-  
-  return { amount, symbol, color };
+
+  return {amount, symbol, color};
 }
 
 const ActionItem: React.FC<{
@@ -635,43 +689,46 @@ const ActionItem: React.FC<{
   walletAddress?: string;
 }> = ({action, onPress, walletAddress}) => {
   // Get transaction type and icon
-  const type = action.enrichedType || action.type || action.transactionType || 'TRANSACTION';
-  const { icon, color } = getTransactionTypeInfo(type);
-  
+  const type =
+    action.enrichedType ||
+    action.type ||
+    action.transactionType ||
+    'TRANSACTION';
+  const {icon, color} = getTransactionTypeInfo(type);
+
   // Get simplified description
   const description = getSimpleDescription(action);
-  
+
   // Get formatted amount
-  const { amount, symbol, color: amountColor } = displayAmount(action);
-  
+  const {amount, symbol, color: amountColor} = displayAmount(action);
+
   // Time ago
   const timeAgo = action.timestamp ? getTimeAgo(action.timestamp) : '';
 
   // Direction prefix
   const direction = action.enrichedData?.direction;
-  const directionPrefix = direction === 'IN' ? '+ ' : direction === 'OUT' ? '- ' : '';
+  const directionPrefix =
+    direction === 'IN' ? '+ ' : direction === 'OUT' ? '- ' : '';
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.7}
-      style={styles.card}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.card}>
       <View style={styles.cardContent}>
         {/* Left - Icon */}
         <View style={[styles.iconContainer, {backgroundColor: `${color}15`}]}>
           <FontAwesome5 name={icon} size={16} color={color} />
         </View>
-        
+
         {/* Middle - Transaction Info */}
         <View style={styles.txInfo}>
           <Text style={styles.description}>{description}</Text>
           <Text style={styles.timeAgo}>{timeAgo}</Text>
         </View>
-        
+
         {/* Right - Amount */}
         <View style={styles.amountContainer}>
           <Text style={[styles.amount, {color: amountColor}]}>
-            {directionPrefix}{amount}
+            {directionPrefix}
+            {amount}
           </Text>
           <Text style={styles.symbol}>{symbol}</Text>
         </View>
@@ -723,9 +780,9 @@ const ActionsPage: React.FC<ActionsPageProps> = ({
         data={myActions}
         keyExtractor={(item, index) => item.signature || `action-${index}`}
         renderItem={({item}) => (
-          <ActionItem 
-            action={item} 
-            onPress={() => setSelectedAction(item)} 
+          <ActionItem
+            action={item}
+            onPress={() => setSelectedAction(item)}
             walletAddress={walletAddress}
           />
         )}
@@ -769,7 +826,7 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowColor: '#9945FF',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: {width: 0, height: 4},
         shadowOpacity: 0.3,
         shadowRadius: 8,
       },
@@ -800,7 +857,7 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowColor: 'rgba(0,0,0,0.05)',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: {width: 0, height: 2},
         shadowOpacity: 1,
         shadowRadius: 6,
       },

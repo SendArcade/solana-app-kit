@@ -1,0 +1,453 @@
+// FILE: src/components/Profile/ProfileTabs/ProfileTabs.tsx
+
+import React, {memo, useState, useMemo, useCallback} from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
+import {TabView, SceneMap, TabBar} from 'react-native-tab-view';
+import {ThreadPost} from '../../thread/thread.types';
+import Collectibles, {NftItem} from '../collectibles/collectibles';
+import {PostHeader, PostBody, PostFooter} from '../../thread';
+import {styles, tabBarStyles, retweetStyles} from './ProfileTabs.style';
+import ActionsPage from '../actions/ActionsPage';
+import {useAppDispatch, useAppSelector} from '../../../hooks/useReduxHooks';
+import {deletePostAsync} from '../../../state/thread/reducer';
+import {AssetItem, PortfolioData} from '../../../hooks/useFetchTokens';
+import Icons from '../../../assets/svgs';
+
+/**
+ * Props for the profile tab content component
+ */
+export interface ProfileTabsProps {
+  myPosts: ThreadPost[];
+  myNFTs: NftItem[];
+  loadingNfts?: boolean;
+  fetchNftsError?: string | null;
+  myActions: any[];
+  loadingActions?: boolean;
+  fetchActionsError?: string | null;
+  onPressPost?: (post: ThreadPost) => void;
+  portfolioData?: PortfolioData;
+  onRefreshPortfolio?: () => void;
+  refreshingPortfolio?: boolean;
+  onAssetPress?: (asset: AssetItem) => void;
+}
+
+// Loading placeholder for lazy-loaded tabs
+const LoadingPlaceholder = memo(() => (
+  <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+    <ActivityIndicator size="large" color="#1d9bf0" />
+  </View>
+));
+
+/**
+ * Empty state component for no posts
+ */
+const EmptyPostsState = memo(() => (
+  <View style={styles.centered}>
+    <Text style={styles.emptyText}>No posts yet!</Text>
+  </View>
+));
+
+/**
+ * Individual post item component
+ */
+const PostItem = memo(({
+  post,
+  onPressPost,
+  onDeletePost,
+  onEditPost,
+  externalRefreshTrigger,
+}: {
+  post: ThreadPost;
+  onPressPost?: (post: ThreadPost) => void;
+  onDeletePost: (post: ThreadPost) => void;
+  onEditPost: (post: ThreadPost) => void;
+  externalRefreshTrigger?: number;
+}) => {
+  const isReply = !!post.parentId;
+  const isRetweet = !!post.retweetOf;
+  const isQuoteRetweet = isRetweet && post.sections && post.sections.length > 0;
+  
+  return (
+    <View style={styles.postCard}>
+      {isReply ? (
+        <TouchableOpacity
+          onPress={() => onPressPost?.(post)}>
+          <Text style={styles.replyLabel}>Reply Post</Text>
+        </TouchableOpacity>
+      ) : null}
+      
+      {/* Retweet indicator */}
+      {isRetweet && (
+        <View style={retweetStyles.retweetHeader}>
+          <Icons.RetweetIdle width={12} height={12} color="#657786" />
+          <Text style={retweetStyles.retweetHeaderText}>
+            {post.user.username} Retweeted
+          </Text>
+        </View>
+      )}
+
+      {/* Retweet content */}
+      {isRetweet ? (
+        <View style={retweetStyles.retweetedContent}>
+          {/* Quote retweet text */}
+          {isQuoteRetweet && (
+            <View style={retweetStyles.quoteContent}>
+              {post.sections.map(section => (
+                <Text key={section.id} style={retweetStyles.quoteText}>
+                  {section.text}
+                </Text>
+              ))}
+            </View>
+          )}
+          
+          {/* Original post content */}
+          {post.retweetOf && (
+            <TouchableOpacity
+              style={retweetStyles.originalPostContainer}
+              activeOpacity={0.8}
+              onPress={() => onPressPost?.(post.retweetOf!)}>
+              <PostHeader
+                post={post.retweetOf}
+                onDeletePost={onDeletePost}
+                onEditPost={onEditPost}
+              />
+              <PostBody
+                post={post.retweetOf}
+                externalRefreshTrigger={externalRefreshTrigger}
+              />
+              <PostFooter 
+                post={post.retweetOf}
+                onPressComment={() => onPressPost?.(post.retweetOf!)}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => onPressPost?.(post)}>
+          {/* Regular post */}
+          <PostHeader
+            post={post}
+            onDeletePost={onDeletePost}
+            onEditPost={onEditPost}
+          />
+          <PostBody
+            post={post}
+            externalRefreshTrigger={externalRefreshTrigger}
+          />
+          <PostFooter post={post} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+});
+
+/**
+ * Posts tab content - shows user's posts or empty state
+ */
+const PostsTab = memo(({
+  posts,
+  onPressPost,
+  externalRefreshTrigger,
+}: {
+  posts: ThreadPost[];
+  onPressPost?: (post: ThreadPost) => void;
+  externalRefreshTrigger?: number;
+}) => {
+  const dispatch = useAppDispatch();
+  const userWallet = useAppSelector(state => state.auth.address);
+  
+  const handleDeletePost = useCallback((post: ThreadPost) => {
+    if (post.user.id !== userWallet) {
+      alert('You are not the owner of this post.');
+      return;
+    }
+    dispatch(deletePostAsync(post.id));
+  }, [dispatch, userWallet]);
+
+  const handleEditPost = useCallback((post: ThreadPost) => {
+    if (post.user.id !== userWallet) {
+      alert('You are not the owner of this post.');
+      return;
+    }
+    // Editing logic would be here
+  }, [userWallet]);
+
+  // Empty state check
+  if (!posts || posts.length === 0) {
+    return <EmptyPostsState />;
+  }
+
+  const renderPost = useCallback(({item}: {item: ThreadPost}) => (
+    <PostItem 
+      post={item}
+      onPressPost={onPressPost}
+      onDeletePost={handleDeletePost}
+      onEditPost={handleEditPost}
+      externalRefreshTrigger={externalRefreshTrigger}
+    />
+  ), [onPressPost, handleDeletePost, handleEditPost, externalRefreshTrigger]);
+
+  // Using a keyExtractor to help React optimize rendering
+  const keyExtractor = useCallback((post: ThreadPost) => post.id, []);
+
+  return (
+    <FlatList
+      data={posts}
+      renderItem={renderPost}
+      keyExtractor={keyExtractor}
+      contentContainerStyle={styles.postList}
+      removeClippedSubviews={true} // Optimize memory usage
+      maxToRenderPerBatch={10}     // Optimize render performance
+      windowSize={5}               // Optimize render window
+      initialNumToRender={7}       // Initial render batch size
+    />
+  );
+});
+
+/**
+ * Portfolio tab content - shows user's NFTs and portfolio
+ */
+const PortfolioTab = memo(({
+  nfts,
+  loading,
+  fetchNftsError,
+  portfolioData,
+  onRefresh,
+  refreshing,
+  onAssetPress,
+}: {
+  nfts: NftItem[];
+  loading?: boolean;
+  fetchNftsError?: string | null;
+  portfolioData?: PortfolioData;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  onAssetPress?: (asset: AssetItem) => void;
+}) => {
+  // Prioritize portfolio data if available
+  const hasPortfolioData = useMemo(() => 
+    portfolioData?.items && portfolioData.items.length > 0,
+    [portfolioData?.items]
+  );
+
+  // Memoize props for Collectibles to prevent re-renders
+  const collectiblesProps = useMemo(() => ({
+    nfts: hasPortfolioData ? [] : nfts,
+    loading,
+    error: fetchNftsError,
+    portfolioItems: portfolioData?.items,
+    nativeBalance: portfolioData?.nativeBalance?.lamports,
+    onRefresh,
+    refreshing,
+    onItemPress: onAssetPress,
+  }), [
+    hasPortfolioData,
+    nfts,
+    loading,
+    fetchNftsError,
+    portfolioData?.items,
+    portfolioData?.nativeBalance?.lamports,
+    onRefresh,
+    refreshing,
+    onAssetPress,
+  ]);
+
+  return (
+    <View style={styles.tabContent}>
+      <Collectibles {...collectiblesProps} />
+    </View>
+  );
+});
+
+/**
+ * Actions tab wrapped in memo
+ */
+const ActionsTabContent = memo(({
+  myActions,
+  loadingActions,
+  fetchActionsError,
+}: {
+  myActions: any[];
+  loadingActions?: boolean;
+  fetchActionsError?: string | null;
+}) => (
+  <ActionsPage
+    myActions={myActions}
+    loadingActions={loadingActions}
+    fetchActionsError={fetchActionsError}
+  />
+));
+
+/**
+ * ProfileTabs - The main tab container that shows Posts, Portfolio, and Actions
+ * Renamed from SwipeTabs for better clarity
+ */
+function ProfileTabs({
+  myPosts,
+  myNFTs,
+  loadingNfts,
+  fetchNftsError,
+  myActions,
+  loadingActions,
+  fetchActionsError,
+  onPressPost,
+  portfolioData,
+  onRefreshPortfolio,
+  refreshingPortfolio,
+  onAssetPress,
+}: ProfileTabsProps) {
+  // Tab navigation state
+  const [index, setIndex] = useState<number>(0);
+  const [routes] = useState([
+    {key: 'posts', title: 'Posts'},
+    {key: 'portfolio', title: 'Portfolio'},
+    {key: 'actions', title: 'Actions'},
+  ]);
+
+  // Refresh counter for posts tab charts
+  const [refreshCounter, setRefreshCounter] = useState(0);
+
+  // Handle tab changes and trigger refreshes as needed
+  const handleIndexChange = useCallback((newIndex: number) => {
+    setIndex(newIndex);
+    if (newIndex === 0) {
+      setRefreshCounter(prev => prev + 1);
+    }
+  }, []);
+
+  // Memoize scene components to prevent re-renders
+  const postsSceneData = useMemo(() => ({
+    posts: myPosts,
+    onPressPost,
+    externalRefreshTrigger: refreshCounter,
+  }), [myPosts, onPressPost, refreshCounter]);
+  
+  const portfolioSceneData = useMemo(() => ({
+    nfts: myNFTs,
+    loading: loadingNfts,
+    fetchNftsError,
+    portfolioData,
+    onRefresh: onRefreshPortfolio,
+    refreshing: refreshingPortfolio,
+    onAssetPress,
+  }), [
+    myNFTs,
+    loadingNfts,
+    fetchNftsError,
+    portfolioData,
+    onRefreshPortfolio,
+    refreshingPortfolio,
+    onAssetPress,
+  ]);
+  
+  const actionsSceneData = useMemo(() => ({
+    myActions,
+    loadingActions,
+    fetchActionsError,
+  }), [myActions, loadingActions, fetchActionsError]);
+
+  // Scene renderers - these components are created once and memoized
+  const PostsScene = useMemo(
+    () => () => <PostsTab {...postsSceneData} />,
+    [postsSceneData]
+  );
+
+  const PortfolioScene = useMemo(
+    () => () => <PortfolioTab {...portfolioSceneData} />,
+    [portfolioSceneData]
+  );
+
+  const ActionsScene = useMemo(
+    () => () => <ActionsTabContent {...actionsSceneData} />,
+    [actionsSceneData]
+  );
+
+  // Scene map for the tab view - only created once
+  const renderScene = useMemo(
+    () => SceneMap({
+      posts: PostsScene,
+      portfolio: PortfolioScene,
+      actions: ActionsScene,
+    }),
+    [PostsScene, PortfolioScene, ActionsScene]
+  );
+
+  // Custom tab bar renderer
+  const renderTabBar = useCallback((props: any) => (
+    <TabBar
+      {...props}
+      style={tabBarStyles.container}
+      labelStyle={tabBarStyles.label}
+      activeColor={tabBarStyles.activeColor}
+      inactiveColor={tabBarStyles.inactiveColor}
+      indicatorStyle={tabBarStyles.indicator}
+      pressColor="transparent" // Prevent ripple effect on Android
+      pressOpacity={0.8}       // Subtle opacity change on iOS
+    />
+  ), []);
+
+  // Memoize the initial layout to prevent recalculation
+  const initialLayout = useMemo(() => ({width: 300, height: 300}), []);
+
+  return (
+    <View style={styles.tabView}>
+      <TabView
+        navigationState={{index, routes}}
+        renderScene={renderScene}
+        onIndexChange={handleIndexChange}
+        renderTabBar={renderTabBar}
+        // Disable horizontal swipe to prevent conflicts with chart gestures
+        swipeEnabled={false}
+        lazy
+        lazyPreloadDistance={0} // Only render active tab
+        renderLazyPlaceholder={() => <LoadingPlaceholder />}
+        removeClippedSubviews={true}
+        initialLayout={initialLayout} // Provide consistent initial layout
+      />
+    </View>
+  );
+}
+
+// Optimize re-renders with memoization and detailed prop comparison
+const MemoizedProfileTabs = memo(ProfileTabs, (prevProps, nextProps) => {
+  // Compare post arrays by length and IDs
+  if (prevProps.myPosts.length !== nextProps.myPosts.length) return false;
+  
+  // Only check post IDs if lengths match - to avoid unnecessary iteration
+  for (let i = 0; i < prevProps.myPosts.length; i++) {
+    if (prevProps.myPosts[i].id !== nextProps.myPosts[i].id) {
+      return false;
+    }
+  }
+
+  // Compare by reference for other array props
+  if (prevProps.myNFTs !== nextProps.myNFTs) return false;
+  if (prevProps.myActions !== nextProps.myActions) return false;
+
+  // Simple equality for loading/error states
+  if (prevProps.loadingNfts !== nextProps.loadingNfts) return false;
+  if (prevProps.fetchNftsError !== nextProps.fetchNftsError) return false;
+  if (prevProps.loadingActions !== nextProps.loadingActions) return false;
+  if (prevProps.fetchActionsError !== nextProps.fetchActionsError) return false;
+  
+  // Check portfolio data
+  if (prevProps.portfolioData !== nextProps.portfolioData) return false;
+  if (prevProps.refreshingPortfolio !== nextProps.refreshingPortfolio) return false;
+  
+  // Compare callbacks by reference
+  if (prevProps.onPressPost !== nextProps.onPressPost) return false;
+  if (prevProps.onRefreshPortfolio !== nextProps.onRefreshPortfolio) return false;
+  if (prevProps.onAssetPress !== nextProps.onAssetPress) return false;
+
+  return true;
+});
+
+export default MemoizedProfileTabs; 

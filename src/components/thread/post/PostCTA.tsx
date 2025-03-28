@@ -369,7 +369,6 @@ export default function PostCTA({
           'x-tensor-api-key': TENSOR_API_KEY,
         },
       });
-
       const rawText = await resp.text();
       let data: any;
       try {

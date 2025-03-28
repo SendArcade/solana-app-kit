@@ -10,6 +10,7 @@ import { fetchAllPosts } from '../../../../state/thread/reducer';
 import { NftItem, useFetchNFTs } from '../../../../hooks/useFetchNFTs';
 import COLORS from '../../../../assets/colors';
 import { SERVER_URL } from '@env';
+import { flattenPosts } from '../../../../components/thread/thread.utils';
 
 const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 
@@ -138,11 +139,17 @@ export default function OtherProfileScreen() {
     }
 
     try {
-      const userPosts = allPosts.filter(
-        p => p.user?.id?.toLowerCase() === userId.toLowerCase(),
+      // Use the flattenPosts utility to get all posts including nested replies
+      const flattenedPosts = flattenPosts(allPosts);
+      
+      // Filter for posts by this user
+      const userPosts = flattenedPosts.filter(
+        (p: ThreadPost) => p.user?.id?.toLowerCase() === userId.toLowerCase()
       );
-      // sort by createdAt desc
-      userPosts.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+      
+      // Sort by creation date, newest first
+      userPosts.sort((a: ThreadPost, b: ThreadPost) => (new Date(b.createdAt) > new Date(a.createdAt) ? 1 : -1));
+      
       setMyPosts(userPosts);
     } catch (error) {
       console.error('Error filtering posts:', error);

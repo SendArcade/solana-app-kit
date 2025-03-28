@@ -1,4 +1,3 @@
-// File: src/components/Profile/ProfileInfo/profileInfo.style.ts
 import {StyleSheet} from 'react-native';
 import COLORS from '../../../assets/colors';
 
@@ -22,10 +21,51 @@ export const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
+  username: {
+    fontSize: 18,
+    fontWeight: '600',
+    lineHeight: 22,
+    color: COLORS.textDark,
+  },
+  handleText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: COLORS.greyDark,
+  },
+  followsBadge: {
+    backgroundColor: COLORS.greyLight,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    paddingVertical: 4,
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'left',
+    color: COLORS.greyDark,
+  },
   bioSection: {
     fontSize: 14,
     fontWeight: '400',
     textAlign: 'left',
+    color: COLORS.textDark,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  statItem: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  statCount: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textDark,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: COLORS.greyMid,
   },
   editProfileBtn: {
     borderWidth: 1,
@@ -40,4 +80,4 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.black,
   },
-});
+}); 

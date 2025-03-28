@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {
   Modal,
   View,
@@ -12,8 +12,8 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { FontAwesome5 } from '@expo/vector-icons';
-import { Action } from '../../../services/profileActions';
+import {FontAwesome5} from '@expo/vector-icons';
+import {Action} from '../../../services/profileActions';
 
 export interface ActionDetailModalProps {
   visible: boolean;
@@ -101,7 +101,11 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   if (!action) return null;
 
   // Determine the action label using enriched type if available
-  let actionType = action.enrichedType || action.transactionType || action.type || 'Transaction';
+  let actionType =
+    action.enrichedType ||
+    action.transactionType ||
+    action.type ||
+    'Transaction';
 
   // Prettier action type name for display
   if (actionType === 'SWAP') actionType = 'Swap';
@@ -130,26 +134,43 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   if (action.enrichedData) {
     // Get details from enriched data
     if (action.enrichedType === 'SWAP') {
-      const { swapType, inputSymbol, outputSymbol, inputAmount, outputAmount, direction: enrichedDirection } = action.enrichedData;
+      const {
+        swapType,
+        inputSymbol,
+        outputSymbol,
+        inputAmount,
+        outputAmount,
+        direction: enrichedDirection,
+      } = action.enrichedData;
 
       swapDetails = {
         inputAmount: inputAmount?.toFixed(4) || '?',
         inputSymbol: inputSymbol || '?',
         outputAmount: outputAmount?.toFixed(4) || '?',
         outputSymbol: outputSymbol || '?',
-        direction: enrichedDirection || 'neutral'
+        direction: enrichedDirection || 'neutral',
       };
 
       direction = enrichedDirection || 'neutral';
-    }
-    else if (action.enrichedType === 'TRANSFER' || action.enrichedType === 'TOKEN_TRANSFER') {
-      const { transferType, amount: txAmount, tokenSymbol, counterparty, direction: enrichedDirection } = action.enrichedData;
+    } else if (
+      action.enrichedType === 'TRANSFER' ||
+      action.enrichedType === 'TOKEN_TRANSFER'
+    ) {
+      const {
+        transferType,
+        amount: txAmount,
+        tokenSymbol,
+        counterparty,
+        direction: enrichedDirection,
+      } = action.enrichedData;
 
       // For display in the transaction detail view
-      amount = txAmount ?
-        (transferType === 'SOL' ? txAmount.toFixed(4) : txAmount.toString()) :
-        '?';
-      symbol = transferType === 'SOL' ? 'SOL' : (tokenSymbol || 'tokens');
+      amount = txAmount
+        ? transferType === 'SOL'
+          ? txAmount.toFixed(4)
+          : txAmount.toString()
+        : '?';
+      symbol = transferType === 'SOL' ? 'SOL' : tokenSymbol || 'tokens';
       direction = enrichedDirection || 'neutral';
 
       // Set from/to based on direction
@@ -211,22 +232,30 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
       let outputSymbol = '';
 
       if (swap.nativeInput) {
-        inputAmount = formatSolAmount(parseInt(String(swap.nativeInput.amount), 10));
+        inputAmount = formatSolAmount(
+          parseInt(String(swap.nativeInput.amount), 10),
+        );
         inputSymbol = 'SOL';
       } else if (swap.tokenInputs && swap.tokenInputs.length > 0) {
         const input = swap.tokenInputs[0];
         const decimals = parseInt(String(input.rawTokenAmount.decimals), 10);
-        inputAmount = (parseFloat(input.rawTokenAmount.tokenAmount) / Math.pow(10, decimals)).toFixed(4);
+        inputAmount = (
+          parseFloat(input.rawTokenAmount.tokenAmount) / Math.pow(10, decimals)
+        ).toFixed(4);
         inputSymbol = truncateAddress(input.mint);
       }
 
       if (swap.nativeOutput) {
-        outputAmount = formatSolAmount(parseInt(String(swap.nativeOutput.amount), 10));
+        outputAmount = formatSolAmount(
+          parseInt(String(swap.nativeOutput.amount), 10),
+        );
         outputSymbol = 'SOL';
       } else if (swap.tokenOutputs && swap.tokenOutputs.length > 0) {
         const output = swap.tokenOutputs[0];
         const decimals = parseInt(String(output.rawTokenAmount.decimals), 10);
-        outputAmount = (parseFloat(output.rawTokenAmount.tokenAmount) / Math.pow(10, decimals)).toFixed(4);
+        outputAmount = (
+          parseFloat(output.rawTokenAmount.tokenAmount) / Math.pow(10, decimals)
+        ).toFixed(4);
         outputSymbol = truncateAddress(output.mint);
       }
 
@@ -236,7 +265,7 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
           inputSymbol,
           outputAmount,
           outputSymbol,
-          direction: 'neutral'
+          direction: 'neutral',
         };
       }
     }
@@ -257,12 +286,20 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   };
 
   // Format direction for display
-  const directionDisplay = direction === 'IN' || direction === 'in' ? 'Received' :
-    direction === 'OUT' || direction === 'out' ? 'Sent' : '';
+  const directionDisplay =
+    direction === 'IN' || direction === 'in'
+      ? 'Received'
+      : direction === 'OUT' || direction === 'out'
+      ? 'Sent'
+      : '';
 
   // Set color based on direction
-  const amountColor = direction === 'IN' || direction === 'in' ? '#14F195' :
-    direction === 'OUT' || direction === 'out' ? '#F43860' : '#333';
+  const amountColor =
+    direction === 'IN' || direction === 'in'
+      ? '#14F195'
+      : direction === 'OUT' || direction === 'out'
+      ? '#F43860'
+      : '#333';
 
   // Show tooltip animation
   const showTooltip = (tooltipType: 'from' | 'to') => {
@@ -304,20 +341,31 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
               <ScrollView
                 style={modalStyles.content}
                 showsVerticalScrollIndicator={false}>
-
                 {/* Transaction Type Banner */}
-                <View style={[modalStyles.typeBanner, { backgroundColor: `${accentColor}10` }]}>
-                  <View style={[modalStyles.iconContainer, { backgroundColor: `${accentColor}20` }]}>
+                <View
+                  style={[
+                    modalStyles.typeBanner,
+                    {backgroundColor: `${accentColor}10`},
+                  ]}>
+                  <View
+                    style={[
+                      modalStyles.iconContainer,
+                      {backgroundColor: `${accentColor}20`},
+                    ]}>
                     <FontAwesome5
-                      name={actionType.toLowerCase().includes('transfer') ? 'exchange-alt'
-                        : actionType.toLowerCase().includes('swap') ? 'sync-alt'
-                          : 'receipt'}
+                      name={
+                        actionType.toLowerCase().includes('transfer')
+                          ? 'exchange-alt'
+                          : actionType.toLowerCase().includes('swap')
+                          ? 'sync-alt'
+                          : 'receipt'
+                      }
                       size={16}
                       color={accentColor}
                     />
                   </View>
                   <View style={modalStyles.typeInfo}>
-                    <Text style={[modalStyles.typeTitle, { color: accentColor }]}>
+                    <Text style={[modalStyles.typeTitle, {color: accentColor}]}>
                       {actionType}
                     </Text>
                     <Text style={modalStyles.dateText}>{date}</Text>
@@ -327,11 +375,14 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
                 {/* Transaction Amount for Transfers */}
                 {direction !== 'neutral' && amount && (
                   <View style={modalStyles.amountContainer}>
-                    <Text style={[
-                      modalStyles.amountText,
-                      { color: amountColor }
-                    ]}>
-                      {direction === 'IN' || direction === 'in' ? '+ ' : direction === 'OUT' || direction === 'out' ? '- ' : ''}{amount} {symbol}
+                    <Text
+                      style={[modalStyles.amountText, {color: amountColor}]}>
+                      {direction === 'IN' || direction === 'in'
+                        ? '+ '
+                        : direction === 'OUT' || direction === 'out'
+                        ? '- '
+                        : ''}
+                      {amount} {symbol}
                     </Text>
                     {directionDisplay && (
                       <Text style={modalStyles.directionLabel}>
@@ -352,7 +403,11 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
                         <Text style={modalStyles.swapLabel}>Paid</Text>
                       </View>
                       <View style={modalStyles.swapArrow}>
-                        <FontAwesome5 name="arrow-right" size={14} color="#999" />
+                        <FontAwesome5
+                          name="arrow-right"
+                          size={14}
+                          color="#999"
+                        />
                       </View>
                       <View style={modalStyles.swapAmount}>
                         <Text style={modalStyles.swapValue}>
@@ -381,9 +436,10 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
                       <TouchableOpacity
                         onPressIn={() => showTooltip('from')}
                         onPressOut={hideTooltip}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={modalStyles.detailValue}>{fromAddress}</Text>
+                        activeOpacity={0.7}>
+                        <Text style={modalStyles.detailValue}>
+                          {fromAddress}
+                        </Text>
 
                         {showFromTooltip && (
                           <Animated.View
@@ -391,16 +447,19 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
                               modalStyles.tooltip,
                               {
                                 opacity: tooltipAnimation,
-                                transform: [{
-                                  translateY: tooltipAnimation.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [-5, 0],
-                                  })
-                                }]
-                              }
-                            ]}
-                          >
-                            <Text style={modalStyles.tooltipText}>{originalFromAddress}</Text>
+                                transform: [
+                                  {
+                                    translateY: tooltipAnimation.interpolate({
+                                      inputRange: [0, 1],
+                                      outputRange: [-5, 0],
+                                    }),
+                                  },
+                                ],
+                              },
+                            ]}>
+                            <Text style={modalStyles.tooltipText}>
+                              {originalFromAddress}
+                            </Text>
                             <View style={modalStyles.tooltipArrow} />
                           </Animated.View>
                         )}
@@ -414,8 +473,7 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
                       <TouchableOpacity
                         onPressIn={() => showTooltip('to')}
                         onPressOut={hideTooltip}
-                        activeOpacity={0.7}
-                      >
+                        activeOpacity={0.7}>
                         <Text style={modalStyles.detailValue}>{toAddress}</Text>
 
                         {showToTooltip && (
@@ -424,16 +482,19 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
                               modalStyles.tooltip,
                               {
                                 opacity: tooltipAnimation,
-                                transform: [{
-                                  translateY: tooltipAnimation.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [-5, 0],
-                                  })
-                                }]
-                              }
-                            ]}
-                          >
-                            <Text style={modalStyles.tooltipText}>{originalToAddress}</Text>
+                                transform: [
+                                  {
+                                    translateY: tooltipAnimation.interpolate({
+                                      inputRange: [0, 1],
+                                      outputRange: [-5, 0],
+                                    }),
+                                  },
+                                ],
+                              },
+                            ]}>
+                            <Text style={modalStyles.tooltipText}>
+                              {originalToAddress}
+                            </Text>
                             <View style={modalStyles.tooltipArrow} />
                           </Animated.View>
                         )}
@@ -445,14 +506,16 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
                   <View style={modalStyles.detailRow}>
                     <Text style={modalStyles.detailLabel}>Signature</Text>
                     <View style={modalStyles.signatureContainer}>
-                      <Text style={modalStyles.detailValue}>{truncatedSignature}</Text>
+                      <Text style={modalStyles.detailValue}>
+                        {truncatedSignature}
+                      </Text>
                       <TouchableOpacity
                         onPress={copySignature}
                         style={modalStyles.copyButton}>
                         <FontAwesome5
-                          name={copied ? "check" : "copy"}
+                          name={copied ? 'check' : 'copy'}
                           size={14}
-                          color={copied ? "#4caf50" : "#1d9bf0"}
+                          color={copied ? '#4caf50' : '#1d9bf0'}
                         />
                       </TouchableOpacity>
                     </View>
@@ -472,7 +535,12 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
                   onPress={openSolscan}
                   style={modalStyles.solscanButton}
                   activeOpacity={0.8}>
-                  <FontAwesome5 name="external-link-alt" size={14} color="#1d9bf0" style={modalStyles.solscanIcon} />
+                  <FontAwesome5
+                    name="external-link-alt"
+                    size={14}
+                    color="#1d9bf0"
+                    style={modalStyles.solscanIcon}
+                  />
                   <Text style={modalStyles.solscanText}>View on Solscan</Text>
                 </TouchableOpacity>
 
@@ -495,7 +563,8 @@ const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
                         {action.instructions.map((instr, idx) => (
                           <View key={idx} style={modalStyles.instructionItem}>
                             <Text style={modalStyles.instructionProgram}>
-                              Program: {instr.programId || instr.program || 'Unknown'}
+                              Program:{' '}
+                              {instr.programId || instr.program || 'Unknown'}
                             </Text>
                             <View style={modalStyles.instructionData}>
                               <Text style={modalStyles.instructionDataText}>

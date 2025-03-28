@@ -13,8 +13,6 @@ import {
   FlatList,
   StyleSheet,
   TextInput,
-  ScrollView,
-  Dimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { setStatusBarStyle } from 'expo-status-bar';
@@ -35,13 +33,12 @@ import {
   fetchFollowing,
   checkIfUserFollowsMe,
 } from '../../services/profileService';
-import { HELIUS_API_KEY } from '@env';
+import { fetchWalletActionsWithCache, pruneOldActionData } from '../../state/profile/reducer';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import * as Clipboard from 'expo-clipboard';
-import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { followUser, unfollowUser } from '../../state/users/reducer';
 import { useFetchPortfolio, AssetItem } from '../../hooks/useFetchTokens';
+import COLORS from '../../assets/colors';
 
 import ProfileView, { UserProfileData } from './ProfileView';
 import {
@@ -52,7 +49,6 @@ import {
   editNameModalStyles,
 } from './profile.style';
 import { flattenPosts } from '../thread/thread.utils';
-import { useAppNavigation as useAppNavigationHook } from '../../hooks/useAppNavigation';
 
 export interface ProfileProps {
   isOwnProfile?: boolean;
@@ -85,16 +81,15 @@ export default function Profile({
   const { address: currentWalletAddress } = useWallet();
   const myWallet = useAppSelector(state => state.auth.address);
 
-  const currentUserWallet = currentWalletAddress || myWallet;
-  const { width } = Dimensions.get('window');
-  const itemWidth = (width - 60) / 2;
+  // Get profile actions from Redux state
+  const profileActions = useAppSelector(state => state.profile.actions);
 
+  const currentUserWallet = currentWalletAddress || myWallet;
   const userWallet = user?.address || '';
   const storedProfilePic = user?.profilePicUrl || '';
   const customizationData = user?.attachmentData || {};
 
-
-  // Local states for profile picture, username, and description
+  // Local states for profile data
   const [profilePicUrl, setProfilePicUrl] = useState<string>(storedProfilePic);
   const [localUsername, setLocalUsername] = useState<string>(user?.username || 'Anonymous');
   const [localDescription, setLocalDescription] = useState<string>(user?.description || '');
@@ -105,11 +100,6 @@ export default function Profile({
   const [amIFollowing, setAmIFollowing] = useState(false);
   const [areTheyFollowingMe, setAreTheyFollowingMe] = useState(false);
 
-  // --- ACTIONS state ---
-  const [myActions, setMyActions] = useState<any[]>([]);
-  const [loadingActions, setLoadingActions] = useState<boolean>(false);
-  const [fetchActionsError, setFetchActionsError] = useState<string | null>(null);
-
   // NFT fetch hook - use it only when nfts are not provided via props
   const {
     nfts: fetchedNfts,
@@ -117,7 +107,7 @@ export default function Profile({
     error: defaultNftError,
   } = useFetchNFTs(userWallet || undefined);
 
-  // Portfolio fetch hook - fetch the complete portfolio including tokens, NFTs, and compressed NFTs
+  // Portfolio fetch hook
   const {
     portfolio,
     loading: loadingPortfolio,
@@ -127,86 +117,41 @@ export default function Profile({
   // For refreshing the portfolio data
   const [refreshingPortfolio, setRefreshingPortfolio] = useState(false);
 
-  const handleRefreshPortfolio = useCallback(async () => {
-    if (!userWallet) return;
-
-    setRefreshingPortfolio(true);
-    try {
-      // Re-fetch portfolio (in a real app, you would implement a refresh method in the hook)
-      // For now, we'll just simulate a refresh with a delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } catch (err) {
-      console.error('Error refreshing portfolio:', err);
-    } finally {
-      setRefreshingPortfolio(false);
-    }
-  }, [userWallet]);
-
-  // Handle asset press
-  const handleAssetPress = useCallback((asset: AssetItem) => {
-    // You can implement what happens when an asset is pressed
-    console.log('Asset pressed:', asset);
-
-    // For NFTs, you might want to show a detail view
-    if (asset.interface === 'V1_NFT' || asset.interface === 'ProgrammableNFT') {
-      // Example: navigation.navigate('NFTDetail', { asset });
-    }
-    // For tokens, you might want to show a transaction history or trade modal
-    else if (asset.interface === 'V1_TOKEN' || asset.token_info) {
-      // Example: navigation.navigate('TokenDetail', { asset });
-    }
-  }, []);
-
+  // Extract values with fallbacks
   const resolvedNfts = nfts.length > 0 ? nfts : fetchedNfts;
   const resolvedLoadingNfts = loadingNfts || defaultNftLoading;
   const resolvedNftError = fetchNftsError || defaultNftError;
 
+  // Get actions data from Redux
+  const myActions = useMemo(() => 
+    userWallet ? (profileActions.data[userWallet] || []) : [],
+    [userWallet, profileActions.data]
+  );
+  
+  const loadingActions = useMemo(() => 
+    !!userWallet && !!profileActions.loading[userWallet],
+    [userWallet, profileActions.loading]
+  );
+  
+  const fetchActionsError = useMemo(() => 
+    userWallet ? profileActions.error[userWallet] : null,
+    [userWallet, profileActions.error]
+  );
+
   // --- Fetch Actions ---
   useEffect(() => {
     if (!userWallet) return;
-
-    let isCancelled = false;
-    setLoadingActions(true);
-    setFetchActionsError(null);
-
-    const fetchActions = async () => {
-      try {
-        console.log('Fetching actions for wallet:', userWallet);
-        const heliusUrl = `https://api.helius.xyz/v0/addresses/${userWallet}/transactions?api-key=${HELIUS_API_KEY}&limit=20`;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-        const res = await fetch(heliusUrl, { signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (!res.ok) {
-          throw new Error(`Helius fetch failed with status ${res.status}`);
-        }
-
-        const data = await res.json();
-        console.log('Data received, items:', data?.length || 0);
-
-        if (!isCancelled) {
-          setMyActions(data || []);
-        }
-      } catch (err: any) {
-        console.error('Error fetching actions:', err.message);
-        if (!isCancelled) {
-          setFetchActionsError(err.message || 'Failed to fetch actions');
-        }
-      } finally {
-        if (!isCancelled) {
-          setLoadingActions(false);
-        }
-      }
-    };
-
-    fetchActions();
-    return () => {
-      isCancelled = true;
-    };
-  }, [userWallet]);
+    
+    // Check if we have recent data to avoid unnecessary fetches
+    const lastFetched = profileActions.lastFetched[userWallet] || 0;
+    const currentTime = Date.now();
+    const isFresh = currentTime - lastFetched < 60000; // 1 minute
+    
+    // Only fetch if we don't have fresh data
+    if (!profileActions.data[userWallet]?.length || !isFresh) {
+      dispatch(fetchWalletActionsWithCache({ walletAddress: userWallet }));
+    }
+  }, [userWallet, dispatch, profileActions.data, profileActions.lastFetched]);
 
   // --- Fetch user profile if needed ---
   useEffect(() => {
@@ -262,14 +207,57 @@ export default function Profile({
   // --- Flatten & filter user posts ---
   const myPosts = useMemo(() => {
     if (!userWallet) return [];
+    
+    // Choose base posts from props or Redux
     const base = posts && posts.length > 0 ? posts : allReduxPosts;
+    
+    // Use flattenPosts to extract all posts including nested replies
     const flat = flattenPosts(base);
+    
+    // Filter for all posts where the user is the author
     const userAll = flat.filter(
       p => p.user.id.toLowerCase() === userWallet.toLowerCase(),
     );
+    
+    // Sort by most recent first
     userAll.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+    
     return userAll;
   }, [userWallet, posts, allReduxPosts]);
+
+  // --- Refresh Portfolio handler ---
+  const handleRefreshPortfolio = useCallback(async () => {
+    if (!userWallet) return;
+    setRefreshingPortfolio(true);
+    
+    try {
+      // Refresh actions with force refresh
+      await dispatch(fetchWalletActionsWithCache({ 
+        walletAddress: userWallet,
+        forceRefresh: true 
+      })).unwrap();
+      
+      // Wait for additional data refreshes
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (err) {
+      console.error('Error refreshing profile data:', err);
+    } finally {
+      setRefreshingPortfolio(false);
+    }
+  }, [userWallet, dispatch]);
+
+  // --- Asset press handler ---
+  const handleAssetPress = useCallback((asset: AssetItem) => {
+    console.log('Asset pressed:', asset);
+    // For NFTs, show detail view
+    if (asset.interface === 'V1_NFT' || asset.interface === 'ProgrammableNFT') {
+      // navigation.navigate('NFTDetail', { asset });
+    }
+    // For tokens, show transaction history
+    else if (asset.interface === 'V1_TOKEN' || asset.token_info) {
+      // navigation.navigate('TokenDetail', { asset });
+    }
+  }, []);
 
   // --- Follow / Unfollow handlers ---
   const handleFollow = useCallback(async () => {
@@ -312,9 +300,8 @@ export default function Profile({
     }
   }, [dispatch, currentUserWallet, userWallet]);
 
-  // --- Avatar selection, modals, editing name logic (unchanged) ---
-  const [avatarOptionModalVisible, setAvatarOptionModalVisible] =
-    useState(false);
+  // --- Avatar modals state ---
+  const [avatarOptionModalVisible, setAvatarOptionModalVisible] = useState(false);
   const [localFileUri, setLocalFileUri] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<'library' | 'nft' | null>(null);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
@@ -327,6 +314,7 @@ export default function Profile({
     setStatusBarStyle('dark');
   }, []);
 
+  // --- Avatar selection handlers ---
   const handleAvatarPress = useCallback(() => {
     if (!isOwnProfile) return;
     setAvatarOptionModalVisible(true);
@@ -361,6 +349,7 @@ export default function Profile({
     setConfirmModalVisible(true);
   }, []);
 
+  // --- Avatar upload/confirm handlers ---
   const handleConfirmUpload = useCallback(async () => {
     if (!isOwnProfile) {
       Alert.alert('Permission Denied', 'Cannot change avatar for other user');
@@ -397,6 +386,7 @@ export default function Profile({
     setSelectedSource(null);
   }, []);
 
+  // --- Profile edit handlers ---
   const handleOpenEditModal = useCallback(() => {
     if (!isOwnProfile) return;
     setTempName(localUsername || '');
@@ -447,6 +437,7 @@ export default function Profile({
     }
   }, [dispatch, tempName, tempDescription, isOwnProfile, userWallet, localUsername, localDescription]);
 
+  // --- Follow navigation handlers ---
   const handlePressFollowers = useCallback(() => {
     if (followersList.length === 0) {
       Alert.alert('No Followers', 'This user has no followers yet.');
@@ -471,7 +462,7 @@ export default function Profile({
     } as never);
   }, [followingList, navigation, userWallet]);
 
-  // Memoize follow/unfollow callbacks to prevent re-renders when amIFollowing changes
+  // Memoize follow/unfollow callbacks
   const memoizedFollowProps = useMemo(() => ({
     amIFollowing,
     areTheyFollowingMe,
@@ -482,16 +473,17 @@ export default function Profile({
     onPressFollowers: handlePressFollowers,
     onPressFollowing: handlePressFollowing
   }), [
-    // Only include the follower counts in dependencies, not the actual following state
-    // This prevents re-renders of unrelated components when following state changes
     followersList.length,
     followingList.length,
     handleFollow,
     handleUnfollow,
     handlePressFollowers,
-    handlePressFollowing
+    handlePressFollowing,
+    amIFollowing,
+    areTheyFollowingMe
   ]);
 
+  // Create resolved user data
   const resolvedUser: UserProfileData = useMemo(
     () => ({
       address: userWallet || '',
@@ -503,6 +495,21 @@ export default function Profile({
     [userWallet, profilePicUrl, localUsername, localDescription, customizationData],
   );
 
+  // Handle post navigation
+  const handlePostPress = useCallback((post: ThreadPost) => {
+    navigation.navigate('PostThread', { postId: post.id });
+  }, [navigation]);
+
+  // This will clean up old action data periodically
+  useEffect(() => {
+    // Cleanup timer to prevent state bloat
+    const cleanupTimer = setInterval(() => {
+      dispatch(pruneOldActionData());
+    }, 5 * 60 * 1000); // Every 5 minutes
+    
+    return () => clearInterval(cleanupTimer);
+  }, [dispatch]);
+
   return (
     <SafeAreaView
       style={[
@@ -510,6 +517,7 @@ export default function Profile({
         containerStyle,
         Platform.OS === 'android' && androidStyles.safeArea,
       ]}>
+      {/* Main profile view */}
       <ProfileView
         isOwnProfile={isOwnProfile}
         user={resolvedUser}
@@ -519,23 +527,19 @@ export default function Profile({
         fetchNftsError={resolvedNftError}
         onAvatarPress={handleAvatarPress}
         onEditProfile={handleOpenEditModal}
-        // Pass the memoized props to avoid unnecessary re-renders
         {...memoizedFollowProps}
-        onPressPost={post => {
-          navigation.navigate('PostThread', { postId: post.id });
-        }}
+        onPressPost={handlePostPress}
         containerStyle={containerStyle}
         myActions={myActions}
         loadingActions={loadingActions}
         fetchActionsError={fetchActionsError}
-        // Add portfolio data
         portfolioData={portfolio}
         onRefreshPortfolio={handleRefreshPortfolio}
         refreshingPortfolio={refreshingPortfolio}
         onAssetPress={handleAssetPress}
       />
 
-      {/* (A) Avatar Option Modal */}
+      {/* Avatar Option Modal */}
       {isOwnProfile && (
         <Modal
           animationType="fade"
@@ -556,7 +560,7 @@ export default function Profile({
                 <Text style={modalStyles.optionButtonText}>My NFTs</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[modalStyles.optionButton, { backgroundColor: 'gray' }]}
+                style={[modalStyles.optionButton, { backgroundColor: COLORS.greyMid }]}
                 onPress={() => setAvatarOptionModalVisible(false)}>
                 <Text style={modalStyles.optionButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -565,7 +569,7 @@ export default function Profile({
         </Modal>
       )}
 
-      {/* (B) NFT Selection Modal */}
+      {/* NFT Selection Modal */}
       {isOwnProfile && (
         <Modal
           animationType="slide"
@@ -577,8 +581,8 @@ export default function Profile({
               <Text style={modalStyles.nftTitle}>Select an NFT</Text>
               {resolvedLoadingNfts ? (
                 <View style={{ marginTop: 20 }}>
-                  <ActivityIndicator size="large" color="#1d9bf0" />
-                  <Text style={{ marginTop: 8, color: '#666', textAlign: 'center' }}>
+                  <ActivityIndicator size="large" color={COLORS.brandPrimary} />
+                  <Text style={{ marginTop: 8, color: COLORS.greyDark, textAlign: 'center' }}>
                     Loading your NFTs...
                   </Text>
                 </View>
@@ -604,7 +608,7 @@ export default function Profile({
                           />
                         ) : (
                           <View style={modalStyles.nftPlaceholder}>
-                            <Text style={{ color: '#666' }}>No Image</Text>
+                            <Text style={{ color: COLORS.greyDark }}>No Image</Text>
                           </View>
                         )}
                       </View>
@@ -642,7 +646,7 @@ export default function Profile({
         </Modal>
       )}
 
-      {/* (C) Confirm Modal if source = 'nft' or library */}
+      {/* NFT Confirm Modal */}
       {isOwnProfile && selectedSource === 'nft' && confirmModalVisible && (
         <Modal
           animationType="fade"
@@ -666,7 +670,7 @@ export default function Profile({
                   }}
                 />
               ) : (
-                <Text style={{ marginVertical: 20, color: '#666' }}>
+                <Text style={{ marginVertical: 20, color: COLORS.greyDark }}>
                   No pending image
                 </Text>
               )}
@@ -674,7 +678,7 @@ export default function Profile({
                 <TouchableOpacity
                   style={[
                     confirmModalStyles.modalButton,
-                    { backgroundColor: '#aaa' },
+                    { backgroundColor: COLORS.greyMid },
                   ]}
                   onPress={handleCancelUpload}>
                   <Text style={confirmModalStyles.buttonText}>Cancel</Text>
@@ -682,7 +686,7 @@ export default function Profile({
                 <TouchableOpacity
                   style={[
                     confirmModalStyles.modalButton,
-                    { backgroundColor: '#1d9bf0' },
+                    { backgroundColor: COLORS.brandPrimary },
                   ]}
                   onPress={handleConfirmUpload}>
                   <Text style={confirmModalStyles.buttonText}>Confirm</Text>
@@ -693,7 +697,7 @@ export default function Profile({
         </Modal>
       )}
 
-      {/* For library selection => inline confirm row at the bottom */}
+      {/* Library image confirmation */}
       {isOwnProfile && selectedSource === 'library' && localFileUri && (
         <View style={inlineConfirmStyles.container}>
           <Text style={inlineConfirmStyles.title}>Confirm Profile Picture</Text>
@@ -706,12 +710,12 @@ export default function Profile({
           />
           <View style={inlineConfirmStyles.buttonRow}>
             <TouchableOpacity
-              style={[inlineConfirmStyles.button, { backgroundColor: '#aaa' }]}
+              style={[inlineConfirmStyles.button, { backgroundColor: COLORS.greyMid }]}
               onPress={handleCancelUpload}>
               <Text style={inlineConfirmStyles.buttonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[inlineConfirmStyles.button, { backgroundColor: '#1d9bf0' }]}
+              style={[inlineConfirmStyles.button, { backgroundColor: COLORS.brandPrimary }]}
               onPress={handleConfirmUpload}>
               <Text style={inlineConfirmStyles.buttonText}>Confirm</Text>
             </TouchableOpacity>
@@ -719,7 +723,7 @@ export default function Profile({
         </View>
       )}
 
-      {/* (E) Edit Name and Description Modal */}
+      {/* Edit Profile Modal */}
       {isOwnProfile && (
         <Modal
           animationType="slide"
@@ -747,7 +751,7 @@ export default function Profile({
                 <TouchableOpacity
                   style={[
                     editNameModalStyles.button,
-                    { backgroundColor: 'gray' },
+                    { backgroundColor: COLORS.greyMid },
                   ]}
                   onPress={() => setEditNameModalVisible(false)}>
                   <Text style={editNameModalStyles.btnText}>Cancel</Text>
@@ -755,7 +759,7 @@ export default function Profile({
                 <TouchableOpacity
                   style={[
                     editNameModalStyles.button,
-                    { backgroundColor: '#1d9bf0' },
+                    { backgroundColor: COLORS.brandPrimary },
                   ]}
                   onPress={handleSaveName}>
                   <Text style={editNameModalStyles.btnText}>Save</Text>

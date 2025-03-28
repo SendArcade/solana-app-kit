@@ -237,7 +237,7 @@ export default function SectionNftListing({ listingData }: SectionNftListingProp
     const solPrice = typeof price === 'string' ?
       parseFloat(price) / 1_000_000_000 :
       price;
-    return solPrice.toFixed(2);
+    return solPrice.toFixed(4);
   }
 
   function getNftImageSource(uri?: string) {
