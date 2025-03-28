@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   Platform,
   Alert,
+  TextInput,
+  Animated,
+  Easing,
 } from 'react-native';
 import { RouteProp, useRoute } from '@react-navigation/native';
 
@@ -14,6 +17,7 @@ import { RootStackParamList } from '../../../../navigation/RootNavigator';
 import PostHeader from '../../../../components/thread/post/PostHeader';
 import PostBody from '../../../../components/thread/post/PostBody';
 import PostFooter from '../../../../components/thread/post/PostFooter';
+import PostCTA from '../../../../components/thread/post/PostCTA';
 import ThreadComposer from '../../../../components/thread/ThreadComposer';
 import { useAppSelector, useAppDispatch } from '../../../../hooks/useReduxHooks';
 import { useAppNavigation } from '../../../../hooks/useAppNavigation';
@@ -80,6 +84,14 @@ export default function PostThreadScreen() {
   const dispatch = useAppDispatch();
   const { postId } = route.params;
 
+  // Add ref for the comment input
+  const commentInputRef = useRef<{ focus: () => void }>(null);
+  // Add ref for the ScrollView
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [isCommentHighlighted, setIsCommentHighlighted] = useState(false);
+  const backgroundOpacity = useRef(new Animated.Value(0)).current;
+  const composerTranslateY = useRef(new Animated.Value(0)).current;
+
   const allPosts = useAppSelector(state => state.thread.allPosts);
   const flatPosts = useMemo(() => flattenPosts(allPosts), [allPosts]);
 
@@ -104,6 +116,60 @@ export default function PostThreadScreen() {
       ? { uri: profilePicUrl }
       : DEFAULT_IMAGES.user,
     verified: true,
+  };
+
+  // Function to focus the comment input and highlight it
+  const focusCommentInput = () => {
+    if (commentInputRef.current) {
+      // Set the highlighted state
+      setIsCommentHighlighted(true);
+      
+      // Scroll to the bottom first
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollToEnd({ animated: true });
+      }
+      
+      // Animate the background dimming effect
+      Animated.timing(backgroundOpacity, {
+        toValue: 1,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true
+      }).start();
+      
+      // Animate a subtle lift effect on the composer
+      Animated.timing(composerTranslateY, {
+        toValue: -3,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true
+      }).start();
+      
+      // Focus the input with a slight delay
+      setTimeout(() => {
+        commentInputRef.current?.focus();
+      }, 250);
+      
+      // Reset the highlight after a delay
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(backgroundOpacity, {
+            toValue: 0,
+            duration: 200,
+            easing: Easing.in(Easing.cubic),
+            useNativeDriver: true
+          }),
+          Animated.timing(composerTranslateY, {
+            toValue: 0,
+            duration: 200,
+            easing: Easing.in(Easing.cubic),
+            useNativeDriver: true
+          })
+        ]).start(() => {
+          setIsCommentHighlighted(false);
+        });
+      }, 300);
+    }
   };
 
   // Gather ancestors and direct children only if currentPost exists
@@ -206,9 +272,14 @@ export default function PostThreadScreen() {
                     }
                   />
                   <PostBody post={post.retweetOf} />
+                  <PostCTA
+                    post={post.retweetOf}
+                    themeOverrides={{}}
+                    styleOverrides={{}}
+                  />
                   <PostFooter 
                     post={post.retweetOf}
-                    onPressComment={() => navigation.push('PostThread', { postId: post.retweetOf!.id })} 
+                    onPressComment={focusCommentInput} 
                   />
                 </TouchableOpacity>
               )}
@@ -225,7 +296,15 @@ export default function PostThreadScreen() {
                 }
               />
               <PostBody post={post} />
-              <PostFooter post={post} />
+              <PostCTA
+                post={post}
+                themeOverrides={{}}
+                styleOverrides={{}}
+              />
+              <PostFooter 
+                post={post} 
+                onPressComment={focusCommentInput}
+              />
             </>
           )}
         </View>
@@ -299,9 +378,14 @@ export default function PostThreadScreen() {
                     }
                   />
                   <PostBody post={post.retweetOf} />
+                  <PostCTA
+                    post={post.retweetOf}
+                    themeOverrides={{}}
+                    styleOverrides={{}}
+                  />
                   <PostFooter 
                     post={post.retweetOf}
-                    onPressComment={() => navigation.push('PostThread', { postId: post.retweetOf!.id })} 
+                    onPressComment={focusCommentInput} 
                   />
                 </TouchableOpacity>
               )}
@@ -318,7 +402,15 @@ export default function PostThreadScreen() {
                 }
               />
               <PostBody post={post} />
-              <PostFooter post={post} />
+              <PostCTA
+                post={post}
+                themeOverrides={{}}
+                styleOverrides={{}}
+              />
+              <PostFooter 
+                post={post} 
+                onPressComment={focusCommentInput}
+              />
             </>
           )}
         </View>
@@ -340,7 +432,9 @@ export default function PostThreadScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        ref={scrollViewRef}
+        contentContainerStyle={styles.scrollContent}>
         {currentPost ? (
           <>
             {ancestorChain.map(p => renderNonClickablePost(p))}
@@ -365,15 +459,49 @@ export default function PostThreadScreen() {
       </ScrollView>
 
       {currentPost && (
-        <View style={styles.composerContainer}>
-          <ThreadComposer
-            currentUser={localUser}
-            parentId={currentPost.id}
-            onPostCreated={() => {
-              console.log('Reply created successfully');
-            }}
-          />
-        </View>
+        <>
+          {/* Semi-transparent overlay for dimming effect */}
+          {isCommentHighlighted && (
+            <Animated.View 
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.3)',
+                opacity: backgroundOpacity,
+                zIndex: 1
+              }}
+            />
+          )}
+          
+          <Animated.View 
+            style={[
+              styles.composerContainer,
+              {
+                transform: [{ translateY: composerTranslateY }],
+                zIndex: 2,
+                // Subtle elevation when focused
+                ...(isCommentHighlighted ? {
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: -2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 5,
+                  elevation: 5,
+                } : {})
+              }
+            ]}>
+            <ThreadComposer
+              ref={commentInputRef}
+              currentUser={localUser}
+              parentId={currentPost.id}
+              onPostCreated={() => {
+                console.log('Reply created successfully');
+              }}
+            />
+          </Animated.View>
+        </>
       )}
 
       {postToEdit && (

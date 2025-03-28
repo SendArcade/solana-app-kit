@@ -289,6 +289,7 @@ export default function PostFooter({
   const [showReactions, setShowReactions] = useState(false);
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const [showRetweetDrawer, setShowRetweetDrawer] = useState(false);
+  const [commentPressed, setCommentPressed] = useState(false);
 
   // Grab user info from Redux
   const address = useAppSelector(state => state.auth.address);
@@ -494,14 +495,16 @@ export default function PostFooter({
   // Handle comment click - navigate to appropriate post
   const handleCommentClick = () => {
     if (onPressComment) {
-      // If this is a retweet and we're viewing the original inside it, navigate to the original
-      if (post.retweetOf && post.sections.length === 0) {
-        // Navigate to the original post that was retweeted
-        onPressComment(post.retweetOf);
-      } else {
-        // Standard behavior - navigate to this post
-        onPressComment(post);
-      }
+      // Add animation effect for comment button
+      setCommentPressed(true);
+      
+      // Trigger the comment action
+      onPressComment(post);
+      
+      // Reset after animation completes
+      setTimeout(() => {
+        setCommentPressed(false);
+      }, 500);
     }
   };
 
@@ -521,10 +524,27 @@ export default function PostFooter({
         <View style={{flexDirection: 'row', gap: 16}}>
           {/* Comment icon */}
           <TouchableOpacity
-            style={styles.itemLeftIcons}
+            style={[
+              styles.itemLeftIcons,
+              commentPressed && { 
+                backgroundColor: '#E8F5FE', 
+                borderRadius: 16, 
+                padding: 4, 
+                transform: [{ scale: 1.1 }] 
+              }
+            ]}
             onPress={handleCommentClick}>
-            <Icons.CommentIdle width={20} height={20} />
-            <Text style={styles.iconText}>{updatedPost.quoteCount || 0}</Text>
+            <Icons.CommentIdle 
+              width={20} 
+              height={20} 
+              color={commentPressed ? '#1d9bf0' : undefined}
+            />
+            <Text style={[
+              styles.iconText, 
+              commentPressed && { color: '#1d9bf0', fontWeight: 'bold' }
+            ]}>
+              {updatedPost.quoteCount || 0}
+            </Text>
           </TouchableOpacity>
 
           {/* Retweet */}
