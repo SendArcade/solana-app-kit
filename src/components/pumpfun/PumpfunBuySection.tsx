@@ -13,6 +13,7 @@ import {
 import { usePumpFun } from '../../hooks/usePumpFun';
 import { PumpfunBuyStyles } from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
+import { TransactionService } from '../../services/transaction/transactionService';
 
 /**
  * Props for the PumpfunBuySection component
@@ -67,6 +68,7 @@ export const PumpfunBuySection: React.FC<PumpfunBuySectionProps> = ({
   const [tokenAddress, setTokenAddress] = useState('');
   const [solAmount, setSolAmount] = useState('0.001');
   const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
   const handleBuy = async () => {
     if (!tokenAddress) {
@@ -75,15 +77,29 @@ export const PumpfunBuySection: React.FC<PumpfunBuySectionProps> = ({
     }
 
     setIsLoading(true);
+    setStatus('Preparing transaction...');
     try {
       await buyToken({
         tokenAddress,
         solAmount: Number(solAmount),
+        onStatusUpdate: (newStatus) => {
+          console.log('Buy token status:', newStatus);
+          // Use TransactionService to filter raw error messages
+          TransactionService.filterStatusUpdate(newStatus, setStatus);
+        }
       });
+      setStatus('Purchase successful!');
+      // Success message will be handled by TransactionService
     } catch (error) {
-      Alert.alert('Error', 'Failed to buy token');
+      console.error('Error buying token:', error);
+      // Don't show raw error in UI
+      setStatus('Transaction failed');
+      // Error notification will be handled by TransactionService
     } finally {
-      setIsLoading(false);
+      setTimeout(() => {
+        setIsLoading(false);
+        setStatus(null);
+      }, 2000);
     }
   };
 
@@ -136,6 +152,10 @@ export const PumpfunBuySection: React.FC<PumpfunBuySectionProps> = ({
         disabled={isLoading}>
         <Text style={PumpfunBuyStyles.pasteButtonText}>Paste</Text>
       </TouchableOpacity>
+
+      {status && (
+        <Text style={PumpfunBuyStyles.statusText}>{status}</Text>
+      )}
 
       <TouchableOpacity
         style={[

@@ -23,6 +23,7 @@ import { useAppDispatch, useAppSelector } from '../../hooks/useReduxHooks';
 import { createRootPostAsync, addPostLocally } from '../../state/thread/reducer';
 import { ThreadSection, ThreadSectionType, ThreadUser } from './thread.types';
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { TransactionService } from '../../services/transaction/transactionService';
 
 // Constants
 const { width } = Dimensions.get('window');
@@ -146,7 +147,7 @@ const NftListingModal = ({
             // For example: transferring NFT, listing NFT for sale, etc.
             const connection = new Connection('https://api.mainnet-beta.solana.com');
             const transaction = new Transaction();
-            
+
             // Here you would add the appropriate instructions for NFT operations
             // For example:
             // transaction.add(
@@ -163,18 +164,25 @@ const NftListingModal = ({
             const signature = await sendTransaction(
                 transaction,
                 connection,
-                { 
+                {
                     confirmTransaction: true,
-                    statusCallback: (status) => console.log(`Transaction status: ${status}`)
+                    statusCallback: (status) => {
+                        // Filter out error messages from status updates
+                        if (!status.startsWith('Error:') && !status.includes('failed')) {
+                            console.log(`Transaction status: ${status}`);
+                        } else {
+                            console.log(`Transaction processing...`);
+                        }
+                    }
                 }
             );
 
             console.log('Transaction sent with signature:', signature);
-            Alert.alert('Success', 'Transaction completed successfully!');
-            
+            TransactionService.showSuccess(signature, 'nft');
+
         } catch (error: any) {
             console.error('Error sending transaction:', error);
-            Alert.alert('Error', `Transaction failed: ${error.message}`);
+            TransactionService.showError(error);
         } finally {
             setIsSendingTransaction(false);
         }
@@ -246,7 +254,7 @@ const NftListingModal = ({
                     })
                 ).unwrap();
 
-                Alert.alert('Success', 'Collection has been shared to your feed!');
+                TransactionService.showSuccess('post_created', 'nft');
             } catch (error: any) {
                 console.warn('Network request failed, adding post locally:', error.message);
                 dispatch(addPostLocally(fallbackPost));
@@ -254,7 +262,7 @@ const NftListingModal = ({
             }
         } catch (err: any) {
             console.error('Error sharing collection:', err);
-            Alert.alert('Error', 'Failed to share the collection. Please try again.');
+            TransactionService.showError(err);
         } finally {
             setShowShareModal(false);
             setSelectedCollection(null);
@@ -353,9 +361,9 @@ const NftListingModal = ({
                     {item.name}
                 </Text>
             </View>
-            
+
             {/* Transaction button for NFT operations */}
-            <TouchableOpacity 
+            <TouchableOpacity
                 style={modalStyles.actionButton}
                 onPress={() => handleNftTransaction(item)}
                 disabled={isSendingTransaction}>
@@ -473,8 +481,8 @@ const NftListingModal = ({
                         </View>
                     )}
 
-                  {/* Footer with two options */}
-                  <View style={modalStyles.footer}>
+                    {/* Footer with two options */}
+                    <View style={modalStyles.footer}>
                         <TouchableOpacity
                             style={[
                                 modalStyles.optionButton,

@@ -1,5 +1,5 @@
 // File: src/screens/TokenMillScreen/components/SwapCard.tsx
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
-import {Connection} from '@solana/web3.js';
+import { Connection } from '@solana/web3.js';
 import { swapTokens } from '../../services/tokenMill/tokenMillService';
 import { StandardWallet } from '../../hooks/useAuth';
 
@@ -29,6 +29,7 @@ export default function SwapCard({
 }: Props) {
   const [amount, setAmount] = useState('1');
   const [swapType, setSwapType] = useState<'buy' | 'sell'>('buy');
+  const [status, setStatus] = useState<string | null>(null);
 
   const onPressSwap = async () => {
     if (!marketAddress) {
@@ -37,6 +38,8 @@ export default function SwapCard({
     }
     try {
       setLoading(true);
+      setStatus('Preparing transaction...');
+
       const txSig = await swapTokens({
         marketAddress,
         swapType,
@@ -44,12 +47,23 @@ export default function SwapCard({
         userPublicKey: publicKey,
         connection,
         solanaWallet,
+        onStatusUpdate: (newStatus) => {
+          console.log('Swap status:', newStatus);
+          setStatus(newStatus);
+        }
       });
+
+      setStatus('Swap completed successfully!');
       Alert.alert('Swap Complete', `Tx: ${txSig}`);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      console.error('Swap error:', err);
+      // Don't show raw error in UI
+      setStatus('Transaction failed');
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+        setStatus(null);
+      }, 2000);
     }
   };
 
@@ -63,12 +77,14 @@ export default function SwapCard({
         value={amount}
         onChangeText={setAmount}
         keyboardType="decimal-pad"
+        editable={!status}
       />
 
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[styles.tab, swapType === 'buy' && styles.selectedTab]}
-          onPress={() => setSwapType('buy')}>
+          onPress={() => setSwapType('buy')}
+          disabled={!!status}>
           <Text
             style={[
               styles.tabText,
@@ -79,7 +95,8 @@ export default function SwapCard({
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, swapType === 'sell' && styles.selectedTab]}
-          onPress={() => setSwapType('sell')}>
+          onPress={() => setSwapType('sell')}
+          disabled={!!status}>
           <Text
             style={[
               styles.tabText,
@@ -90,7 +107,16 @@ export default function SwapCard({
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.button} onPress={onPressSwap}>
+      {status && (
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>{status}</Text>
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={[styles.button, status ? { opacity: 0.7 } : {}]}
+        onPress={onPressSwap}
+        disabled={!!status}>
         <Text style={styles.buttonText}>
           {swapType === 'buy' ? 'Buy Tokens' : 'Sell Tokens'}
         </Text>
@@ -145,6 +171,18 @@ const styles = StyleSheet.create({
   },
   selectedTabText: {
     color: '#fff',
+  },
+  statusContainer: {
+    backgroundColor: '#f8f8f8',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  statusText: {
+    color: '#333',
+    fontSize: 14,
+    textAlign: 'center',
   },
   button: {
     backgroundColor: '#2a2a2a',
