@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,14 +11,14 @@ import {
   Linking,
   Dimensions,
 } from 'react-native';
-import {FontAwesome5} from '@expo/vector-icons';
-import {fetchJupiterTokenData} from '../../../utils/tokenUtils';
-import {useCoingecko, Timeframe} from '../../../hooks/useCoingecko';
+import { FontAwesome5 } from '@expo/vector-icons';
+import { fetchJupiterTokenData } from '../../../utils/tokenUtils';
+import { useCoingecko, Timeframe } from '../../../hooks/useCoingecko';
 import LineGraph from '../TradeCard/LineGraph';
-import {fetchUserAssets} from '../../../utils/common/fetch';
-import {styles} from './TokenDetailsDrawer.styles';
+import { fetchUserAssets } from '../../../utils/common/fetch';
+import { styles } from './TokenDetailsDrawer.styles';
 
-const {width} = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 interface TokenDetailsDrawerProps {
   visible: boolean;
@@ -212,21 +212,22 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
     </View>
   );
 
+
   const renderOverviewTab = () => {
     const isNftOrCollection = initialData?.isCollection || initialData?.nftData;
     if (isNftOrCollection) {
       return (
         <ScrollView
           style={styles.tabContent}
-          contentContainerStyle={{flexGrow: 1, paddingBottom: 40}}>
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About</Text>
             <Text style={styles.sectionText}>
               {initialData?.isCollection
                 ? initialData?.collectionData?.description ||
-                  'No description available.'
+                'No description available.'
                 : initialData?.nftData?.description ||
-                  'No description available.'}
+                'No description available.'}
             </Text>
           </View>
 
@@ -366,13 +367,14 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                 )}
 
                 {initialData.collectionData.discord && (
-                  <View style={styles.detailRow}>
+                  <View style={[styles.detailRow, { height: 44, alignItems: 'center' }]}>
                     <Text style={styles.detailLabel}>Discord</Text>
                     <TouchableOpacity
                       onPress={() =>
                         Linking.openURL(initialData.collectionData.discord)
-                      }>
-                      <Text style={[styles.detailValue, {color: '#5865F2'}]}>
+                      }
+                      style={{ flexShrink: 0, alignSelf: 'center' }}>
+                      <Text style={[styles.detailValue, { color: '#5865F2', minWidth: 100, textAlign: 'right' }, styles.noWrap]}>
                         Join Discord
                       </Text>
                     </TouchableOpacity>
@@ -380,17 +382,18 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                 )}
 
                 {initialData.collectionData.twitter && (
-                  <View style={styles.detailRow}>
+                  <View style={[styles.detailRow, { height: 44, alignItems: 'center' }]}>
                     <Text style={styles.detailLabel}>Twitter</Text>
                     <TouchableOpacity
                       onPress={() =>
                         Linking.openURL(initialData.collectionData.twitter)
-                      }>
+                      }
+                      style={{ flexShrink: 0, alignSelf: 'center' }}>
                       <Text
                         style={[
                           styles.detailValue,
-                          {color: '#1DA1F2'},
-                          styles.noWrap,
+                          { color: '#1DA1F2', minWidth: 100, textAlign: 'right' },
+                          styles.noWrap
                         ]}>
                         @
                         {initialData.collectionData.twitter
@@ -402,17 +405,18 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                 )}
 
                 {initialData.collectionData.website && (
-                  <View style={styles.detailRow}>
+                  <View style={[styles.detailRow, { height: 44, alignItems: 'center' }]}>
                     <Text style={styles.detailLabel}>Website</Text>
                     <TouchableOpacity
                       onPress={() =>
                         Linking.openURL(initialData.collectionData.website)
-                      }>
+                      }
+                      style={{ flexShrink: 0, alignSelf: 'center' }}>
                       <Text
                         style={[
                           styles.detailValue,
-                          {color: '#007AFF'},
-                          styles.noWrap,
+                          { color: '#007AFF', minWidth: 100, textAlign: 'right' },
+                          styles.noWrap
                         ]}>
                         Visit Website
                       </Text>
@@ -458,7 +462,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                 {initialData.nftData.listing?.price && (
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Listed Price</Text>
-                    <Text style={[styles.detailValue, {color: '#00C851'}]}>
+                    <Text style={[styles.detailValue, { color: '#00C851' }]}>
                       {(
                         parseFloat(initialData.nftData.listing.price) /
                         1_000_000_000
@@ -487,7 +491,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                       <Text
                         style={[
                           styles.sectionTitle,
-                          {marginTop: 16, marginBottom: 8},
+                          { marginTop: 16, marginBottom: 8 },
                         ]}>
                         Attributes
                       </Text>
@@ -513,14 +517,15 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                 <TouchableOpacity
                   style={[
                     styles.marketplaceButton,
-                    {backgroundColor: '#E6F9FA', width: '48%'},
+                    { backgroundColor: '#E6F9FA', width: '48%', minWidth: 160 },
                   ]}
                   onPress={openTensor}>
-                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text
                       style={[
                         styles.marketplaceButtonText,
-                        {color: '#32D4DE'},
+                        { color: '#32D4DE' },
+                        styles.noWrap
                       ]}>
                       View on Tensor
                     </Text>
@@ -528,7 +533,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                       name="external-link-alt"
                       size={12}
                       color="#32D4DE"
-                      style={{marginLeft: 4}}
+                      style={{ marginLeft: 4 }}
                     />
                   </View>
                 </TouchableOpacity>
@@ -536,14 +541,15 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                 <TouchableOpacity
                   style={[
                     styles.marketplaceButton,
-                    {backgroundColor: '#FCEDF4', width: '48%'},
+                    { backgroundColor: '#FCEDF4', width: '48%', minWidth: 160 },
                   ]}
                   onPress={openMagicEden}>
-                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text
                       style={[
                         styles.marketplaceButtonText,
-                        {color: '#E42575'},
+                        { color: '#E42575' },
+                        styles.noWrap
                       ]}>
                       View on Magic Eden
                     </Text>
@@ -551,7 +557,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                       name="external-link-alt"
                       size={12}
                       color="#E42575"
-                      style={{marginLeft: 4}}
+                      style={{ marginLeft: 4 }}
                     />
                   </View>
                 </TouchableOpacity>
@@ -565,7 +571,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
     return (
       <ScrollView
         style={styles.tabContent}
-        contentContainerStyle={{flexGrow: 1, paddingBottom: 40}}>
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
           <Text style={styles.sectionText}>
@@ -594,7 +600,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
               <Text style={styles.detailLabel}>Token Standard</Text>
               <Text style={styles.detailValue}>
                 {heliusTokenData.token_info.token_program ===
-                'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'
+                  'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'
                   ? 'SPL Token'
                   : heliusTokenData.token_info.token_program}
               </Text>
@@ -615,12 +621,13 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
           )}
 
           {tokenData?.extensions?.website && (
-            <View style={styles.detailRow}>
+            <View style={[styles.detailRow, { height: 44, alignItems: 'center' }]}>
               <Text style={styles.detailLabel}>Website</Text>
               <TouchableOpacity
+                style={{ flexShrink: 0, alignSelf: 'center' }}
                 onPress={() => Linking.openURL(tokenData.extensions.website)}>
                 <Text
-                  style={[styles.detailValue, styles.linkText, styles.noWrap]}
+                  style={[styles.detailValue, styles.linkText, styles.noWrap, { minWidth: 100, textAlign: 'right' }]}
                   numberOfLines={1}>
                   {tokenData.extensions.website}
                 </Text>
@@ -646,8 +653,8 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                   timeframeChangePercent > 0
                     ? styles.positiveChange
                     : timeframeChangePercent < 0
-                    ? styles.negativeChange
-                    : {},
+                      ? styles.negativeChange
+                      : {},
                 ]}>
                 {timeframeChangePercent > 0 ? '+' : ''}
                 {timeframeChangePercent.toFixed(2)}%
@@ -662,8 +669,8 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
           </View>
         )}
 
-        <TouchableOpacity style={styles.explorerButton} onPress={openExplorer}>
-          <Text style={styles.explorerButtonText}>View on Solscan</Text>
+        <TouchableOpacity style={[styles.explorerButton, { minWidth: 150 }]} onPress={openExplorer}>
+          <Text style={[styles.explorerButtonText, styles.noWrap]}>View on Solscan</Text>
         </TouchableOpacity>
       </ScrollView>
     );
@@ -672,7 +679,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
   const renderMarketTab = () => (
     <ScrollView
       style={styles.tabContent}
-      contentContainerStyle={{flexGrow: 1, paddingBottom: 40}}>
+      contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}>
       {tokenData?.extensions?.coingeckoId && (
         <>
           {renderTimeframeSelector()}
@@ -733,8 +740,8 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
               timeframeChangePercent > 0
                 ? styles.positiveChange
                 : timeframeChangePercent < 0
-                ? styles.negativeChange
-                : {},
+                  ? styles.negativeChange
+                  : {},
             ]}>
             {timeframeChangePercent > 0 ? '+' : ''}
             {timeframeChangePercent.toFixed(2)}%
@@ -762,13 +769,13 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
               </Text>
             </View>
             <TouchableOpacity
-              style={styles.coingeckoButton}
+              style={[styles.coingeckoButton, { minWidth: 150 }]}
               onPress={() =>
                 Linking.openURL(
                   `https://www.coingecko.com/en/coins/${tokenData.extensions.coingeckoId}`,
                 )
               }>
-              <Text style={styles.coingeckoButtonText}>View on Coingecko</Text>
+              <Text style={[styles.coingeckoButtonText, styles.noWrap]}>View on Coingecko</Text>
             </TouchableOpacity>
           </>
         )}
@@ -804,10 +811,10 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
           <Image
             source={
               initialData?.logoURI
-                ? {uri: initialData.logoURI}
+                ? { uri: initialData.logoURI }
                 : tokenData?.logoURI
-                ? {uri: tokenData.logoURI}
-                : require('../../../assets/images/SENDlogo.png')
+                  ? { uri: tokenData.logoURI }
+                  : require('../../../assets/images/SENDlogo.png')
             }
             style={
               initialData?.isCollection || initialData?.nftData
@@ -844,8 +851,8 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                           timeframeChangePercent > 0
                             ? '#00C851'
                             : timeframeChangePercent < 0
-                            ? '#FF5252'
-                            : '#666666',
+                              ? '#FF5252'
+                              : '#666666',
                       },
                     ]}>
                     {timeframeChangePercent > 0 ? '+' : ''}

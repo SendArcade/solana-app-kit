@@ -199,6 +199,8 @@ export default function SectionNftListing({ listingData }: SectionNftListingProp
     }
   };
 
+  // console.log(collectionData, "/////////////////////")
+
   // Handle opening the NFT details drawer
   const handleOpenNftDetails = async () => {
     // Show loading indicator briefly
@@ -390,7 +392,7 @@ export default function SectionNftListing({ listingData }: SectionNftListingProp
       <TokenDetailsDrawer
         visible={showNftDetailsDrawer}
         onClose={() => setShowNftDetailsDrawer(false)}
-        tokenMint={listingData.mint || listingData.collId || ''}
+        tokenMint={listingData.collId || listingData.mint || ''}
         initialData={getNftDetailsForDrawer()}
         loading={drawerLoading}
       />
