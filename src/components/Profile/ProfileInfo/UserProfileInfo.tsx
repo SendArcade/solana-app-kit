@@ -93,7 +93,7 @@ const TokenAttachModal = memo(({
   onChangeDescription: (text: string) => void;
 }) => {
   if (!visible) return null;
-  
+
   return (
     <Modal
       animationType="slide"
@@ -239,7 +239,7 @@ const TokenCard = memo(({
       }
       tokenImage={attachmentData?.coin?.image || null}
       tokenDesc={attachmentData?.coin?.description || ''}
-      onBuyPress={() => {}}
+      onBuyPress={() => { }}
       tokenMint={attachmentData?.coin?.mint}
       showDownArrow={isOwnProfile}
       onArrowPress={undefined}
@@ -271,8 +271,8 @@ const FollowButton = memo(({
     <AddButton
       amIFollowing={!!amIFollowing}
       areTheyFollowingMe={!!areTheyFollowingMe}
-      onPressFollow={onPressFollow || (() => {})}
-      onPressUnfollow={onPressUnfollow || (() => {})}
+      onPressFollow={onPressFollow || (() => { })}
+      onPressUnfollow={onPressUnfollow || (() => { })}
       recipientAddress={recipientAddress}
     />
   </View>
@@ -364,7 +364,7 @@ function UserProfileInfo({
   const dispatch = useAppDispatch();
 
   // Format wallet address as a handle
-  const handleString = useMemo(() => 
+  const handleString = useMemo(() =>
     userWallet
       ? '@' + userWallet.slice(0, 6) + '...' + userWallet.slice(-4)
       : '@no_wallet',
@@ -372,24 +372,24 @@ function UserProfileInfo({
   );
 
   // Default bio with username if none provided
-  const sampleBio = useMemo(() => 
+  const sampleBio = useMemo(() =>
     bioText ||
     `Hey folks! I'm ${username} building on Solana. Mention @someone to highlight.`,
     [bioText, username]
   );
 
   // Conditionals for UI elements - memoized to prevent recalculations
-  const canShowFollowsYou = useMemo(() => 
-    !isOwnProfile && areTheyFollowingMe, 
+  const canShowFollowsYou = useMemo(() =>
+    !isOwnProfile && areTheyFollowingMe,
     [isOwnProfile, areTheyFollowingMe]
   );
-  
-  const canShowAddButton = useMemo(() => 
+
+  const canShowAddButton = useMemo(() =>
     !isOwnProfile,
     [isOwnProfile]
   );
 
-  const showBuyCard = useMemo(() => 
+  const showBuyCard = useMemo(() =>
     isOwnProfile || (attachmentData.coin && attachmentData.coin.mint),
     [isOwnProfile, attachmentData.coin]
   );
@@ -495,7 +495,7 @@ function UserProfileInfo({
   return (
     <View style={styles.profileInfo}>
       {/* Profile Header with Avatar and Name */}
-      <ProfileHeader 
+      <ProfileHeader
         profilePicUrl={profilePicUrl}
         username={username}
         handleString={handleString}
@@ -541,7 +541,7 @@ function UserProfileInfo({
       )}
 
       {/* Token attachment modal */}
-      <TokenAttachModal 
+      <TokenAttachModal
         visible={showAttachDetailsModal}
         onClose={handleCloseModal}
         onConfirm={handleAttachCoinConfirm}
@@ -559,14 +559,14 @@ function arePropsEqual(
 ) {
   // Fast-path for reference equality
   if (prevProps === nextProps) return true;
-  
+
   // Profile data
   if (prevProps.profilePicUrl !== nextProps.profilePicUrl) return false;
   if (prevProps.username !== nextProps.username) return false;
   if (prevProps.userWallet !== nextProps.userWallet) return false;
   if (prevProps.isOwnProfile !== nextProps.isOwnProfile) return false;
   if (prevProps.bioText !== nextProps.bioText) return false;
-  
+
   // Social status
   if (prevProps.amIFollowing !== nextProps.amIFollowing) return false;
   if (prevProps.areTheyFollowingMe !== nextProps.areTheyFollowingMe) return false;
@@ -584,7 +584,7 @@ function arePropsEqual(
     if (prevHasCoin && nextHasCoin) {
       const prevCoin = prevProps.attachmentData?.coin;
       const nextCoin = nextProps.attachmentData?.coin;
-      
+
       if (prevCoin?.mint !== nextCoin?.mint) return false;
       if (prevCoin?.symbol !== nextCoin?.symbol) return false;
       if (prevCoin?.name !== nextCoin?.name) return false;

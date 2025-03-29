@@ -100,6 +100,13 @@ export default function Profile({
   const [amIFollowing, setAmIFollowing] = useState(false);
   const [areTheyFollowingMe, setAreTheyFollowingMe] = useState(false);
 
+  // Loading state tracking
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isFollowersLoading, setIsFollowersLoading] = useState(true);
+  const [isFollowingLoading, setIsFollowingLoading] = useState(true);
+  const [isFollowStatusLoading, setIsFollowStatusLoading] = useState(!isOwnProfile);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+
   // NFT fetch hook - use it only when nfts are not provided via props
   const {
     nfts: fetchedNfts,
@@ -138,6 +145,60 @@ export default function Profile({
     [userWallet, profileActions.error]
   );
 
+  // Combined loading state to prevent flickering
+  const isLoading = useMemo(() => {
+    // Don't show loading if initial data has been loaded
+    if (initialDataLoaded) return false;
+
+    // Only show loading state for own profile
+    if (!isOwnProfile) return false;
+
+    return (
+      isProfileLoading ||
+      isFollowersLoading ||
+      isFollowingLoading ||
+      loadingActions ||
+      loadingPortfolio
+    );
+  }, [
+    initialDataLoaded,
+    isOwnProfile,
+    isProfileLoading,
+    isFollowersLoading,
+    isFollowingLoading,
+    loadingActions,
+    loadingPortfolio
+  ]);
+
+  // Mark data as initially loaded once all critical data is fetched
+  useEffect(() => {
+    if (
+      // For own profile, wait for all necessary data
+      isOwnProfile ? (
+        !isProfileLoading &&
+        !isFollowersLoading &&
+        !isFollowingLoading &&
+        !loadingActions
+      ) : (
+        // For other profiles, don't wait as long
+        !isProfileLoading
+      )
+    ) {
+      // Delay setting this flag to ensure all rendering is complete
+      const timer = setTimeout(() => {
+        setInitialDataLoaded(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [
+    isOwnProfile,
+    isProfileLoading,
+    isFollowersLoading,
+    isFollowingLoading,
+    isFollowStatusLoading,
+    loadingActions
+  ]);
+
   // --- Fetch Actions ---
   useEffect(() => {
     if (!userWallet) return;
@@ -150,12 +211,20 @@ export default function Profile({
     // Only fetch if we don't have fresh data
     if (!profileActions.data[userWallet]?.length || !isFresh) {
       dispatch(fetchWalletActionsWithCache({ walletAddress: userWallet }));
+    } else {
+      // If we have fresh data, mark actions as loaded
+      setInitialDataLoaded(prevState => prevState || true);
     }
   }, [userWallet, dispatch, profileActions.data, profileActions.lastFetched]);
 
   // --- Fetch user profile if needed ---
   useEffect(() => {
-    if (!userWallet) return;
+    if (!userWallet) {
+      setIsProfileLoading(false);
+      return;
+    }
+
+    setIsProfileLoading(true);
     dispatch(fetchUserProfile(userWallet))
       .unwrap()
       .then(value => {
@@ -165,33 +234,82 @@ export default function Profile({
       })
       .catch(err => {
         console.error('Failed to fetch user profile:', err);
+      })
+      .finally(() => {
+        setIsProfileLoading(false);
       });
   }, [userWallet, dispatch]);
 
   // --- Followers/Following logic ---
   useEffect(() => {
-    if (!userWallet || !isOwnProfile) return;
-    fetchFollowers(userWallet).then(list => setFollowersList(list));
-    fetchFollowing(userWallet).then(list => setFollowingList(list));
+    if (!userWallet || !isOwnProfile) {
+      if (isOwnProfile) {
+        setIsFollowersLoading(false);
+        setIsFollowingLoading(false);
+      }
+      return;
+    }
+
+    setIsFollowersLoading(true);
+    setIsFollowingLoading(true);
+
+    fetchFollowers(userWallet)
+      .then(list => {
+        setFollowersList(list);
+        setIsFollowersLoading(false);
+      })
+      .catch(() => setIsFollowersLoading(false));
+
+    fetchFollowing(userWallet)
+      .then(list => {
+        setFollowingList(list);
+        setIsFollowingLoading(false);
+      })
+      .catch(() => setIsFollowingLoading(false));
   }, [userWallet, isOwnProfile]);
 
   useEffect(() => {
-    if (!userWallet || isOwnProfile) return;
-    fetchFollowers(userWallet).then(followers => {
-      setFollowersList(followers);
-      if (currentUserWallet && followers.findIndex((x: any) => x.id === currentUserWallet) >= 0) {
-        setAmIFollowing(true);
-      } else {
-        setAmIFollowing(false);
+    if (!userWallet || isOwnProfile) {
+      if (!isOwnProfile) {
+        setIsFollowStatusLoading(false);
+        setIsFollowersLoading(false);
+        setIsFollowingLoading(false);
       }
-    });
-    fetchFollowing(userWallet).then(following => {
-      setFollowingList(following);
-    });
+      return;
+    }
+
+    setIsFollowersLoading(true);
+    setIsFollowingLoading(true);
+    setIsFollowStatusLoading(true);
+
+    fetchFollowers(userWallet)
+      .then(followers => {
+        setFollowersList(followers);
+        if (currentUserWallet && followers.findIndex((x: any) => x.id === currentUserWallet) >= 0) {
+          setAmIFollowing(true);
+        } else {
+          setAmIFollowing(false);
+        }
+        setIsFollowersLoading(false);
+      })
+      .catch(() => setIsFollowersLoading(false));
+
+    fetchFollowing(userWallet)
+      .then(following => {
+        setFollowingList(following);
+        setIsFollowingLoading(false);
+      })
+      .catch(() => setIsFollowingLoading(false));
+
     if (currentUserWallet) {
-      checkIfUserFollowsMe(currentUserWallet, userWallet).then(result => {
-        setAreTheyFollowingMe(result);
-      });
+      checkIfUserFollowsMe(currentUserWallet, userWallet)
+        .then(result => {
+          setAreTheyFollowingMe(result);
+          setIsFollowStatusLoading(false);
+        })
+        .catch(() => setIsFollowStatusLoading(false));
+    } else {
+      setIsFollowStatusLoading(false);
     }
   }, [userWallet, isOwnProfile, currentUserWallet]);
 
@@ -578,6 +696,7 @@ export default function Profile({
         onRefreshPortfolio={handleRefreshPortfolio}
         refreshingPortfolio={refreshingPortfolio}
         onAssetPress={handleAssetPress}
+        isLoading={isLoading}
       />
 
       {/* Avatar Option Modal */}
