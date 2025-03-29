@@ -62,9 +62,12 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList<any>>(null);
   const [quoteReplyModalVisible, setQuoteReplyModalVisible] = useState(false);
   const [quoteReplyPostId, setQuoteReplyPostId] = useState<string | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [listContentHeight, setListContentHeight] = useState(0);
+  const [listLayoutHeight, setListLayoutHeight] = useState(0);
 
   // Track the currently visible messages for grouping messages by user
-  const [visibleMessages, setVisibleMessages] = useState<{[key: string]: boolean}>({});
+  const [visibleMessages, setVisibleMessages] = useState<{ [key: string]: boolean }>({});
 
   // Fetch posts on mount
   useEffect(() => {
@@ -79,21 +82,30 @@ export default function ChatScreen() {
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
     setSortedPosts(roots);
+    // Reset initial load flag when posts change
+    setIsInitialLoad(true);
   }, [allPosts]);
 
   const scrollToEnd = useCallback(() => {
-    if (sortedPosts.length > 0) {
-      flatListRef.current?.scrollToEnd({ animated: true });
+    if (sortedPosts.length > 0 && flatListRef.current) {
+      // Only scroll if content height exceeds the layout height
+      if (listContentHeight > listLayoutHeight) {
+        flatListRef.current.scrollToEnd({ animated: false });
+      }
     }
-  }, [sortedPosts.length]);
+  }, [sortedPosts.length, listContentHeight, listLayoutHeight]);
 
   useEffect(() => {
-    // Add a small delay to ensure the FlatList has updated
-    const timer = setTimeout(() => {
-      scrollToEnd();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [sortedPosts.length, scrollToEnd]);
+    // Only scroll to end on initial render or when a new message is added
+    if (isInitialLoad && sortedPosts.length > 0) {
+      // Add a small delay to ensure the FlatList has fully rendered
+      const timer = setTimeout(() => {
+        scrollToEnd();
+        setIsInitialLoad(false);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [sortedPosts.length, scrollToEnd, isInitialLoad]);
 
   /**
    * Open the quote reply modal for a given message (post)
@@ -108,13 +120,13 @@ export default function ChatScreen() {
    */
   const isPartOfGroup = (index: number, post: ThreadPost): boolean => {
     if (index === 0) return false;
-    
+
     const prevPost = sortedPosts[index - 1];
     // Messages are grouped if from the same user and within 5 minutes
     return (
       prevPost.user.id === post.user.id &&
       Math.abs(
-        new Date(post.createdAt).getTime() - 
+        new Date(post.createdAt).getTime() -
         new Date(prevPost.createdAt).getTime()
       ) < 5 * 60 * 1000 // 5 minutes
     );
@@ -132,24 +144,24 @@ export default function ChatScreen() {
       isSentByCurrentUser && storedProfilePic
         ? { uri: storedProfilePic }
         : item.user.avatar
-        ? typeof item.user.avatar === 'string'
-          ? { uri: item.user.avatar }
-          : item.user.avatar
-        : DEFAULT_IMAGES.user;
+          ? typeof item.user.avatar === 'string'
+            ? { uri: item.user.avatar }
+            : item.user.avatar
+          : DEFAULT_IMAGES.user;
 
     // Show the header row with avatar/name only for received messages or first message in a group
     const shouldShowHeader = !isSentByCurrentUser && !isPartOfGroup(index, item);
 
     // Add minor vertical spacing adjustment for grouped messages
     const isGroupedMessage = isPartOfGroup(index, item);
-    
+
     // Check if this message contains a trade card or NFT
     const containsTradeCard = hasTradeSection(item);
     const containsNft = hasNftSection(item);
-    
+
     // Adjust bubble width for messages with charts
-    const specialContentBubbleStyle = containsTradeCard 
-      ? { maxWidth: Math.min(screenWidth * 0.85, 320) } 
+    const specialContentBubbleStyle = containsTradeCard
+      ? { maxWidth: Math.min(screenWidth * 0.85, 320) }
       : {};
 
     return (
@@ -199,8 +211,8 @@ export default function ChatScreen() {
           {/* Wrap trade cards in a container with proper styling */}
           {containsTradeCard && (
             <View style={styles.chartContainer}>
-              <PostCTA 
-                post={item} 
+              <PostCTA
+                post={item}
                 styleOverrides={{
                   container: chatBodyOverrides.threadPostCTAContainer,
                   button: { padding: 8, height: 32 },
@@ -213,11 +225,11 @@ export default function ChatScreen() {
               />
             </View>
           )}
-          
+
           {/* Regular CTA buttons for non-trade posts */}
           {!containsTradeCard && containsNft && (
-            <PostCTA 
-              post={item} 
+            <PostCTA
+              post={item}
               styleOverrides={{
                 container: chatBodyOverrides.threadPostCTAContainer,
                 button: styles.tradeButton,
@@ -246,10 +258,34 @@ export default function ChatScreen() {
     );
   };
 
+  const handleContentSizeChange = (width: number, height: number) => {
+    setListContentHeight(height);
+
+    // Scroll to end on first content size change for initial positioning
+    if (isInitialLoad && height > 0) {
+      scrollToEnd();
+    }
+  };
+
+  const handleLayout = (event: any) => {
+    setListLayoutHeight(event.nativeEvent.layout.height);
+
+    // On initial layout, we'll prepare for scrolling
+    if (isInitialLoad) {
+      scrollToEnd();
+    }
+  };
+
+  const handlePostCreated = () => {
+    setIsInitialLoad(true); // Force scroll to bottom when new message created
+    // Small delay to ensure the new post has been added to the list
+    setTimeout(scrollToEnd, 200);
+  };
+
   return (
     <SafeAreaView
       style={[
-        {flex: 1, backgroundColor: '#FFFFFF'},
+        { flex: 1, backgroundColor: '#FFFFFF' },
         Platform.OS === 'android' && androidStyles.safeArea,
       ]}>
       <StatusBar backgroundColor="#FFFFFF" barStyle="dark-content" />
@@ -264,17 +300,22 @@ export default function ChatScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          onContentSizeChange={scrollToEnd}
-          onLayout={scrollToEnd}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={10}
+          onContentSizeChange={handleContentSizeChange}
+          onLayout={handleLayout}
+          initialNumToRender={20}
+          maxToRenderPerBatch={15}
+          windowSize={15}
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+            autoscrollToTopThreshold: 10,
+          }}
+          removeClippedSubviews={false}
         />
 
         <View style={styles.composerContainer}>
           <ThreadComposer
             currentUser={currentUser}
-            onPostCreated={scrollToEnd}
+            onPostCreated={handlePostCreated}
           />
         </View>
       </KeyboardAvoidingView>
@@ -286,7 +327,7 @@ export default function ChatScreen() {
           onClose={() => {
             setQuoteReplyModalVisible(false);
             setQuoteReplyPostId(null);
-            scrollToEnd();
+            setIsInitialLoad(true); // Force scroll to bottom when reply is added
           }}
           retweetOf={quoteReplyPostId}
           currentUser={currentUser}
