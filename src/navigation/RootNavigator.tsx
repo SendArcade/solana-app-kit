@@ -3,11 +3,9 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { useSelector } from 'react-redux';
 import { RootState } from '../state/store';
 import MainTabs from './MainTabs';
-import TokenMillScreen from '../screens/Common/TokenMillScreen/TokenMillScreen';
 import ChatScreen from '../screens/SampleUI/Chat/ChatScreen/ChatScreen';
 import CoinDetailPage from '../screens/SampleUI/Threads/CoinDetailPage/CoinDetailPage';
 import BlinkScreen from '../screens/Common/BlinkScreen';
-import PumpfunScreen from '../screens/Common/pumpfunScreen/pumpfunScreen';
 import NftScreen from '../screens/Common/NftScreen/NftScreen';
 import IntroScreen from '../screens/Common/IntroScreen/IntroScreen';
 import LoginScreen from '../screens/Common/LoginScreen/LoginScreen';
@@ -17,6 +15,8 @@ import OtherProfileScreen from '../screens/SampleUI/Threads/OtherProfileScreen/O
 import PostThreadScreen from '../screens/SampleUI/Threads/PostThreadScreen/PostthreadScreen';
 import FollowersFollowingListScreen from '../components/thread/FollowersFollowingListScreen/FollowersFollowingListScreen';
 import ProfileScreen from '../screens/SampleUI/Threads/ProfileScreen/ProfileScreen';
+import { TokenMillScreen } from '../modules/tokenMill';
+import { PumpfunScreen } from '../modules/pumpFun';
 
 export type RootStackParamList = {
   LoginOptions: undefined;
