@@ -34,7 +34,7 @@ import {
   checkIfUserFollowsMe,
 } from '../../services/profileService';
 import { fetchWalletActionsWithCache, pruneOldActionData } from '../../state/profile/reducer';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { followUser, unfollowUser } from '../../state/users/reducer';
 import { useFetchPortfolio, AssetItem } from '../../hooks/useFetchTokens';
@@ -123,17 +123,17 @@ export default function Profile({
   const resolvedNftError = fetchNftsError || defaultNftError;
 
   // Get actions data from Redux
-  const myActions = useMemo(() => 
+  const myActions = useMemo(() =>
     userWallet ? (profileActions.data[userWallet] || []) : [],
     [userWallet, profileActions.data]
   );
-  
-  const loadingActions = useMemo(() => 
+
+  const loadingActions = useMemo(() =>
     !!userWallet && !!profileActions.loading[userWallet],
     [userWallet, profileActions.loading]
   );
-  
-  const fetchActionsError = useMemo(() => 
+
+  const fetchActionsError = useMemo(() =>
     userWallet ? profileActions.error[userWallet] : null,
     [userWallet, profileActions.error]
   );
@@ -141,12 +141,12 @@ export default function Profile({
   // --- Fetch Actions ---
   useEffect(() => {
     if (!userWallet) return;
-    
+
     // Check if we have recent data to avoid unnecessary fetches
     const lastFetched = profileActions.lastFetched[userWallet] || 0;
     const currentTime = Date.now();
     const isFresh = currentTime - lastFetched < 60000; // 1 minute
-    
+
     // Only fetch if we don't have fresh data
     if (!profileActions.data[userWallet]?.length || !isFresh) {
       dispatch(fetchWalletActionsWithCache({ walletAddress: userWallet }));
@@ -195,6 +195,39 @@ export default function Profile({
     }
   }, [userWallet, isOwnProfile, currentUserWallet]);
 
+  // Refresh follower/following data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (!userWallet) return;
+
+      // We'll always refresh the data for the displayed profile
+      console.log(`[useFocusEffect] Refreshing data for ${isOwnProfile ? 'own profile' : 'other profile'}: ${userWallet}`);
+
+      // Always fetch the followers for the current displayed profile
+      fetchFollowers(userWallet).then(list => {
+        setFollowersList(list);
+
+        // Also update amIFollowing status for other profiles
+        if (!isOwnProfile && currentUserWallet) {
+          const isFollowing = list.some((x: any) => x.id === currentUserWallet);
+          setAmIFollowing(isFollowing);
+        }
+      });
+
+      // Always fetch the following for the current displayed profile
+      fetchFollowing(userWallet).then(list => {
+        setFollowingList(list);
+      });
+
+      // If viewing other's profile, check if they follow current user
+      if (!isOwnProfile && currentUserWallet) {
+        checkIfUserFollowsMe(currentUserWallet, userWallet).then(result => {
+          setAreTheyFollowingMe(result);
+        });
+      }
+    }, [userWallet, isOwnProfile, currentUserWallet])
+  );
+
   // --- Fetch posts if not provided ---
   useEffect(() => {
     if (!posts || posts.length === 0) {
@@ -207,21 +240,21 @@ export default function Profile({
   // --- Flatten & filter user posts ---
   const myPosts = useMemo(() => {
     if (!userWallet) return [];
-    
+
     // Choose base posts from props or Redux
     const base = posts && posts.length > 0 ? posts : allReduxPosts;
-    
+
     // Use flattenPosts to extract all posts including nested replies
     const flat = flattenPosts(base);
-    
+
     // Filter for all posts where the user is the author
     const userAll = flat.filter(
       p => p.user.id.toLowerCase() === userWallet.toLowerCase(),
     );
-    
+
     // Sort by most recent first
     userAll.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
-    
+
     return userAll;
   }, [userWallet, posts, allReduxPosts]);
 
@@ -229,14 +262,14 @@ export default function Profile({
   const handleRefreshPortfolio = useCallback(async () => {
     if (!userWallet) return;
     setRefreshingPortfolio(true);
-    
+
     try {
       // Refresh actions with force refresh
-      await dispatch(fetchWalletActionsWithCache({ 
+      await dispatch(fetchWalletActionsWithCache({
         walletAddress: userWallet,
-        forceRefresh: true 
+        forceRefresh: true
       })).unwrap();
-      
+
       // Wait for additional data refreshes
       await new Promise(resolve => setTimeout(resolve, 500));
     } catch (err) {
@@ -269,7 +302,11 @@ export default function Profile({
       await dispatch(
         followUser({ followerId: currentUserWallet, followingId: userWallet }),
       ).unwrap();
+
+      // Update UI immediately to show I'm following this person
       setAmIFollowing(true);
+
+      // Update followers list for the profile we're viewing
       setFollowersList(prev => {
         if (!prev.some(u => u.id === currentUserWallet)) {
           return [
@@ -293,7 +330,11 @@ export default function Profile({
       await dispatch(
         unfollowUser({ followerId: currentUserWallet, followingId: userWallet }),
       ).unwrap();
+
+      // Update UI immediately
       setAmIFollowing(false);
+
+      // Update followers list for the profile we're viewing
       setFollowersList(prev => prev.filter(u => u.id !== currentUserWallet));
     } catch (err: any) {
       Alert.alert('Unfollow Error', err.message);
@@ -506,7 +547,7 @@ export default function Profile({
     const cleanupTimer = setInterval(() => {
       dispatch(pruneOldActionData());
     }, 5 * 60 * 1000); // Every 5 minutes
-    
+
     return () => clearInterval(cleanupTimer);
   }, [dispatch]);
 

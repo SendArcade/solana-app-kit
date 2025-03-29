@@ -3,8 +3,10 @@ import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, Platform } f
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../../../navigation/RootNavigator';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type FollowersFollowingRouteProp = RouteProp<RootStackParamList, 'FollowersFollowingList'>;
+type FollowersFollowingNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface SimpleUserItem {
   id: string;
@@ -15,8 +17,15 @@ interface SimpleUserItem {
 
 export default function FollowersFollowingListScreen() {
   const route = useRoute<FollowersFollowingRouteProp>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<FollowersFollowingNavigationProp>();
   const { mode, userId, userList }: any = route.params;
+
+  const navigateToUserProfile = (user: SimpleUserItem) => {
+    if (!user.id) return;
+
+    // Navigate to the OtherProfile screen with the user ID
+    navigation.navigate('OtherProfile', { userId: user.id });
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -31,10 +40,7 @@ export default function FollowersFollowingListScreen() {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.userRow}
-            onPress={() => {
-              // If you want to navigate to that user's profile, do so here:
-              // navigation.navigate('OtherProfile', {userId: item.id});
-            }}
+            onPress={() => navigateToUserProfile(item)}
           >
             <View style={styles.avatarContainer}>
               {item.profile_picture_url ? (
