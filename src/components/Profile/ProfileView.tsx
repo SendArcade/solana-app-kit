@@ -1,6 +1,6 @@
 // File: src/components/Profile/ProfileView.tsx
 import React, { useMemo, memo } from 'react';
-import { View, StyleProp, ViewStyle } from 'react-native';
+import { View, StyleProp, ViewStyle, ActivityIndicator } from 'react-native';
 import UserProfileInfo from './ProfileInfo/UserProfileInfo';
 import ProfileTabs from './ProfileTabs/ProfileTabs';
 
@@ -8,6 +8,7 @@ import { styles as profileStyles } from './profile.style';
 import { ThreadPost } from '../thread/thread.types';
 import { NftItem } from '../../hooks/useFetchNFTs';
 import { AssetItem, PortfolioData } from '../../hooks/useFetchTokens';
+import COLORS from '../../assets/colors';
 
 export interface UserProfileData {
   address: string;
@@ -53,6 +54,8 @@ export interface ProfileViewProps {
   onRefreshPortfolio?: () => void;
   refreshingPortfolio?: boolean;
   onAssetPress?: (asset: AssetItem) => void;
+  // New loading state prop to prevent flickering
+  isLoading?: boolean;
 }
 
 // Pure component that only renders when props actually change
@@ -90,6 +93,7 @@ function ProfileViewComponent({
   onRefreshPortfolio,
   refreshingPortfolio,
   onAssetPress,
+  isLoading = false,
 }: ProfileViewProps) {
   // Ensure attachmentData is always defined
   const attachmentData = useMemo(() => user.attachmentData || {}, [user.attachmentData]);
@@ -151,7 +155,7 @@ function ProfileViewComponent({
     // Content-related dependencies grouped together
     myPosts,
     myNFTs,
-    myActions, 
+    myActions,
     portfolioData,
     // Loading states grouped together
     loadingNfts,
@@ -168,9 +172,18 @@ function ProfileViewComponent({
 
   // Memoize container style to prevent re-renders
   const containerStyleMemo = useMemo(() => [
-    profileStyles.container, 
+    profileStyles.container,
     containerStyle
   ], [containerStyle]);
+
+  // Show loading spinner when data is still being fetched
+  if (isLoading) {
+    return (
+      <View style={[containerStyleMemo, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.brandPrimary} />
+      </View>
+    );
+  }
 
   return (
     <View style={containerStyleMemo}>
@@ -186,6 +199,9 @@ function ProfileViewComponent({
  * Custom comparison function to prevent unnecessary re-renders
  */
 function arePropsEqual(prev: ProfileViewProps, next: ProfileViewProps) {
+  // Loading state comparison
+  if (prev.isLoading !== next.isLoading) return false;
+
   // User data comparison - check by reference first
   if (prev.user !== next.user) {
     if (prev.user.address !== next.user.address) return false;
@@ -193,17 +209,17 @@ function arePropsEqual(prev: ProfileViewProps, next: ProfileViewProps) {
     if (prev.user.username !== next.user.username) return false;
     if (prev.user.description !== next.user.description) return false;
   }
-  
+
   if (prev.isOwnProfile !== next.isOwnProfile) return false;
-  
+
   // Deep compare attachmentData.coin if it exists, only if references differ
   if (prev.user.attachmentData !== next.user.attachmentData) {
     const prevCoin = prev.user.attachmentData?.coin;
     const nextCoin = next.user.attachmentData?.coin;
-    
+
     // If one is undefined and the other isn't
     if (!!prevCoin !== !!nextCoin) return false;
-    
+
     // If both exist, compare key properties
     if (prevCoin && nextCoin) {
       if (prevCoin.mint !== nextCoin.mint) return false;
@@ -225,13 +241,13 @@ function arePropsEqual(prev: ProfileViewProps, next: ProfileViewProps) {
   if (prev.loadingActions !== next.loadingActions) return false;
   if (prev.fetchActionsError !== next.fetchActionsError) return false;
   if (prev.refreshingPortfolio !== next.refreshingPortfolio) return false;
-  
+
   // Social state comparison
   if (prev.amIFollowing !== next.amIFollowing) return false;
   if (prev.areTheyFollowingMe !== next.areTheyFollowingMe) return false;
   if (prev.followersCount !== next.followersCount) return false;
   if (prev.followingCount !== next.followingCount) return false;
-  
+
   // Callbacks comparison (references only)
   if (prev.onRefreshPortfolio !== next.onRefreshPortfolio) return false;
   if (prev.onAssetPress !== next.onAssetPress) return false;
@@ -242,7 +258,7 @@ function arePropsEqual(prev: ProfileViewProps, next: ProfileViewProps) {
   if (prev.onUnfollowPress !== next.onUnfollowPress) return false;
   if (prev.onPressFollowers !== next.onPressFollowers) return false;
   if (prev.onPressFollowing !== next.onPressFollowing) return false;
-  
+
   // Style comparison
   if (prev.containerStyle !== next.containerStyle) return false;
 
