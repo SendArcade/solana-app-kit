@@ -45,7 +45,6 @@ export default function SwapCard({
       });
 
       setStatus('Swap completed successfully!');
-      Alert.alert('Swap Complete', `Tx: ${txSig}`);
     } catch (err: any) {
       console.error('Swap error:', err);
       // Don't show raw error in UI

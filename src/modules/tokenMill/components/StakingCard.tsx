@@ -36,7 +36,6 @@ export default function StakingCard({
       });
 
       setStatus('Tokens staked successfully!');
-      Alert.alert('Staking Complete', `Tx: ${txSig}`);
     } catch (err: any) {
       console.error('Staking error:', err);
       // Don't show raw error in UI

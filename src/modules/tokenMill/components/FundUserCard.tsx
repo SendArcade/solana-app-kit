@@ -31,7 +31,6 @@ export default function FundUserCard({
       });
 
       setStatus('Transaction successful!');
-      Alert.alert('User funded wSOL', `Deposited ~0.5 SOL.\nTx: ${txSig}`);
     } catch (err: any) {
       console.error('Fund user error:', err);
       // Don't show raw error in UI

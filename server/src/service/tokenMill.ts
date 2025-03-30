@@ -43,6 +43,7 @@ export class TokenMillClient {
   config: PublicKey = new PublicKey(process.env.TOKEN_MILL_CONFIG_PDA!);
 
   constructor() {
+    console.log('TokenMillClient initializing with RPC_URL:', process.env.RPC_URL);
     this.connection = new Connection(process.env.RPC_URL!);
 
     // Initialize wallet from private key
@@ -346,6 +347,7 @@ export class TokenMillClient {
   ): Promise<TokenMillResponse<{transaction: string}>> {
     try {
       console.log('[buildSwapTx] START with params:', params);
+      console.log('[buildSwapTx] Using RPC_URL:', process.env.RPC_URL);
 
       const {
         market,
@@ -1120,6 +1122,22 @@ export class TokenMillClient {
   async getAssetMetadata(assetId: string) {
     if (!process.env.RPC_URL) {
       throw new Error('RPC_URL is not set in environment variables.');
+    }
+
+    // Check if we're using the public Solana RPC URL which doesn't support getAsset
+    if (process.env.RPC_URL === 'https://api.devnet.solana.com') {
+      console.log('Using public Solana RPC that does not support getAsset. Returning mock data.');
+      return {
+        result: {
+          content: {
+            metadata: {
+              name: "Token Metadata Unavailable",
+              symbol: "N/A",
+              description: "Using public RPC endpoint - asset metadata unavailable"
+            }
+          }
+        }
+      };
     }
 
     try {

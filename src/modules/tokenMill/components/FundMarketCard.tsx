@@ -31,7 +31,6 @@ export default function FundMarketCard({
       });
 
       setStatus('Transaction successful!');
-      Alert.alert('Market Funded', `Deposited 0.1 SOL.\nTx: ${txSig}`);
     } catch (err: any) {
       console.error('Fund market error:', err);
       // Don't show raw error in UI

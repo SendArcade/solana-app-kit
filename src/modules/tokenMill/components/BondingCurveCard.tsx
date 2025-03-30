@@ -8,7 +8,7 @@ import { setBondingCurve } from '../services/tokenMillService';
 import { BondingCurveCardStyles as styles } from './styles/BondingCurveCard.style';
 import { Dimensions } from 'react-native';
 
-const {width} = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 const CHART_WIDTH = Math.min(width * 0.85, 350);
 const CHART_HEIGHT = 180;
 
@@ -26,7 +26,7 @@ export default function BondingCurveCard({
   const [status, setStatus] = useState<string | null>(null);
   const [statusType, setStatusType] = useState<'info' | 'success' | 'error'>('info');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  
+
   // Curve parameters for display
   const [curveType, setCurveType] = useState<string>('linear');
   const [basePrice, setBasePrice] = useState<number>(0);
@@ -47,7 +47,7 @@ export default function BondingCurveCard({
         legend: ['Ask Curve', 'Bid Curve'],
       };
     }
-    
+
     const askPricesNumber = askPrices.map(bn => bn.toNumber());
     const bidPricesNumber = bidPrices.map(bn => bn.toNumber());
     return {
@@ -66,7 +66,7 @@ export default function BondingCurveCard({
   const handleCurveChange = (newAsk: BN[], newBid: BN[], parameters: any) => {
     setAskPrices(newAsk);
     setBidPrices(newBid);
-    
+
     // Update display parameters
     if (parameters) {
       setCurveType(parameters.curveType || 'linear');
@@ -84,22 +84,22 @@ export default function BondingCurveCard({
   const onPressSetCurve = async () => {
     if (!marketAddress) {
       Alert.alert(
-        'No Market Address', 
+        'No Market Address',
         'Please enter or create a market first before setting the bonding curve.',
         [{ text: 'OK', style: 'default' }]
       );
       return;
     }
-    
+
     if (askPrices.length === 0 || bidPrices.length === 0) {
       Alert.alert(
-        'Configure Curve First', 
+        'Configure Curve First',
         'Please configure the bonding curve parameters before submitting.',
         [{ text: 'OK', style: 'default' }]
       );
       return;
     }
-    
+
     try {
       setLoading(true);
       setIsSubmitting(true);
@@ -127,37 +127,16 @@ export default function BondingCurveCard({
 
       setStatus('Bonding curve set successfully!');
       setStatusType('success');
-      
-      Alert.alert(
-        'Bonding Curve Set', 
-        `Your bonding curve has been successfully configured on-chain.\n\nTransaction: ${txSig.slice(0, 8)}...${txSig.slice(-8)}`,
-        [
-          { 
-            text: 'View Transaction', 
-            onPress: () => {
-              // This would ideally open the transaction in a block explorer
-              Alert.alert('Transaction ID', txSig);
-            }
-          },
-          { text: 'OK', style: 'default' }
-        ]
-      );
     } catch (err: any) {
       console.error('Bonding curve error:', err);
       setStatus('Transaction failed. Please try again.');
       setStatusType('error');
-      
-      Alert.alert(
-        'Transaction Failed', 
-        'There was an error setting the bonding curve. Please try again.',
-        [{ text: 'OK', style: 'default' }]
-      );
     } finally {
       setTimeout(() => {
         setLoading(false);
         setIsSubmitting(false);
       }, 1000);
-      
+
       // Keep success/error message visible a bit longer
       setTimeout(() => {
         setStatus(null);
@@ -184,7 +163,7 @@ export default function BondingCurveCard({
       <View style={styles.cardHeader}>
         <Text style={styles.sectionTitle}>Bonding Curve</Text>
         <Text style={styles.sectionDescription}>
-          Configure the pricing curve for your token. The bonding curve determines how token price 
+          Configure the pricing curve for your token. The bonding curve determines how token price
           changes based on supply.
         </Text>
       </View>
@@ -194,7 +173,7 @@ export default function BondingCurveCard({
         {/* Left column: Configuration controls */}
         <View style={styles.configColumn}>
           <Text style={styles.configSectionTitle}>Configure Parameters</Text>
-          
+
           <View style={styles.configControls}>
             <BondingCurveConfigurator
               onCurveChange={handleCurveChange}
@@ -202,12 +181,12 @@ export default function BondingCurveCard({
             />
           </View>
         </View>
-        
+
         {/* Right column: Visual preview */}
         <View style={styles.visualColumn}>
           <View style={styles.livePreviewContainer}>
             <Text style={styles.livePreviewTitle}>Live Preview</Text>
-            
+
             {/* Chart visualization */}
             <View style={styles.previewChart}>
               <LineChart
@@ -249,7 +228,7 @@ export default function BondingCurveCard({
                 withVerticalLines={false}
               />
             </View>
-            
+
             {/* Legend */}
             <View style={styles.legendContainer}>
               <View style={styles.legendItem}>
@@ -261,7 +240,7 @@ export default function BondingCurveCard({
                 <Text style={styles.legendText}>Bid Price</Text>
               </View>
             </View>
-            
+
             {/* Current parameters display */}
             {askPrices.length > 0 && (
               <View style={styles.curveParameters}>
@@ -296,9 +275,9 @@ export default function BondingCurveCard({
       {status && (
         <View style={getStatusContainerStyle()}>
           {isSubmitting && (
-            <ActivityIndicator 
-              size="small" 
-              color={statusType === 'error' ? '#e12d39' : statusType === 'success' ? '#03a66d' : '#0065ff'} 
+            <ActivityIndicator
+              size="small"
+              color={statusType === 'error' ? '#e12d39' : statusType === 'success' ? '#03a66d' : '#0065ff'}
             />
           )}
           <Text style={getStatusTextStyle()}>{status}</Text>
@@ -313,7 +292,7 @@ export default function BondingCurveCard({
           {isSubmitting ? 'Setting Curve...' : 'Set Curve On-Chain'}
         </Text>
       </TouchableOpacity>
-      
+
       <Text style={styles.helpText}>
         Setting the curve will require a transaction approval from your wallet
       </Text>
