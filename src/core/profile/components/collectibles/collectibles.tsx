@@ -13,8 +13,8 @@ import {
   ImageBackground
 } from 'react-native';
 import {styles} from './collectibles.style';
-import {AssetItem} from '../../../hooks/useFetchTokens';
-import {fixImageUrl} from '../../../hooks/useFetchTokens';
+import {AssetItem} from '../../../../hooks/useFetchTokens';
+import {fixImageUrl} from '../../../../hooks/useFetchTokens';
 
 /**
  * Represents a single NFT item
@@ -178,7 +178,7 @@ const PortfolioSection: React.FC<PortfolioSectionProps> = ({
     return (
       <View style={portfolioStyles.imageWrapper}>
         <Image
-          source={require('../../../assets/images/SENDlogo.png')}
+          source={require('../../../../assets/images/SENDlogo.png')}
           style={portfolioStyles.fallbackImage}
           resizeMode="cover"
         />

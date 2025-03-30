@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
-import Profile from '../../../../components/Profile/profile';
+import Profile from '../../../../core/profile/components/profile';
 import { useAppSelector, useAppDispatch } from '../../../../hooks/useReduxHooks';
 import { ThreadPost } from '../../../../components/thread/thread.types';
 import { useFetchNFTs } from '../../../../hooks/useFetchNFTs';

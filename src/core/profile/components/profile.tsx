@@ -16,31 +16,36 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { setStatusBarStyle } from 'expo-status-bar';
-import { useAppSelector, useAppDispatch } from '../../hooks/useReduxHooks';
+import { useAppSelector, useAppDispatch } from '../../../hooks/useReduxHooks';
 import {
   fetchUserProfile,
   updateProfilePic,
   updateUsername,
   updateDescription,
-} from '../../state/auth/reducer';
-import { fetchAllPosts } from '../../state/thread/reducer';
-import { ThreadPost } from '../thread/thread.types';
-import { NftItem, useFetchNFTs } from '../../hooks/useFetchNFTs';
-import { useWallet } from '../../hooks/useWallet';
+} from '../../../state/auth/reducer';
+import { fetchAllPosts } from '../../../state/thread/reducer';
+import { ThreadPost } from '../../../components/thread/thread.types';
+import { NftItem, useFetchNFTs } from '../../../hooks/useFetchNFTs';
+import { useWallet } from '../../../hooks/useWallet';
 import {
   uploadProfileAvatar,
   fetchFollowers,
   fetchFollowing,
   checkIfUserFollowsMe,
-} from '../../services/profileService';
-import { fetchWalletActionsWithCache, pruneOldActionData } from '../../state/profile/reducer';
+} from '../../../services/profileService';
+import { fetchWalletActionsWithCache, pruneOldActionData } from '../../../state/profile/reducer';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { followUser, unfollowUser } from '../../state/users/reducer';
-import { useFetchPortfolio, AssetItem } from '../../hooks/useFetchTokens';
-import COLORS from '../../assets/colors';
+import { followUser, unfollowUser } from '../../../state/users/reducer';
+import { useFetchPortfolio, AssetItem } from '../../../hooks/useFetchTokens';
+import COLORS from '../../../assets/colors';
 
-import ProfileView, { UserProfileData } from './ProfileView';
+// Import hooks, utils, and types from the modular structure
+import { useProfileFollow, useProfileActions, useProfileManagement } from '../hooks';
+import { flattenPosts, isUserWalletOwner } from '../utils/profileUtils';
+import { ProfileProps, UserProfileData } from '../types';
+
+import ProfileView from './ProfileView';
 import {
   styles,
   modalStyles,
@@ -48,23 +53,6 @@ import {
   inlineConfirmStyles,
   editNameModalStyles,
 } from './profile.style';
-import { flattenPosts } from '../thread/thread.utils';
-
-export interface ProfileProps {
-  isOwnProfile?: boolean;
-  user: {
-    address: string;
-    profilePicUrl?: string;
-    username?: string;
-    description?: string;
-    attachmentData?: any;
-  };
-  posts?: ThreadPost[];
-  nfts?: NftItem[];
-  loadingNfts?: boolean;
-  fetchNftsError?: string | null;
-  containerStyle?: object;
-}
 
 export default function Profile({
   isOwnProfile = false,
