@@ -13,7 +13,7 @@ import LoginScreen from '../screens/Common/LoginScreen/LoginScreen';
 // NEW IMPORT
 import OtherProfileScreen from '../screens/SampleUI/Threads/OtherProfileScreen/OtherProfileScreen';
 import PostThreadScreen from '../screens/SampleUI/Threads/PostThreadScreen/PostthreadScreen';
-import FollowersFollowingListScreen from '../components/thread/FollowersFollowingListScreen/FollowersFollowingListScreen';
+import FollowersFollowingListScreen from '../core/thread/components/FollowersFollowingListScreen/FollowersFollowingListScreen';
 import ProfileScreen from '../screens/SampleUI/Threads/ProfileScreen/ProfileScreen';
 import { TokenMillScreen } from '../modules/tokenMill';
 import { PumpfunScreen } from '../modules/pumpFun';
@@ -31,7 +31,7 @@ export type RootStackParamList = {
   // NEW ROUTE
   OtherProfile: { userId: string };
   PostThread: { postId: string };
-  FollowersFollowingList : undefined;
+  FollowersFollowingList: undefined;
   ProfileScreen: undefined;
 };
 

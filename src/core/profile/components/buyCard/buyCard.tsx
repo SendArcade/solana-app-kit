@@ -1,25 +1,25 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
-  Image, 
-  Text, 
-  TouchableOpacity, 
-  View, 
-  Animated, 
-  Modal, 
-  ScrollView, 
+  Image,
+  Text,
+  TouchableOpacity,
+  View,
+  Animated,
+  Modal,
+  ScrollView,
   StyleSheet,
   Dimensions,
   ActivityIndicator,
   ImageBackground
 } from 'react-native';
-import {styles as buyCardStyles} from './buyCard.style';
+import { styles as buyCardStyles } from './buyCard.style';
 import Icons from '../../../../assets/svgs/index';
-import {DEFAULT_IMAGES} from '../../../../config/constants';
+import { DEFAULT_IMAGES } from '../../../../config/constants';
 
-import {AssetItem, useFetchPortfolio, fixImageUrl} from '../../../../hooks/useFetchTokens';
+import { AssetItem, useFetchPortfolio, fixImageUrl } from '../../../../hooks/useFetchTokens';
 import { useAppSelector } from '../../../../hooks/useReduxHooks';
 import { useAuth } from '../../../../hooks/useAuth';
-import TradeModal from '../../../../components/thread/trade/TradeModal';
+import TradeModal from '../../../thread/components/trade/TradeModal';
 
 /**
  * Define props for the BuyCard
@@ -58,7 +58,7 @@ export interface BuyCardProps {
    * Called when the down arrow is pressed (e.g. open a modal).
    */
   onArrowPress?: () => void;
-  
+
   /**
    * Optional wallet address to show portfolio for.
    * If not provided, will use connected wallet.
@@ -86,26 +86,26 @@ export interface BuyCardProps {
 const PortfolioAssetItem: React.FC<{
   asset: AssetItem;
   onSelect?: (asset: AssetItem) => void;
-}> = ({asset, onSelect}) => {
-  const {width} = Dimensions.get('window');
+}> = ({ asset, onSelect }) => {
+  const { width } = Dimensions.get('window');
   const itemWidth = (width - 48) / 2;
-  
+
   // For tokens, use a list item style
   if (asset.assetType === 'token') {
     const imageUrl = asset.image ? fixImageUrl(asset.image) : '';
-    
-    const formattedBalance = asset.token_info ? 
+
+    const formattedBalance = asset.token_info ?
       parseFloat(
         (parseInt(asset.token_info.balance) / Math.pow(10, asset.token_info.decimals))
           .toFixed(asset.token_info.decimals)
       ).toString() : '0';
-    
-    const tokenValue = asset.token_info?.price_info?.total_price 
+
+    const tokenValue = asset.token_info?.price_info?.total_price
       ? `$${asset.token_info.price_info.total_price.toFixed(2)}`
       : '';
 
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={portfolioStyles.tokenItem}
         onPress={() => onSelect && onSelect(asset)}
         activeOpacity={0.7}
@@ -126,7 +126,7 @@ const PortfolioAssetItem: React.FC<{
             </View>
           )}
         </View>
-        
+
         {/* Token Details */}
         <View style={portfolioStyles.tokenDetails}>
           <Text style={portfolioStyles.tokenName} numberOfLines={1}>
@@ -136,7 +136,7 @@ const PortfolioAssetItem: React.FC<{
             {asset.token_info?.symbol || asset.symbol || ''}
           </Text>
         </View>
-        
+
         {/* Token Balance & Value */}
         <View style={portfolioStyles.tokenBalanceContainer}>
           <Text style={portfolioStyles.tokenBalance}>
@@ -151,12 +151,12 @@ const PortfolioAssetItem: React.FC<{
       </TouchableOpacity>
     );
   }
-  
+
   // For NFTs, use a grid item style
   // Properly handle image rendering
   const renderAssetImage = () => {
     const imageUrl = asset.image ? fixImageUrl(asset.image) : '';
-    
+
     if (!imageUrl) {
       return (
         <View style={portfolioStyles.assetPlaceholder}>
@@ -166,7 +166,7 @@ const PortfolioAssetItem: React.FC<{
         </View>
       );
     }
-    
+
     return (
       <View style={portfolioStyles.assetImageWrapper}>
         <Image
@@ -175,29 +175,29 @@ const PortfolioAssetItem: React.FC<{
           resizeMode="cover"
         />
         <Image
-          source={{uri: imageUrl}}
+          source={{ uri: imageUrl }}
           style={portfolioStyles.assetImage}
           resizeMode="cover"
         />
       </View>
     );
   };
-  
+
   return (
-    <TouchableOpacity 
-      style={[portfolioStyles.assetItem, {width: itemWidth}]}
+    <TouchableOpacity
+      style={[portfolioStyles.assetItem, { width: itemWidth }]}
       onPress={() => onSelect && onSelect(asset)}
       activeOpacity={0.7}
     >
       <View style={portfolioStyles.assetImageContainer}>
         {renderAssetImage()}
-        
+
         {asset.compression?.compressed && (
           <View style={portfolioStyles.compressedBadge}>
             <Text style={portfolioStyles.compressedText}>C</Text>
           </View>
         )}
-        
+
         {/* Show price if available */}
         {asset.token_info?.price_info?.price_per_token && (
           <View style={portfolioStyles.priceBadge}>
@@ -207,12 +207,12 @@ const PortfolioAssetItem: React.FC<{
           </View>
         )}
       </View>
-      
+
       <View style={portfolioStyles.assetDetails}>
         <Text style={portfolioStyles.assetName} numberOfLines={1}>
           {asset.name}
         </Text>
-        
+
         {asset.collection?.name ? (
           <Text style={portfolioStyles.assetCollection} numberOfLines={1}>
             {asset.collection.name}
@@ -246,14 +246,14 @@ const BuyCard: React.FC<BuyCardProps> = ({
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
   const userName = useAppSelector(state => state.auth.username);
-  const {solanaWallet} = useAuth();
+  const { solanaWallet } = useAuth();
 
   // For simplicity, using the first connected wallet
   const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
   const effectiveWalletAddress = walletAddress || userPublicKey?.toString();
-  
+
   // Fetch portfolio data when needed
-  const {portfolio, loading, error} = useFetchPortfolio(
+  const { portfolio, loading, error } = useFetchPortfolio(
     showPortfolioModal ? effectiveWalletAddress : undefined
   );
 
@@ -264,29 +264,29 @@ const BuyCard: React.FC<BuyCardProps> = ({
       ? '@' + userPublicKey.slice(0, 6) + '...' + userPublicKey.slice(-4)
       : '@anonymous',
     verified: true,
-    avatar: storedProfilePic ? {uri: storedProfilePic} : DEFAULT_IMAGES.user,
+    avatar: storedProfilePic ? { uri: storedProfilePic } : DEFAULT_IMAGES.user,
   };
 
   const handleBuyPress = () => {
     // Open the trade modal
     setShowTradeModal(true);
   };
-  
+
   const handleArrowPress = () => {
     // Custom handler if provided
     if (onArrowPress) {
       onArrowPress();
       return; // Don't open portfolio modal if custom handler is provided
     }
-    
+
     // Open portfolio modal
     setShowPortfolioModal(true);
   };
-  
+
   const handleSelectAsset = (asset: AssetItem) => {
     // Close the portfolio modal
     setShowPortfolioModal(false);
-    
+
     // If onSelectAsset is provided, call it with the asset
     if (onSelectAsset) {
       onSelectAsset(asset);
@@ -306,7 +306,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
     if (isPinYourCoin && !tokenImage) {
       return null;
     }
-    
+
     if (tokenImage) {
       if (typeof tokenImage === 'string') {
         return (
@@ -317,7 +317,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
               resizeMode="cover"
             />
             <Image
-              source={{uri: fixImageUrl(tokenImage)}}
+              source={{ uri: fixImageUrl(tokenImage) }}
               style={cardStyles.img}
               resizeMode="cover"
             />
@@ -343,20 +343,20 @@ const BuyCard: React.FC<BuyCardProps> = ({
     : tokenName;
 
   // Group portfolio items by type
-  const tokens = portfolio.items?.filter(item => 
+  const tokens = portfolio.items?.filter(item =>
     item.assetType === 'token'
   ) || [];
-  
-  const regularNfts = portfolio.items?.filter(item => 
+
+  const regularNfts = portfolio.items?.filter(item =>
     item.assetType === 'nft'
   ) || [];
-  
-  const compressedNfts = portfolio.items?.filter(item => 
+
+  const compressedNfts = portfolio.items?.filter(item =>
     item.assetType === 'cnft'
   ) || [];
 
-  const solBalance = portfolio.nativeBalance 
-    ? (portfolio.nativeBalance.lamports / 1000000000).toFixed(4) 
+  const solBalance = portfolio.nativeBalance
+    ? (portfolio.nativeBalance.lamports / 1000000000).toFixed(4)
     : '0';
 
   // Is this a "Pin your coin" state? (No token attached yet)
@@ -364,7 +364,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
 
   return (
     <View style={[
-      cardStyles.container, 
+      cardStyles.container,
       isPinYourCoin ? cardStyles.pinYourCoinContainer : null,
       containerStyle
     ]}>
@@ -386,7 +386,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
             {isPinYourCoin ? tokenName : `Buy $${tokenName}`}
           </Text>
           {tokenDesc ? (
-            <Text style={{fontWeight: '400', fontSize: 13, color: '#999999'}}>
+            <Text style={{ fontWeight: '400', fontSize: 13, color: '#999999' }}>
               {tokenDesc}
             </Text>
           ) : (
@@ -413,8 +413,8 @@ const BuyCard: React.FC<BuyCardProps> = ({
 
         {/* Only show arrow if showDownArrow is true */}
         {showDownArrow && (
-          <TouchableOpacity 
-            style={[cardStyles.arrowButton, isPinYourCoin ? cardStyles.pinArrowButton : null]} 
+          <TouchableOpacity
+            style={[cardStyles.arrowButton, isPinYourCoin ? cardStyles.pinArrowButton : null]}
             onPress={handleArrowPress}
           >
             {isPinYourCoin ? (
@@ -453,7 +453,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
           initialActiveTab="TRADE_AND_SHARE"
         />
       )}
-      
+
       {/* Portfolio Modal */}
       <Modal
         visible={showPortfolioModal}
@@ -474,14 +474,14 @@ const BuyCard: React.FC<BuyCardProps> = ({
                 <Text style={portfolioStyles.closeButtonText}>✕</Text>
               </TouchableOpacity>
             </View>
-            
+
             {/* Actions section at the top when a token is already attached */}
             {showRemoveButton && tokenMint && onSelectAsset && (
               <View style={portfolioStyles.actionsContainer}>
                 <Text style={portfolioStyles.actionsText}>
                   Currently pinned: {tokenName}
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={portfolioStyles.removeButton}
                   onPress={() => {
                     setShowPortfolioModal(false);
@@ -493,7 +493,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
                 <View style={portfolioStyles.divider} />
               </View>
             )}
-            
+
             {loading ? (
               <View style={portfolioStyles.loadingContainer}>
                 <ActivityIndicator size="large" color="#1d9bf0" />
@@ -502,7 +502,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
             ) : error ? (
               <View style={portfolioStyles.errorContainer}>
                 <Text style={portfolioStyles.errorText}>{error}</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={portfolioStyles.retryButton}
                   onPress={() => {
                     // Close and reopen the modal to retry
@@ -528,7 +528,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
                     </Text>
                   </View>
                 )}
-                
+
                 {/* Token selection instructions for profile modal */}
                 {onSelectAsset && (
                   <View style={portfolioStyles.instructionsContainer}>
@@ -537,7 +537,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
                     </Text>
                   </View>
                 )}
-                
+
                 {/* Tokens Section */}
                 {tokens.length > 0 && (
                   <View style={portfolioStyles.sectionContainer}>
@@ -545,8 +545,8 @@ const BuyCard: React.FC<BuyCardProps> = ({
                     <View style={portfolioStyles.tokenListContainer}>
                       {tokens.map((asset, index) => (
                         <React.Fragment key={asset.id || asset.mint}>
-                          <PortfolioAssetItem 
-                            asset={asset} 
+                          <PortfolioAssetItem
+                            asset={asset}
                             onSelect={handleSelectAsset}
                           />
                           {index < tokens.length - 1 && <View style={portfolioStyles.divider} />}
@@ -555,32 +555,32 @@ const BuyCard: React.FC<BuyCardProps> = ({
                     </View>
                   </View>
                 )}
-                
+
                 {/* NFTs Section */}
                 {regularNfts.length > 0 && (
                   <View style={portfolioStyles.sectionContainer}>
                     <Text style={portfolioStyles.sectionTitle}>NFTs</Text>
                     <View style={portfolioStyles.assetsGrid}>
                       {regularNfts.map(asset => (
-                        <PortfolioAssetItem 
-                          key={asset.id || asset.mint} 
-                          asset={asset} 
+                        <PortfolioAssetItem
+                          key={asset.id || asset.mint}
+                          asset={asset}
                           onSelect={handleSelectAsset}
                         />
                       ))}
                     </View>
                   </View>
                 )}
-                
+
                 {/* Compressed NFTs Section */}
                 {compressedNfts.length > 0 && (
                   <View style={portfolioStyles.sectionContainer}>
                     <Text style={portfolioStyles.sectionTitle}>Compressed NFTs</Text>
                     <View style={portfolioStyles.assetsGrid}>
                       {compressedNfts.map(asset => (
-                        <PortfolioAssetItem 
-                          key={asset.id || asset.mint} 
-                          asset={asset} 
+                        <PortfolioAssetItem
+                          key={asset.id || asset.mint}
+                          asset={asset}
                           onSelect={handleSelectAsset}
                         />
                       ))}
