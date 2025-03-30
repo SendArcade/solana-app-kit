@@ -48,10 +48,6 @@ export default function MarketCreationCard({
       });
 
       setStatus('Market created successfully!');
-      Alert.alert(
-        'Market Created',
-        `Market: ${marketAddress}\nTx: ${txSignature}`,
-      );
       onMarketCreated(marketAddress, baseTokenMint);
     } catch (err: any) {
       console.error('Create market error:', err);

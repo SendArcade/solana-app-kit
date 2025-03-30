@@ -53,10 +53,6 @@ export default function VestingCard({
 
       setCreateStatus('Vesting plan created successfully!');
       setVestingPlanAddress(ephemeralVestingPubkey);
-      Alert.alert(
-        'Vesting Plan Created',
-        `Vesting Plan: ${ephemeralVestingPubkey}\nTx: ${txSignature}`,
-      );
     } catch (err: any) {
       console.error('Create vesting error:', err);
       // Don't show raw error in UI
@@ -100,7 +96,6 @@ export default function VestingCard({
       });
 
       setReleaseStatus('Vesting released successfully!');
-      Alert.alert('Vesting Released', `Tx: ${txSig}`);
     } catch (err: any) {
       console.error('Release vesting error:', err);
       // Don't show raw error in UI
