@@ -1,10 +1,10 @@
-import React, {useState} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, 
-  Image, 
-  Text, 
-  FlatList, 
-  TouchableOpacity, 
+  View,
+  Image,
+  Text,
+  FlatList,
+  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   Dimensions,
@@ -12,9 +12,11 @@ import {
   RefreshControl,
   ImageBackground
 } from 'react-native';
-import {styles} from './collectibles.style';
-import {AssetItem} from '../../../../hooks/useFetchTokens';
-import {fixImageUrl} from '../../../../hooks/useFetchTokens';
+import { styles } from './collectibles.style';
+import { AssetItem } from '../../../../hooks/useFetchTokens';
+import { fixImageUrl } from '../../../../hooks/useFetchTokens';
+import TokenDetailsDrawer from '../../../../components/Common/TokenDetailsDrawer/TokenDetailsDrawer';
+import { TENSOR_API_KEY } from '@env';
 
 /**
  * Represents a single NFT item
@@ -74,27 +76,35 @@ interface CollectiblesProps {
 
 const SOL_DECIMAL = 1000000000; // 1 SOL = 10^9 lamports
 
+// NFT data cache to prevent redundant fetches
+const nftDataCache = new Map<string, any>();
+
 // List renderer for token items
 const TokenListItem: React.FC<{
   item: AssetItem;
   onPress?: (item: AssetItem) => void;
 }> = ({ item, onPress }) => {
   const imageUrl = item.image ? fixImageUrl(item.image) : '';
-  
-  const formattedBalance = item.token_info ? 
+
+  const formattedBalance = item.token_info ?
     parseFloat(
       (parseInt(item.token_info.balance) / Math.pow(10, item.token_info.decimals))
         .toFixed(item.token_info.decimals)
     ).toString() : '0';
-  
-  const tokenValue = item.token_info?.price_info?.total_price 
+
+  const tokenValue = item.token_info?.price_info?.total_price
     ? `$${item.token_info.price_info.total_price.toFixed(2)}`
     : '';
 
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={portfolioStyles.tokenListItem}
-      onPress={() => onPress && onPress(item)}
+      onPress={() => {
+        if (onPress) {
+          console.log("TokenListItem: Pressing item with mint:", item.mint, "id:", item.id);
+          onPress(item);
+        }
+      }}
       activeOpacity={0.7}
     >
       {/* Token Logo */}
@@ -113,7 +123,7 @@ const TokenListItem: React.FC<{
           </View>
         )}
       </View>
-      
+
       {/* Token Details */}
       <View style={portfolioStyles.tokenDetails}>
         <Text style={portfolioStyles.tokenName} numberOfLines={1}>
@@ -123,7 +133,7 @@ const TokenListItem: React.FC<{
           {item.token_info?.symbol || item.symbol || ''}
         </Text>
       </View>
-      
+
       {/* Token Balance & Value */}
       <View style={portfolioStyles.tokenBalanceContainer}>
         <Text style={portfolioStyles.tokenBalance}>
@@ -163,7 +173,7 @@ const PortfolioSection: React.FC<PortfolioSectionProps> = ({
   // Custom image renderer that handles loading and errors
   const renderAssetImage = (item: AssetItem) => {
     const imageUrl = item.image ? fixImageUrl(item.image) : '';
-    
+
     if (!imageUrl) {
       // If no image is available, display a placeholder with the token symbol/name
       return (
@@ -174,7 +184,7 @@ const PortfolioSection: React.FC<PortfolioSectionProps> = ({
         </View>
       );
     }
-    
+
     return (
       <View style={portfolioStyles.imageWrapper}>
         <Image
@@ -200,7 +210,7 @@ const PortfolioSection: React.FC<PortfolioSectionProps> = ({
           key="list"
           data={items}
           keyExtractor={item => item.id || item.mint}
-          renderItem={({item}) => (
+          renderItem={({ item }) => (
             <TokenListItem item={item} onPress={onItemPress} />
           )}
           scrollEnabled={false}
@@ -221,22 +231,27 @@ const PortfolioSection: React.FC<PortfolioSectionProps> = ({
         numColumns={2}
         keyExtractor={item => item.id || item.mint}
         columnWrapperStyle={portfolioStyles.columnWrapper}
-        renderItem={({item}) => (
-          <TouchableOpacity 
-            style={[portfolioStyles.itemContainer, {width: itemWidth}]}
-            onPress={() => onItemPress && onItemPress(item)}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[portfolioStyles.itemContainer, { width: itemWidth }]}
+            onPress={() => {
+              if (onItemPress) {
+                console.log("Grid item pressed with mint:", item.mint, "id:", item.id);
+                onItemPress(item);
+              }
+            }}
             activeOpacity={0.7}
           >
             <View style={portfolioStyles.imageContainer}>
               {renderAssetImage(item)}
-              
+
               {/* Display badges for special asset types */}
               {item.compression?.compressed && (
                 <View style={portfolioStyles.compressedBadge}>
                   <Text style={portfolioStyles.compressedText}>C</Text>
                 </View>
               )}
-              
+
               {/* Show token price if available */}
               {item.token_info?.price_info?.price_per_token && (
                 <View style={portfolioStyles.priceBadge}>
@@ -246,12 +261,12 @@ const PortfolioSection: React.FC<PortfolioSectionProps> = ({
                 </View>
               )}
             </View>
-            
+
             <View style={portfolioStyles.itemDetails}>
               <Text style={portfolioStyles.itemName} numberOfLines={1}>
                 {item.name}
               </Text>
-              
+
               {item.token_info ? (
                 <Text style={portfolioStyles.itemBalance}>
                   {parseFloat(
@@ -288,7 +303,98 @@ const Collectibles: React.FC<CollectiblesProps> = ({
   onItemPress,
 }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'tokens' | 'nfts' | 'cnfts'>('all');
-  
+  const [selectedAsset, setSelectedAsset] = useState<AssetItem | null>(null);
+  const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+  const [detailedNftData, setDetailedNftData] = useState<any>(null);
+
+  // Handle asset item press
+  const handleAssetPress = async (item: AssetItem) => {
+    if (!item) {
+      console.warn("Attempted to open details for invalid asset item");
+      return;
+    }
+
+    // Use mint or id, whichever is available
+    const assetId = item.mint || item.id;
+    if (!assetId) {
+      console.warn("Asset missing both mint and id properties", JSON.stringify(item, null, 2));
+      return;
+    }
+
+    setSelectedAsset(item);
+
+    // If it's an NFT, we should fetch more detailed data
+    if (item.assetType === 'nft' || item.assetType === 'cnft') {
+      // Set loading state and show drawer immediately
+      setDrawerLoading(true);
+      setShowDetailsDrawer(true);
+
+      try {
+        const nftData = await fetchNftData(assetId);
+        setDetailedNftData(nftData);
+      } catch (error) {
+        console.error("Error fetching detailed NFT data:", error);
+        setDetailedNftData(null);
+      } finally {
+        setDrawerLoading(false);
+      }
+    } else {
+      setDetailedNftData(null);
+      setShowDetailsDrawer(true);
+    }
+
+    // Call external onItemPress if provided
+    if (onItemPress) {
+      onItemPress(item);
+    }
+  };
+
+  // Function to fetch detailed NFT data
+  const fetchNftData = async (mint: string) => {
+    // Check cache first
+    if (nftDataCache.has(mint)) {
+      console.log("Using cached NFT data for mint:", mint);
+      return nftDataCache.get(mint);
+    }
+
+    console.log("Fetching NFT data from Tensor API for mint:", mint);
+
+    // Check if we have a Tensor API key
+    if (!TENSOR_API_KEY) {
+      console.error("TENSOR_API_KEY is missing! Unable to fetch NFT data.");
+      return null;
+    }
+
+    try {
+      const url = `https://api.mainnet.tensordev.io/api/v1/mint?mints=${mint}`;
+      const resp = await fetch(url, {
+        headers: {
+          'x-tensor-api-key': TENSOR_API_KEY,
+        },
+      });
+
+      if (!resp.ok) {
+        const errorText = await resp.text();
+        throw new Error(`Tensor API error: ${resp.status} - ${errorText}`);
+      }
+
+      const data = await resp.json();
+      if (Array.isArray(data) && data.length > 0) {
+        console.log("Successfully fetched NFT data:", data[0].name);
+        // Cache the data for future use
+        nftDataCache.set(mint, data[0]);
+        return data[0];
+      } else {
+        console.warn("Tensor API returned empty data for mint:", mint);
+        throw new Error('No data returned from Tensor');
+      }
+    } catch (error) {
+      console.error("Error fetching NFT data:", error);
+      return null;
+    }
+  };
+
   // Show loading state while fetching data
   if (loading) {
     return (
@@ -298,14 +404,14 @@ const Collectibles: React.FC<CollectiblesProps> = ({
       </View>
     );
   }
-  
+
   // Show error state if there was a problem
   if (error) {
     return (
       <View style={portfolioStyles.errorContainer}>
         <Text style={portfolioStyles.errorText}>{error}</Text>
         {onRefresh && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={portfolioStyles.retryButton}
             onPress={onRefresh}
           >
@@ -332,7 +438,7 @@ const Collectibles: React.FC<CollectiblesProps> = ({
       <View style={portfolioStyles.emptyContainer}>
         <Text style={portfolioStyles.emptyText}>No assets found in this wallet.</Text>
         {onRefresh && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={portfolioStyles.retryButton}
             onPress={onRefresh}
           >
@@ -344,15 +450,15 @@ const Collectibles: React.FC<CollectiblesProps> = ({
   }
 
   // Filter items by type
-  const tokens = items.filter(item => 
+  const tokens = items.filter(item =>
     item.assetType === 'token'
   );
-  
-  const regularNfts = items.filter(item => 
+
+  const regularNfts = items.filter(item =>
     item.assetType === 'nft'
   );
-  
-  const compressedNfts = items.filter(item => 
+
+  const compressedNfts = items.filter(item =>
     item.assetType === 'cnft'
   );
 
@@ -363,10 +469,10 @@ const Collectibles: React.FC<CollectiblesProps> = ({
     switch (activeTab) {
       case 'tokens':
         return tokens.length > 0 ? (
-          <PortfolioSection 
-            sectionTitle="Tokens" 
-            items={tokens} 
-            onItemPress={onItemPress}
+          <PortfolioSection
+            sectionTitle="Tokens"
+            items={tokens}
+            onItemPress={handleAssetPress}
             emptyMessage="No tokens found"
             displayAsList={true}
           />
@@ -375,14 +481,14 @@ const Collectibles: React.FC<CollectiblesProps> = ({
             <Text style={portfolioStyles.emptyTabText}>No tokens found in this wallet</Text>
           </View>
         );
-        
+
       case 'nfts':
         return regularNfts.length > 0 ? (
-          <PortfolioSection 
-            sectionTitle="NFTs" 
-            items={regularNfts} 
-            onItemPress={onItemPress}
-            emptyMessage="No NFTs found" 
+          <PortfolioSection
+            sectionTitle="NFTs"
+            items={regularNfts}
+            onItemPress={handleAssetPress}
+            emptyMessage="No NFTs found"
             displayAsList={false}
           />
         ) : (
@@ -390,14 +496,14 @@ const Collectibles: React.FC<CollectiblesProps> = ({
             <Text style={portfolioStyles.emptyTabText}>No NFTs found in this wallet</Text>
           </View>
         );
-        
+
       case 'cnfts':
         return compressedNfts.length > 0 ? (
-          <PortfolioSection 
-            sectionTitle="Compressed NFTs" 
-            items={compressedNfts} 
-            onItemPress={onItemPress}
-            emptyMessage="No compressed NFTs found" 
+          <PortfolioSection
+            sectionTitle="Compressed NFTs"
+            items={compressedNfts}
+            onItemPress={handleAssetPress}
+            emptyMessage="No compressed NFTs found"
             displayAsList={false}
           />
         ) : (
@@ -405,7 +511,7 @@ const Collectibles: React.FC<CollectiblesProps> = ({
             <Text style={portfolioStyles.emptyTabText}>No compressed NFTs found in this wallet</Text>
           </View>
         );
-        
+
       case 'all':
       default:
         return (
@@ -415,40 +521,40 @@ const Collectibles: React.FC<CollectiblesProps> = ({
               <Text style={portfolioStyles.solBalanceLabel}>SOL Balance</Text>
               <Text style={portfolioStyles.solBalanceValue}>{solBalance} SOL</Text>
             </View>
-            
+
             {/* Tokens Section */}
             {tokens.length > 0 && (
-              <PortfolioSection 
-                sectionTitle="Tokens" 
-                items={tokens.slice(0, 6)} 
-                onItemPress={onItemPress}
+              <PortfolioSection
+                sectionTitle="Tokens"
+                items={tokens.slice(0, 6)}
+                onItemPress={handleAssetPress}
                 displayAsList={true}
               />
             )}
-            
+
             {/* NFTs Section */}
             {regularNfts.length > 0 && (
-              <PortfolioSection 
-                sectionTitle="NFTs" 
-                items={regularNfts.slice(0, 4)} 
-                onItemPress={onItemPress}
+              <PortfolioSection
+                sectionTitle="NFTs"
+                items={regularNfts.slice(0, 4)}
+                onItemPress={handleAssetPress}
                 displayAsList={false}
               />
             )}
-            
+
             {/* Compressed NFTs Section */}
             {compressedNfts.length > 0 && (
-              <PortfolioSection 
-                sectionTitle="Compressed NFTs" 
-                items={compressedNfts.slice(0, 4)} 
-                onItemPress={onItemPress}
+              <PortfolioSection
+                sectionTitle="Compressed NFTs"
+                items={compressedNfts.slice(0, 4)}
+                onItemPress={handleAssetPress}
                 displayAsList={false}
               />
             )}
-            
+
             {/* Show a view all button if there are more items than shown */}
             {tokens.length > 6 || regularNfts.length > 4 || compressedNfts.length > 4 ? (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={portfolioStyles.viewAllButton}
                 onPress={() => {
                   // Navigate to the category with the most items
@@ -469,108 +575,183 @@ const Collectibles: React.FC<CollectiblesProps> = ({
     }
   };
 
-  return (
-    <ScrollView
-      style={portfolioStyles.scrollContainer}
-      contentContainerStyle={portfolioStyles.scrollContent}
-      refreshControl={
-        <RefreshControl 
-          refreshing={refreshing || false} 
-          onRefresh={onRefresh}
-          colors={['#1d9bf0']} 
-          tintColor={'#1d9bf0'}
-        />
-      }
-    >
-      {/* Tabs for filtering different asset types */}
-      <View style={portfolioStyles.tabContainer}>
-        <TouchableOpacity
-          style={[
-            portfolioStyles.tab,
-            activeTab === 'all' && portfolioStyles.activeTab,
-          ]}
-          onPress={() => setActiveTab('all')}
-        >
-          <Text 
-            style={[
-              portfolioStyles.tabText, 
-              activeTab === 'all' && portfolioStyles.activeTabText
-            ]}
-          >
-            All
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            portfolioStyles.tab,
-            activeTab === 'tokens' && portfolioStyles.activeTab,
-          ]}
-          onPress={() => setActiveTab('tokens')}
-        >
-          <Text 
-            style={[
-              portfolioStyles.tabText, 
-              activeTab === 'tokens' && portfolioStyles.activeTabText
-            ]}
-          >
-            Tokens
-          </Text>
-          {tokens.length > 0 && (
-            <View style={portfolioStyles.badgeContainer}>
-              <Text style={portfolioStyles.badgeText}>{tokens.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            portfolioStyles.tab,
-            activeTab === 'nfts' && portfolioStyles.activeTab,
-          ]}
-          onPress={() => setActiveTab('nfts')}
-        >
-          <Text 
-            style={[
-              portfolioStyles.tabText, 
-              activeTab === 'nfts' && portfolioStyles.activeTabText
-            ]}
-          >
-            NFTs
-          </Text>
-          {regularNfts.length > 0 && (
-            <View style={portfolioStyles.badgeContainer}>
-              <Text style={portfolioStyles.badgeText}>{regularNfts.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            portfolioStyles.tab,
-            activeTab === 'cnfts' && portfolioStyles.activeTab,
-          ]}
-          onPress={() => setActiveTab('cnfts')}
-        >
-          <Text 
-            style={[
-              portfolioStyles.tabText, 
-              activeTab === 'cnfts' && portfolioStyles.activeTabText
-            ]}
-          >
-            cNFTs
-          </Text>
-          {compressedNfts.length > 0 && (
-            <View style={portfolioStyles.badgeContainer}>
-              <Text style={portfolioStyles.badgeText}>{compressedNfts.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+  // Generate initialData for TokenDetailsDrawer
+  const getInitialData = () => {
+    if (!selectedAsset) return undefined;
 
-      {/* Render the appropriate content based on selected tab */}
-      {renderItems()}
-    </ScrollView>
+    // Check if it's an NFT (regular or compressed)
+    const isNft = selectedAsset.assetType === 'nft' || selectedAsset.assetType === 'cnft';
+
+    // Create the initial data object with required fields
+    const initialData: any = {
+      symbol: selectedAsset.token_info?.symbol || selectedAsset.symbol || '',
+      name: selectedAsset.name || '',
+      logoURI: selectedAsset.image ? fixImageUrl(selectedAsset.image) : ''
+    };
+
+    // For NFTs, add more specific data
+    if (isNft) {
+      // If we have fetched detailed NFT data, use that
+      if (detailedNftData) {
+        initialData.nftData = {
+          name: detailedNftData.name || selectedAsset.name,
+          collName: detailedNftData.collName || selectedAsset.collection?.name || '',
+          description: detailedNftData.description || selectedAsset.description || '',
+          rarityRankTN: detailedNftData.rarityRankTN,
+          numMints: detailedNftData.numMints,
+          owner: detailedNftData.owner,
+          attributes: detailedNftData.attributes || selectedAsset.attributes,
+          listing: detailedNftData.listing,
+          lastSale: detailedNftData.lastSale
+        };
+      } else {
+        // Use the basic data we have
+        initialData.nftData = {
+          collName: selectedAsset.collection?.name || '',
+          description: selectedAsset.description ||
+            (drawerLoading ?
+              'Loading NFT data...' :
+              'No detailed information available for this NFT. This could be because the Tensor API is unavailable or the NFT is not indexed.')
+        };
+
+        // Add attributes if available
+        if (selectedAsset.attributes && Array.isArray(selectedAsset.attributes)) {
+          initialData.nftData.attributes = selectedAsset.attributes;
+        }
+
+        // Add a dummy attribute to explain the situation if we're not loading
+        if (!drawerLoading && !TENSOR_API_KEY) {
+          initialData.nftData.attributes = [
+            {
+              trait_type: 'Note',
+              value: 'Tensor API key is missing. Add TENSOR_API_KEY to your environment variables for full NFT details.'
+            }
+          ];
+        }
+      }
+    }
+
+    return initialData;
+  };
+
+  return (
+    <>
+      <ScrollView
+        style={portfolioStyles.scrollContainer}
+        contentContainerStyle={portfolioStyles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing || false}
+            onRefresh={onRefresh}
+            colors={['#1d9bf0']}
+            tintColor={'#1d9bf0'}
+          />
+        }
+      >
+        {/* Tabs for filtering different asset types */}
+        <View style={portfolioStyles.tabContainer}>
+          <TouchableOpacity
+            style={[
+              portfolioStyles.tab,
+              activeTab === 'all' && portfolioStyles.activeTab,
+            ]}
+            onPress={() => setActiveTab('all')}
+          >
+            <Text
+              style={[
+                portfolioStyles.tabText,
+                activeTab === 'all' && portfolioStyles.activeTabText
+              ]}
+            >
+              All
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              portfolioStyles.tab,
+              activeTab === 'tokens' && portfolioStyles.activeTab,
+            ]}
+            onPress={() => setActiveTab('tokens')}
+          >
+            <Text
+              style={[
+                portfolioStyles.tabText,
+                activeTab === 'tokens' && portfolioStyles.activeTabText
+              ]}
+            >
+              Tokens
+            </Text>
+            {tokens.length > 0 && (
+              <View style={portfolioStyles.badgeContainer}>
+                <Text style={portfolioStyles.badgeText}>{tokens.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              portfolioStyles.tab,
+              activeTab === 'nfts' && portfolioStyles.activeTab,
+            ]}
+            onPress={() => setActiveTab('nfts')}
+          >
+            <Text
+              style={[
+                portfolioStyles.tabText,
+                activeTab === 'nfts' && portfolioStyles.activeTabText
+              ]}
+            >
+              NFTs
+            </Text>
+            {regularNfts.length > 0 && (
+              <View style={portfolioStyles.badgeContainer}>
+                <Text style={portfolioStyles.badgeText}>{regularNfts.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              portfolioStyles.tab,
+              activeTab === 'cnfts' && portfolioStyles.activeTab,
+            ]}
+            onPress={() => setActiveTab('cnfts')}
+          >
+            <Text
+              style={[
+                portfolioStyles.tabText,
+                activeTab === 'cnfts' && portfolioStyles.activeTabText
+              ]}
+            >
+              cNFTs
+            </Text>
+            {compressedNfts.length > 0 && (
+              <View style={portfolioStyles.badgeContainer}>
+                <Text style={portfolioStyles.badgeText}>{compressedNfts.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Render the appropriate content based on selected tab */}
+        {renderItems()}
+      </ScrollView>
+
+      {/* TokenDetailsDrawer */}
+      {selectedAsset && (
+        <TokenDetailsDrawer
+          visible={showDetailsDrawer}
+          onClose={() => {
+            setShowDetailsDrawer(false);
+            setDetailedNftData(null); // Clear the detailed data when drawer closes
+          }}
+          tokenMint={selectedAsset.mint || selectedAsset.id || 'unknown-token'}
+          initialData={getInitialData()}
+          loading={drawerLoading}
+        />
+      )}
+    </>
   );
 };
 
@@ -583,7 +764,7 @@ const portfolioStyles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 20,
   },
-  
+
   // Tab styles
   tabContainer: {
     flexDirection: 'row',
@@ -631,7 +812,7 @@ const portfolioStyles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
   },
-  
+
   // Token list styles
   tokenListItem: {
     flexDirection: 'row',
@@ -708,7 +889,7 @@ const portfolioStyles = StyleSheet.create({
     backgroundColor: '#f0f2f5',
     marginLeft: 60,
   },
-  
+
   // Section styles
   sectionContainer: {
     marginBottom: 24,
@@ -726,7 +907,7 @@ const portfolioStyles = StyleSheet.create({
   columnWrapper: {
     justifyContent: 'space-between',
   },
-  
+
   // Item styles
   itemContainer: {
     marginBottom: 16,
@@ -780,7 +961,7 @@ const portfolioStyles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#AAB8C2',
   },
-  
+
   // Badges
   compressedBadge: {
     position: 'absolute',
@@ -812,7 +993,7 @@ const portfolioStyles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
   },
-  
+
   // Item details
   itemDetails: {
     padding: 8,
@@ -831,7 +1012,7 @@ const portfolioStyles = StyleSheet.create({
     fontSize: 12,
     color: '#657786',
   },
-  
+
   // SOL Balance
   solBalanceContainer: {
     margin: 16,
@@ -856,7 +1037,7 @@ const portfolioStyles = StyleSheet.create({
     fontWeight: '600',
     color: '#14171a',
   },
-  
+
   // Loading state
   loadingContainer: {
     flex: 1,
@@ -870,7 +1051,7 @@ const portfolioStyles = StyleSheet.create({
     color: '#657786',
     textAlign: 'center',
   },
-  
+
   // Error state
   errorContainer: {
     flex: 1,
@@ -884,7 +1065,7 @@ const portfolioStyles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
-  
+
   // Empty states
   emptyContainer: {
     flex: 1,
@@ -913,7 +1094,7 @@ const portfolioStyles = StyleSheet.create({
     color: '#657786',
     textAlign: 'center',
   },
-  
+
   // Buttons
   retryButton: {
     backgroundColor: '#1d9bf0',

@@ -20,6 +20,7 @@ import { AssetItem, useFetchPortfolio, fixImageUrl } from '../../../../hooks/use
 import { useAppSelector } from '../../../../hooks/useReduxHooks';
 import { useAuth } from '../../../../hooks/useAuth';
 import TradeModal from '../../../thread/components/trade/TradeModal';
+import TokenDetailsDrawer from '../../../../components/Common/TokenDetailsDrawer/TokenDetailsDrawer';
 
 /**
  * Define props for the BuyCard
@@ -244,6 +245,9 @@ const BuyCard: React.FC<BuyCardProps> = ({
 }) => {
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
+  const [showTokenDetailsDrawer, setShowTokenDetailsDrawer] = useState(false);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
   const userName = useAppSelector(state => state.auth.username);
   const { solanaWallet } = useAuth();
@@ -297,6 +301,13 @@ const BuyCard: React.FC<BuyCardProps> = ({
       if (asset.token_info) {
         // You could implement this logic based on your requirements
       }
+    }
+  };
+
+  // Handle click on token image or name to view details
+  const handleTokenDetailsPress = () => {
+    if (tokenMint && !isPinYourCoin) {
+      setShowTokenDetailsDrawer(true);
     }
   };
 
@@ -371,12 +382,21 @@ const BuyCard: React.FC<BuyCardProps> = ({
       {/* Left section with image + name/desc */}
       <View style={cardStyles.contentContainer}>
         {renderBuyCardImage() && (
-          <View style={cardStyles.imgContainer}>
+          <TouchableOpacity
+            style={cardStyles.imgContainer}
+            activeOpacity={0.8}
+            onPress={!isPinYourCoin ? handleTokenDetailsPress : undefined}
+            disabled={isPinYourCoin}
+          >
             {renderBuyCardImage()}
-          </View>
+          </TouchableOpacity>
         )}
 
-        <View>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={!isPinYourCoin ? handleTokenDetailsPress : undefined}
+          disabled={isPinYourCoin}
+        >
           <Text
             style={{
               fontWeight: '500',
@@ -400,7 +420,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
               {isPinYourCoin ? description : 'Buy my Token'}
             </Text>
           )}
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* Right section: Buy button + optional arrow */}
@@ -592,6 +612,21 @@ const BuyCard: React.FC<BuyCardProps> = ({
           </View>
         </View>
       </Modal>
+
+      {/* Token Details Drawer */}
+      {tokenMint && !isPinYourCoin && (
+        <TokenDetailsDrawer
+          visible={showTokenDetailsDrawer}
+          onClose={() => setShowTokenDetailsDrawer(false)}
+          tokenMint={tokenMint}
+          initialData={{
+            symbol: cleanTokenName,
+            name: description || cleanTokenName,
+            logoURI: typeof tokenImage === 'string' ? fixImageUrl(tokenImage) : undefined,
+          }}
+          loading={drawerLoading}
+        />
+      )}
     </View>
   );
 };

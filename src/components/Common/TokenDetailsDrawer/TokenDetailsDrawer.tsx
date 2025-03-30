@@ -662,6 +662,8 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
             </View>
 
             <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Market Cap</Text>
+
               <Text style={[styles.statValue, styles.statValueText]}>
                 {formatLargeNumber(marketCap)}
               </Text>
