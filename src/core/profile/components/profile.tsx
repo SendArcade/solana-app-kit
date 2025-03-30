@@ -24,7 +24,7 @@ import {
   updateDescription,
 } from '../../../state/auth/reducer';
 import { fetchAllPosts } from '../../../state/thread/reducer';
-import { ThreadPost } from '../../../components/thread/thread.types';
+
 import { NftItem, useFetchNFTs } from '../../../hooks/useFetchNFTs';
 import { useWallet } from '../../../hooks/useWallet';
 import {
@@ -53,6 +53,7 @@ import {
   inlineConfirmStyles,
   editNameModalStyles,
 } from './profile.style';
+import { ThreadPost } from '../../thread/types';
 
 export default function Profile({
   isOwnProfile = false,
