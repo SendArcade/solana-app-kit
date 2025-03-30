@@ -5,12 +5,12 @@ import { useRoute, RouteProp, useNavigation, useFocusEffect } from '@react-navig
 import { RootStackParamList } from '../../../../navigation/RootNavigator';
 import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks';
 import Profile from '../../../../core/profile/components/profile';
-import { ThreadPost } from '../../../../components/thread/thread.types';
+import { ThreadPost } from '../../../../core/thread/components/thread.types';
 import { fetchAllPosts } from '../../../../state/thread/reducer';
 import { NftItem, useFetchNFTs } from '../../../../hooks/useFetchNFTs';
 import COLORS from '../../../../assets/colors';
 import { SERVER_URL } from '@env';
-import { flattenPosts } from '../../../../components/thread/thread.utils';
+import { flattenPosts } from '../../../../core/thread/components/thread.utils';
 
 const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 

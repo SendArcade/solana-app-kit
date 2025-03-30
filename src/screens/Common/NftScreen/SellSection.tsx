@@ -29,7 +29,7 @@ import {
 import { CLUSTER, HELIUS_API_KEY, HELIUS_RPC_URL, TENSOR_API_KEY } from '@env';
 import { sellStyles as styles } from './sellSection.styles';
 import { useDispatch } from 'react-redux';
-import { ThreadSection } from '../../../components/thread/thread.types';
+import { ThreadSection } from '../../../core/thread/components/thread.types';
 // import {addRootPost} from '../../../state/thread/reducer';
 import { fetchWithRetries } from '../../../utils/common/fetch';
 import { ENDPOINTS } from '../../../config/constants';

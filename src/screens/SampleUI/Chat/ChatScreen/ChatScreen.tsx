@@ -16,13 +16,15 @@ import { useSelector } from 'react-redux';
 import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks';
 import { fetchAllPosts } from '../../../../state/thread/reducer';
 import { RootState } from '../../../../state/store';
-import { ThreadPost, ThreadUser } from '../../../../components/thread/thread.types';
-import { PostBody, ThreadComposer } from '../../../../components/thread';
-import PostCTA from '../../../../components/thread/post/PostCTA';
-import RetweetPreview from '../../../../components/thread/retweet/RetweetPreview';
-import RetweetModal from '../../../../components/thread/retweet/RetweetModal';
+import { ThreadPost, ThreadUser } from '../../../../core/thread/components/thread.types';
+
+import PostCTA from '../../../../core/thread/components/post/PostCTA';
+import RetweetPreview from '../../../../core/thread/components/retweet/RetweetPreview';
+import RetweetModal from '../../../../core/thread/components/retweet/RetweetModal';
 import { styles, androidStyles, chatBodyOverrides } from './ChatScreen.styles';
 import { DEFAULT_IMAGES } from '../../../../config/constants';
+import PostBody from '../../../../core/thread/components/post/PostBody';
+import ThreadComposer from '../../../../core/thread/components/ThreadComposer';
 
 // Get screen width for responsive sizing
 const screenWidth = Dimensions.get('window').width;

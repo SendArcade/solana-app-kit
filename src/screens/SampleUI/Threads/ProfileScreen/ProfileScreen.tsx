@@ -2,10 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import Profile from '../../../../core/profile/components/profile';
 import { useAppSelector, useAppDispatch } from '../../../../hooks/useReduxHooks';
-import { ThreadPost } from '../../../../components/thread/thread.types';
+import { ThreadPost } from '../../../../core/thread/components/thread.types';
 import { useFetchNFTs } from '../../../../hooks/useFetchNFTs';
 import { useWallet } from '../../../../hooks/useWallet';
-import { flattenPosts } from '../../../../components/thread/thread.utils';
+import { flattenPosts } from '../../../../core/thread/components/thread.utils';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchFollowers, fetchFollowing } from '../../../../services/profileService';
 

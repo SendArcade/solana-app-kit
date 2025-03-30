@@ -1,5 +1,5 @@
 // FILE: src/mocks/allposts.ts
-import {ThreadPost} from '../components/thread/thread.types';
+import {ThreadPost} from '../core/thread/components/thread.types';
 
 export const allposts: ThreadPost[] = [
   // ====== Example Post 1: Simple text-only ======

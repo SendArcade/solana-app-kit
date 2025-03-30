@@ -13,7 +13,7 @@ import {
   ImageSourcePropType,
 } from 'react-native';
 import Icon from '../../../assets/svgs/index';
-import { getMergedTheme } from '../../thread/thread.styles';
+import { getMergedTheme } from '../../../core/thread/components/thread.styles';
 import styles from './TradeCard.style';
 import { useCoingecko, Timeframe } from '../../../hooks/useCoingecko';
 import LineGraph from './LineGraph';
@@ -138,17 +138,17 @@ function TradeCard({
     ) {
       return; // Already fetched this pair and completed
     }
-    
+
     let canceled = false;
     setLoadingMeta(true);
-    
+
     try {
       // Fetch both input and output token data
       const [inMeta, outMeta] = await Promise.all([
         fetchJupiterTokenData(tradeData.inputMint),
         fetchJupiterTokenData(tradeData.outputMint)
       ]);
-      
+
       if (!canceled) {
         setInputTokenMeta(inMeta);
         setOutputTokenMeta(outMeta);
@@ -157,7 +157,7 @@ function TradeCard({
           outputMint: tradeData.outputMint,
         };
         setMetaFetchFinished(true);
-        
+
         // If user wants a chart & there's a coingeckoId => set it & fetch data immediately
         if (showGraphForOutputToken && outMeta?.extensions?.coingeckoId) {
           setSelectedCoinId(outMeta.extensions.coingeckoId.toLowerCase());
@@ -171,7 +171,7 @@ function TradeCard({
     } finally {
       if (!canceled) setLoadingMeta(false);
     }
-    
+
     return () => {
       canceled = true;
     };
@@ -182,8 +182,8 @@ function TradeCard({
   // --------------------------------------------------
   const fetchTokenPrices = useCallback(async (inputMeta: any, outputMeta: any) => {
     // Skip if we already have USD values in the trade data
-    if (tradeData.inputUsdValue && tradeData.outputUsdValue && 
-        tradeData.inputUsdValue !== '$??' && tradeData.outputUsdValue !== '$??') {
+    if (tradeData.inputUsdValue && tradeData.outputUsdValue &&
+      tradeData.inputUsdValue !== '$??' && tradeData.outputUsdValue !== '$??') {
       return;
     }
 
@@ -258,7 +258,7 @@ function TradeCard({
         `https://api.coingecko.com/api/v3/simple/price?ids=${symbol.toLowerCase()}&vs_currencies=usd`
       );
       const data = await response.json();
-      
+
       if (data[symbol.toLowerCase()] && data[symbol.toLowerCase()].usd) {
         if (type === 'input') {
           setInputUsdPrice(data[symbol.toLowerCase()].usd);
@@ -301,7 +301,7 @@ function TradeCard({
     if (externalRefreshTrigger !== prevRefreshTriggerRef.current) {
       prevRefreshTriggerRef.current = externalRefreshTrigger;
       refreshCoinData();
-      
+
       // Also refresh token prices when external trigger changes
       fetchTokenPrices(inputTokenMeta, outputTokenMeta);
     }
@@ -317,12 +317,12 @@ function TradeCard({
   // --------------------------------------------------
   // Calculate USD values from prices and quantities - MEMOIZED
   // --------------------------------------------------
-  const { 
+  const {
     calculatedInputUsdValue,
     calculatedOutputUsdValue,
     currentOutputValue,
-    executionPrice, 
-    executionTimestamp 
+    executionPrice,
+    executionTimestamp
   } = useMemo(() => {
     let executionPrice: number | undefined;
     let calculatedInputUsdValue = '';
@@ -353,7 +353,7 @@ function TradeCard({
     if (outputUsdPrice !== null && tradeData.outputQuantity) {
       const outputQty = parseFloat(tradeData.outputQuantity);
       calculatedOutputUsdValue = `$${(outputQty * outputUsdPrice).toFixed(2)}`;
-      
+
       // Calculate current value of output tokens (may differ from trade time)
       currentOutputValue = `$${(outputQty * outputUsdPrice).toFixed(2)}`;
     }
@@ -376,30 +376,30 @@ function TradeCard({
   // --------------------------------------------------
   const priceDifference = useMemo(() => {
     if (!tradeData.outputUsdValue || !currentOutputValue) return null;
-    
+
     // Skip if we're using placeholders or empty values
     if (
-      tradeData.outputUsdValue === '$??' || 
-      tradeData.outputUsdValue === '' || 
+      tradeData.outputUsdValue === '$??' ||
+      tradeData.outputUsdValue === '' ||
       currentOutputValue === ''
     ) {
       return null;
     }
-    
+
     try {
       // Parse values, removing the $ prefix
       const tradeValueStr = tradeData.outputUsdValue.replace('$', '').replace('~', '');
       const currentValueStr = currentOutputValue.replace('$', '');
-      
+
       const tradeValue = parseFloat(tradeValueStr);
       const currentValueNum = parseFloat(currentValueStr);
-      
+
       if (isNaN(tradeValue) || isNaN(currentValueNum) || tradeValue === 0) {
         return null;
       }
-      
+
       const percentChange = ((currentValueNum - tradeValue) / tradeValue) * 100;
-      
+
       return {
         percentChange,
         isPositive: percentChange > 0,
@@ -414,11 +414,11 @@ function TradeCard({
   // --------------------------------------------------
   // Fallback name/logo from Jupiter metadata - MEMOIZED
   // --------------------------------------------------
-  const { 
-    fallbackInName, 
-    fallbackInLogo, 
-    fallbackOutName, 
-    fallbackOutLogo 
+  const {
+    fallbackInName,
+    fallbackInLogo,
+    fallbackOutName,
+    fallbackOutLogo
   } = useMemo(() => {
     // Use token metadata if available, otherwise fallback to tradeData symbols
     return {
@@ -428,9 +428,9 @@ function TradeCard({
       fallbackOutLogo: outputTokenMeta?.logoURI ?? '',
     };
   }, [
-    inputTokenMeta, 
-    outputTokenMeta, 
-    tradeData.inputSymbol, 
+    inputTokenMeta,
+    outputTokenMeta,
+    tradeData.inputSymbol,
     tradeData.outputSymbol
   ]);
 
@@ -456,7 +456,7 @@ function TradeCard({
   // --------------------------------------------------
   const isOutputChartMode = !!showGraphForOutputToken;
   const isLoading = loadingMeta || loadingOHLC;
-  
+
   if (isOutputChartMode) {
     return (
       <>
@@ -470,7 +470,7 @@ function TradeCard({
               <Image
                 source={
                   fallbackOutLogo
-                    ? {uri: fallbackOutLogo}
+                    ? { uri: fallbackOutLogo }
                     : require('../../../assets/images/SENDlogo.png')
                 }
                 style={styles.tradeCardTokenImage}
@@ -483,13 +483,13 @@ function TradeCard({
               </View>
             </View>
             <View style={styles.tradeCardRightSide}>
-              <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
+              <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
                 {tradeData.outputQuantity + ' ' + tradeData.outputSymbol}
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={styles.tradeCardUsdPrice}>
-                  {tradeData.outputUsdValue && tradeData.outputUsdValue !== '$??' 
-                    ? tradeData.outputUsdValue 
+                  {tradeData.outputUsdValue && tradeData.outputUsdValue !== '$??'
+                    ? tradeData.outputUsdValue
                     : calculatedOutputUsdValue}
                 </Text>
                 {priceDifference && (
@@ -544,7 +544,7 @@ function TradeCard({
               onPress={handleRefresh}
               accessibilityLabel="Refresh Chart">
               <Icon.SwapIcon width={20} height={20} />
-              <Text style={{color: '#1d9bf0', marginLeft: 4}}>Refresh</Text>
+              <Text style={{ color: '#1d9bf0', marginLeft: 4 }}>Refresh</Text>
             </TouchableOpacity>
           </View>
 
@@ -593,9 +593,9 @@ function TradeCard({
                         marginRight: 4,
                       }}
                     />
-                    <Text style={{fontSize: 10}}>Current</Text>
+                    <Text style={{ fontSize: 10 }}>Current</Text>
                   </View>
-                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <View
                       style={{
                         width: 8,
@@ -605,16 +605,16 @@ function TradeCard({
                         marginRight: 4,
                       }}
                     />
-                    <Text style={{fontSize: 10}}>Trade Execution</Text>
+                    <Text style={{ fontSize: 10 }}>Trade Execution</Text>
                   </View>
                 </View>
               </>
             ) : coinError ? (
-              <Text style={{color: 'red', marginTop: 6}}>
+              <Text style={{ color: 'red', marginTop: 6 }}>
                 Error: {coinError.toString()}
               </Text>
             ) : (
-              <Text style={{color: '#999', marginTop: 6}}>
+              <Text style={{ color: '#999', marginTop: 6 }}>
                 No chart data found. Try a different timeframe or refresh.
               </Text>
             )}
@@ -664,12 +664,12 @@ function TradeCard({
     <>
       <View style={styles.tradeCardContainer}>
         {loadingMeta ? (
-          <View style={{alignItems: 'center', justifyContent: 'center'}}>
+          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator size="small" color="#1d9bf0" />
           </View>
         ) : (
           <>
-            <View style={{position: 'relative'}}>
+            <View style={{ position: 'relative' }}>
               {/* Input token info */}
               <TouchableOpacity
                 style={styles.tradeCardCombinedSides}
@@ -679,7 +679,7 @@ function TradeCard({
                   <Image
                     source={
                       fallbackInLogo
-                        ? {uri: fallbackInLogo}
+                        ? { uri: fallbackInLogo }
                         : require('../../../assets/images/SENDlogo.png')
                     }
                     style={styles.tradeCardTokenImage}
@@ -689,19 +689,19 @@ function TradeCard({
                       {fallbackInName}
                     </Text>
                     <Text style={styles.tradeCardTokenPrice}>
-                      {tradeData.inputUsdValue && tradeData.inputUsdValue !== '$??' 
-                        ? tradeData.inputUsdValue 
+                      {tradeData.inputUsdValue && tradeData.inputUsdValue !== '$??'
+                        ? tradeData.inputUsdValue
                         : calculatedInputUsdValue}
                     </Text>
                   </View>
                 </View>
                 <View style={styles.tradeCardRightSide}>
-                  <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
+                  <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
                     {tradeData.inputQuantity}
                   </Text>
                   <Text style={styles.tradeCardUsdPrice}>
-                    {tradeData.inputUsdValue && tradeData.inputUsdValue !== '$??' 
-                      ? tradeData.inputUsdValue 
+                    {tradeData.inputUsdValue && tradeData.inputUsdValue !== '$??'
+                      ? tradeData.inputUsdValue
                       : calculatedInputUsdValue}
                   </Text>
                 </View>
@@ -721,7 +721,7 @@ function TradeCard({
                   <Image
                     source={
                       fallbackOutLogo
-                        ? {uri: fallbackOutLogo}
+                        ? { uri: fallbackOutLogo }
                         : require('../../../assets/images/SENDlogo.png')
                     }
                     style={styles.tradeCardTokenImage}
@@ -731,20 +731,20 @@ function TradeCard({
                       {fallbackOutName}
                     </Text>
                     <Text style={styles.tradeCardTokenPrice}>
-                      {tradeData.outputUsdValue && tradeData.outputUsdValue !== '$??' 
-                        ? tradeData.outputUsdValue 
+                      {tradeData.outputUsdValue && tradeData.outputUsdValue !== '$??'
+                        ? tradeData.outputUsdValue
                         : calculatedOutputUsdValue}
                     </Text>
                   </View>
                 </View>
                 <View style={styles.tradeCardRightSide}>
-                  <Text style={[styles.tradeCardSolPrice, {color: '#00C851'}]}>
+                  <Text style={[styles.tradeCardSolPrice, { color: '#00C851' }]}>
                     {tradeData.outputQuantity + ' ' + tradeData.outputSymbol}
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={styles.tradeCardUsdPrice}>
-                      {tradeData.outputUsdValue && tradeData.outputUsdValue !== '$??' 
-                        ? tradeData.outputUsdValue 
+                      {tradeData.outputUsdValue && tradeData.outputUsdValue !== '$??'
+                        ? tradeData.outputUsdValue
                         : calculatedOutputUsdValue}
                     </Text>
                     {priceDifference && (
@@ -773,12 +773,12 @@ function TradeCard({
                   alignItems: 'center',
                 }}
                 onPress={onTrade}>
-                <Text style={{color: '#fff', fontWeight: 'bold'}}>
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>
                   Trade Now
                 </Text>
               </TouchableOpacity>
             )}
-            
+
             {/* Current Price Indicator (in non-chart mode) */}
             {outputUsdPrice !== null && tradeData.outputQuantity && !showGraphForOutputToken && (
               <View style={{
@@ -856,7 +856,7 @@ function arePropsEqual(prev: TradeCardProps, next: TradeCardProps) {
   // Deep compare tradeData objects
   const p = prev.tradeData;
   const n = next.tradeData;
-  
+
   if (
     p.inputMint !== n.inputMint ||
     p.outputMint !== n.outputMint ||
@@ -872,17 +872,17 @@ function arePropsEqual(prev: TradeCardProps, next: TradeCardProps) {
   ) {
     return false;
   }
-  
+
   // Compare theme and style references
   if (prev.themeOverrides !== next.themeOverrides) return false;
   if (prev.styleOverrides !== next.styleOverrides) return false;
   if (prev.userStyleSheet !== next.userStyleSheet) return false;
-  
+
   // If avatar is a string (URI), compare as string
   if (typeof prev.userAvatar === 'string' || typeof next.userAvatar === 'string') {
     return prev.userAvatar === next.userAvatar;
   }
-  
+
   // Otherwise compare avatar references
   return prev.userAvatar === next.userAvatar;
 }

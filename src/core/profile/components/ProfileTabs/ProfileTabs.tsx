@@ -17,11 +17,15 @@ import ActionsPage from '../actions/ActionsPage';
 
 import Icons from '../../../../assets/svgs';
 import { AssetItem, PortfolioData } from '../../../../hooks/useFetchTokens';
-import { ThreadPost } from '../../../../components/thread/thread.types';
-import { PostBody, PostFooter, PostHeader } from '../../../../components/thread';
+
 import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks';
 import { deletePostAsync } from '../../../../state/thread/reducer';
 import { ProfileTabsProps } from '../../types';
+import { ThreadPost } from '../../../thread/types';
+import PostHeader from '../../../thread/components/post/PostHeader';
+import PostBody from '../../../thread/components/post/PostBody';
+import PostFooter from '../../../thread/components/post/PostFooter';
+
 
 // Loading placeholder for lazy-loaded tabs
 const LoadingPlaceholder = memo(() => (
