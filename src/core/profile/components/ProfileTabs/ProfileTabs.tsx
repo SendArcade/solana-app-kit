@@ -1,6 +1,6 @@
 // FILE: src/components/Profile/ProfileTabs/ProfileTabs.tsx
 
-import React, {memo, useState, useMemo, useCallback} from 'react';
+import React, { memo, useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,38 +8,24 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import {TabView, SceneMap, TabBar} from 'react-native-tab-view';
-import {ThreadPost} from '../../thread/thread.types';
-import Collectibles, {NftItem} from '../collectibles/collectibles';
-import {PostHeader, PostBody, PostFooter} from '../../thread';
-import {styles, tabBarStyles, retweetStyles} from './ProfileTabs.style';
-import ActionsPage from '../actions/ActionsPage';
-import {useAppDispatch, useAppSelector} from '../../../hooks/useReduxHooks';
-import {deletePostAsync} from '../../../state/thread/reducer';
-import {AssetItem, PortfolioData} from '../../../hooks/useFetchTokens';
-import Icons from '../../../assets/svgs';
+import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 
-/**
- * Props for the profile tab content component
- */
-export interface ProfileTabsProps {
-  myPosts: ThreadPost[];
-  myNFTs: NftItem[];
-  loadingNfts?: boolean;
-  fetchNftsError?: string | null;
-  myActions: any[];
-  loadingActions?: boolean;
-  fetchActionsError?: string | null;
-  onPressPost?: (post: ThreadPost) => void;
-  portfolioData?: PortfolioData;
-  onRefreshPortfolio?: () => void;
-  refreshingPortfolio?: boolean;
-  onAssetPress?: (asset: AssetItem) => void;
-}
+import Collectibles, { NftItem } from '../collectibles/collectibles';
+
+import { styles, tabBarStyles, retweetStyles } from './ProfileTabs.style';
+import ActionsPage from '../actions/ActionsPage';
+
+import Icons from '../../../../assets/svgs';
+import { AssetItem, PortfolioData } from '../../../../hooks/useFetchTokens';
+import { ThreadPost } from '../../../../components/thread/thread.types';
+import { PostBody, PostFooter, PostHeader } from '../../../../components/thread';
+import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks';
+import { deletePostAsync } from '../../../../state/thread/reducer';
+import { ProfileTabsProps } from '../../types';
 
 // Loading placeholder for lazy-loaded tabs
 const LoadingPlaceholder = memo(() => (
-  <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
     <ActivityIndicator size="large" color="#1d9bf0" />
   </View>
 ));
@@ -72,7 +58,7 @@ const PostItem = memo(({
   const isReply = !!post.parentId;
   const isRetweet = !!post.retweetOf;
   const isQuoteRetweet = isRetweet && post.sections && post.sections.length > 0;
-  
+
   return (
     <View style={styles.postCard}>
       {isReply ? (
@@ -81,7 +67,7 @@ const PostItem = memo(({
           <Text style={styles.replyLabel}>Reply Post</Text>
         </TouchableOpacity>
       ) : null}
-      
+
       {/* Retweet indicator */}
       {isRetweet && (
         <View style={retweetStyles.retweetHeader}>
@@ -105,7 +91,7 @@ const PostItem = memo(({
               ))}
             </View>
           )}
-          
+
           {/* Original post content */}
           {post.retweetOf && (
             <TouchableOpacity
@@ -121,7 +107,7 @@ const PostItem = memo(({
                 post={post.retweetOf}
                 externalRefreshTrigger={externalRefreshTrigger}
               />
-              <PostFooter 
+              <PostFooter
                 post={post.retweetOf}
                 onPressComment={() => onPressPost?.(post.retweetOf!)}
               />
@@ -163,7 +149,7 @@ const PostsTab = memo(({
 }) => {
   const dispatch = useAppDispatch();
   const userWallet = useAppSelector(state => state.auth.address);
-  
+
   const handleDeletePost = useCallback((post: ThreadPost) => {
     if (post.user.id !== userWallet) {
       alert('You are not the owner of this post.');
@@ -185,8 +171,8 @@ const PostsTab = memo(({
     return <EmptyPostsState />;
   }
 
-  const renderPost = useCallback(({item}: {item: ThreadPost}) => (
-    <PostItem 
+  const renderPost = useCallback(({ item }: { item: ThreadPost }) => (
+    <PostItem
       post={item}
       onPressPost={onPressPost}
       onDeletePost={handleDeletePost}
@@ -233,7 +219,7 @@ const PortfolioTab = memo(({
   onAssetPress?: (asset: AssetItem) => void;
 }) => {
   // Prioritize portfolio data if available
-  const hasPortfolioData = useMemo(() => 
+  const hasPortfolioData = useMemo(() =>
     portfolioData?.items && portfolioData.items.length > 0,
     [portfolioData?.items]
   );
@@ -307,9 +293,9 @@ function ProfileTabs({
   // Tab navigation state
   const [index, setIndex] = useState<number>(0);
   const [routes] = useState([
-    {key: 'posts', title: 'Posts'},
-    {key: 'portfolio', title: 'Portfolio'},
-    {key: 'actions', title: 'Actions'},
+    { key: 'posts', title: 'Posts' },
+    { key: 'portfolio', title: 'Portfolio' },
+    { key: 'actions', title: 'Actions' },
   ]);
 
   // Refresh counter for posts tab charts
@@ -329,7 +315,7 @@ function ProfileTabs({
     onPressPost,
     externalRefreshTrigger: refreshCounter,
   }), [myPosts, onPressPost, refreshCounter]);
-  
+
   const portfolioSceneData = useMemo(() => ({
     nfts: myNFTs,
     loading: loadingNfts,
@@ -347,7 +333,7 @@ function ProfileTabs({
     refreshingPortfolio,
     onAssetPress,
   ]);
-  
+
   const actionsSceneData = useMemo(() => ({
     myActions,
     loadingActions,
@@ -395,12 +381,12 @@ function ProfileTabs({
   ), []);
 
   // Memoize the initial layout to prevent recalculation
-  const initialLayout = useMemo(() => ({width: 300, height: 300}), []);
+  const initialLayout = useMemo(() => ({ width: 300, height: 300 }), []);
 
   return (
     <View style={styles.tabView}>
       <TabView
-        navigationState={{index, routes}}
+        navigationState={{ index, routes }}
         renderScene={renderScene}
         onIndexChange={handleIndexChange}
         renderTabBar={renderTabBar}
@@ -420,7 +406,7 @@ function ProfileTabs({
 const MemoizedProfileTabs = memo(ProfileTabs, (prevProps, nextProps) => {
   // Compare post arrays by length and IDs
   if (prevProps.myPosts.length !== nextProps.myPosts.length) return false;
-  
+
   // Only check post IDs if lengths match - to avoid unnecessary iteration
   for (let i = 0; i < prevProps.myPosts.length; i++) {
     if (prevProps.myPosts[i].id !== nextProps.myPosts[i].id) {
@@ -437,11 +423,11 @@ const MemoizedProfileTabs = memo(ProfileTabs, (prevProps, nextProps) => {
   if (prevProps.fetchNftsError !== nextProps.fetchNftsError) return false;
   if (prevProps.loadingActions !== nextProps.loadingActions) return false;
   if (prevProps.fetchActionsError !== nextProps.fetchActionsError) return false;
-  
+
   // Check portfolio data
   if (prevProps.portfolioData !== nextProps.portfolioData) return false;
   if (prevProps.refreshingPortfolio !== nextProps.refreshingPortfolio) return false;
-  
+
   // Compare callbacks by reference
   if (prevProps.onPressPost !== nextProps.onPressPost) return false;
   if (prevProps.onRefreshPortfolio !== nextProps.onRefreshPortfolio) return false;

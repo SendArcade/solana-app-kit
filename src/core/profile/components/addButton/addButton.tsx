@@ -10,17 +10,17 @@ import {
   Alert,
 } from 'react-native';
 import { styles } from './addButton.style';
-import Icons from '../../../assets/svgs/index';
-import { useAppSelector, useAppDispatch } from '../../../hooks/useReduxHooks';
+import Icons from '../../../../assets/svgs/index';
+import { useAppSelector, useAppDispatch } from '../../../../hooks/useReduxHooks';
 import { Cluster, Connection, clusterApiUrl, PublicKey } from '@solana/web3.js';
-import { sendSOL } from '../../../utils/transactions/transactionUtils';
-import { useWallet } from '../../../hooks/useWallet';
+import { sendSOL } from '../../../../utils/transactions/transactionUtils';
+import { useWallet } from '../../../../hooks/useWallet';
 import {
   setSelectedFeeTier as setFeeTier,
   setTransactionMode as setMode
-} from '../../../state/transaction/reducer';
+} from '../../../../state/transaction/reducer';
 import { CLUSTER } from '@env';
-import { TransactionService } from '../../../services/transaction/transactionService';
+import { TransactionService } from '../../../../services/transaction/transactionService';
 
 export interface AddButtonProps {
   amIFollowing: boolean;

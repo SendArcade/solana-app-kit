@@ -4,7 +4,7 @@ import { View, StyleSheet, Platform, Alert, ActivityIndicator, Text } from 'reac
 import { useRoute, RouteProp, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../../../../navigation/RootNavigator';
 import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks';
-import Profile from '../../../../components/Profile/profile';
+import Profile from '../../../../core/profile/components/profile';
 import { ThreadPost } from '../../../../components/thread/thread.types';
 import { fetchAllPosts } from '../../../../state/thread/reducer';
 import { NftItem, useFetchNFTs } from '../../../../hooks/useFetchNFTs';
@@ -141,15 +141,15 @@ export default function OtherProfileScreen() {
     try {
       // Use the flattenPosts utility to get all posts including nested replies
       const flattenedPosts = flattenPosts(allPosts);
-      
+
       // Filter for posts by this user
       const userPosts = flattenedPosts.filter(
         (p: ThreadPost) => p.user?.id?.toLowerCase() === userId.toLowerCase()
       );
-      
+
       // Sort by creation date, newest first
       userPosts.sort((a: ThreadPost, b: ThreadPost) => (new Date(b.createdAt) > new Date(a.createdAt) ? 1 : -1));
-      
+
       setMyPosts(userPosts);
     } catch (error) {
       console.error('Error filtering posts:', error);

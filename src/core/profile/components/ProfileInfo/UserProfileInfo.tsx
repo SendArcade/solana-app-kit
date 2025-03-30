@@ -8,73 +8,19 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import { findMentioned } from '../../../utils/common/findMentioned';
+import { findMentioned } from '../../../../utils/common/findMentioned';
 import AddButton from '../addButton/addButton';
 import BuyCard from '../buyCard/buyCard';
-import ProfileIcons from '../../../assets/svgs/index';
+import ProfileIcons from '../../../../assets/svgs/index';
 import { styles } from './UserProfileInfo.style';
-import { useAppDispatch } from '../../../hooks/useReduxHooks';
+import { useAppDispatch } from '../../../../hooks/useReduxHooks';
 import {
   attachCoinToProfile,
   removeAttachedCoin,
-} from '../../../state/auth/reducer';
+} from '../../../../state/auth/reducer';
 import { tokenModalStyles } from './profileInfoTokenModal.style';
-import COLORS from '../../../assets/colors';
-
-/**
- * Represents the props for the UserProfileInfo component.
- */
-export interface UserProfileInfoProps {
-  /** The user's profile picture URL */
-  profilePicUrl: string;
-  /** The user's current display name */
-  username: string;
-  /** The user's Solana wallet address */
-  userWallet: string;
-  /** Whether this profile belongs to the current user (is own profile) */
-  isOwnProfile: boolean;
-  /** Callback when user taps the avatar image (e.g. pick a new avatar) */
-  onAvatarPress?: () => void;
-  /** Callback when user taps "Edit Profile" (open an edit name modal) */
-  onEditProfile?: () => void;
-  /** Optional short text describing the user's bio. We'll show mention highlighting. */
-  bioText?: string;
-  /** If the current user is following this user */
-  amIFollowing?: boolean;
-  /** If this user is following the current user */
-  areTheyFollowingMe?: boolean;
-  /** Called when we tap "Follow" or "Follow Back" */
-  onFollowPress?: () => void;
-  /** Called when we tap "Unfollow" */
-  onUnfollowPress?: () => void;
-  /** Follower count for display */
-  followersCount?: number;
-  /** Following count for display */
-  followingCount?: number;
-  /** If provided, pressing follower count triggers onPressFollowers */
-  onPressFollowers?: () => void;
-  /** If provided, pressing following count triggers onPressFollowing */
-  onPressFollowing?: () => void;
-  /**
-   * Attachment data from the DB. We specifically care about:
-   *  { coin?: {
-   *       mint: string;
-   *       symbol?: string;
-   *       name?: string;
-   *       image?: string;       // stored from Helius or user-provided
-   *       description?: string; // user-provided description
-   *  } }
-   */
-  attachmentData?: {
-    coin?: {
-      mint: string;
-      symbol?: string;
-      name?: string;
-      image?: string;
-      description?: string;
-    };
-  };
-}
+import COLORS from '../../../../assets/colors';
+import { UserProfileInfoProps } from '../../types';
 
 /**
  * TokenAttachModal - Component for the token attachment modal
@@ -307,7 +253,7 @@ const ProfileHeader = memo(({
           source={
             profilePicUrl
               ? { uri: profilePicUrl }
-              : require('../../../assets/images/User.png')
+              : require('../../../../assets/images/User.png')
           }
         />
       </TouchableOpacity>

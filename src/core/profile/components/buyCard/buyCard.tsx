@@ -13,12 +13,13 @@ import {
   ImageBackground
 } from 'react-native';
 import {styles as buyCardStyles} from './buyCard.style';
-import Icons from '../../../assets/svgs/index';
-import {DEFAULT_IMAGES} from '../../../config/constants';
-import TradeModal from '../../thread/trade/TradeModal';
-import {useAppSelector} from '../../../hooks/useReduxHooks';
-import {useAuth} from '../../../hooks/useAuth';
-import {AssetItem, useFetchPortfolio, fixImageUrl} from '../../../hooks/useFetchTokens';
+import Icons from '../../../../assets/svgs/index';
+import {DEFAULT_IMAGES} from '../../../../config/constants';
+
+import {AssetItem, useFetchPortfolio, fixImageUrl} from '../../../../hooks/useFetchTokens';
+import { useAppSelector } from '../../../../hooks/useReduxHooks';
+import { useAuth } from '../../../../hooks/useAuth';
+import TradeModal from '../../../../components/thread/trade/TradeModal';
 
 /**
  * Define props for the BuyCard
@@ -169,7 +170,7 @@ const PortfolioAssetItem: React.FC<{
     return (
       <View style={portfolioStyles.assetImageWrapper}>
         <Image
-          source={require('../../../assets/images/SENDlogo.png')}
+          source={require('../../../../assets/images/SENDlogo.png')}
           style={portfolioStyles.fallbackImage}
           resizeMode="cover"
         />
@@ -311,7 +312,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
         return (
           <View style={cardStyles.imgWrapper}>
             <Image
-              source={require('../../../assets/images/SENDlogo.png')}
+              source={require('../../../../assets/images/SENDlogo.png')}
               style={cardStyles.imgBackground}
               resizeMode="cover"
             />

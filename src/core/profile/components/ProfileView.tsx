@@ -5,58 +5,11 @@ import UserProfileInfo from './ProfileInfo/UserProfileInfo';
 import ProfileTabs from './ProfileTabs/ProfileTabs';
 
 import { styles as profileStyles } from './profile.style';
-import { ThreadPost } from '../thread/thread.types';
-import { NftItem } from '../../hooks/useFetchNFTs';
-import { AssetItem, PortfolioData } from '../../hooks/useFetchTokens';
-import COLORS from '../../assets/colors';
-
-export interface UserProfileData {
-  address: string;
-  profilePicUrl: string;
-  username: string;
-  description?: string;
-  // Attachment data with coin properties
-  attachmentData?: {
-    coin?: {
-      mint: string;
-      symbol?: string;
-      name?: string;
-      image?: string;
-      description?: string;
-    };
-  };
-}
-
-export interface ProfileViewProps {
-  isOwnProfile: boolean;
-  user: UserProfileData;
-  myPosts: ThreadPost[];
-  myNFTs: NftItem[];
-  loadingNfts: boolean;
-  fetchNftsError: string | null;
-  onAvatarPress?: () => void;
-  onEditProfile?: () => void;
-  amIFollowing?: boolean;
-  areTheyFollowingMe?: boolean;
-  onFollowPress?: () => void;
-  onUnfollowPress?: () => void;
-  followersCount?: number;
-  followingCount?: number;
-  onPressFollowers?: () => void;
-  onPressFollowing?: () => void;
-  onPressPost?: (post: ThreadPost) => void;
-  containerStyle?: StyleProp<ViewStyle>;
-  myActions: any[];
-  loadingActions: boolean;
-  fetchActionsError: string | null;
-  // Portfolio related props
-  portfolioData?: PortfolioData;
-  onRefreshPortfolio?: () => void;
-  refreshingPortfolio?: boolean;
-  onAssetPress?: (asset: AssetItem) => void;
-  // New loading state prop to prevent flickering
-  isLoading?: boolean;
-}
+import { ThreadPost } from '../../../components/thread/thread.types';
+import { NftItem } from '../../../hooks/useFetchNFTs';
+import { AssetItem, PortfolioData } from '../../../hooks/useFetchTokens';
+import COLORS from '../../../assets/colors';
+import { UserProfileData, ProfileViewProps } from '../types';
 
 // Pure component that only renders when props actually change
 const ProfileInfoMemo = memo(UserProfileInfo);
