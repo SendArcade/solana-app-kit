@@ -25,8 +25,7 @@ import { TENSOR_API_KEY } from '@env';
 import { useWallet } from '../../../hooks/useWallet';
 import TradeModal from './trade/TradeModal';
 import { DEFAULT_IMAGES } from '../../../config/constants';
-import { NftItem, useFetchNFTs } from '../../../hooks/useFetchNFTs';
-import NftListingModal from './NftListingModal';
+import { NftListingModal, useFetchNFTs, NftItem } from '../../../modules/nft';
 import { uploadThreadImage } from '../../../services/threadImageService';
 
 /**

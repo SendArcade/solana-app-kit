@@ -6,7 +6,7 @@ import MainTabs from './MainTabs';
 import ChatScreen from '../screens/SampleUI/Chat/ChatScreen/ChatScreen';
 import CoinDetailPage from '../screens/SampleUI/Threads/CoinDetailPage/CoinDetailPage';
 import BlinkScreen from '../screens/Common/BlinkScreen';
-import NftScreen from '../screens/Common/NftScreen/NftScreen';
+import NftScreen from '../modules/nft/screens/NftScreen';
 import IntroScreen from '../screens/Common/IntroScreen/IntroScreen';
 import LoginScreen from '../screens/Common/LoginScreen/LoginScreen';
 

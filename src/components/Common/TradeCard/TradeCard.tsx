@@ -549,76 +549,41 @@ function TradeCard({
           </View>
 
           {/* Chart container */}
-          <View
-            style={[
-              {
-                width: '100%',
-                height: 220,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#FFFFFF',
-              } as StyleProp<ViewStyle>,
-            ]}>
-            {isLoading ? (
-              <ActivityIndicator size="large" color="#1d9bf0" />
-            ) : graphData.length > 0 ? (
-              <>
-                <LineGraph
-                  data={graphData}
-                  width={Dimensions.get('window').width - 70}
-                  executionPrice={executionPrice}
-                  executionTimestamp={executionTimestamp}
-                  timestamps={timestamps}
-                  userAvatar={userAvatar}
-                />
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                    marginTop: 5,
-                    opacity: 0.7,
-                  }}>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      marginRight: 12,
-                    }}>
-                    <View
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 4,
-                        backgroundColor: '#318EF8',
-                        marginRight: 4,
-                      }}
-                    />
-                    <Text style={{ fontSize: 10 }}>Current</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 4,
-                        backgroundColor: '#FF5722',
-                        marginRight: 4,
-                      }}
-                    />
-                    <Text style={{ fontSize: 10 }}>Trade Execution</Text>
-                  </View>
-                </View>
-              </>
-            ) : coinError ? (
+          {coinError ? (
+            <View style={{
+              width: '100%',
+              height: 220,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#FFFFFF',
+            }}>
               <Text style={{ color: 'red', marginTop: 6 }}>
                 Error: {coinError.toString()}
               </Text>
-            ) : (
+            </View>
+          ) : graphData.length === 0 && !isLoading ? (
+            <View style={{
+              width: '100%',
+              height: 220,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#FFFFFF',
+            }}>
               <Text style={{ color: '#999', marginTop: 6 }}>
                 No chart data found. Try a different timeframe or refresh.
               </Text>
-            )}
-          </View>
+            </View>
+          ) : (
+            <LineGraph
+              data={graphData}
+              width={Dimensions.get('window').width - 100}
+              executionPrice={executionPrice}
+              executionTimestamp={executionTimestamp}
+              timestamps={timestamps}
+              userAvatar={userAvatar}
+              isLoading={isLoading}
+            />
+          )}
 
           {/* Current Price Indicator */}
           {timeframePrice > 0 && (

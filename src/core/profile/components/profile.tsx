@@ -25,7 +25,8 @@ import {
 } from '../../../state/auth/reducer';
 import { fetchAllPosts } from '../../../state/thread/reducer';
 
-import { NftItem, useFetchNFTs } from '../../../hooks/useFetchNFTs';
+import { useFetchNFTs } from '../../../modules/nft';
+import { NftItem } from '../../../modules/nft/types';
 import { useWallet } from '../../../hooks/useWallet';
 import {
   uploadProfileAvatar,

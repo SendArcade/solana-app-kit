@@ -1,23 +1,18 @@
-// FILE: src/hooks/useFetchNFTs.ts
-import {useState, useEffect} from 'react';
-import {fetchWithRetries, getRpcUrlForProvider} from '../utils/common/fetch';
-import {TENSOR_API_KEY} from '@env';
-import {fixImageUrl} from '../utils/common/fixUrl';
-import { ENDPOINTS } from '../config/constants';
+// FILE: src/modules/nft/hooks/useFetchNFTs.ts
+import { useState, useEffect } from 'react';
+import { fetchWithRetries } from '../../../utils/common/fetch';
+import { TENSOR_API_KEY } from '@env';
+import { ENDPOINTS } from '../../../config/constants';
+import { NftItem, FetchNFTsOptions } from '../types';
+import { fixImageUrl } from '../utils/imageUtils';
 
-export interface NftItem {
-  mint: string;
-  name: string;
-  image: string;
-  collection?: string;
-  isCompressed : boolean
-}
-
-interface FetchNFTsOptions {
-  providerType?: 'privy' | 'dynamic' | 'turnkey' | 'mwa' | null;
-  limit?: number;
-}
-
+/**
+ * Hook to fetch NFTs for a user's wallet
+ * 
+ * @param walletAddress The wallet address to fetch NFTs for
+ * @param options Optional configuration for fetching NFTs
+ * @returns Object containing NFTs, loading state, and error
+ */
 export function useFetchNFTs(
   walletAddress?: string, 
   options: FetchNFTsOptions = {}
@@ -71,7 +66,7 @@ export function useFetchNFTs(
               image: fixImageUrl(item.imageUri || ''),
               collection: item.slugDisplay || '',
               isCompressed: item.isCompressed || false
-            };
+            } as NftItem;
           })
           .filter(Boolean) as NftItem[];
           
@@ -95,5 +90,5 @@ export function useFetchNFTs(
     };
   }, [walletAddress, providerType]);
 
-  return {nfts, loading, error};
+  return { nfts, loading, error };
 }

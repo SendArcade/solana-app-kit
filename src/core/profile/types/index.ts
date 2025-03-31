@@ -196,7 +196,7 @@ export interface TransactionEvents {
 
 // Import needed types
 import { ThreadPost } from '../../../components/thread/thread.types';
-import { NftItem } from '../../../hooks/useFetchNFTs';
+import { NftItem } from '../../../modules/nft/hooks/useFetchNFTs';
 import { AssetItem, PortfolioData } from '../../../hooks/useFetchTokens';
 import { StyleProp, ViewStyle } from 'react-native';
 import { Action } from '../services/profileActions'; 

@@ -3,11 +3,11 @@ import { View } from 'react-native';
 import Profile from '../../../../core/profile/components/profile';
 import { useAppSelector, useAppDispatch } from '../../../../hooks/useReduxHooks';
 import { ThreadPost } from '../../../../core/thread/components/thread.types';
-import { useFetchNFTs } from '../../../../hooks/useFetchNFTs';
 import { useWallet } from '../../../../hooks/useWallet';
 import { flattenPosts } from '../../../../core/thread/components/thread.utils';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchFollowers, fetchFollowing } from '../../../../services/profileService';
+import { useFetchNFTs } from '../../../../modules/nft';
 
 export default function ProfileScreen() {
   // Get user data from Redux

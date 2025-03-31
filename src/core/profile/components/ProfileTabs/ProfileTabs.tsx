@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 
-import Collectibles, { NftItem } from '../collectibles/collectibles';
+// Import from the original location instead of the NFT module
+import Collectibles from '../collectibles/collectibles';
+import { NftItem } from '../../../../modules/nft/types';
 
 import { styles, tabBarStyles, retweetStyles } from './ProfileTabs.style';
 import ActionsPage from '../actions/ActionsPage';
