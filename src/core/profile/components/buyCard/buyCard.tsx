@@ -10,7 +10,8 @@ import {
   StyleSheet,
   Dimensions,
   ActivityIndicator,
-  ImageBackground
+  ImageBackground,
+  TextInput,
 } from 'react-native';
 import { styles as buyCardStyles } from './buyCard.style';
 import Icons from '../../../../assets/svgs/index';
@@ -21,6 +22,14 @@ import { useAppSelector } from '../../../../hooks/useReduxHooks';
 import { useAuth } from '../../../../hooks/useAuth';
 import TradeModal from '../../../thread/components/trade/TradeModal';
 import TokenDetailsDrawer from '../../../../components/Common/TokenDetailsDrawer/TokenDetailsDrawer';
+import NFTCollectionDrawer from '../../../../components/Common/NFTCollectionDrawer/NFTCollectionDrawer';
+
+// Import collection search functionality
+import { searchCollections } from '../../../../modules/nft/services/nftService';
+import { CollectionResult } from '../../../../modules/nft/types';
+import { buyCollectionFloor } from '../../../../modules/nft';
+import { useWallet } from '../../../../hooks/useWallet';
+import { TransactionService } from '../../../../services/transaction/transactionService';
 
 /**
  * Define props for the BuyCard
@@ -248,13 +257,23 @@ const BuyCard: React.FC<BuyCardProps> = ({
   const [showTokenDetailsDrawer, setShowTokenDetailsDrawer] = useState(false);
   const [drawerLoading, setDrawerLoading] = useState(false);
 
+  // States for NFT collection search and selection
+  const [collectionName, setCollectionName] = useState('');
+  const [searchResults, setSearchResults] = useState<CollectionResult[]>([]);
+  const [loadingSearch, setLoadingSearch] = useState(false);
+  const [selectedCollection, setSelectedCollection] = useState<CollectionResult | null>(null);
+  const [showNftCollectionDrawer, setShowNftCollectionDrawer] = useState(false);
+  const [nftLoading, setNftLoading] = useState(false);
+  const [nftStatusMsg, setNftStatusMsg] = useState('');
+
   const storedProfilePic = useAppSelector(state => state.auth.profilePicUrl);
   const userName = useAppSelector(state => state.auth.username);
   const { solanaWallet } = useAuth();
+  const { wallet, address, publicKey, sendTransaction } = useWallet();
 
   // For simplicity, using the first connected wallet
-  const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || null;
-  const effectiveWalletAddress = walletAddress || userPublicKey?.toString();
+  const userPublicKey = address || (solanaWallet?.wallets?.[0]?.publicKey?.toString() || '');
+  const effectiveWalletAddress = walletAddress || userPublicKey;
 
   // Fetch portfolio data when needed
   const { portfolio, loading, error } = useFetchPortfolio(
@@ -271,9 +290,143 @@ const BuyCard: React.FC<BuyCardProps> = ({
     avatar: storedProfilePic ? { uri: storedProfilePic } : DEFAULT_IMAGES.user,
   };
 
+  // Search collections functionality
+  const handleSearchCollections = async () => {
+    if (!collectionName.trim()) return;
+    setLoadingSearch(true);
+    setSearchResults([]);
+
+    try {
+      const results = await searchCollections(collectionName.trim());
+      setSearchResults(results);
+    } catch (err: any) {
+      console.error('Error searching collections:', err);
+      setSearchResults([]);
+    } finally {
+      setLoadingSearch(false);
+    }
+  };
+
+  // Handle selection of an NFT collection
+  const handleSelectCollection = (collection: CollectionResult) => {
+    console.log('Collection selected:', collection);
+
+    // Close the portfolio modal
+    setShowPortfolioModal(false);
+
+    // If onSelectAsset is provided, call it with the formatted collection as an asset
+    if (onSelectAsset) {
+      // Create a collection asset with a special description that marks it as a collection
+      const assetItem = {
+        mint: collection.collId,
+        name: collection.name,
+        image: collection.imageUri,
+        assetType: 'nft',
+        collection: {
+          name: collection.name,
+        },
+        // Adding metadata - This gets stored in tokenDesc
+        metadata: {
+          description: `NFT Collection: ${collection.description || collection.name}`
+        }
+      } as unknown as AssetItem;
+
+      onSelectAsset(assetItem);
+    }
+  };
+
+  // Is this item an NFT collection?
+  const isNftCollection = () => {
+    console.log('isNftCollection check:');
+    console.log('- description:', description);
+    console.log('- tokenName:', tokenName);
+    console.log('- tokenMint:', tokenMint);
+
+    // Known NFT collection names (lowercase for case-insensitive matching)
+    const knownNftCollections = [
+      'mad lads',
+      'okay bears',
+      'solana monkey business',
+      'clay friends',
+      'famous fox federation',
+      'smb gen3'
+    ];
+
+    // Hard-coded check for Mad Lads (exact match)
+    if (description === 'Mad Lads') {
+      console.log('Mad Lads detected via exact match!');
+      return true;
+    }
+
+    // Check description (case-insensitive)
+    if (description && knownNftCollections.includes(description.toLowerCase())) {
+      console.log(`Known collection detected in description: ${description}`);
+      return true;
+    }
+
+    // Check token name (case-insensitive)
+    if (tokenName && knownNftCollections.includes(tokenName.toLowerCase())) {
+      console.log(`Known collection detected in tokenName: ${tokenName}`);
+      return true;
+    }
+
+    // Check if any part contains "NFT" or "Collection"
+    const nftIndicators = ['nft', 'collection'];
+
+    if (
+      (description && nftIndicators.some(indicator => description.toLowerCase().includes(indicator))) ||
+      (tokenName && nftIndicators.some(indicator => tokenName.toLowerCase().includes(indicator))) ||
+      (tokenDesc && nftIndicators.some(indicator => tokenDesc.toLowerCase().includes(indicator)))
+    ) {
+      console.log('NFT indicator detected in text');
+      return true;
+    }
+
+    console.log('Not detected as NFT collection');
+    return false;
+  };
+
+  // Debug logs to check if the collection is being detected correctly
+  console.log('TokenName:', tokenName);
+  console.log('TokenDesc:', tokenDesc);
+  console.log('Description:', description);
+  console.log('Is NFT Collection?', isNftCollection());
+
   const handleBuyPress = () => {
-    // Open the trade modal
-    setShowTradeModal(true);
+    console.log('Buy button pressed');
+
+    // If external handler provided, use that instead
+    if (onBuyPress) {
+      onBuyPress();
+      return;
+    }
+
+    // First reset all modals
+    setShowTradeModal(false);
+    setShowTokenDetailsDrawer(false);
+    setShowNftCollectionDrawer(false);
+
+    // Direct check for Mad Lads - highest priority
+    if (description === 'Mad Lads' ||
+      (description && description.toLowerCase().includes('mad lads')) ||
+      (tokenName && tokenName.toLowerCase().includes('mad lads'))) {
+      console.log('Mad Lads directly detected, showing NFT Collection Drawer');
+      setShowNftCollectionDrawer(true);
+      return;
+    }
+
+    // Check if this is an NFT collection
+    const isNft = isNftCollection();
+    console.log('Is NFT collection?', isNft);
+
+    // Open the appropriate modal
+    if (isNft) {
+      console.log('Opening NFT Collection Drawer');
+      setShowNftCollectionDrawer(true);
+    } else {
+      console.log('Opening Trade Modal');
+      setShowTradeModal(true);
+    }
   };
 
   const handleArrowPress = () => {
@@ -307,7 +460,11 @@ const BuyCard: React.FC<BuyCardProps> = ({
   // Handle click on token image or name to view details
   const handleTokenDetailsPress = () => {
     if (tokenMint && !isPinYourCoin) {
-      setShowTokenDetailsDrawer(true);
+      if (isNftCollection()) {
+        setShowNftCollectionDrawer(true);
+      } else {
+        setShowTokenDetailsDrawer(true);
+      }
     }
   };
 
@@ -403,11 +560,11 @@ const BuyCard: React.FC<BuyCardProps> = ({
               fontSize: isPinYourCoin ? 16 : 15,
               color: isPinYourCoin ? '#1d9bf0' : '#000000',
             }}>
-            {isPinYourCoin ? tokenName : `Buy $${tokenName}`}
+            {isPinYourCoin ? tokenName : tokenName.length > 15 ? `Buy $${tokenName.substring(0, 12)}...` : `Buy $${tokenName}`}
           </Text>
           {tokenDesc ? (
             <Text style={{ fontWeight: '400', fontSize: 13, color: '#999999' }}>
-              {tokenDesc}
+              {tokenDesc.length > 20 ? `${tokenDesc.substring(0, 17)}...` : tokenDesc}
             </Text>
           ) : (
             <Text
@@ -417,18 +574,43 @@ const BuyCard: React.FC<BuyCardProps> = ({
                 color: '#666',
                 marginTop: 4,
               }}>
-              {isPinYourCoin ? description : 'Buy my Token'}
+              {isPinYourCoin ? description : description && description.length > 20 ? `${description.substring(0, 17)}...` : 'Buy my Token'}
             </Text>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* Right section: Buy button + optional arrow */}
+      {/* Right section: Buy buttons + optional arrow */}
       <View style={cardStyles.buyButtonContainer}>
         {!isPinYourCoin && (
-          <TouchableOpacity style={cardStyles.buyButton} onPress={handleBuyPress}>
-            <Text style={cardStyles.buyButtonText}>Buy</Text>
-          </TouchableOpacity>
+          <>
+            {/* Simple check - if it has a UUID-like tokenMint, it's an NFT collection */}
+            {tokenMint && tokenMint.includes('-') ? (
+              <TouchableOpacity
+                style={cardStyles.buyButton}
+                onPress={() => {
+                  console.log('NFT Buy button pressed, tokenMint:', tokenMint);
+                  setShowTradeModal(false);
+                  setShowTokenDetailsDrawer(false);
+                  setShowNftCollectionDrawer(true);
+                }}
+              >
+                <Text style={cardStyles.buyButtonText}>View NFT</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={cardStyles.buyButton}
+                onPress={() => {
+                  console.log('Token Buy button pressed, tokenMint:', tokenMint);
+                  setShowTradeModal(true);
+                  setShowTokenDetailsDrawer(false);
+                  setShowNftCollectionDrawer(false);
+                }}
+              >
+                <Text style={cardStyles.buyButtonText}>Buy</Text>
+              </TouchableOpacity>
+            )}
+          </>
         )}
 
         {/* Only show arrow if showDownArrow is true */}
@@ -576,37 +758,61 @@ const BuyCard: React.FC<BuyCardProps> = ({
                   </View>
                 )}
 
-                {/* NFTs Section */}
-                {regularNfts.length > 0 && (
-                  <View style={portfolioStyles.sectionContainer}>
-                    <Text style={portfolioStyles.sectionTitle}>NFTs</Text>
-                    <View style={portfolioStyles.assetsGrid}>
-                      {regularNfts.map(asset => (
-                        <PortfolioAssetItem
-                          key={asset.id || asset.mint}
-                          asset={asset}
-                          onSelect={handleSelectAsset}
-                        />
-                      ))}
-                    </View>
-                  </View>
-                )}
+                {/* NFT Collections Section with Search */}
+                <View style={portfolioStyles.sectionContainer}>
+                  <Text style={portfolioStyles.sectionTitle}>NFTs</Text>
 
-                {/* Compressed NFTs Section */}
-                {compressedNfts.length > 0 && (
-                  <View style={portfolioStyles.sectionContainer}>
-                    <Text style={portfolioStyles.sectionTitle}>Compressed NFTs</Text>
-                    <View style={portfolioStyles.assetsGrid}>
-                      {compressedNfts.map(asset => (
-                        <PortfolioAssetItem
-                          key={asset.id || asset.mint}
-                          asset={asset}
-                          onSelect={handleSelectAsset}
-                        />
+                  {/* Search Input */}
+                  <View style={portfolioStyles.searchContainer}>
+                    <TextInput
+                      style={portfolioStyles.searchInput}
+                      placeholder="Search collections..."
+                      placeholderTextColor="#999"
+                      value={collectionName}
+                      onChangeText={setCollectionName}
+                      onSubmitEditing={handleSearchCollections}
+                    />
+                    <TouchableOpacity
+                      style={portfolioStyles.searchButton}
+                      onPress={handleSearchCollections}>
+                      <Text style={portfolioStyles.searchButtonText}>Search</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Search Results or Loading State */}
+                  {loadingSearch ? (
+                    <View style={portfolioStyles.loadingContainer}>
+                      <ActivityIndicator size="small" color="#1d9bf0" />
+                      <Text style={portfolioStyles.loadingText}>Searching collections...</Text>
+                    </View>
+                  ) : searchResults.length > 0 ? (
+                    <View style={portfolioStyles.collectionGrid}>
+                      {searchResults.map(collection => (
+                        <TouchableOpacity
+                          key={collection.collId}
+                          style={portfolioStyles.collectionItem}
+                          onPress={() => handleSelectCollection(collection)}>
+                          <Image
+                            source={{ uri: collection.imageUri ? fixImageUrl(collection.imageUri) : '' }}
+                            style={portfolioStyles.collectionImage}
+                            resizeMode="cover"
+                          />
+                          <Text style={portfolioStyles.collectionName} numberOfLines={1}>
+                            {collection.name}
+                          </Text>
+                        </TouchableOpacity>
                       ))}
                     </View>
-                  </View>
-                )}
+                  ) : (
+                    <View style={portfolioStyles.emptyContainer}>
+                      <Text style={portfolioStyles.emptyText}>
+                        {collectionName.trim()
+                          ? 'No collections found. Try a different search term.'
+                          : 'Search for NFT collections to pin to your profile.'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </ScrollView>
             )}
           </View>
@@ -627,6 +833,23 @@ const BuyCard: React.FC<BuyCardProps> = ({
           loading={drawerLoading}
         />
       )}
+
+      {/* NFT Collection Drawer - Render in the main component view */}
+      <NFTCollectionDrawer
+        visible={showNftCollectionDrawer}
+        onClose={() => {
+          console.log('NFT Collection Drawer closed from parent');
+          setShowNftCollectionDrawer(false);
+        }}
+        collection={{
+          collId: tokenMint || '',
+          name: description || tokenName || 'NFT Collection',
+          image: typeof tokenImage === 'string'
+            ? fixImageUrl(tokenImage)
+            : tokenImage || require('../../../../assets/images/SENDlogo.png'),
+          description: tokenDesc || `Collection of NFTs: ${description || tokenName}`,
+        }}
+      />
     </View>
   );
 };
@@ -669,6 +892,10 @@ const cardStyles = {
     marginLeft: 6,
   },
 };
+
+// Get screen dimensions for grid items
+const { width } = Dimensions.get('window');
+const ITEM_WIDTH = (width * 0.9 - 48) / 3; // 3 items per row with padding
 
 const portfolioStyles = StyleSheet.create({
   modalContainer: {
@@ -1000,6 +1227,63 @@ const portfolioStyles = StyleSheet.create({
     fontSize: 14,
     color: '#657786',
     fontStyle: 'italic',
+  },
+  // Styles for collection search
+  searchContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: '#f0f2f5',
+    borderRadius: 14,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    fontSize: 14,
+    marginRight: 8,
+  },
+  searchButton: {
+    backgroundColor: '#1d9bf0',
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    justifyContent: 'center',
+  },
+  searchButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  collectionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 8,
+  },
+  collectionItem: {
+    width: ITEM_WIDTH,
+    marginBottom: 12,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    margin: 8,
+    overflow: 'hidden',
+  },
+  collectionImage: {
+    width: '100%',
+    height: 100,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  collectionName: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#14171a',
+    padding: 8,
+    textAlign: 'center',
   },
 });
 
