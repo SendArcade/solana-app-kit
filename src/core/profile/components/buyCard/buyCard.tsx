@@ -406,15 +406,6 @@ const BuyCard: React.FC<BuyCardProps> = ({
     setShowTokenDetailsDrawer(false);
     setShowNftCollectionDrawer(false);
 
-    // Direct check for Mad Lads - highest priority
-    if (description === 'Mad Lads' ||
-      (description && description.toLowerCase().includes('mad lads')) ||
-      (tokenName && tokenName.toLowerCase().includes('mad lads'))) {
-      console.log('Mad Lads directly detected, showing NFT Collection Drawer');
-      setShowNftCollectionDrawer(true);
-      return;
-    }
-
     // Check if this is an NFT collection
     const isNft = isNftCollection();
     console.log('Is NFT collection?', isNft);
@@ -460,11 +451,10 @@ const BuyCard: React.FC<BuyCardProps> = ({
   // Handle click on token image or name to view details
   const handleTokenDetailsPress = () => {
     if (tokenMint && !isPinYourCoin) {
-      if (isNftCollection()) {
-        setShowNftCollectionDrawer(true);
-      } else {
-        setShowTokenDetailsDrawer(true);
-      }
+      // For both tokens and NFTs, open TokenDetailsDrawer when name/image is clicked
+      setShowTradeModal(false);
+      setShowNftCollectionDrawer(false);
+      setShowTokenDetailsDrawer(true);
     }
   };
 
@@ -589,7 +579,8 @@ const BuyCard: React.FC<BuyCardProps> = ({
               <TouchableOpacity
                 style={cardStyles.buyButton}
                 onPress={() => {
-                  console.log('NFT Buy button pressed, tokenMint:', tokenMint);
+                  console.log('NFT View button pressed - opening NFTCollectionDrawer for marketplace actions', tokenMint);
+                  // For View NFT button, open NFTCollectionDrawer for marketplace actions
                   setShowTradeModal(false);
                   setShowTokenDetailsDrawer(false);
                   setShowNftCollectionDrawer(true);
@@ -829,6 +820,14 @@ const BuyCard: React.FC<BuyCardProps> = ({
             symbol: cleanTokenName,
             name: description || cleanTokenName,
             logoURI: typeof tokenImage === 'string' ? fixImageUrl(tokenImage) : undefined,
+            isCollection: isNftCollection(),
+            collectionData: isNftCollection() ? {
+              description: tokenDesc || `Collection of NFTs: ${description || tokenName}`,
+              name: description || tokenName || 'NFT Collection',
+              imageUri: typeof tokenImage === 'string' ? fixImageUrl(tokenImage) : undefined,
+              tokenCount: 0,
+              floorPrice: 0,
+            } : undefined
           }}
           loading={drawerLoading}
         />
