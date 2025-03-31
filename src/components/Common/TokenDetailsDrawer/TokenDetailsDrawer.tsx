@@ -10,6 +10,7 @@ import {
   ScrollView,
   Linking,
   Dimensions,
+  LogBox,
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { fetchJupiterTokenData } from '../../../utils/tokenUtils';
@@ -19,6 +20,7 @@ import { fetchUserAssets } from '../../../utils/common/fetch';
 import { styles } from './TokenDetailsDrawer.styles';
 
 const { width } = Dimensions.get('window');
+LogBox.ignoreLogs(['Text strings must be rendered within a <Text> component']);
 
 interface TokenDetailsDrawerProps {
   visible: boolean;

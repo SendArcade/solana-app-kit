@@ -13,6 +13,8 @@ import {
   Easing,
   PanResponder,
   StyleSheet,
+  Text,
+  ActivityIndicator,
 } from 'react-native';
 import {LineChart} from 'react-native-chart-kit';
 import {
@@ -37,6 +39,7 @@ interface LineGraphProps {
   timestamps?: number[];
   executionColor?: string;
   userAvatar?: any;
+  isLoading?: boolean;
 }
 
 /**
@@ -51,16 +54,16 @@ const LineGraph: React.FC<LineGraphProps> = ({
   timestamps,
   userAvatar,
   executionColor = '#FF5722',
+  isLoading = false,
 }) => {
-  // The chart itself is 200px tall
-  const chartHeight = 200;
+  // The chart itself is 220px tall
+  const chartHeight = 220;
 
   // We'll assume the caller either passes a width or we do a default
   const containerWidth = width || Dimensions.get('window').width - 32;
 
-  // Because we have some internal left/right padding in the chart style
-  // we want to subtract them from the "usable" width for hover calculations
-  const HORIZONTAL_PADDING = 12; // 8 + 4 from chart style
+  // Adjusted padding to ensure rightmost points are visible
+  const HORIZONTAL_PADDING = 20; // Increased from 12 to ensure rightmost dot is visible
   const usableChartWidth = containerWidth - HORIZONTAL_PADDING;
 
   // We'll animate data changes
@@ -307,7 +310,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
   // Keep track of each data point's (x, y)
   const pointsRef = useRef<{x: number; y: number}[]>([]);
 
-  // Build the tooltip’s SVG elements
+  // Build the tooltip's SVG elements
   const renderTooltip = useCallback(
     (x: number, y: number, idx: number, price: number) => {
       // Shift tooltip horizontally if near edges
@@ -445,6 +448,21 @@ const LineGraph: React.FC<LineGraphProps> = ({
         );
       }
 
+      // Make rightmost point visible
+      if (index === data.length - 1) {
+        elements.push(
+          <Circle
+            key={`last-point-${index}`}
+            cx={x}
+            cy={y}
+            r={6}
+            fill="#318EF8"
+            stroke="white"
+            strokeWidth={2}
+          />
+        );
+      }
+
       // If user is hovering near this point
       if (tooltipPos && index === tooltipPos.index) {
         elements.push(renderTooltip(x, y, index, tooltipPos.price));
@@ -459,6 +477,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
       executionColor,
       tooltipPos,
       renderTooltip,
+      data.length,
     ],
   );
 
@@ -496,49 +515,65 @@ const LineGraph: React.FC<LineGraphProps> = ({
   }, [tooltipPos]);
 
   return (
-    <View style={{width: containerWidth}}>
-      {/* This container ensures the chart is displayed but doesn't intercept touches */}
-      <View
-        style={{
-          position: 'relative',
-          width: containerWidth,
-          height: chartHeight,
-        }}>
-        {/* The chart (no pointer events) */}
-        <LineChart
-          data={chartData}
-          width={containerWidth}
-          height={chartHeight}
-          chartConfig={chartConfig}
-          bezier
-          withDots
-          withHorizontalLines
-          withVerticalLines={false}
-          withHorizontalLabels
-          withVerticalLabels={false}
-          withShadow={false}
-          style={{
-            marginVertical: 8,
-            borderRadius: 16,
-            paddingRight: 4,
-            paddingLeft: 8,
-          }}
-          renderDotContent={renderDotContent}
-          decorator={renderHoverFill}
-        />
+    <View style={styles.container}>
+      {isLoading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#1d9bf0" />
+        </View>
+      ) : (
+        <>
+          <LineChart
+            data={chartData}
+            width={containerWidth}
+            height={chartHeight}
+            chartConfig={chartConfig}
+            bezier
+            withDots
+            withHorizontalLines
+            withVerticalLines={false}
+            withHorizontalLabels
+            withVerticalLabels={false}
+            withShadow={false}
+            style={{
+              marginVertical: 8,
+              borderRadius: 16,
+              paddingRight: 12, // Increased to ensure rightmost dot is visible
+              paddingLeft: 8,
+            }}
+            renderDotContent={renderDotContent}
+            decorator={renderHoverFill}
+          />
 
-        {/* Transparent overlay that captures all pointer events */}
-        <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers} />
-      </View>
+          {/* Transparent overlay that captures all pointer events */}
+          <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers} />
+        </>
+      )}
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    position: 'relative',
+    width: '100%',
+    height: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  loaderContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
 
 export default React.memo(LineGraph, (prev, next) => {
   if (prev.data.length !== next.data.length) return false;
   if (prev.executionPrice !== next.executionPrice) return false;
   if (prev.executionTimestamp !== next.executionTimestamp) return false;
   if (prev.width !== next.width) return false;
+  if (prev.isLoading !== next.isLoading) return false;
   if (JSON.stringify(prev.data) !== JSON.stringify(next.data)) return false;
 
   // Compare timestamps array

@@ -14,19 +14,10 @@ import {
 } from 'react-native';
 import { styles } from './collectibles.style';
 import { AssetItem } from '../../../../hooks/useFetchTokens';
-import { fixImageUrl } from '../../../../hooks/useFetchTokens';
+import { fixImageUrl, fetchNftMetadata } from '../../../../modules/nft';
 import TokenDetailsDrawer from '../../../../components/Common/TokenDetailsDrawer/TokenDetailsDrawer';
 import { TENSOR_API_KEY } from '@env';
-
-/**
- * Represents a single NFT item
- */
-export interface NftItem {
-  mint: string;
-  name: string;
-  image: string;
-  collection?: string;
-}
+import { NftItem } from '../../../../modules/nft/types';
 
 export interface PortfolioSectionProps {
   sectionTitle: string;
@@ -352,45 +343,20 @@ const Collectibles: React.FC<CollectiblesProps> = ({
 
   // Function to fetch detailed NFT data
   const fetchNftData = async (mint: string) => {
-    // Check cache first
+    // If we already have cached data, return it
     if (nftDataCache.has(mint)) {
-      console.log("Using cached NFT data for mint:", mint);
       return nftDataCache.get(mint);
     }
 
-    console.log("Fetching NFT data from Tensor API for mint:", mint);
-
-    // Check if we have a Tensor API key
-    if (!TENSOR_API_KEY) {
-      console.error("TENSOR_API_KEY is missing! Unable to fetch NFT data.");
-      return null;
-    }
-
     try {
-      const url = `https://api.mainnet.tensordev.io/api/v1/mint?mints=${mint}`;
-      const resp = await fetch(url, {
-        headers: {
-          'x-tensor-api-key': TENSOR_API_KEY,
-        },
-      });
-
-      if (!resp.ok) {
-        const errorText = await resp.text();
-        throw new Error(`Tensor API error: ${resp.status} - ${errorText}`);
-      }
-
-      const data = await resp.json();
-      if (Array.isArray(data) && data.length > 0) {
-        console.log("Successfully fetched NFT data:", data[0].name);
-        // Cache the data for future use
-        nftDataCache.set(mint, data[0]);
-        return data[0];
-      } else {
-        console.warn("Tensor API returned empty data for mint:", mint);
-        throw new Error('No data returned from Tensor');
-      }
+      // Use the centralized fetch function instead of implementing it here
+      const nftData = await fetchNftMetadata(mint);
+      
+      // Cache the result
+      nftDataCache.set(mint, nftData);
+      return nftData;
     } catch (error) {
-      console.error("Error fetching NFT data:", error);
+      console.error(`Error fetching NFT data for ${mint}:`, error);
       return null;
     }
   };

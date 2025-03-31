@@ -5,9 +5,6 @@ import UserProfileInfo from './ProfileInfo/UserProfileInfo';
 import ProfileTabs from './ProfileTabs/ProfileTabs';
 
 import { styles as profileStyles } from './profile.style';
-
-import { NftItem } from '../../../hooks/useFetchNFTs';
-import { AssetItem, PortfolioData } from '../../../hooks/useFetchTokens';
 import COLORS from '../../../assets/colors';
 import { UserProfileData, ProfileViewProps } from '../types';
 

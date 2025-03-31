@@ -13,52 +13,31 @@ import {
     Alert,
     Pressable,
 } from 'react-native';
-import { NftItem } from '../../../hooks/useFetchNFTs';
 import Icons from '../../../assets/svgs';
 import { TENSOR_API_KEY } from '@env';
 import { DEFAULT_IMAGES } from '../../../config/constants';
-import { useAuth } from '../../../hooks/useAuth';
 import { useWallet } from '../../../hooks/useWallet';
 import { useAppDispatch, useAppSelector } from '../../../hooks/useReduxHooks';
 import { createRootPostAsync, addPostLocally } from '../../../state/thread/reducer';
-import { ThreadSection, ThreadSectionType, ThreadUser } from './thread.types';
+import { ThreadSection, ThreadSectionType, ThreadUser } from '../../../core/thread/components/thread.types';
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { TransactionService } from '../../../services/transaction/transactionService';
+
+// Import types from our module
+import { NftItem, NftListingModalProps, CollectionResult } from '../types';
+
+// Import services and utils
+import { searchCollections } from '../services/nftService';
+import { fixImageUrl } from '../utils/imageUtils';
 
 // Constants
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = (width * 0.9 - 30) / 3; // Added more padding
+const SOL_TO_LAMPORTS = 1_000_000_000;
 
-interface NftListingModalProps {
-    visible: boolean;
-    onClose: () => void;
-    onSelectListing: (item: NftItem) => void;
-    listingItems: NftItem[];
-    loadingListings: boolean;
-    fetchNftsError: string | null;
-    styles?: any; // Pass styles from parent component
-}
-
-interface CollectionResult {
-    collId: string;
-    name: string;
-    description?: string;
-    imageUri?: string;
-}
-
-/** Helper to fix IPFS/Arweave URLs */
-const fixImageUrl = (url: any): string => {
-    if (!url) return '';
-    if (url.startsWith('ipfs://'))
-        return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
-    if (url.startsWith('ar://'))
-        return url.replace('ar://', 'https://arweave.net/');
-    if (url.startsWith('/')) return `https://arweave.net${url}`;
-    if (!url.startsWith('http') && !url.startsWith('data:'))
-        return `https://${url}`;
-    return url;
-};
-
+/**
+ * Modal for displaying NFT listings and allowing users to select NFTs
+ */
 const NftListingModal = ({
     visible,
     onClose,
@@ -96,35 +75,10 @@ const NftListingModal = ({
         if (!collectionName.trim()) return;
         setLoadingSearch(true);
         setSearchResults([]);
+        
         try {
-            const url = `https://api.mainnet.tensordev.io/api/v1/collections/search_collections?query=${encodeURIComponent(
-                collectionName.trim(),
-            )}`;
-            const options = {
-                method: 'GET',
-                headers: {
-                    accept: 'application/json',
-                    'x-tensor-api-key': TENSOR_API_KEY,
-                },
-            };
-            const response = await fetch(url, options);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch collections: ${response.status}`);
-            }
-            const data = await response.json();
-            if (data.collections && data.collections.length > 0) {
-                const mapped: CollectionResult[] = data.collections.map((c: any) => ({
-                    collId: c.collId,
-                    name: c.name,
-                    description: c.description || '',
-                    imageUri: c.imageUri || '',
-                }));
-                console.log('Search results:', mapped);
-                setSearchResults(mapped);
-            } else {
-                console.log('No collections found');
-                setSearchResults([]);
-            }
+            const results = await searchCollections(collectionName.trim());
+            setSearchResults(results);
         } catch (err: any) {
             console.error('Error searching collections:', err);
             setSearchResults([]);

@@ -95,7 +95,8 @@ export default function RetweetPreview({
           // Collapsed: wrap PostBody in a container with limited height
           <View style={[
             localStyles.collapsedContainer,
-            (hasImage || hasVideo || hasTrade) ? localStyles.mediaContainer : {}
+            (hasImage || hasVideo) ? localStyles.mediaContainer : {},
+            hasTrade ? { maxHeight: 300 } : {}
           ]}>
             <PostBody
               post={retweetOf}

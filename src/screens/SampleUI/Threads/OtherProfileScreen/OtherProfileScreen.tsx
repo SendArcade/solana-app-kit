@@ -7,7 +7,7 @@ import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks'
 import Profile from '../../../../core/profile/components/profile';
 import { ThreadPost } from '../../../../core/thread/components/thread.types';
 import { fetchAllPosts } from '../../../../state/thread/reducer';
-import { NftItem, useFetchNFTs } from '../../../../hooks/useFetchNFTs';
+import { useFetchNFTs } from '../../../../modules/nft/hooks/useFetchNFTs';
 import COLORS from '../../../../assets/colors';
 import { SERVER_URL } from '@env';
 import { flattenPosts } from '../../../../core/thread/components/thread.utils';
