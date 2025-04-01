@@ -11,7 +11,6 @@ import PostCTA from './post/PostCTA';
 import PostFooter from './post/PostFooter';
 import PostHeader from './post/PostHeader';
 
-
 // Default exports to maintain backward compatibility
 export {
   Thread,

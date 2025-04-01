@@ -16,11 +16,11 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../../../state/store';
 import { Cluster, clusterApiUrl, Connection } from '@solana/web3.js';
 import { CLUSTER } from '@env';
-import { useWallet } from '../../../../hooks/useWallet';
+import { useWallet } from '../../../../modules/embeddedWalletProviders/hooks/useWallet';
 import TradeModal from '../trade/TradeModal';
 import { useAppSelector } from '../../../../hooks/useReduxHooks';
 import { DEFAULT_IMAGES, ENDPOINTS } from '../../../../config/constants';
-import { TransactionService } from '../../../../services/transaction/transactionService';
+import { TransactionService } from '../../../../modules/embeddedWalletProviders/services/transaction/transactionService';
 
 // Import NFT services
 import { buyNft, buyCollectionFloor } from '../../../../modules/nft';

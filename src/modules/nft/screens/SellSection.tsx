@@ -33,7 +33,7 @@ import { ThreadSection } from '../../../core/thread/components/thread.types';
 // import {addRootPost} from '../../../state/thread/reducer';
 import { fetchWithRetries } from '../../../utils/common/fetch';
 import { ENDPOINTS } from '../../../config/constants';
-import { TransactionService } from '../../../services/transaction/transactionService';
+import { TransactionService } from '../../embeddedWalletProviders/services/transaction/transactionService';
 
 const SOL_TO_LAMPORTS = 1_000_000_000;
 

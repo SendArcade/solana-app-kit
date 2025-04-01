@@ -1,7 +1,7 @@
 import { Connection } from '@solana/web3.js';
 import { StyleSheet } from 'react-native';
 import BN from 'bn.js';
-import { StandardWallet } from '../../../hooks/useAuth';
+import { StandardWallet } from '../../embeddedWalletProviders/hooks/useAuth';
 
 // Component props types
 export interface BondingCurveCardProps {

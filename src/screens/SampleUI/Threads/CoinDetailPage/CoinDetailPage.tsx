@@ -1,11 +1,11 @@
 import React, {useState} from 'react';
 import {SafeAreaView, Text, TouchableOpacity, View} from 'react-native';
 import {styles} from './CoinDetailPage.style';
-import {CoinDetailTopSection} from '../../../../components/CoinDetails/CoinDetailTopSection/CoinDetailTopSection';
-import {CoinDetailLatestSection} from '../../../../components/CoinDetails/CoinDetailLatestSection/CoinDetailLatestSection';
-import {CoinDetailPeopleSection} from '../../../../components/CoinDetails/CoinDetailPeopleSection/CoinDetailPeopleSection';
-import {CoinDetailPhotosSection} from '../../../../components/CoinDetails/CoinDetailPhotosSection/CoinDetailPhotosSection';
-import {CoinDetailVideosSection} from '../../../../components/CoinDetails/CoinDetailVideosSection/CoinDetailVideosSection';
+import {CoinDetailTopSection} from '../../../../core/sharedUI/CoinDetails/CoinDetailTopSection/CoinDetailTopSection';
+import {CoinDetailLatestSection} from '../../../../core/sharedUI/CoinDetails/CoinDetailLatestSection/CoinDetailLatestSection';
+import {CoinDetailPeopleSection} from '../../../../core/sharedUI/CoinDetails/CoinDetailPeopleSection/CoinDetailPeopleSection';
+import {CoinDetailPhotosSection} from '../../../../core/sharedUI/CoinDetails/CoinDetailPhotosSection/CoinDetailPhotosSection';
+import {CoinDetailVideosSection} from '../../../../core/sharedUI/CoinDetails/CoinDetailVideosSection/CoinDetailVideosSection';
 import {DEFAULT_IMAGES} from '../../../../config/constants';
 
 // Import the new modular components
