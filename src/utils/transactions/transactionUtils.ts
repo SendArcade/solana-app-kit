@@ -12,10 +12,10 @@ import {
   TransactionMessage,
 } from '@solana/web3.js';
 import {Buffer} from 'buffer';
-import { TransactionService } from '../../services/transaction/transactionService';
+import { TransactionService } from '../../modules/embeddedWalletProviders/services/transaction/transactionService';
 import { store } from '../../state/store';
-import { StandardWallet } from '../../hooks/useAuth';
 import { Platform } from 'react-native';
+import { StandardWallet } from '../../modules/embeddedWalletProviders/types';
 
 /**
  * Fee tier to microLamports mapping for priority transactions
@@ -193,8 +193,8 @@ export async function sendPriorityTransactionMWA(
         // Create a proper error with logs
         const error = new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
         // Add logs if they exist
-        if (confirmation.value.err.logs) {
-          error.logs = confirmation.value.err.logs;
+        if (confirmation.value.err && typeof confirmation.value.err === 'object' && 'logs' in confirmation.value.err) {
+          (error as any).logs = confirmation.value.err.logs;
         }
         TransactionService.showError(error);
         throw error;

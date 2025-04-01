@@ -28,9 +28,31 @@ export class TokenService {
       ) {
         // For native SOL
         const balance = await connection.getBalance(walletPublicKey);
-        // Reserve some SOL for transaction fees
-        const usableBalance = Math.max(0, balance - 0.005 * 1e9); // Reserve 0.005 SOL
-        return usableBalance / Math.pow(10, 9);
+        console.log("[TokenService] SOL balance in lamports:", balance);
+        
+        // Convert lamports to SOL
+        const SOL_DECIMALS = 9;
+        
+        // For very small SOL amounts (less than 0.001 SOL), return the full balance
+        // without reserving any for fees, since the user likely just wants to see what they have
+        if (balance < 1_000_000) { // 0.001 SOL in lamports
+          const fullSolBalance = balance / Math.pow(10, SOL_DECIMALS);
+          console.log("[TokenService] SOL balance is very small, returning full amount:", fullSolBalance);
+          return fullSolBalance;
+        }
+        
+        // Otherwise, reserve a small amount for fees
+        const MIN_SOL_RESERVE = 0.0005; // 0.0005 SOL reserved for fees (500,000 lamports)
+        const MIN_LAMPORTS_RESERVE = MIN_SOL_RESERVE * Math.pow(10, SOL_DECIMALS);
+        
+        // Calculate usable balance
+        const usableBalance = Math.max(0, balance - MIN_LAMPORTS_RESERVE);
+        const solBalance = usableBalance / Math.pow(10, SOL_DECIMALS);
+        
+        console.log("[TokenService] SOL balance converted to SOL:", solBalance, 
+          `(Reserved ${MIN_SOL_RESERVE} SOL for fees, raw balance: ${balance / Math.pow(10, SOL_DECIMALS)} SOL)`);
+        
+        return solBalance;
       } else {
         // For SPL tokens
         try {
@@ -44,18 +66,20 @@ export class TokenService {
             // Get the token amount from the first account
             const tokenBalance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount;
             const amount = parseFloat(tokenBalance.amount) / Math.pow(10, tokenBalance.decimals);
+            console.log(`[TokenService] ${tokenInfo.symbol} balance:`, amount);
             return amount;
           } else {
+            console.log(`[TokenService] No ${tokenInfo.symbol} token account found`);
             return 0;
           }
         } catch (err) {
-          console.error('Error fetching token balance:', err);
+          console.error(`[TokenService] Error fetching ${tokenInfo.symbol} token balance:`, err);
           return 0;
         }
       }
     } catch (err) {
-      console.error('Error fetching balance:', err);
-      return null;
+      console.error('[TokenService] Error fetching balance:', err);
+      return 0; // Return 0 instead of null to avoid UI issues
     }
   }
 

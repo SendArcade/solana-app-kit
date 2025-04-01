@@ -15,7 +15,7 @@ import Icons from '../../../../assets/svgs';
 import { createThreadStyles, getMergedTheme } from '../thread.styles';
 import { ThreadPost, ThreadUser } from '../thread.types';
 import { DEFAULT_IMAGES } from '../../../../config/constants';
-import { useWallet } from '../../../../hooks/useWallet';
+import { useWallet } from '../../../../modules/embeddedWalletProviders/hooks/useWallet';
 
 interface PostHeaderProps {
   /** The post data to display in the header */

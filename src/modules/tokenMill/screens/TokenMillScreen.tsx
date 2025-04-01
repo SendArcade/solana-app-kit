@@ -4,8 +4,8 @@ import {View, Text, ScrollView, ActivityIndicator, Alert} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Cluster, Connection, clusterApiUrl} from '@solana/web3.js';
 
-import {useAuth} from '../../../hooks/useAuth';
-import {useWallet} from '../../../hooks/useWallet';
+import {useAuth} from '../../embeddedWalletProviders/hooks/useAuth';
+import {useWallet} from '../../embeddedWalletProviders/hooks/useWallet';
 import {tokenMillScreenStyles as styles} from './styles/TokenMillScreen.style';
 import FundUserCard from '../components/FundUserCard';
 import ExistingAddressesCard from '../components/ExistingAddressCard';

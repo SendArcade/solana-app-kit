@@ -2,8 +2,8 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { View, Text, ImageSourcePropType } from 'react-native';
 import { ThreadUser, TradeData } from '../thread.types';
-import { TradeCard } from '../../../../components/Common/TradeCard';
 import { DEFAULT_IMAGES } from '../../../../config/constants';
+import { TradeCard } from '../../../sharedUI/Common/TradeCard';
 
 interface SectionTradeProps {
   text?: string;

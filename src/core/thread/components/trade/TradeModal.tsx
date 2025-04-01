@@ -27,7 +27,7 @@ import SelectTokenModal from './SelectTokenModal';
 import { ENDPOINTS } from '../../../../config/constants';
 import { CLUSTER } from '@env';
 import { useAppDispatch } from '../../../../hooks/useReduxHooks';
-import { useWallet } from '../../../../hooks/useWallet';
+import { useWallet } from '../../../../modules/embeddedWalletProviders/hooks/useWallet';
 import {
   addPostLocally,
   createRootPostAsync,
@@ -36,7 +36,7 @@ import styles from './tradeModal.style';
 import PastSwapItem from './PastSwapItem';
 import { SwapTransaction, fetchRecentSwaps, enrichSwapTransactions } from '../../../../services/swapTransactions';
 import { FontAwesome5 } from '@expo/vector-icons';
-import { TransactionService } from '../../../../services/transaction/transactionService';
+import { TransactionService } from '../../../../modules/embeddedWalletProviders/services/transaction/transactionService';
 import { TokenInfo, TokenService } from '../../../../services/token/tokenService';
 import { TradeService } from '../../../../services/trade/tradeService';
 
@@ -88,7 +88,7 @@ export default function TradeModal({
   const dispatch = useAppDispatch();
   // Use our wallet hook
   const { publicKey: userPublicKey, connected, sendTransaction } = useWallet();
-
+  console.log("[TradeModal] User public key:", userPublicKey);
   const [selectedTab, setSelectedTab] = useState<TabOption>(() =>
     initialActiveTab ?? 'PAST_SWAPS'
   );
@@ -146,11 +146,19 @@ export default function TradeModal({
   );
 
   /**
-   * Cleanup on unmount
+   * Setup cleanup and initialization
    */
   useEffect(() => {
+    // Set mounted flag
+    isMounted.current = true;
+    
+    // Return cleanup function
     return () => {
+      console.log('[TradeModal] Component unmounting, cleaning up');
       isMounted.current = false;
+      
+      // Clear any pending timeouts
+      pendingTokenOps.current = { input: false, output: false };
     };
   }, []);
 
@@ -158,22 +166,31 @@ export default function TradeModal({
    * Fetches the user's balance for the current input token
    */
   const fetchTokenBalance = useCallback(async (tokenToUse?: TokenInfo) => {
-    if (!connected || !userPublicKey) return null;
+    if (!connected || !userPublicKey) {
+      console.log("[TradeModal] No wallet connected, cannot fetch balance");
+      return null;
+    }
 
     const tokenForBalance = tokenToUse || inputToken;
 
     try {
       console.log(`[TradeModal] Fetching balance for ${tokenForBalance.symbol}...`);
       const balance = await TokenService.fetchTokenBalance(userPublicKey, tokenForBalance);
+      
+      // Only update state if component is still mounted and balance is non-null
       if (isMounted.current) {
         console.log(`[TradeModal] Token balance fetched for ${tokenForBalance.symbol}: ${balance}`);
+        
+        // Even if balance is 0, we'll set it (instead of null) to indicate we've successfully fetched
         setCurrentBalance(balance);
         return balance;
       }
     } catch (err) {
-      console.error('Error fetching balance:', err);
+      console.error('[TradeModal] Error fetching balance:', err);
       if (isMounted.current) {
         setCurrentBalance(0);
+        setErrorMsg(`Failed to fetch ${tokenForBalance.symbol} balance`);
+        setTimeout(() => isMounted.current && setErrorMsg(''), 3000);
       }
     }
     return null;
@@ -207,7 +224,9 @@ export default function TradeModal({
    */
   const initializeTokens = useCallback(async () => {
     // Don't initialize if already initializing or completed
-    if (!isMounted.current) return;
+    if (!isMounted.current || (pendingTokenOps.current.input && pendingTokenOps.current.output)) {
+      return;
+    }
 
     try {
       // Initialize input token
@@ -216,6 +235,8 @@ export default function TradeModal({
 
       // Mark operations as pending
       pendingTokenOps.current = { input: true, output: true };
+      
+      console.log('[TradeModal] Initializing tokens...');
 
       // If initialInputToken is provided, ensure it's a complete TokenInfo
       if (initialInputToken?.address) {
@@ -236,25 +257,39 @@ export default function TradeModal({
       }
 
       if (isMounted.current) {
+        // Batch state updates to reduce rerenders
+        const tokensChanged = 
+          completeInputToken.address !== inputToken.address || 
+          completeOutputToken.address !== outputToken.address;
+        
         setInputToken(completeInputToken);
         setOutputToken(completeOutputToken);
-        pendingTokenOps.current.input = false;
-        pendingTokenOps.current.output = false;
+        pendingTokenOps.current = { input: false, output: false };
         setTokensInitialized(true);
 
-        // Force a balance fetch and price fetch for the input token
-        setTimeout(() => {
+        // Only fetch balance if tokens actually changed or we don't have a balance yet
+        if (tokensChanged || currentBalance === null) {
+          console.log('[TradeModal] Tokens changed or no balance, fetching balance and price');
           fetchTokenBalance(completeInputToken).then(() => {
-            console.log('[TradeModal] Fetching price after balance update');
-            fetchTokenPrice(completeInputToken);
+            if (isMounted.current) {
+              fetchTokenPrice(completeInputToken);
+            }
           });
-        }, 100);
+        }
       }
     } catch (error) {
       console.error('[TradeModal] Error initializing tokens:', error);
       pendingTokenOps.current = { input: false, output: false };
     }
-  }, [initialInputToken, initialOutputToken, fetchTokenBalance, fetchTokenPrice]);
+  }, [
+    initialInputToken, 
+    initialOutputToken, 
+    fetchTokenBalance, 
+    fetchTokenPrice, 
+    inputToken.address, 
+    outputToken.address, 
+    currentBalance
+  ]);
 
   /**
    * Handle visibility changes to reset states
@@ -262,9 +297,11 @@ export default function TradeModal({
   useEffect(() => {
     if (visible) {
       // Reset states when modal opens
-      setResultMsg('');
-      setErrorMsg('');
-      setSolscanTxSig('');
+      if (isMounted.current) {
+        setResultMsg('');
+        setErrorMsg('');
+        setSolscanTxSig('');
+      }
 
       // Initialize tokens when modal becomes visible
       if (!tokensInitialized) {
@@ -272,9 +309,19 @@ export default function TradeModal({
       } else if (connected && userPublicKey) {
         // If tokens are already initialized, fetch both balance and price
         console.log('[TradeModal] Modal visible, fetching balance and price for initialized tokens');
-        fetchTokenBalance().then(() => {
-          fetchTokenPrice();
-        });
+        
+        // Use a small timeout to avoid state updates colliding
+        const timer = setTimeout(() => {
+          if (isMounted.current) {
+            fetchTokenBalance().then(() => {
+              if (isMounted.current) {
+                fetchTokenPrice();
+              }
+            });
+          }
+        }, 100);
+        
+        return () => clearTimeout(timer);
       }
     }
   }, [visible, tokensInitialized, initializeTokens, connected, userPublicKey, fetchTokenBalance, fetchTokenPrice]);
@@ -313,45 +360,72 @@ export default function TradeModal({
     setResultMsg('');
     setErrorMsg('');
 
-    try {
-      // Execute the swap using the trade service
-      const response = await TradeService.executeSwap(
-        inputToken,
-        outputToken,
-        solAmount,
-        userPublicKey,
-        sendTransaction,
-        {
-          statusCallback: (status) => {
-            if (isMounted.current) {
-              setResultMsg(status);
+    let retryCount = 0;
+    const MAX_RETRIES = 2;
+
+    while (retryCount <= MAX_RETRIES) {
+      try {
+        // Execute the swap using the trade service
+        const response = await TradeService.executeSwap(
+          inputToken,
+          outputToken,
+          solAmount,
+          userPublicKey,
+          sendTransaction,
+          {
+            statusCallback: (status) => {
+              if (isMounted.current) {
+                setResultMsg(status);
+              }
             }
           }
-        }
-      );
+        );
 
-      if (response.success && response.signature) {
+        if (response.success && response.signature) {
+          if (isMounted.current) {
+            setResultMsg(`Swap successful!`);
+
+            // Show the share prompt modal
+            setPendingBuyInputLamports(response.inputAmount);
+            setPendingBuyOutputLamports(response.outputAmount);
+            setShowSharePrompt(true);
+          }
+          return; // Success, exit the retry loop
+        } else {
+          throw new Error(response.error?.toString() || 'Transaction failed');
+        }
+      } catch (err: any) {
+        console.error('Trade error:', err);
+        
+        // Check if this is a signature verification error
+        if (err.message.includes('signature verification') && retryCount < MAX_RETRIES) {
+          console.log(`Retrying transaction (attempt ${retryCount + 1} of ${MAX_RETRIES})...`);
+          retryCount++;
+          // Small delay before retry
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
+
         if (isMounted.current) {
-          setResultMsg(`Swap successful!`);
-
-          // Show the share prompt modal
-          setPendingBuyInputLamports(response.inputAmount);
-          setPendingBuyOutputLamports(response.outputAmount);
-          setShowSharePrompt(true);
+          // Format error message for user
+          let errorMessage = 'Trade failed. ';
+          if (err.message.includes('signature verification')) {
+            errorMessage += 'Please try again.';
+          } else if (err.message.includes('0x1771')) {
+            errorMessage += 'Insufficient balance or price impact too high.';
+          } else {
+            errorMessage += err.message;
+          }
+          
+          setErrorMsg(errorMessage);
+          console.error('Detailed error:', err.message);
         }
-      } else {
-        throw new Error(response.error?.toString() || 'Transaction failed');
+        break; // Exit retry loop on non-signature errors
       }
-    } catch (err: any) {
-      console.error('Trade error:', err);
-      if (isMounted.current) {
-        setErrorMsg('Trade failed. Please try again.');
-        console.error('Detailed error:', err.message);
-      }
-    } finally {
-      if (isMounted.current) {
-        setLoading(false);
-      }
+    }
+
+    if (isMounted.current) {
+      setLoading(false);
     }
   }, [
     connected,
@@ -738,54 +812,158 @@ export default function TradeModal({
   const handleMaxButtonClick = useCallback(async () => {
     console.log("[TradeModal] MAX button clicked, current balance:", currentBalance);
 
+    if (isMounted.current) {
+      setErrorMsg(''); // Clear any existing error messages
+    }
+
+    // Validate wallet connection
+    if (!connected || !userPublicKey) {
+      if (isMounted.current) {
+        Alert.alert(
+          "Wallet Not Connected",
+          "Please connect your wallet to view your balance."
+        );
+      }
+      return;
+    }
+
+    // If we already have a balance, use it
     if (currentBalance !== null && currentBalance > 0) {
       setSolAmount(String(currentBalance));
-    } else {
-      // Force balance refresh and use the returned value directly
+      return;
+    }
+    
+    // Otherwise, fetch fresh balance
+    if (isMounted.current) {
       setResultMsg("Fetching your balance...");
+    }
+    
+    try {
       const balance = await fetchTokenBalance();
-      setResultMsg("");
-
+      
+      if (isMounted.current) {
+        setResultMsg("");
+      }
+      
+      // Check if we have a balance after fetching
       if (balance !== null && balance > 0 && isMounted.current) {
         console.log("[TradeModal] Setting max amount from fetched balance:", balance);
         setSolAmount(String(balance));
-      } else {
-        if (isMounted.current) {
+      } else if (isMounted.current) {
+        console.log("[TradeModal] Balance fetch returned:", balance);
+        
+        // Check if we actually have lamports but they're below the threshold
+        if (balance === 0) {
+          // This is likely a case where the user has a very small SOL balance
+          // Get the raw balance through connection for SOL
+          if (inputToken.symbol === 'SOL' || 
+              inputToken.address === 'So11111111111111111111111111111111111111112') {
+            try {
+              // We checked userPublicKey above, but TypeScript doesn't track that through the async function
+              // So we need to check again
+              if (!userPublicKey) {
+                throw new Error("Public key not available");
+              }
+              
+              const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
+              const connection = new Connection(rpcUrl, 'confirmed');
+              const rawBalance = await connection.getBalance(userPublicKey);
+              
+              if (rawBalance > 0) {
+                // We have some lamports, but not enough for transactions
+                Alert.alert(
+                  "Low SOL Balance",
+                  `You have ${rawBalance / 1e9} SOL, which is too low for transactions. Consider adding more SOL to your wallet.`
+                );
+                return;
+              }
+            } catch (e) {
+              console.error("[TradeModal] Error checking raw balance:", e);
+            }
+          }
+          
+          // If we reach here, show the generic message
           Alert.alert(
             "Balance Unavailable",
-            `Could not fetch your ${inputToken.symbol} balance. Make sure your wallet is connected and try again.`
+            `Could not get your ${inputToken.symbol} balance. Please check your wallet connection.`
           );
         }
       }
+    } catch (error) {
+      console.error("[TradeModal] Error in MAX button handler:", error);
+      if (isMounted.current) {
+        setResultMsg("");
+        setErrorMsg(`Failed to fetch your ${inputToken.symbol} balance`);
+        setTimeout(() => isMounted.current && setErrorMsg(''), 3000);
+      }
     }
-  }, [currentBalance, fetchTokenBalance, inputToken.symbol]);
+  }, [currentBalance, fetchTokenBalance, inputToken.symbol, inputToken.address, userPublicKey, connected]);
 
   /**
    * When token selection changes, update the balance and price
    */
   const handleTokenSelected = useCallback(async (token: any) => {
+    if (!isMounted.current) return;
+    
     try {
+      console.log(`[TradeModal] Token selected: ${token.symbol || 'Unknown'}`);
+      
+      // Mark token operation as pending
+      if (selectingWhichSide === 'input') {
+        pendingTokenOps.current.input = true;
+      } else {
+        pendingTokenOps.current.output = true;
+      }
+      
       // Ensure we have complete token info
       const completeToken = await TokenService.ensureCompleteTokenInfo(token);
 
-      if (selectingWhichSide === 'input') {
-        setInputToken(completeToken);
-        // When input token changes, immediately fetch new balance and price
-        console.log('[TradeModal] Input token changed to', completeToken.symbol);
+      if (!isMounted.current) return;
 
-        // Small delay to ensure state update before fetch
+      if (selectingWhichSide === 'input') {
+        console.log('[TradeModal] Input token changed to', completeToken.symbol);
+        
+        // Update input token state
+        setInputToken(completeToken);
+        pendingTokenOps.current.input = false;
+        
+        // Clear any existing amount since token changed
+        setSolAmount('0');
+        setCurrentBalance(null);
+        
+        // Fetch balance and price for new token with small delay
         setTimeout(async () => {
-          await fetchTokenBalance(completeToken);
-          await fetchTokenPrice(completeToken);
+          if (isMounted.current) {
+            try {
+              const newBalance = await fetchTokenBalance(completeToken);
+              if (isMounted.current && newBalance !== null) {
+                await fetchTokenPrice(completeToken);
+              }
+            } catch (error) {
+              console.error('[TradeModal] Error fetching balance/price after token change:', error);
+            }
+          }
         }, 100);
       } else {
-        setOutputToken(completeToken);
         console.log('[TradeModal] Output token changed to', completeToken.symbol);
+        setOutputToken(completeToken);
+        pendingTokenOps.current.output = false;
       }
 
       setShowSelectTokenModal(false);
     } catch (error) {
       console.error('[TradeModal] Error selecting token:', error);
+      // Reset pending flags
+      if (selectingWhichSide === 'input') {
+        pendingTokenOps.current.input = false;
+      } else {
+        pendingTokenOps.current.output = false;
+      }
+      
+      if (isMounted.current) {
+        setErrorMsg('Failed to load token information');
+        setTimeout(() => isMounted.current && setErrorMsg(''), 3000);
+      }
     }
   }, [selectingWhichSide, fetchTokenBalance, fetchTokenPrice]);
 

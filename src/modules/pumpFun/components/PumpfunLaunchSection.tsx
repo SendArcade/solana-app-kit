@@ -11,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { usePumpFun } from '../hooks/usePumpFun';
 import { PumpfunLaunchStyles } from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
-import { TransactionService } from '../../../services/transaction/transactionService';
+import { TransactionService } from '../../embeddedWalletProviders/services/transaction/transactionService';
 import { PumpfunLaunchSectionProps } from '../types';
 
 export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
