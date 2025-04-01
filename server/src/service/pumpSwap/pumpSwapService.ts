@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { Connection, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
-import { PumpAmmSdk } from '@pump-fun/pump-swap-sdk/dist/sdk/pumpAmm.js';
+import { PumpAmmSdk } from '@pump-fun/pump-swap-sdk';
 import BN from 'bn.js';
 import {
   getBlockhashWithFallback,
@@ -17,7 +17,7 @@ dotenv.config();
 // Default RPC URL as fallback
 const DEFAULT_RPC_URL = 'https://api.mainnet-beta.solana.com';
 
-// Direction enum - locally defined to match SDK
+// Direction enum - define locally since it's not properly exported as a value
 export enum Direction {
   QuoteToBase = 0,
   BaseToQuote = 1

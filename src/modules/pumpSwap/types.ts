@@ -1,5 +1,6 @@
 import { StyleProp, ViewStyle } from 'react-native';
 import { Pool, Direction } from '@pump-fun/pump-swap-sdk';
+import { PublicKey } from '@solana/web3.js';
 
 /**
  * Base props interface for all PumpSwap sections
@@ -60,10 +61,12 @@ export interface SwapQuoteParams {
  * Swap transaction parameters
  */
 export interface SwapParams {
-  pool: Pool;
+  userPublicKey: string;
+  pool: string;
   amount: number;
   direction: Direction;
-  slippage?: number;
+  slippage: number;
+  solanaWallet: any;
   onStatusUpdate?: (status: string) => void;
 }
 
@@ -90,11 +93,13 @@ export interface LiquidityQuoteResult {
  * Add liquidity transaction parameters
  */
 export interface AddLiquidityParams {
-  pool: Pool;
-  baseAmount: number;
-  quoteAmount: number;
+  userPublicKey: string;
+  pool: string;
+  baseAmount: number | null;
+  quoteAmount: number | null;
   lpTokenAmount: number;
-  slippage?: number;
+  slippage: number;
+  solanaWallet: any;
   onStatusUpdate?: (status: string) => void;
 }
 
@@ -102,9 +107,11 @@ export interface AddLiquidityParams {
  * Remove liquidity transaction parameters
  */
 export interface RemoveLiquidityParams {
-  pool: Pool;
+  userPublicKey: string;
+  pool: string;
   lpTokenAmount: number;
-  slippage?: number;
+  slippage: number;
+  solanaWallet: any;
   onStatusUpdate?: (status: string) => void;
 }
 
@@ -112,11 +119,13 @@ export interface RemoveLiquidityParams {
  * Pool creation transaction parameters
  */
 export interface CreatePoolParams {
+  userPublicKey: string;
   index: number;
   baseMint: string;
   quoteMint: string;
   baseAmount: number;
   quoteAmount: number;
+  solanaWallet: any;
   onStatusUpdate?: (status: string) => void;
 }
 
@@ -133,4 +142,5 @@ export interface UsePumpSwapResult {
   addLiquidity: (params: AddLiquidityParams) => Promise<string>;
   removeLiquidity: (params: RemoveLiquidityParams) => Promise<string>;
   createPool: (params: CreatePoolParams) => Promise<string>;
-} 
+}
+

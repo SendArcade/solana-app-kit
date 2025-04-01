@@ -1,338 +1,264 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
-import { Pool } from '@pump-fun/pump-swap-sdk';
-import { usePumpSwap } from '../hooks/usePumpSwap';
-import { LiquidityRemoveSectionProps } from '../types';
-import TokenInput from './TokenInput';
-import PoolSelector from './PoolSelector';
-import ActionButton from './ActionButton';
-import { formatNumber } from '../utils/pumpSwapUtils';
+import { View, Text, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
+import { Connection } from '@solana/web3.js';
+import {
+    getWithdrawalQuote,
+    removeLiquidity
+} from '../services/pumpSwapService';
+import { DEFAULT_SLIPPAGE } from '../utils/pumpSwapUtils';
+// Import our custom wallet hooks
+import { useWallet } from '../../embeddedWalletProviders/hooks/useWallet';
+import { StandardWallet } from '../../embeddedWalletProviders/types';
 
-// Default slippage tolerance percentage
-const DEFAULT_SLIPPAGE = 0.5;
-
-interface TokenInfo {
-    symbol: string;
-    logo?: string;
-    mint: string;
-    decimals: number;
-    balance?: string;
+interface LiquidityRemoveSectionProps {
+    pool?: string;
+    baseToken?: {
+        symbol: string;
+        decimals: number;
+    };
+    quoteToken?: {
+        symbol: string;
+        decimals: number;
+    };
+    connection: Connection;
+    solanaWallet: StandardWallet | any;
 }
 
-interface TokenMap {
-    [key: string]: TokenInfo;
-}
+// Default tokens and pool
+const DEFAULT_POOL = 'default_pool_address';
+const DEFAULT_BASE_TOKEN = {
+    symbol: 'SOL',
+    decimals: 9,
+};
+const DEFAULT_QUOTE_TOKEN = {
+    symbol: 'USDC',
+    decimals: 6,
+};
 
 /**
  * A section for removing liquidity from PumpSwap pools
  * @component
  */
-const LiquidityRemoveSection: React.FC<LiquidityRemoveSectionProps> = ({
-    containerStyle,
-    inputStyle,
-    buttonStyle,
-    removeLiquidityButtonLabel = 'Remove Liquidity'
-}) => {
-    const {
-        pools,
-        isLoading,
-        removeLiquidity,
-        refreshPools
-    } = usePumpSwap();
+export function LiquidityRemoveSection({
+    pool = DEFAULT_POOL,
+    baseToken = DEFAULT_BASE_TOKEN,
+    quoteToken = DEFAULT_QUOTE_TOKEN,
+    connection,
+    solanaWallet
+}: LiquidityRemoveSectionProps) {
+    // Use hook just for connected state and address
+    const { publicKey, address, connected } = useWallet();
 
-    // State variables
-    const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
-    const [lpTokenAmount, setLpTokenAmount] = useState('');
-    const [expectedBaseAmount, setExpectedBaseAmount] = useState<number | null>(null);
-    const [expectedQuoteAmount, setExpectedQuoteAmount] = useState<number | null>(null);
-    const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE);
-    const [removeLoading, setRemoveLoading] = useState(false);
-    const [status, setStatus] = useState('');
+    const [lpTokenAmount, setLpTokenAmount] = useState<string>('');
+    const [baseAmount, setBaseAmount] = useState<string>('');
+    const [quoteAmount, setQuoteAmount] = useState<string>('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-    // Mock token map - in a real app, this would come from a token service
-    const tokenMap: TokenMap = {
-        // Add some example tokens - this would be populated from your token service
-        'So11111111111111111111111111111111111111112': {
-            symbol: 'SOL',
-            logo: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png',
-            mint: 'So11111111111111111111111111111111111111112',
-            decimals: 9,
-            balance: '10.5'
-        },
-        'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': {
-            symbol: 'USDC',
-            logo: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png',
-            mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-            decimals: 6,
-            balance: '100'
-        }
-    };
-
-    // Get LP token info
-    const getLpToken = useCallback(() => {
-        if (!selectedPool) return null;
-
-        const mintAddress = (selectedPool as any).lpMint || 'UNKNOWN_LP';
-
-        return {
-            symbol: 'LP',
-            mint: mintAddress,
-            decimals: 9, // Typical for LP tokens
-            balance: '5.0' // Mock LP token balance - in a real app, get from user's wallet
-        };
-    }, [selectedPool]);
-
-    // Get base token info
-    const getBaseToken = useCallback(() => {
-        if (!selectedPool) return null;
-
-        const mintAddress = (selectedPool as any).baseMint;
-
-        return tokenMap[mintAddress] || {
-            symbol: 'Unknown',
-            mint: mintAddress,
-            decimals: 9
-        };
-    }, [selectedPool, tokenMap]);
-
-    // Get quote token info
-    const getQuoteToken = useCallback(() => {
-        if (!selectedPool) return null;
-
-        const mintAddress = (selectedPool as any).quoteMint;
-
-        return tokenMap[mintAddress] || {
-            symbol: 'Unknown',
-            mint: mintAddress,
-            decimals: 9
-        };
-    }, [selectedPool, tokenMap]);
-
-    // Calculate expected token amounts based on LP token amount
-    const calculateExpectedAmounts = useCallback(() => {
-        if (!selectedPool || !lpTokenAmount || parseFloat(lpTokenAmount) <= 0) {
-            setExpectedBaseAmount(null);
-            setExpectedQuoteAmount(null);
-            return;
-        }
-
-        // In a real implementation, you would call the SDK to get accurate estimates
-        // This is a simplified mock calculation based on pool reserves and LP amount
-        const parsedAmount = parseFloat(lpTokenAmount);
-        const pool = selectedPool as any;
-
-        // Mock LP token total supply - in a real app, get from chain
-        const lpTokenTotalSupply = 100;
-
-        // Calculate percentage of pool being withdrawn
-        const sharePercentage = parsedAmount / lpTokenTotalSupply;
-
-        // Calculate token amounts based on pool reserves
-        const baseReserve = parseFloat(pool.baseReserve || '0');
-        const quoteReserve = parseFloat(pool.quoteReserve || '0');
-
-        setExpectedBaseAmount(baseReserve * sharePercentage);
-        setExpectedQuoteAmount(quoteReserve * sharePercentage);
-
-    }, [selectedPool, lpTokenAmount]);
-
-    // Update expected amounts when LP token amount changes
-    const handleLpTokenAmountChange = (text: string) => {
-        setLpTokenAmount(text);
-
-        // Slight delay to ensure UI is responsive
-        setTimeout(() => {
-            calculateExpectedAmounts();
-        }, 100);
-    };
-
-    // Handle remove liquidity action
-    const handleRemoveLiquidity = async () => {
-        if (!selectedPool || !lpTokenAmount || parseFloat(lpTokenAmount) <= 0) {
-            Alert.alert('Error', 'Please enter a valid LP token amount.');
-            return;
-        }
+    // Handle LP token amount change and get expected output
+    const handleLpTokenAmountChange = useCallback(async (amount: string) => {
+        if (!amount || !connected) return;
 
         try {
-            setRemoveLoading(true);
+            setIsLoading(true);
+            setError(null);
+            setStatusMessage('Calculating expected tokens...');
 
-            const parsedAmount = parseFloat(lpTokenAmount);
+            const numericAmount = parseFloat(amount);
+            const withdrawalQuote = await getWithdrawalQuote(
+                pool,
+                numericAmount,
+                DEFAULT_SLIPPAGE
+            );
 
-            const txSignature = await removeLiquidity({
-                pool: selectedPool,
-                lpTokenAmount: parsedAmount,
-                slippage,
-                onStatusUpdate: (status) => setStatus(status)
+            setLpTokenAmount(amount);
+            setBaseAmount(withdrawalQuote.base?.toString() || '0');
+            setQuoteAmount(withdrawalQuote.quote?.toString() || '0');
+            setStatusMessage(null);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to get withdrawal quote');
+            setBaseAmount('');
+            setQuoteAmount('');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [pool, connected]);
+
+    // Handle remove liquidity action
+    const handleRemoveLiquidity = useCallback(async () => {
+        if (!connected || !solanaWallet || !lpTokenAmount) return;
+
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            const userAddress = address || publicKey?.toString() || '';
+            if (!userAddress) {
+                throw new Error('No wallet address found');
+            }
+
+            // Use updated removeLiquidity function with wallet integration
+            await removeLiquidity({
+                pool,
+                lpTokenAmount: parseFloat(lpTokenAmount),
+                slippage: DEFAULT_SLIPPAGE,
+                userPublicKey: userAddress,
+                connection,
+                solanaWallet,
+                onStatusUpdate: setStatusMessage
             });
 
-            console.log('Remove liquidity transaction successful:', txSignature);
-
-            // Reset form
+            // Clear inputs after successful operation
             setLpTokenAmount('');
-            setExpectedBaseAmount(null);
-            setExpectedQuoteAmount(null);
-
-            // Refresh pools to get updated balances
-            refreshPools();
-
-            Alert.alert(
-                'Liquidity Removed',
-                `You've successfully removed liquidity from the pool! Transaction signature: ${txSignature.slice(0, 8)}...${txSignature.slice(-8)}`
-            );
-        } catch (error) {
-            console.error('Error removing liquidity:', error);
-            Alert.alert('Remove Liquidity Failed', error instanceof Error ? error.message : 'An unknown error occurred');
+            setBaseAmount('');
+            setQuoteAmount('');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to remove liquidity');
+            setStatusMessage(null);
         } finally {
-            setRemoveLoading(false);
-            setStatus('');
+            setIsLoading(false);
         }
-    };
+    }, [pool, solanaWallet, address, publicKey, lpTokenAmount, connection, connected]);
 
-    // Get tokens
-    const lpToken = getLpToken();
-    const baseToken = getBaseToken();
-    const quoteToken = getQuoteToken();
-
-    // Determine if remove liquidity should be disabled
-    const isRemoveDisabled =
-        !selectedPool ||
-        !lpTokenAmount ||
-        parseFloat(lpTokenAmount) <= 0 ||
-        removeLoading;
+    if (!connected) {
+        return (
+            <View style={styles.container}>
+                <Text style={styles.connectMessage}>
+                    Please connect your wallet to remove liquidity
+                </Text>
+            </View>
+        );
+    }
 
     return (
-        <View style={[styles.container, containerStyle]}>
-            <PoolSelector
-                pools={pools}
-                selectedPool={selectedPool}
-                onSelectPool={(pool) => {
-                    setSelectedPool(pool);
-                    setLpTokenAmount('');
-                    setExpectedBaseAmount(null);
-                    setExpectedQuoteAmount(null);
-                }}
-                isLoading={isLoading}
-                tokenMap={tokenMap}
-            />
-
-            <TokenInput
-                label="LP Token Amount"
+        <View style={styles.container}>
+            <TextInput
+                style={styles.input}
                 value={lpTokenAmount}
                 onChangeText={handleLpTokenAmountChange}
-                token={lpToken || { symbol: 'LP', mint: '', decimals: 0 }}
-                balance={lpToken?.balance}
+                placeholder="Enter LP token amount"
+                keyboardType="numeric"
+                editable={!isLoading}
             />
 
-            {(expectedBaseAmount !== null && expectedQuoteAmount !== null) && (
-                <View style={styles.expectedOutputContainer}>
-                    <Text style={styles.expectedOutputTitle}>Expected Output:</Text>
+            <View style={styles.outputContainer}>
+                <Text style={styles.outputLabel}>You'll receive:</Text>
 
-                    <View style={styles.tokenOutputRow}>
-                        <View style={styles.tokenIcon}>
-                            {baseToken?.logo ? (
-                                <Text style={styles.tokenIconText}>
-                                    {baseToken.symbol.charAt(0)}
-                                </Text>
-                            ) : (
-                                <Text style={styles.tokenIconText}>B</Text>
-                            )}
-                        </View>
-                        <Text style={styles.tokenAmount}>
-                            {formatNumber(expectedBaseAmount, 6)} {baseToken?.symbol || 'Base'}
-                        </Text>
-                    </View>
-
-                    <View style={styles.tokenOutputRow}>
-                        <View style={styles.tokenIcon}>
-                            {quoteToken?.logo ? (
-                                <Text style={styles.tokenIconText}>
-                                    {quoteToken.symbol.charAt(0)}
-                                </Text>
-                            ) : (
-                                <Text style={styles.tokenIconText}>Q</Text>
-                            )}
-                        </View>
-                        <Text style={styles.tokenAmount}>
-                            {formatNumber(expectedQuoteAmount, 6)} {quoteToken?.symbol || 'Quote'}
-                        </Text>
-                    </View>
+                <View style={styles.tokenOutputRow}>
+                    <Text style={styles.tokenLabel}>{baseToken.symbol}:</Text>
+                    <Text style={styles.tokenAmount}>{baseAmount || '0'}</Text>
                 </View>
-            )}
 
-            {status && (
-                <View style={styles.statusContainer}>
-                    <Text style={styles.statusText}>{status}</Text>
+                <View style={styles.tokenOutputRow}>
+                    <Text style={styles.tokenLabel}>{quoteToken.symbol}:</Text>
+                    <Text style={styles.tokenAmount}>{quoteAmount || '0'}</Text>
                 </View>
-            )}
+            </View>
 
-            <ActionButton
-                title={removeLiquidityButtonLabel}
+            <Text
+                style={[
+                    styles.removeButton,
+                    (!lpTokenAmount || isLoading) && styles.disabledButton
+                ]}
                 onPress={handleRemoveLiquidity}
-                disabled={isRemoveDisabled}
-                loading={removeLoading}
-                style={[styles.removeButton, buttonStyle]}
-                variant={isRemoveDisabled ? 'secondary' : 'danger'}
-            />
+            >
+                {isLoading ? 'Processing...' : 'Remove Liquidity'}
+            </Text>
+
+            {isLoading && (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color="#6E56CF" />
+                    {statusMessage && (
+                        <Text style={styles.statusText}>{statusMessage}</Text>
+                    )}
+                </View>
+            )}
+
+            {error && (
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
+                </View>
+            )}
         </View>
     );
-};
+}
 
 const styles = StyleSheet.create({
     container: {
-        width: '100%',
-    },
-    expectedOutputContainer: {
-        marginTop: 16,
         padding: 16,
-        backgroundColor: '#F8F9FA',
-        borderRadius: 12,
+    },
+    input: {
         borderWidth: 1,
         borderColor: '#E2E8F0',
-    },
-    expectedOutputTitle: {
+        borderRadius: 8,
+        padding: 12,
         fontSize: 16,
-        fontWeight: '600',
-        color: '#334155',
+        marginBottom: 16,
+    },
+    outputContainer: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 8,
+        padding: 16,
+        marginVertical: 16,
+    },
+    outputLabel: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#64748B',
         marginBottom: 12,
     },
     tokenOutputRow: {
         flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
+        justifyContent: 'space-between',
+        marginVertical: 4,
     },
-    tokenIcon: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: '#E2E8F0',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 8,
-    },
-    tokenIconText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#64748B',
+    tokenLabel: {
+        fontSize: 16,
+        color: '#334155',
+        fontWeight: '500',
     },
     tokenAmount: {
-        fontSize: 15,
-        fontWeight: '500',
+        fontSize: 16,
         color: '#334155',
-    },
-    statusContainer: {
-        marginTop: 16,
-        padding: 12,
-        backgroundColor: '#F1F5F9',
-        borderRadius: 8,
-    },
-    statusText: {
-        fontSize: 14,
-        color: '#334155',
-        textAlign: 'center',
+        fontWeight: '600',
     },
     removeButton: {
-        marginTop: 24,
+        backgroundColor: '#6E56CF',
+        color: '#FFFFFF',
+        padding: 16,
+        borderRadius: 8,
+        textAlign: 'center',
+        fontSize: 16,
+        fontWeight: '600',
+        marginTop: 8,
     },
-});
-
-export default LiquidityRemoveSection; 
+    disabledButton: {
+        backgroundColor: '#CBD5E1',
+    },
+    errorContainer: {
+        marginTop: 16,
+        padding: 8,
+        backgroundColor: '#ffebee',
+        borderRadius: 4,
+    },
+    errorText: {
+        color: '#c62828',
+        fontSize: 14,
+    },
+    loadingContainer: {
+        marginTop: 16,
+        alignItems: 'center',
+    },
+    statusText: {
+        marginTop: 8,
+        fontSize: 14,
+        color: '#64748B',
+    },
+    connectMessage: {
+        textAlign: 'center',
+        fontSize: 16,
+        color: '#64748B',
+        marginVertical: 20,
+    },
+}); 
