@@ -6,12 +6,17 @@
     "version": "0.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "android": {
       "package": "com.bhu1tyagi.solanasocialstarter",
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "ios": {
       "bundleIdentifier": "com.bhu1tyagi.solanasocialstarter",
@@ -19,11 +24,19 @@
         "NSPhotoLibraryUsageDescription": "We need access to your photos to let you pick images."
       }
     },
-    "plugins": ["expo-secure-store", [
-      "expo-image-picker",
-      {
-        "photosPermission": "We need access to your photos to let you pick images."
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "We need access to your photos to let you pick images."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c02fa8da-01f8-4d39-b47f-dc85d7079c7d"
       }
-    ]]
+    }
   }
 }

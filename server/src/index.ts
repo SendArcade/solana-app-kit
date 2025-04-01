@@ -19,6 +19,7 @@ import knex from './db/knex';
 import jupiterSwapRouter from './routes/jupiterSwapRoutes';
 import profileImageRouter from './routes/profileImageRoutes';
 import { threadImageRouter } from './routes/threadImageRoutes';
+import { pumpSwapRouter } from './routes/pumpSwapRoutes';
 
 const app = express();
 app.use(express.json());
@@ -60,6 +61,7 @@ app.use('/api', threadRouter);
 app.use('/api/jupiter', jupiterSwapRouter);
 app.use('/api/profile', profileImageRouter);
 app.use('/api/thread/images', threadImageRouter);
+app.use('/api/pump-swap', pumpSwapRouter);
 
 /**
  * TokenMill client instance for interacting with the Solana program.

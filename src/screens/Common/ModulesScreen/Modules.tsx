@@ -8,9 +8,9 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import {useAuth} from '../../../hooks/useAuth';
-import {useNavigation} from '@react-navigation/native';
-import {styles} from './Modules.styles';
+import { useAuth } from '../../../hooks/useAuth';
+import { useNavigation } from '@react-navigation/native';
+import { styles } from './Modules.styles';
 
 const sections = [
   {
@@ -47,7 +47,7 @@ const androidStyles = StyleSheet.create({
 });
 
 export default function ModuleScreen() {
-  const {logout} = useAuth();
+  const { logout } = useAuth();
   const navigation = useNavigation();
 
   const handlePress = (section: any) => {
@@ -72,7 +72,7 @@ export default function ModuleScreen() {
         {sections.map(section => (
           <View
             key={section.key}
-            style={[styles.card, {backgroundColor: section.backgroundColor}]}>
+            style={[styles.card, { backgroundColor: section.backgroundColor }]}>
             <Text style={styles.cardTitle}>{section.title}</Text>
             <Text style={styles.cardDescription}>{section.description}</Text>
             <TouchableOpacity
