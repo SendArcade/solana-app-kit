@@ -15,9 +15,9 @@ import {
 import { styles } from './collectibles.style';
 import { AssetItem } from '../../../../hooks/useFetchTokens';
 import { fixImageUrl, fetchNftMetadata } from '../../../../modules/nft';
-import TokenDetailsDrawer from '../../../../components/Common/TokenDetailsDrawer/TokenDetailsDrawer';
 import { TENSOR_API_KEY } from '@env';
 import { NftItem } from '../../../../modules/nft/types';
+import TokenDetailsDrawer from '../../../sharedUI/Common/TokenDetailsDrawer/TokenDetailsDrawer';
 
 export interface PortfolioSectionProps {
   sectionTitle: string;

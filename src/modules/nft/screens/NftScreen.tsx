@@ -3,9 +3,9 @@ import { View, Text, SafeAreaView, StyleSheet, TouchableOpacity } from 'react-na
 import BuySection from './BuySection';
 import SellSection from './SellSection';
 import { styles } from './styles';
-import { useAuth } from '../../../hooks/useAuth';
+import { useAuth } from '../../embeddedWalletProviders/hooks/useAuth';
 import { useAppSelector } from '../../../hooks/useReduxHooks';
-import { TransactionService } from '../../../services/transaction/transactionService';
+import { TransactionService } from '../../embeddedWalletProviders/services/transaction/transactionService';
 
 
 

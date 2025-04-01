@@ -3,7 +3,7 @@ import { View, TouchableOpacity, Animated, Easing } from 'react-native';
 import Icons from '../../../assets/svgs/index';
 import styles from './IntroScreen.styles';
 import { useAppNavigation } from '../../../hooks/useAppNavigation';
-import { getDynamicClient } from '../../../services/walletProviders/dynamic';
+import { getDynamicClient } from '../../../modules/embeddedWalletProviders/services/walletProviders/dynamic';
 
 export default function IntroScreen() {
   const navigation = useAppNavigation();

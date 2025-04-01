@@ -15,14 +15,14 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { navigationRef } from './src/hooks/useAppNavigation';
 import { store } from './src/state/store';
 import './src/utils/polyfills';
-import TransactionNotification from './src/components/Common/TransactionNotification';
 
 import { PrivyProvider, PrivyElements } from '@privy-io/expo';
 
 // Dynamic client initialization
-import { initDynamicClient, getDynamicClient } from './src/services/walletProviders/dynamic';
 import { CustomizationProvider } from './src/CustomizationProvider';
 import { DefaultCustomizationConfig } from './src/config';
+import { getDynamicClient, initDynamicClient } from './src/modules/embeddedWalletProviders/services/walletProviders';
+import TransactionNotification from './src/core/sharedUI/Common/TransactionNotification';
 
 export default function App() {
   const config = DefaultCustomizationConfig;

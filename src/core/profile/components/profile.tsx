@@ -27,7 +27,7 @@ import { fetchAllPosts } from '../../../state/thread/reducer';
 
 import { useFetchNFTs } from '../../../modules/nft';
 import { NftItem } from '../../../modules/nft/types';
-import { useWallet } from '../../../hooks/useWallet';
+import { useWallet } from '../../../modules/embeddedWalletProviders/hooks/useWallet';
 import {
   uploadProfileAvatar,
   fetchFollowers,

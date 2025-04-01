@@ -22,7 +22,7 @@ import { createThreadStyles, getMergedTheme } from './thread.styles';
 import { ThreadSection, ThreadSectionType, ThreadUser } from '../types';
 import * as ImagePicker from 'expo-image-picker';
 import { TENSOR_API_KEY } from '@env';
-import { useWallet } from '../../../hooks/useWallet';
+import { useWallet } from '../../../modules/embeddedWalletProviders/hooks/useWallet';
 import TradeModal from './trade/TradeModal';
 import { DEFAULT_IMAGES } from '../../../config/constants';
 import { NftListingModal, useFetchNFTs, NftItem } from '../../../modules/nft';

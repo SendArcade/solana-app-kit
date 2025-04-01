@@ -10,7 +10,7 @@ import {
 import { usePumpFun } from '../hooks/usePumpFun';
 import { PumpfunBuyStyles } from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
-import { TransactionService } from '../../../services/transaction/transactionService';
+import { TransactionService } from '../../embeddedWalletProviders/services/transaction/transactionService';
 import { PumpfunBuySectionProps } from '../types';
 
 export const PumpfunBuySection: React.FC<PumpfunBuySectionProps> = ({

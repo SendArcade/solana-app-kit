@@ -19,7 +19,7 @@ import {
 
 import {calculateWithSlippageBuy} from 'pumpdotfun-sdk';
 import {SERVER_URL} from '@env';
-import { TransactionService } from '../../../services/transaction/transactionService';
+import { TransactionService } from '../../embeddedWalletProviders/services/transaction/transactionService';
 
 /**
  * Create and immediately buy tokens
