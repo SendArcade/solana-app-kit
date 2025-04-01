@@ -6,7 +6,7 @@
 
 import { Connection, PublicKey, TransactionInstruction, Transaction, clusterApiUrl, Cluster } from '@solana/web3.js';
 import { PumpAmmSdk, Pool } from '@pump-fun/pump-swap-sdk';
-import { BN } from '@project-serum/anchor';
+// import { BN } from '@project-serum/anchor';
 import { CLUSTER, HELIUS_RPC_URL } from '@env';
 import { ENDPOINTS } from '../../../config/constants';
 import { 
