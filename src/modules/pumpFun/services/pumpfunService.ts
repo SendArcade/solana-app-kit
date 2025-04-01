@@ -1,11 +1,7 @@
-// FILE: src/services/pumpfun/pumpfunService.ts
-
 import {
   PublicKey,
   Keypair,
   LAMPORTS_PER_SOL,
-  Connection,
-  VersionedTransaction,
 } from '@solana/web3.js';
 import {PumpFunSDK} from 'pumpdotfun-sdk';
 import {getAssociatedTokenAddress} from '@solana/spl-token';
@@ -16,7 +12,6 @@ import {
   getSwapFee,
   getSwapQuote,
   getSwapTransaction,
-  parseRaydiumVersionedTransaction,
   buildPumpFunBuyTransaction,
   buildPumpFunSellTransaction,
   RAYDIUM_SOL_MINT,
@@ -24,7 +19,7 @@ import {
 
 import {calculateWithSlippageBuy} from 'pumpdotfun-sdk';
 import {SERVER_URL} from '@env';
-import { TransactionService } from '../../../services/transaction/transactionService';
+import { TransactionService } from '../../embeddedWalletProviders/services/transaction/transactionService';
 
 /**
  * Create and immediately buy tokens

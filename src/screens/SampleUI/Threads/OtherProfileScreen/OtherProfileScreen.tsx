@@ -7,10 +7,10 @@ import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks'
 import Profile from '../../../../core/profile/components/profile';
 import { ThreadPost } from '../../../../core/thread/components/thread.types';
 import { fetchAllPosts } from '../../../../state/thread/reducer';
-import { useFetchNFTs } from '../../../../modules/nft/hooks/useFetchNFTs';
 import COLORS from '../../../../assets/colors';
 import { SERVER_URL } from '@env';
 import { flattenPosts } from '../../../../core/thread/components/thread.utils';
+import { useFetchNFTs } from '../../../../modules/nft';
 
 const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 

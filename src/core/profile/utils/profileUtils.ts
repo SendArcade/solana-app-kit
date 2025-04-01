@@ -2,7 +2,8 @@
  * Profile utility functions
  */
 
-import { ThreadPost } from '../../../components/thread/thread.types';
+import { ThreadPost } from "../../thread/types";
+
 
 /**
  * Flattens nested threads for display in profile
@@ -96,7 +97,7 @@ export function calculateProfileStats(
   likeCount: number;
 } {
   // Count total likes across all posts
-  const likeCount = posts.reduce((total, post) => total + (post.likeCount || 0), 0);
+  const likeCount = posts.reduce((total, post) => total + (post.reactionCount ?? 0), 0);
   
   return {
     postCount: posts.length,

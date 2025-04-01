@@ -16,12 +16,12 @@ import {
 import Icons from '../../../assets/svgs';
 import { TENSOR_API_KEY } from '@env';
 import { DEFAULT_IMAGES } from '../../../config/constants';
-import { useWallet } from '../../../hooks/useWallet';
+import { useWallet } from '../../embeddedWalletProviders/hooks/useWallet';
 import { useAppDispatch, useAppSelector } from '../../../hooks/useReduxHooks';
 import { createRootPostAsync, addPostLocally } from '../../../state/thread/reducer';
 import { ThreadSection, ThreadSectionType, ThreadUser } from '../../../core/thread/components/thread.types';
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
-import { TransactionService } from '../../../services/transaction/transactionService';
+import { TransactionService } from '../../embeddedWalletProviders/services/transaction/transactionService';
 
 // Import types from our module
 import { NftItem, NftListingModalProps, CollectionResult } from '../types';

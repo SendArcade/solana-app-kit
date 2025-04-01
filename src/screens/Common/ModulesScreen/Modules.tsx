@@ -8,9 +8,9 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import { useAuth } from '../../../hooks/useAuth';
-import { useNavigation } from '@react-navigation/native';
-import { styles } from './Modules.styles';
+import {useAuth} from '../../../modules/embeddedWalletProviders/hooks/useAuth';
+import {useNavigation} from '@react-navigation/native';
+import {styles} from './Modules.styles';
 
 const sections = [
   {

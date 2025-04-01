@@ -14,13 +14,13 @@ import Icons from '../../../../assets/svgs/index';
 import { useAppSelector, useAppDispatch } from '../../../../hooks/useReduxHooks';
 import { Cluster, Connection, clusterApiUrl, PublicKey } from '@solana/web3.js';
 import { sendSOL } from '../../../../utils/transactions/transactionUtils';
-import { useWallet } from '../../../../hooks/useWallet';
+import { useWallet } from '../../../../modules/embeddedWalletProviders/hooks/useWallet';
 import {
   setSelectedFeeTier as setFeeTier,
   setTransactionMode as setMode
 } from '../../../../state/transaction/reducer';
 import { CLUSTER } from '@env';
-import { TransactionService } from '../../../../services/transaction/transactionService';
+import { TransactionService } from '../../../../modules/embeddedWalletProviders/services/transaction/transactionService';
 
 export interface AddButtonProps {
   amIFollowing: boolean;

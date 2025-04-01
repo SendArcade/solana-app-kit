@@ -12,8 +12,8 @@ import {SERVER_URL} from '@env';
 import {createSyncNativeInstruction} from '@solana/spl-token';
 import * as spl from '@solana/spl-token';
 import { PUBLIC_KEYS } from '../../../config/constants';
-import { StandardWallet } from '../../../hooks/useAuth';
-import { TransactionService } from '../../../services/transaction/transactionService';
+import { TransactionService } from '../../embeddedWalletProviders/services/transaction/transactionService';
+import { StandardWallet } from '../../embeddedWalletProviders/types';
 
 /**
  * fundUserWithWSOL

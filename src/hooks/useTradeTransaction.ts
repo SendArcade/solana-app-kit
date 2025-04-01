@@ -9,14 +9,14 @@ import {
 
 import { RootState } from '../state/store';
 import { useCustomization } from '../CustomizationProvider';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../modules/embeddedWalletProviders/hooks/useAuth';
 import { ENDPOINTS } from '../config/constants';
 import { CLUSTER, SERVER_URL } from '@env';
 import { 
   sendSOL, 
   sendTransactionWithPriorityFee 
 } from '../utils/transactions/transactionUtils';
-import { TransactionService } from '../services/transaction/transactionService';
+import { TransactionService } from '../modules/embeddedWalletProviders/services/transaction/transactionService';
 
 /**
  * Hook to handle trade transactions for both Privy & Dynamic.

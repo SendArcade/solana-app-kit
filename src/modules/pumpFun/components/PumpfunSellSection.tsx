@@ -12,7 +12,7 @@ import {
 import { usePumpFun } from '../hooks/usePumpFun';
 import { PumpfunSellStyles } from './Pumpfun.styles';
 import PumpfunCard from './PumpfunCard';
-import { TransactionService } from '../../../services/transaction/transactionService';
+import { TransactionService } from '../../embeddedWalletProviders/services/transaction/transactionService';
 import { PumpfunSellSectionProps } from '../types';
 
 
