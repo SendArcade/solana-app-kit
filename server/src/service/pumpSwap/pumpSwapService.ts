@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { Connection, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
-import { PumpAmmSdk } from '@pump-fun/pump-swap-sdk';
+import { PumpAmmSdk } from '@pump-fun/pump-swap-sdk/dist/sdk/pumpAmm.js';
 import BN from 'bn.js';
 import {
   getBlockhashWithFallback,
