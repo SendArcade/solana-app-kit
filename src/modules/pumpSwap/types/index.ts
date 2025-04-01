@@ -3,8 +3,25 @@
  */
 
 import { StyleProp, ViewStyle, TextStyle } from 'react-native';
-import { PublicKey, Connection, Transaction } from '@solana/web3.js';
-import { PumpAmmSdk, Direction, Pool } from '@pump-fun/pump-swap-sdk';
+import { PublicKey, Connection } from '@solana/web3.js';
+import { StandardWallet } from '../../embeddedWalletProviders/types';
+
+// Direction enum for swap direction
+export enum Direction {
+  QuoteToBase = 0,
+  BaseToQuote = 1
+}
+
+// Pool interface - simplified version of the server-side Pool type
+export interface Pool {
+  address: string;
+  baseMint: string;
+  quoteMint: string;
+  baseReserve?: string;
+  quoteReserve?: string;
+  lpMint?: string;
+  price?: number;
+}
 
 /**
  * Props for the PumpSwapCard component
@@ -113,59 +130,43 @@ export interface LiquidityPool {
  * Types for the services
  */
 export interface SwapParams {
-  /** The user's public key */
-  userPublicKey: string;
-  /** The pool to swap in */
-  pool: Pool;
+  /** The pool address to swap in */
+  pool: string;
   /** The amount to swap */
   amount: number;
   /** The direction of the swap */
   direction: Direction;
   /** The slippage tolerance in percentage */
-  slippage: number;
-  /** The wallet to use for the transaction */
-  solanaWallet: any;
-  /** Optional callback for status updates */
-  onStatusUpdate?: (status: string) => void;
+  slippage?: number;
+  /** The user's public key */
+  userPublicKey: string;
 }
 
 export interface AddLiquidityParams {
-  /** The user's public key */
-  userPublicKey: string;
-  /** The pool to add liquidity to */
-  pool: Pool;
+  /** The pool address to add liquidity to */
+  pool: string;
   /** The base token amount */
   baseAmount: number;
   /** The quote token amount */
   quoteAmount: number;
   /** The slippage tolerance in percentage */
-  slippage: number;
-  /** Expected LP token amount */
-  lpTokenAmount: number;
-  /** The wallet to use for the transaction */
-  solanaWallet: any;
-  /** Optional callback for status updates */
-  onStatusUpdate?: (status: string) => void;
+  slippage?: number;
+  /** The user's public key */
+  userPublicKey: string;
 }
 
 export interface RemoveLiquidityParams {
-  /** The user's public key */
-  userPublicKey: string;
-  /** The pool to remove liquidity from */
-  pool: Pool;
+  /** The pool address to remove liquidity from */
+  pool: string;
   /** The LP token amount to burn */
   lpTokenAmount: number;
   /** The slippage tolerance in percentage */
-  slippage: number;
-  /** The wallet to use for the transaction */
-  solanaWallet: any;
-  /** Optional callback for status updates */
-  onStatusUpdate?: (status: string) => void;
+  slippage?: number;
+  /** The user's public key */
+  userPublicKey: string;
 }
 
 export interface CreatePoolParams {
-  /** The user's public key */
-  userPublicKey: string;
   /** The index for the pool */
   index: number;
   /** The base token mint */
@@ -176,35 +177,26 @@ export interface CreatePoolParams {
   baseAmount: number;
   /** The initial quote token amount */
   quoteAmount: number;
-  /** The wallet to use for the transaction */
-  solanaWallet: any;
-  /** Optional callback for status updates */
-  onStatusUpdate?: (status: string) => void;
+  /** The user's public key */
+  userPublicKey: string;
 }
 
+// Context type for potential future use
 export interface PumpSwapContextType {
-  /** The PumpAmmSdk instance */
-  sdk: PumpAmmSdk | null;
   /** Whether the SDK is loading */
   isLoading: boolean;
-  /** The user's connected wallet */
-  wallet: any;
   /** The Solana Connection */
   connection: Connection | null;
   /** Available pools */
   pools: Pool[];
   /** Swap tokens */
-  swap: (params: SwapParams) => Promise<string>;
+  swap: (params: SwapParams & { connection: Connection, solanaWallet: StandardWallet, onStatusUpdate?: (status: string) => void }) => Promise<string>;
   /** Add liquidity to a pool */
-  addLiquidity: (params: AddLiquidityParams) => Promise<string>;
+  addLiquidity: (params: AddLiquidityParams & { connection: Connection, solanaWallet: StandardWallet, onStatusUpdate?: (status: string) => void }) => Promise<string>;
   /** Remove liquidity from a pool */
-  removeLiquidity: (params: RemoveLiquidityParams) => Promise<string>;
+  removeLiquidity: (params: RemoveLiquidityParams & { connection: Connection, solanaWallet: StandardWallet, onStatusUpdate?: (status: string) => void }) => Promise<string>;
   /** Create a new pool */
-  createPool: (params: CreatePoolParams) => Promise<string>;
-  /** Get expected output for a swap */
-  getSwapQuote: (pool: Pool, inputAmount: number, direction: Direction, slippage: number) => Promise<number>;
-  /** Get expected output for adding liquidity */
-  getLiquidityQuote: (pool: Pool, baseAmount: number, quoteAmount: number, slippage: number) => Promise<number>;
+  createPool: (params: CreatePoolParams & { connection: Connection, solanaWallet: StandardWallet, onStatusUpdate?: (status: string) => void }) => Promise<string>;
   /** Refresh pools */
   refreshPools: () => Promise<void>;
 }

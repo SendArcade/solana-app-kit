@@ -7,34 +7,80 @@ import {
     ScrollView,
     SafeAreaView,
     KeyboardAvoidingView,
-    Platform
+    Platform,
+    Alert,
+    ActivityIndicator
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Connection } from '@solana/web3.js';
+import { useWallet } from '../../embeddedWalletProviders/hooks/useWallet';
+import { useAuth } from '../../embeddedWalletProviders/hooks/useAuth';
+import { useSolanaConnection } from '../../../hooks/useSolanaConnection';
+import { useAppSelector } from '../../../hooks/useReduxHooks';
 import {
-    PumpSwapCard,
     SwapSection,
     LiquidityAddSection,
     LiquidityRemoveSection,
     PoolCreationSection
 } from '../components';
 
-type TabType = 'swap' | 'addLiquidity' | 'removeLiquidity' | 'createPool';
+type TabType = 'swap' | 'add' | 'remove' | 'create';
 
 /**
  * Main screen for the PumpSwap module with tabs for different functions
  * @component
  */
 const PumpSwapScreen: React.FC = () => {
+    // Get wallet and connection
+    const { wallet, address } = useWallet();
+    const { solanaWallet } = useAuth();
+    const myWallet = useAppSelector(state => state.auth.address);
+    const connection = useSolanaConnection();
+
     const [activeTab, setActiveTab] = useState<TabType>('swap');
+    const [loading, setLoading] = useState(false);
     const insets = useSafeAreaInsets();
+
+    // Make sure we have a valid public key string
+    const publicKey = (myWallet || address || solanaWallet?.wallets?.[0]?.publicKey) || '';
+
+    // Get the most appropriate wallet to use for transactions
+    const getWalletForTransactions = () => {
+        // Prefer the standardized wallet if available
+        if (wallet) {
+            return wallet;
+        }
+
+        // Fall back to solanaWallet if available
+        if (solanaWallet) {
+            return solanaWallet;
+        }
+
+        // If no wallet available, show error
+        Alert.alert('Error', 'No wallet is available for transactions');
+        return null;
+    };
+
+    const walletForTx = getWalletForTransactions();
+
+    // Check if wallet is connected
+    if (!publicKey) {
+        return (
+            <View style={styles.container}>
+                <Text style={styles.connectMessage}>
+                    Please connect your wallet to use PumpSwap
+                </Text>
+            </View>
+        );
+    }
 
     // Render the tab bar
     const renderTabBar = () => {
         const tabs: { key: TabType; label: string }[] = [
             { key: 'swap', label: 'Swap' },
-            { key: 'addLiquidity', label: 'Add Liquidity' },
-            { key: 'removeLiquidity', label: 'Remove Liquidity' },
-            { key: 'createPool', label: 'Create Pool' },
+            { key: 'add', label: 'Add Liquidity' },
+            { key: 'remove', label: 'Remove Liquidity' },
+            { key: 'create', label: 'Create Pool' },
         ];
 
         return (
@@ -62,17 +108,45 @@ const PumpSwapScreen: React.FC = () => {
         );
     };
 
-    // Render the active tab content
+    // Render the active tab content with wallet and connection
     const renderTabContent = () => {
+        if (!walletForTx) {
+            return (
+                <Text style={styles.errorText}>
+                    Wallet not available for transactions
+                </Text>
+            );
+        }
+
         switch (activeTab) {
             case 'swap':
-                return <SwapSection swapButtonLabel="Swap Tokens" />;
-            case 'addLiquidity':
-                return <LiquidityAddSection addLiquidityButtonLabel="Add Liquidity" />;
-            case 'removeLiquidity':
-                return <LiquidityRemoveSection removeLiquidityButtonLabel="Remove Liquidity" />;
-            case 'createPool':
-                return <PoolCreationSection createPoolButtonLabel="Create Pool" />;
+                return (
+                    <SwapSection
+                        solanaWallet={walletForTx}
+                        connection={connection}
+                    />
+                );
+            case 'add':
+                return (
+                    <LiquidityAddSection
+                        solanaWallet={walletForTx}
+                        connection={connection}
+                    />
+                );
+            case 'remove':
+                return (
+                    <LiquidityRemoveSection
+                        solanaWallet={walletForTx}
+                        connection={connection}
+                    />
+                );
+            case 'create':
+                return (
+                    <PoolCreationSection
+                        solanaWallet={walletForTx}
+                        connection={connection}
+                    />
+                );
             default:
                 return null;
         }
@@ -98,14 +172,25 @@ const PumpSwapScreen: React.FC = () => {
                         <Text style={styles.subtitle}>
                             Swap, provide liquidity, and create pools
                         </Text>
+                        <Text style={styles.walletAddress}>
+                            Your Wallet: {publicKey.slice(0, 4)}...{publicKey.slice(-4)}
+                        </Text>
                     </View>
 
-                    <PumpSwapCard>
+                    {loading && (
+                        <ActivityIndicator
+                            color="#6E56CF"
+                            style={styles.loader}
+                            size="large"
+                        />
+                    )}
+
+                    <View style={styles.card}>
                         {renderTabBar()}
                         <View style={styles.tabContent}>
                             {renderTabContent()}
                         </View>
-                    </PumpSwapCard>
+                    </View>
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -138,6 +223,22 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#64748B',
         textAlign: 'center',
+        marginBottom: 8,
+    },
+    walletAddress: {
+        fontSize: 14,
+        color: '#64748B',
+        textAlign: 'center',
+    },
+    card: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 16,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
     },
     tabBar: {
         flexDirection: 'row',
@@ -172,6 +273,21 @@ const styles = StyleSheet.create({
     tabContent: {
         paddingTop: 8,
         paddingHorizontal: 4,
+    },
+    connectMessage: {
+        textAlign: 'center',
+        fontSize: 16,
+        color: '#64748B',
+        marginTop: 40,
+    },
+    errorText: {
+        textAlign: 'center',
+        fontSize: 16,
+        color: '#E53E3E',
+        marginVertical: 20,
+    },
+    loader: {
+        marginVertical: 20,
     },
 });
 
