@@ -18,12 +18,18 @@ import {
 import { DEFAULT_SLIPPAGE } from '../utils/pumpSwapUtils';
 
 
-// Replace this with an actual pool address
-const DEFAULT_POOL = '11111111111111111111111111111111';
+// Token address examples as placeholders
+const SOL_MINT = 'So11111111111111111111111111111111111111112';
+const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
-// Example tokens: You can change these to match your real base/quote tokens
-const DEFAULT_BASE_TOKEN = { symbol: 'SOL', decimals: 9 };
-const DEFAULT_QUOTE_TOKEN = { symbol: 'USDC', decimals: 6 };
+// Token metadata for common tokens
+const KNOWN_TOKENS: Record<string, { symbol: string, name: string, decimals: number }> = {
+    [SOL_MINT]: { symbol: 'SOL', name: 'Solana', decimals: 9 },
+    [USDC_MINT]: { symbol: 'USDC', name: 'USD Coin', decimals: 6 },
+    'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So': { symbol: 'mSOL', name: 'Marinade Staked SOL', decimals: 9 },
+    'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': { symbol: 'USDT', name: 'USDT', decimals: 6 },
+    'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': { symbol: 'BONK', name: 'Bonk', decimals: 5 },
+};
 
 interface SwapSectionProps {
     connection: Connection;
@@ -43,71 +49,116 @@ export function SwapSection({
 
     // UI states
     const [direction, setDirection] = useState<Direction>(Direction.BaseToQuote);
+    const [poolAddress, setPoolAddress] = useState('');
+    const [baseMint, setBaseMint] = useState(SOL_MINT);
+    const [quoteMint, setQuoteMint] = useState(USDC_MINT);
     const [baseAmount, setBaseAmount] = useState('');
     const [quoteAmount, setQuoteAmount] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+    // Get token symbols for display
+    const baseSymbol = KNOWN_TOKENS[baseMint]?.symbol || 'BASE';
+    const quoteSymbol = KNOWN_TOKENS[quoteMint]?.symbol || 'QUOTE';
+
     // Fetch quote if user changes the base amount
-    const handleBaseAmountChange = useCallback(async (amount: string) => {
-        if (!amount || !connected) {
-            setBaseAmount(amount);
+    const handleBaseAmountChange = useCallback((amount: string) => {
+        setBaseAmount(amount);
+
+        // Only try to get quote if there's a valid pool address and amount
+        if (!amount || !poolAddress || !connected) {
             setQuoteAmount('');
             return;
         }
 
-        try {
-            setIsLoading(true);
-            setError(null);
-            setStatusMessage('Getting quote...');
+        const fetchQuote = async () => {
+            try {
+                setIsLoading(true);
+                setError(null);
+                setStatusMessage('Getting quote...');
 
-            const numeric = parseFloat(amount);
-            const result = await getSwapQuoteFromBase(
-                DEFAULT_POOL,
-                numeric,
-                DEFAULT_SLIPPAGE
-            );
+                const numeric = parseFloat(amount);
+                const result = await getSwapQuoteFromBase(
+                    poolAddress,
+                    numeric,
+                    DEFAULT_SLIPPAGE
+                );
 
-            setBaseAmount(amount);
-            setQuoteAmount(result.toString());
-            setStatusMessage(null);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to get quote');
-        } finally {
-            setIsLoading(false);
-        }
-    }, [connected]);
+                setQuoteAmount(result.toString());
+                setStatusMessage(null);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'Failed to get quote');
+                setQuoteAmount('');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        // Use setTimeout to avoid too many API calls when typing fast
+        const timeoutId = setTimeout(fetchQuote, 500);
+        return () => clearTimeout(timeoutId);
+    }, [poolAddress, connected]);
 
     // Fetch quote if user changes the quote amount
-    const handleQuoteAmountChange = useCallback(async (amount: string) => {
-        if (!amount || !connected) {
-            setQuoteAmount(amount);
+    const handleQuoteAmountChange = useCallback((amount: string) => {
+        setQuoteAmount(amount);
+
+        // Only try to get quote if there's a valid pool address and amount
+        if (!amount || !poolAddress || !connected) {
             setBaseAmount('');
             return;
         }
 
-        try {
-            setIsLoading(true);
-            setError(null);
-            setStatusMessage('Getting quote...');
+        const fetchQuote = async () => {
+            try {
+                setIsLoading(true);
+                setError(null);
+                setStatusMessage('Getting quote...');
 
-            const numeric = parseFloat(amount);
-            const result = await getSwapQuoteFromQuote(
-                DEFAULT_POOL,
-                numeric,
-                DEFAULT_SLIPPAGE
-            );
+                const numeric = parseFloat(amount);
+                const result = await getSwapQuoteFromQuote(
+                    poolAddress,
+                    numeric,
+                    DEFAULT_SLIPPAGE
+                );
 
-            setQuoteAmount(amount);
-            setBaseAmount(result.toString());
-            setStatusMessage(null);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to get quote');
-        } finally {
-            setIsLoading(false);
-        }
-    }, [connected]);
+                setBaseAmount(result.toString());
+                setStatusMessage(null);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'Failed to get quote');
+                setBaseAmount('');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        // Use setTimeout to avoid too many API calls when typing fast
+        const timeoutId = setTimeout(fetchQuote, 500);
+        return () => clearTimeout(timeoutId);
+    }, [poolAddress, connected]);
+
+    // Handle mint changes
+    const handleBaseMintChange = useCallback((mint: string) => {
+        setBaseMint(mint);
+        setBaseAmount('');
+        setQuoteAmount('');
+        setError(null);
+    }, []);
+
+    const handleQuoteMintChange = useCallback((mint: string) => {
+        setQuoteMint(mint);
+        setBaseAmount('');
+        setQuoteAmount('');
+        setError(null);
+    }, []);
+
+    const handlePoolAddressChange = useCallback((address: string) => {
+        setPoolAddress(address);
+        setBaseAmount('');
+        setQuoteAmount('');
+        setError(null);
+    }, []);
 
     // Toggle direction (Base->Quote or Quote->Base)
     const toggleDirection = useCallback(() => {
@@ -131,27 +182,33 @@ export function SwapSection({
             return;
         }
 
+        if (!poolAddress) {
+            setError('No pool address specified');
+            return;
+        }
+
         try {
             setIsLoading(true);
             setError(null);
             setStatusMessage('Building swap transaction...');
 
-            // Amount is whichever side the user typed into. E.g. if direction=BaseToQuote, we rely on baseAmount
+            // Amount is based on the direction
             const numericAmount = parseFloat(
                 direction === Direction.BaseToQuote ? baseAmount : quoteAmount
             );
+
             if (isNaN(numericAmount) || numericAmount <= 0) {
                 throw new Error('Invalid amount specified');
             }
 
-            // Convert local Direction enum to a numeric value expected by the SDK
-            const directionValue = direction === Direction.BaseToQuote ? 1 : 0;
+            // Use direction value directly
+            const directionValue = direction;
 
             // Request server to build & return base64 transaction
             const signature = await swapTokens({
-                pool: DEFAULT_POOL,
+                pool: poolAddress,
                 amount: numericAmount,
-                direction: directionValue as any, // Type cast to any to avoid type mismatch
+                direction: directionValue,
                 slippage: DEFAULT_SLIPPAGE,
                 userPublicKey: userAddress,
                 connection,
@@ -159,8 +216,13 @@ export function SwapSection({
                 onStatusUpdate: (msg) => setStatusMessage(msg),
             });
 
-            setStatusMessage(`Swap successful! Tx Signature: ${signature}`);
+            setStatusMessage(`Swap successful! Tx: ${signature.slice(0, 8)}...${signature.slice(-8)}`);
+
+            // Reset amounts after successful swap
+            setBaseAmount('');
+            setQuoteAmount('');
         } catch (err) {
+            console.error('Swap error:', err);
             setError(err instanceof Error ? err.message : 'Swap failed');
             setStatusMessage(null);
         } finally {
@@ -173,7 +235,8 @@ export function SwapSection({
         baseAmount,
         quoteAmount,
         direction,
-        connection
+        connection,
+        poolAddress
     ]);
 
     if (!connected) {
@@ -190,17 +253,48 @@ export function SwapSection({
         <View style={styles.container}>
             <Text style={styles.sectionTitle}>
                 {direction === Direction.BaseToQuote
-                    ? `Swap ${DEFAULT_BASE_TOKEN.symbol} → ${DEFAULT_QUOTE_TOKEN.symbol}`
-                    : `Swap ${DEFAULT_QUOTE_TOKEN.symbol} → ${DEFAULT_BASE_TOKEN.symbol}`
+                    ? `Swap ${baseSymbol} → ${quoteSymbol}`
+                    : `Swap ${quoteSymbol} → ${baseSymbol}`
                 }
             </Text>
 
+            {/* Pool Address */}
+            <Text style={styles.inputLabel}>Pool Address</Text>
+            <TextInput
+                style={styles.input}
+                value={poolAddress}
+                onChangeText={handlePoolAddressChange}
+                placeholder="Enter pool address"
+                editable={!isLoading}
+            />
+
+            {/* Base Token Mint */}
+            <Text style={styles.inputLabel}>Base Token Mint {baseSymbol !== 'BASE' ? `(${baseSymbol})` : ''}</Text>
+            <TextInput
+                style={styles.input}
+                value={baseMint}
+                onChangeText={handleBaseMintChange}
+                placeholder="Base token mint address"
+                editable={!isLoading}
+            />
+
+            {/* Quote Token Mint */}
+            <Text style={styles.inputLabel}>Quote Token Mint {quoteSymbol !== 'QUOTE' ? `(${quoteSymbol})` : ''}</Text>
+            <TextInput
+                style={styles.input}
+                value={quoteMint}
+                onChangeText={handleQuoteMintChange}
+                placeholder="Quote token mint address"
+                editable={!isLoading}
+            />
+
             {/* Input for "base" token */}
+            <Text style={styles.inputLabel}>Input {baseSymbol} Amount</Text>
             <TextInput
                 style={styles.input}
                 value={baseAmount}
                 onChangeText={handleBaseAmountChange}
-                placeholder={`Enter ${DEFAULT_BASE_TOKEN.symbol} amount`}
+                placeholder={`Enter ${baseSymbol} amount`}
                 keyboardType="numeric"
                 editable={!isLoading && direction === Direction.BaseToQuote}
             />
@@ -211,11 +305,12 @@ export function SwapSection({
             </TouchableOpacity>
 
             {/* Input for "quote" token */}
+            <Text style={styles.inputLabel}>Input {quoteSymbol} Amount</Text>
             <TextInput
                 style={styles.input}
                 value={quoteAmount}
                 onChangeText={handleQuoteAmountChange}
-                placeholder={`Enter ${DEFAULT_QUOTE_TOKEN.symbol} amount`}
+                placeholder={`Enter ${quoteSymbol} amount`}
                 keyboardType="numeric"
                 editable={!isLoading && direction === Direction.QuoteToBase}
             />
@@ -224,10 +319,10 @@ export function SwapSection({
             <TouchableOpacity
                 style={[
                     styles.swapButton,
-                    (!baseAmount && !quoteAmount) || isLoading ? styles.disabledButton : null
+                    (!poolAddress || (!baseAmount && !quoteAmount) || isLoading) ? styles.disabledButton : null
                 ]}
                 onPress={handleSwap}
-                disabled={(!baseAmount && !quoteAmount) || isLoading}
+                disabled={!poolAddress || (!baseAmount && !quoteAmount) || isLoading}
             >
                 <Text style={styles.swapButtonText}>
                     {isLoading ? 'Processing...' : 'Swap'}
@@ -242,12 +337,29 @@ export function SwapSection({
             )}
 
             {/* Status and error messages */}
-            {statusMessage && <Text style={styles.statusText}>{statusMessage}</Text>}
+            {statusMessage && (
+                <View style={styles.statusContainer}>
+                    <Text style={styles.statusText}>{statusMessage}</Text>
+                </View>
+            )}
             {error && (
                 <View style={styles.errorContainer}>
                     <Text style={styles.errorText}>{error}</Text>
                 </View>
             )}
+
+            {/* Help text */}
+            <View style={styles.infoContainer}>
+                <Text style={styles.infoTextDetail}>
+                    <Text style={{ fontWeight: 'bold' }}>Step 1:</Text> Enter the pool address first. This should be the address of an existing liquidity pool.
+                </Text>
+                <Text style={styles.infoTextDetail}>
+                    <Text style={{ fontWeight: 'bold' }}>Step 2:</Text> Enter the base and quote token mint addresses (if different from default).
+                </Text>
+                <Text style={styles.infoTextDetail}>
+                    <Text style={{ fontWeight: 'bold' }}>Step 3:</Text> Enter amount to swap and click Swap button.
+                </Text>
+            </View>
         </View>
     );
 }
@@ -265,6 +377,12 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#64748B',
         textAlign: 'center',
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#64748B',
+        marginBottom: 4,
     },
     input: {
         borderWidth: 1,
@@ -304,8 +422,15 @@ const styles = StyleSheet.create({
         marginTop: 12,
         alignItems: 'center',
     },
-    statusText: {
+    statusContainer: {
         marginTop: 10,
+        backgroundColor: '#EFF6FF',
+        borderRadius: 6,
+        padding: 8,
+        borderLeftWidth: 3,
+        borderLeftColor: '#3B82F6',
+    },
+    statusText: {
         fontSize: 14,
         color: '#64748B',
     },
@@ -318,5 +443,16 @@ const styles = StyleSheet.create({
     errorText: {
         color: '#d32f2f',
         fontSize: 14,
+    },
+    infoContainer: {
+        backgroundColor: '#F1F5F9',
+        borderRadius: 8,
+        padding: 12,
+        marginTop: 12,
+    },
+    infoTextDetail: {
+        fontSize: 14,
+        color: '#64748B',
+        marginBottom: 8,
     },
 });
