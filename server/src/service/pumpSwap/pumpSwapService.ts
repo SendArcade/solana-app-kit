@@ -580,6 +580,22 @@ export class PumpSwapClient {
       console.log(`Is SOL Quote?: ${isQuoteSol}`);
       console.log("=================================");
       
+      // Check user's SOL balance first
+      console.log("Checking wallet SOL balance");
+      const solBalance = await this.connection.getBalance(userPubkey);
+      console.log(`User wallet SOL balance: ${solBalance} lamports (${solBalance / 1_000_000_000} SOL)`);
+      
+      // Estimated minimum SOL required for creating a pool (account rent + transaction fee)
+      const MIN_SOL_REQUIRED_LAMPORTS = 2500000; // 0.0025 SOL (slightly higher than the 0.00236 seen in error)
+      
+      if (solBalance < MIN_SOL_REQUIRED_LAMPORTS) {
+        console.error(`Insufficient SOL balance. Have ${solBalance} lamports, need at least ${MIN_SOL_REQUIRED_LAMPORTS} lamports`);
+        return {
+          success: false,
+          error: `Insufficient SOL balance for creating pool. You have ${(solBalance / 1_000_000_000).toFixed(6)} SOL, but need at least ${(MIN_SOL_REQUIRED_LAMPORTS / 1_000_000_000).toFixed(6)} SOL for transaction fees and account rent.`
+        };
+      }
+      
       // Create accounts for pool if using mainnet
       const isMainnet = process.env.RPC_URL?.includes('mainnet') || false;
       console.log(`Using network: ${isMainnet ? 'Mainnet' : 'Devnet/Testnet'}`);
