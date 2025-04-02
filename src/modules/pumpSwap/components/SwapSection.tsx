@@ -1,159 +1,186 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
+import {
+    View,
+    Text,
+    StyleSheet,
+    TextInput,
+    ActivityIndicator,
+    TouchableOpacity
+} from 'react-native';
+import { useWallet } from '../../embeddedWalletProviders/hooks/useWallet';
 import { Connection } from '@solana/web3.js';
 import {
     getSwapQuoteFromBase,
     getSwapQuoteFromQuote,
     swapTokens,
-    Direction
-} from '../services/pumpSwapService';
+    Direction,
+} from '../services/pumpSwapService'; // <--- These are your server-calling helpers
 import { DEFAULT_SLIPPAGE } from '../utils/pumpSwapUtils';
-import { useWallet } from '../../embeddedWalletProviders/hooks/useWallet';
-import { StandardWallet } from '../../embeddedWalletProviders/types';
+
+
+// Replace this with an actual pool address
+const DEFAULT_POOL = '11111111111111111111111111111111';
+
+// Example tokens: You can change these to match your real base/quote tokens
+const DEFAULT_BASE_TOKEN = { symbol: 'SOL', decimals: 9 };
+const DEFAULT_QUOTE_TOKEN = { symbol: 'USDC', decimals: 6 };
 
 interface SwapSectionProps {
-    pool?: string;
-    baseToken?: {
-        symbol: string;
-        decimals: number;
-    };
-    quoteToken?: {
-        symbol: string;
-        decimals: number;
-    };
     connection: Connection;
-    solanaWallet: StandardWallet | any;
+    // The wallet object you use in your app (returned from useWallet, or whichever you prefer)
+    solanaWallet: any;
 }
 
-// Default tokens
-const DEFAULT_POOL = 'default_pool_address';
-const DEFAULT_BASE_TOKEN = {
-    symbol: 'SOL',
-    decimals: 9,
-};
-const DEFAULT_QUOTE_TOKEN = {
-    symbol: 'USDC',
-    decimals: 6,
-};
-
+/**
+ * SwapSection allows a user to swap from Base -> Quote or Quote -> Base
+ */
 export function SwapSection({
-    pool = DEFAULT_POOL,
-    baseToken = DEFAULT_BASE_TOKEN,
-    quoteToken = DEFAULT_QUOTE_TOKEN,
     connection,
-    solanaWallet
+    solanaWallet,
 }: SwapSectionProps) {
-    // Use hook just for connected state and address
-    const { publicKey, address, connected } = useWallet();
+    // Pull out info from your custom wallet hook
+    const { address, connected } = useWallet();
 
+    // UI states
     const [direction, setDirection] = useState<Direction>(Direction.BaseToQuote);
-    const [baseAmount, setBaseAmount] = useState<string>('');
-    const [quoteAmount, setQuoteAmount] = useState<string>('');
+    const [baseAmount, setBaseAmount] = useState('');
+    const [quoteAmount, setQuoteAmount] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+    // Fetch quote if user changes the base amount
     const handleBaseAmountChange = useCallback(async (amount: string) => {
-        if (!amount || !connected) return;
+        if (!amount || !connected) {
+            setBaseAmount(amount);
+            setQuoteAmount('');
+            return;
+        }
 
         try {
             setIsLoading(true);
             setError(null);
             setStatusMessage('Getting quote...');
 
-            const numericAmount = parseFloat(amount);
-            const quoteAmount = await getSwapQuoteFromBase(
-                pool,
-                numericAmount,
+            const numeric = parseFloat(amount);
+            const result = await getSwapQuoteFromBase(
+                DEFAULT_POOL,
+                numeric,
                 DEFAULT_SLIPPAGE
             );
 
             setBaseAmount(amount);
-            setQuoteAmount(quoteAmount.toString());
+            setQuoteAmount(result.toString());
             setStatusMessage(null);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to get quote');
         } finally {
             setIsLoading(false);
         }
-    }, [pool, connected]);
+    }, [connected]);
 
+    // Fetch quote if user changes the quote amount
     const handleQuoteAmountChange = useCallback(async (amount: string) => {
-        if (!amount || !connected) return;
+        if (!amount || !connected) {
+            setQuoteAmount(amount);
+            setBaseAmount('');
+            return;
+        }
 
         try {
             setIsLoading(true);
             setError(null);
             setStatusMessage('Getting quote...');
 
-            const numericAmount = parseFloat(amount);
-            const baseAmount = await getSwapQuoteFromQuote(
-                pool,
-                numericAmount,
+            const numeric = parseFloat(amount);
+            const result = await getSwapQuoteFromQuote(
+                DEFAULT_POOL,
+                numeric,
                 DEFAULT_SLIPPAGE
             );
 
             setQuoteAmount(amount);
-            setBaseAmount(baseAmount.toString());
+            setBaseAmount(result.toString());
             setStatusMessage(null);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to get quote');
         } finally {
             setIsLoading(false);
         }
-    }, [pool, connected]);
+    }, [connected]);
 
+    // Toggle direction (Base->Quote or Quote->Base)
+    const toggleDirection = useCallback(() => {
+        setDirection((prev) =>
+            prev === Direction.BaseToQuote ? Direction.QuoteToBase : Direction.BaseToQuote
+        );
+        // Clear amounts whenever direction changes
+        setBaseAmount('');
+        setQuoteAmount('');
+        setStatusMessage(null);
+        setError(null);
+    }, []);
+
+    // Perform the swap transaction
     const handleSwap = useCallback(async () => {
-        if (!connected || !solanaWallet || !baseAmount) return;
+        if (!connected || !solanaWallet) return;
+
+        const userAddress = address || '';
+        if (!userAddress) {
+            setError('No wallet address found');
+            return;
+        }
 
         try {
             setIsLoading(true);
             setError(null);
+            setStatusMessage('Building swap transaction...');
 
-            const userAddress = address || publicKey?.toString() || '';
-            if (!userAddress) {
-                throw new Error('No wallet address found');
+            // Amount is whichever side the user typed into. E.g. if direction=BaseToQuote, we rely on baseAmount
+            const numericAmount = parseFloat(
+                direction === Direction.BaseToQuote ? baseAmount : quoteAmount
+            );
+            if (isNaN(numericAmount) || numericAmount <= 0) {
+                throw new Error('Invalid amount specified');
             }
 
-            // Use updated swapTokens function with wallet integration
-            await swapTokens({
-                pool,
-                amount: parseFloat(baseAmount),
-                direction,
+            // Convert local Direction enum to a numeric value expected by the SDK
+            const directionValue = direction === Direction.BaseToQuote ? 1 : 0;
+
+            // Request server to build & return base64 transaction
+            const signature = await swapTokens({
+                pool: DEFAULT_POOL,
+                amount: numericAmount,
+                direction: directionValue as any, // Type cast to any to avoid type mismatch
                 slippage: DEFAULT_SLIPPAGE,
                 userPublicKey: userAddress,
                 connection,
                 solanaWallet,
-                onStatusUpdate: setStatusMessage
+                onStatusUpdate: (msg) => setStatusMessage(msg),
             });
 
-            // Clear inputs after successful swap
-            setBaseAmount('');
-            setQuoteAmount('');
+            setStatusMessage(`Swap successful! Tx Signature: ${signature}`);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to perform swap');
+            setError(err instanceof Error ? err.message : 'Swap failed');
             setStatusMessage(null);
         } finally {
             setIsLoading(false);
         }
-    }, [pool, baseAmount, direction, solanaWallet, address, publicKey, connection, connected]);
-
-    const toggleDirection = useCallback(() => {
-        setDirection(prev =>
-            prev === Direction.BaseToQuote
-                ? Direction.QuoteToBase
-                : Direction.BaseToQuote
-        );
-        setBaseAmount('');
-        setQuoteAmount('');
-        setStatusMessage(null);
-    }, []);
+    }, [
+        address,
+        connected,
+        solanaWallet,
+        baseAmount,
+        quoteAmount,
+        direction,
+        connection
+    ]);
 
     if (!connected) {
         return (
             <View style={styles.container}>
-                <Text style={styles.connectMessage}>
-                    Please connect your wallet to use Swap
+                <Text style={styles.infoText}>
+                    Please connect your wallet to perform swaps
                 </Text>
             </View>
         );
@@ -161,50 +188,61 @@ export function SwapSection({
 
     return (
         <View style={styles.container}>
+            <Text style={styles.sectionTitle}>
+                {direction === Direction.BaseToQuote
+                    ? `Swap ${DEFAULT_BASE_TOKEN.symbol} → ${DEFAULT_QUOTE_TOKEN.symbol}`
+                    : `Swap ${DEFAULT_QUOTE_TOKEN.symbol} → ${DEFAULT_BASE_TOKEN.symbol}`
+                }
+            </Text>
+
+            {/* Input for "base" token */}
             <TextInput
                 style={styles.input}
                 value={baseAmount}
                 onChangeText={handleBaseAmountChange}
-                placeholder={`Enter ${baseToken.symbol} amount`}
+                placeholder={`Enter ${DEFAULT_BASE_TOKEN.symbol} amount`}
                 keyboardType="numeric"
-                editable={!isLoading}
+                editable={!isLoading && direction === Direction.BaseToQuote}
             />
 
-            <Text
-                style={styles.directionButton}
-                onPress={toggleDirection}
-            >
-                {direction === Direction.BaseToQuote ? '↓' : '↑'}
-            </Text>
+            {/* Toggle direction button */}
+            <TouchableOpacity onPress={toggleDirection} style={styles.toggleButton}>
+                <Text style={styles.toggleButtonText}>⇅</Text>
+            </TouchableOpacity>
 
+            {/* Input for "quote" token */}
             <TextInput
                 style={styles.input}
                 value={quoteAmount}
                 onChangeText={handleQuoteAmountChange}
-                placeholder={`Enter ${quoteToken.symbol} amount`}
+                placeholder={`Enter ${DEFAULT_QUOTE_TOKEN.symbol} amount`}
                 keyboardType="numeric"
-                editable={!isLoading}
+                editable={!isLoading && direction === Direction.QuoteToBase}
             />
 
-            <Text
+            {/* Swap button */}
+            <TouchableOpacity
                 style={[
                     styles.swapButton,
-                    (!baseAmount || !quoteAmount || isLoading) && styles.disabledButton
+                    (!baseAmount && !quoteAmount) || isLoading ? styles.disabledButton : null
                 ]}
                 onPress={handleSwap}
+                disabled={(!baseAmount && !quoteAmount) || isLoading}
             >
-                {isLoading ? 'Processing...' : 'Swap'}
-            </Text>
+                <Text style={styles.swapButtonText}>
+                    {isLoading ? 'Processing...' : 'Swap'}
+                </Text>
+            </TouchableOpacity>
 
+            {/* Loading indicator */}
             {isLoading && (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="small" color="#6E56CF" />
-                    {statusMessage && (
-                        <Text style={styles.statusText}>{statusMessage}</Text>
-                    )}
                 </View>
             )}
 
+            {/* Status and error messages */}
+            {statusMessage && <Text style={styles.statusText}>{statusMessage}</Text>}
             {error && (
                 <View style={styles.errorContainer}>
                     <Text style={styles.errorText}>{error}</Text>
@@ -215,8 +253,18 @@ export function SwapSection({
 }
 
 const styles = StyleSheet.create({
-    container: {
-        padding: 16,
+    container: { padding: 16 },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        marginBottom: 8,
+        textAlign: 'center',
+        color: '#1E293B',
+    },
+    infoText: {
+        fontSize: 16,
+        color: '#64748B',
+        textAlign: 'center',
     },
     input: {
         borderWidth: 1,
@@ -224,50 +272,51 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 12,
         fontSize: 16,
-        marginBottom: 8,
+        marginBottom: 12,
     },
-    directionButton: {
-        fontSize: 24,
-        textAlign: 'center',
+    toggleButton: {
+        alignSelf: 'center',
         marginVertical: 8,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 8,
+        padding: 8,
+    },
+    toggleButtonText: {
+        fontSize: 18,
         color: '#6E56CF',
     },
     swapButton: {
         backgroundColor: '#6E56CF',
-        color: '#FFFFFF',
-        padding: 16,
         borderRadius: 8,
-        textAlign: 'center',
+        padding: 16,
+        marginTop: 8,
+        alignItems: 'center',
+    },
+    swapButtonText: {
+        color: '#FFFFFF',
         fontSize: 16,
         fontWeight: '600',
-        marginTop: 16,
     },
     disabledButton: {
-        backgroundColor: '#CBD5E1',
-    },
-    errorContainer: {
-        marginTop: 8,
-        padding: 8,
-        backgroundColor: '#ffebee',
-        borderRadius: 4,
-    },
-    errorText: {
-        color: '#c62828',
-        fontSize: 14,
+        opacity: 0.5,
     },
     loadingContainer: {
-        marginTop: 16,
+        marginTop: 12,
         alignItems: 'center',
     },
     statusText: {
-        marginTop: 8,
+        marginTop: 10,
         fontSize: 14,
         color: '#64748B',
     },
-    connectMessage: {
-        textAlign: 'center',
-        fontSize: 16,
-        color: '#64748B',
-        marginVertical: 20,
+    errorContainer: {
+        marginTop: 10,
+        backgroundColor: '#ffeef0',
+        borderRadius: 6,
+        padding: 8,
     },
-}); 
+    errorText: {
+        color: '#d32f2f',
+        fontSize: 14,
+    },
+});

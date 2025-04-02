@@ -1,151 +1,87 @@
 /**
- * PumpSwap Utilities
- * 
- * Utility functions for the PumpSwap module
+ * PumpSwap utilities for swap operations, pool management, and token calculations
  */
 
-import { PublicKey } from '@solana/web3.js';
-import { Direction } from '../types';
-
-/**
- * Default slippage tolerance (0.5%)
- */
+// Default slippage tolerance percentage for swaps (0.5%)
 export const DEFAULT_SLIPPAGE = 0.5;
 
 /**
- * Validate a Solana public key
+ * Calculate price impact for a swap
+ * @param inputAmount Amount of input token
+ * @param outputAmount Amount of output token
+ * @param marketPrice Current market price
+ * @returns Price impact as a percentage
  */
-export function isValidPublicKey(key: string): boolean {
-  try {
-    new PublicKey(key);
-    return true;
-  } catch {
-    return false;
-  }
+export function calculatePriceImpact(
+  inputAmount: number,
+  outputAmount: number,
+  marketPrice: number
+): number {
+  if (!inputAmount || !outputAmount || !marketPrice) return 0;
+  
+  const executionPrice = outputAmount / inputAmount;
+  const impact = Math.abs((executionPrice - marketPrice) / marketPrice) * 100;
+  
+  return impact;
 }
 
 /**
- * Format a number to a fixed number of decimal places
+ * Format token amount with appropriate decimals
+ * @param amount Raw token amount 
+ * @param decimals Token decimals (default: 9 for SOL)
+ * @returns Formatted amount string
  */
-export function formatNumber(value: number, decimals: number = 6): string {
-  return value.toFixed(decimals);
+export function formatTokenAmount(amount: number, decimals = 9): string {
+  if (amount === 0) return '0';
+  
+  const formattedAmount = amount.toFixed(decimals);
+  // Remove trailing zeros
+  return formattedAmount.replace(/\.?0+$/, '');
 }
 
 /**
- * Convert a number to a percentage string
+ * Calculates the minimum amount out based on slippage tolerance
+ * @param expectedAmount Expected output amount
+ * @param slippagePercentage Slippage tolerance percentage (default: DEFAULT_SLIPPAGE)
+ * @returns Minimum amount out accounting for slippage
  */
-export function formatPercentage(value: number): string {
-  return `${value.toFixed(2)}%`;
+export function calculateMinimumAmountOut(
+  expectedAmount: number,
+  slippagePercentage: number = DEFAULT_SLIPPAGE
+): number {
+  if (!expectedAmount) return 0;
+  
+  const slippageFactor = 1 - (slippagePercentage / 100);
+  return expectedAmount * slippageFactor;
 }
 
 /**
- * Convert a Direction enum to a human-readable string
+ * Calculate fee amount for a given trade
+ * @param amount Trade amount
+ * @param feePercentage Fee percentage (default: 0.3% which is common in AMMs)
+ * @returns Fee amount
  */
-export function getDirectionLabel(direction: Direction): string {
-  switch (direction) {
-    case Direction.BaseToQuote:
-      return 'Base to Quote';
-    case Direction.QuoteToBase:
-      return 'Quote to Base';
-    default:
-      return 'Unknown';
-  }
+export function calculateFee(amount: number, feePercentage = 0.3): number {
+  return amount * (feePercentage / 100);
 }
 
 /**
- * Calculate the minimum output amount based on slippage
+ * Validate token address for Solana token format
+ * @param address Token mint address
+ * @returns True if it appears valid
  */
-export function calculateMinOutput(amount: number, slippage: number): number {
-  return amount * (1 - slippage / 100);
+export function isValidTokenAddress(address: string): boolean {
+  // Basic validation for Solana public key format
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address);
 }
 
 /**
- * Calculate the maximum input amount based on slippage
+ * Get estimated LP token amount from pool creation
+ * @param baseAmount Amount of base token
+ * @param quoteAmount Amount of quote token
+ * @returns Estimated LP token amount
  */
-export function calculateMaxInput(amount: number, slippage: number): number {
-  return amount * (1 + slippage / 100);
-}
-
-/**
- * Validate swap parameters
- */
-export function validateSwapParams(params: {
-  pool: string;
-  amount: number;
-  direction: Direction;
-  slippage: number;
-}): string | null {
-  if (!isValidPublicKey(params.pool)) {
-    return 'Invalid pool address';
-  }
-
-  if (params.amount <= 0) {
-    return 'Amount must be greater than 0';
-  }
-
-  if (params.slippage <= 0 || params.slippage > 100) {
-    return 'Slippage must be between 0 and 100';
-  }
-
-  return null;
-}
-
-/**
- * Validate liquidity parameters
- */
-export function validateLiquidityParams(params: {
-  pool: string;
-  baseAmount: number | null;
-  quoteAmount: number | null;
-  slippage: number;
-}): string | null {
-  if (!isValidPublicKey(params.pool)) {
-    return 'Invalid pool address';
-  }
-
-  if (params.baseAmount === null && params.quoteAmount === null) {
-    return 'Either base amount or quote amount must be provided';
-  }
-
-  if (params.baseAmount !== null && params.baseAmount <= 0) {
-    return 'Base amount must be greater than 0';
-  }
-
-  if (params.quoteAmount !== null && params.quoteAmount <= 0) {
-    return 'Quote amount must be greater than 0';
-  }
-
-  if (params.slippage <= 0 || params.slippage > 100) {
-    return 'Slippage must be between 0 and 100';
-  }
-
-  return null;
-}
-
-/**
- * Validate pool creation parameters
- */
-export function validateCreatePoolParams(params: {
-  baseMint: string;
-  quoteMint: string;
-  baseAmount: number;
-  quoteAmount: number;
-}): string | null {
-  if (!isValidPublicKey(params.baseMint)) {
-    return 'Invalid base mint address';
-  }
-
-  if (!isValidPublicKey(params.quoteMint)) {
-    return 'Invalid quote mint address';
-  }
-
-  if (params.baseAmount <= 0) {
-    return 'Base amount must be greater than 0';
-  }
-
-  if (params.quoteAmount <= 0) {
-    return 'Quote amount must be greater than 0';
-  }
-
-  return null;
+export function estimateLpTokenAmount(baseAmount: number, quoteAmount: number): number {
+  // Simplified square root formula commonly used in AMMs
+  return Math.sqrt(baseAmount * quoteAmount);
 } 
