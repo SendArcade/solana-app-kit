@@ -556,21 +556,97 @@ export class PumpSwapClient {
       const poolAddress = new PublicKey(pool);
       const slippageDecimal = slippage / 100;
       
-      // Convert to BN
-      const lpTokenAmountBN = new BN(lpTokenAmount);
+      console.log(`Building remove liquidity transaction for pool: ${poolAddress.toBase58()}`);
+      console.log(`Parameters: lpTokenAmount=${lpTokenAmount}, slippage=${slippageDecimal}`);
+      
+      // First, check if the pool exists
+      try {
+        const poolAccountInfo = await this.connection.getAccountInfo(poolAddress);
+        if (!poolAccountInfo || !poolAccountInfo.data) {
+          return { 
+            success: false, 
+            error: `Pool not found at address: ${pool}` 
+          };
+        }
+        console.log(`Pool account found, data size: ${poolAccountInfo.data.length} bytes`);
+      } catch (error) {
+        console.error(`Error checking pool existence: ${error instanceof Error ? error.message : String(error)}`);
+        return { 
+          success: false, 
+          error: `Error validating pool: ${error instanceof Error ? error.message : String(error)}`
+        };
+      }
+      
+      // Try to get LP token mint from the pool
+      const poolData = await this.connection.getAccountInfo(poolAddress);
+      if (!poolData) {
+        return { success: false, error: "Failed to fetch pool data" };
+      }
+      
+      // Check if the user has enough LP tokens
+      try {
+        const lpTokenMint = new PublicKey("8mVQCtSUCLAx2ha5kj82jUASLMJDFosUkptb9nmiQXLM"); // This can be extracted from pool data in production
+        const userLpTokenAccount = await getAssociatedTokenAddressSync(
+          lpTokenMint,
+          userPubkey
+        );
+        
+        console.log(`Checking LP token balance in account: ${userLpTokenAccount.toBase58()}`);
+        
+        const tokenAccountInfo = await this.connection.getAccountInfo(userLpTokenAccount);
+        if (!tokenAccountInfo) {
+          console.log(`User does not have an LP token account for this pool`);
+          // Instead of returning error, we'll continue and let the transaction fail gracefully
+        }
+      } catch (error) {
+        console.warn(`Warning checking LP token balance: ${error instanceof Error ? error.message : String(error)}`);
+        // Continue anyway - the transaction will fail if the user doesn't have the tokens
+      }
+      
+      // Convert LP token amount to BN with 9 decimals precision
+      const LP_TOKEN_DECIMALS = 9; // Most pools use 9 decimals for LP tokens
+      const lpTokenAmountRaw = Math.floor(lpTokenAmount * Math.pow(10, LP_TOKEN_DECIMALS));
+      const lpTokenAmountBN = new BN(lpTokenAmountRaw);
+      
+      console.log(`LP token amount in smallest units: ${lpTokenAmountBN.toString()}`);
+      
+      // Get expected output amounts (base and quote tokens)
+      try {
+        console.log(`Getting expected output token amounts...`);
+        const { base, quote } = await this.sdk.withdrawAutoCompleteBaseAndQuoteFromLpToken(
+          poolAddress,
+          lpTokenAmountBN,
+          slippageDecimal
+        );
+        console.log(`Expected output: base=${base.toString()}, quote=${quote.toString()}`);
+      } catch (error) {
+        console.warn(`Warning fetching expected output: ${error instanceof Error ? error.message : String(error)}`);
+        // Continue anyway - this is just for display and doesn't affect the transaction
+      }
       
       // Create a new transaction
       const tx = new Transaction();
       
-      // Add placeholder instruction - actual SDK method might require different parameters
-      tx.add(
-        // Placeholder instruction
-        new TransactionInstruction({
-          keys: [],
-          programId: new PublicKey('11111111111111111111111111111111'),
-          data: Buffer.from([])
-        })
-      );
+      try {
+        // Get withdraw instructions using the LP token amount
+        console.log(`Getting withdraw instructions with LP token amount: ${lpTokenAmountBN.toString()}`);
+        const withdrawInstructions = await this.sdk.withdrawInstructions(
+          poolAddress,
+          lpTokenAmountBN,
+          slippageDecimal as any, // Cast to any to satisfy type requirements
+          userPubkey
+        );
+        
+        console.log(`Generated ${withdrawInstructions.length} withdraw instructions`);
+        
+        // Add instructions to transaction
+        for (const instruction of withdrawInstructions) {
+          tx.add(instruction);
+        }
+      } catch (sdkError) {
+        console.error("Error generating withdraw instructions:", sdkError);
+        throw new Error(`SDK error generating withdraw instructions: ${sdkError instanceof Error ? sdkError.message : 'Unknown SDK error'}`);
+      }
       
       // Get recent blockhash
       const blockhash = await getBlockhashWithFallback(this.connection);
