@@ -455,32 +455,77 @@ export class PumpSwapClient {
       const poolAddress = new PublicKey(pool);
       const slippageDecimal = slippage / 100;
       
-      // Convert to BN
-      const baseAmountBN = new BN(baseAmount);
-      const quoteAmountBN = new BN(quoteAmount);
-      
-      console.log(`Amount in smallest units: base=${baseAmountBN.toString()}, quote=${quoteAmountBN.toString()}`);
+      console.log(`Building add liquidity transaction for pool: ${poolAddress.toBase58()}`);
+      console.log(`Parameters: baseAmount=${baseAmount}, quoteAmount=${quoteAmount}, slippage=${slippageDecimal}`);
       
       // Create a new transaction
       const tx = new Transaction();
       
-      // First, calculate the expected LP token amount based on input
-      // Convert to BN
-      const { lpToken } = await this.sdk.depositAutocompleteQuoteAndLpTokenFromBase(
-        poolAddress,
-        baseAmountBN,
-        slippageDecimal
-      );
+      // Calculate the LP token amount based on input
+      let lpTokenAmount: BN;
       
-      // Add placeholder instruction - actual SDK method might require different parameters
-      tx.add(
-        // Placeholder instruction
-        new TransactionInstruction({
-          keys: [],
-          programId: new PublicKey('11111111111111111111111111111111'),
-          data: Buffer.from([])
-        })
-      );
+      if (baseAmount !== null && baseAmount > 0) {
+        console.log(`Using base amount: ${baseAmount}`);
+        // Convert to BN with 9 decimals precision
+        const baseAmountRaw = Math.floor(baseAmount * Math.pow(10, 9));
+        const baseAmountBN = new BN(baseAmountRaw);
+        
+        try {
+          // Get LP token amount from base
+          const { lpToken } = await this.sdk.depositAutocompleteQuoteAndLpTokenFromBase(
+            poolAddress,
+            baseAmountBN,
+            slippageDecimal
+          );
+          lpTokenAmount = lpToken;
+          console.log(`Calculated LP token amount from base: ${lpTokenAmount.toString()}`);
+        } catch (error) {
+          console.error("Error calculating LP token amount from base:", error);
+          throw new Error(`Failed to calculate LP token amount: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      } else if (quoteAmount !== null && quoteAmount > 0) {
+        console.log(`Using quote amount: ${quoteAmount}`);
+        // Convert to BN with 9 decimals precision
+        const quoteAmountRaw = Math.floor(quoteAmount * Math.pow(10, 9));
+        const quoteAmountBN = new BN(quoteAmountRaw);
+        
+        try {
+          // Get LP token amount from quote
+          const { lpToken } = await this.sdk.depositAutocompleteBaseAndLpTokenFromQuote(
+            poolAddress,
+            quoteAmountBN,
+            slippageDecimal
+          );
+          lpTokenAmount = lpToken;
+          console.log(`Calculated LP token amount from quote: ${lpTokenAmount.toString()}`);
+        } catch (error) {
+          console.error("Error calculating LP token amount from quote:", error);
+          throw new Error(`Failed to calculate LP token amount: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      } else {
+        throw new Error("Either baseAmount or quoteAmount must be provided");
+      }
+      
+      try {
+        // Get deposit instructions using the calculated LP token amount
+        console.log(`Getting deposit instructions with LP token amount: ${lpTokenAmount.toString()}`);
+        const depositInstructions = await this.sdk.depositInstructions(
+          poolAddress,
+          lpTokenAmount,
+          slippageDecimal as any, // Cast to any to satisfy type requirements
+          userPubkey
+        );
+        
+        console.log(`Generated ${depositInstructions.length} deposit instructions`);
+        
+        // Add instructions to transaction
+        for (const instruction of depositInstructions) {
+          tx.add(instruction);
+        }
+      } catch (sdkError) {
+        console.error("Error generating deposit instructions:", sdkError);
+        throw new Error(`SDK error generating deposit instructions: ${sdkError instanceof Error ? sdkError.message : 'Unknown SDK error'}`);
+      }
       
       // Get recent blockhash
       const blockhash = await getBlockhashWithFallback(this.connection);
