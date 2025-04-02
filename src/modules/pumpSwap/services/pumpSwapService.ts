@@ -471,6 +471,17 @@ export async function swapTokens({
     return signature;
   } catch (error) {
     console.error('Error in swapTokens:', error);
+    
+    // Extract specific error information for better error messages
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Check for insufficient funds or token balance errors
+    if (errorMessage.includes('insufficient funds') || errorMessage.includes('0x1')) {
+      const friendlyError = new Error('Insufficient token balance to complete this swap.');
+      onStatusUpdate?.(`Transaction failed: ${friendlyError.message}`);
+      throw friendlyError;
+    }
+    
     // Don't send raw error through status update
     onStatusUpdate?.('Transaction failed');
     TransactionService.showError(error);

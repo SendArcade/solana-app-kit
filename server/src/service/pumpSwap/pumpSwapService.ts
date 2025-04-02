@@ -178,81 +178,61 @@ export class PumpSwapClient {
         };
       }
       
-      // Convert number to BN for SDK
-      const inputAmountBN = new BN(inputAmount);
+      // Convert number to BN for SDK (Assuming 9 decimals for simplicity)
+      const DECIMALS = 9;
+      const inputAmountRaw = Math.floor(inputAmount * Math.pow(10, DECIMALS));
+      const inputAmountBN = new BN(inputAmountRaw);
       
-      let outputAmount: BN;
-      
-      // Based on the direction, use the appropriate method
-      // The SDK expects the direction as a number, not the enum
-      const directionNumber = direction === Direction.BaseToQuote ? 1 : 0;
+      let outputAmountRaw: BN;
       
       try {
-        if (direction === Direction.BaseToQuote) {
-          // Calculate how much quote tokens you'll get for the base amount
-          try {
-            outputAmount = await this.sdk.swapAutocompleteQuoteFromBase(
-              poolAddress,
-              inputAmountBN,
-              slippageDecimal,
-              directionNumber as any // Using explicit cast to avoid type issues
-            );
-          } catch (sdkError: unknown) {
-            if (typeof sdkError === 'object' && sdkError !== null && 'message' in sdkError && 
-                typeof (sdkError as Error).message === 'string' && 
-                (sdkError as Error).message.includes('Invalid account discriminator')) {
-              console.warn('SDK returned Invalid account discriminator. Pool may be using a different program ID.');
-              
-              // Return a simulated value since we can't use the SDK
-              // For a simple price simulation, use a reference price and adjust for slippage
-              // This is just a fallback to allow the UI to work
-              console.log('Using fallback price simulation');
-              const simulatedOutputAmount = new BN(Math.floor(inputAmount * 0.95)); // 5% loss simulation
-              return { 
-                success: true, 
-                data: simulatedOutputAmount.toNumber(),
-                error: 'Used simulated price due to SDK error: Invalid account discriminator' 
-              };
-            }
-            throw sdkError;
-          }
-        } else {
-          // Calculate how much base tokens you'll get for the quote amount
-          try {
-            outputAmount = await this.sdk.swapAutocompleteBaseFromQuote(
-              poolAddress,
-              inputAmountBN,
-              slippageDecimal,
-              directionNumber as any // Using explicit cast to avoid type issues
-            );
-          } catch (sdkError: unknown) {
-            if (typeof sdkError === 'object' && sdkError !== null && 'message' in sdkError && 
-                typeof (sdkError as Error).message === 'string' && 
-                (sdkError as Error).message.includes('Invalid account discriminator')) {
-              console.warn('SDK returned Invalid account discriminator. Pool may be using a different program ID.');
-              
-              // Return a simulated value since we can't use the SDK
-              // For a simple price simulation, use a reference price and adjust for slippage
-              console.log('Using fallback price simulation');
-              const simulatedOutputAmount = new BN(Math.floor(inputAmount * 0.95)); // 5% loss simulation
-              return { 
-                success: true, 
-                data: simulatedOutputAmount.toNumber(),
-                error: 'Used simulated price due to SDK error: Invalid account discriminator' 
-              };
-            }
-            throw sdkError;
-          }
+        console.log(`Getting swap quote for pool: ${poolAddress.toBase58()}, direction: ${direction === Direction.BaseToQuote ? 'BaseToQuote' : 'QuoteToBase'}`);
+        
+        // Use numeric direction values (0 or 1) as they seem more compatible across SDK versions/methods
+        const numericDirection = direction === Direction.BaseToQuote ? 1 : 0;
+        
+        if (numericDirection === 1) { // BaseToQuote
+          console.log(`Using swapAutocompleteQuoteFromBase with baseAmount=${inputAmountBN.toString()}, slippage=${slippageDecimal}`);
+          outputAmountRaw = await this.sdk.swapAutocompleteQuoteFromBase(
+            poolAddress,
+            inputAmountBN,
+            slippageDecimal,
+            numericDirection as any // Cast to any to satisfy type
+          );
+        } else { // QuoteToBase
+          console.log(`Using swapAutocompleteBaseFromQuote with quoteAmount=${inputAmountBN.toString()}, slippage=${slippageDecimal}`);
+          outputAmountRaw = await this.sdk.swapAutocompleteBaseFromQuote(
+            poolAddress,
+            inputAmountBN,
+            slippageDecimal,
+            numericDirection as any // Cast to any to satisfy type
+          );
         }
         
-        // Convert BN to number for response
-        return { success: true, data: outputAmount.toNumber() };
-      } catch (error: any) {
-        console.error('Error getting swap quote:', error);
-        return { 
-          success: false, 
-          error: `Failed to get swap quote: ${error.message || 'Unknown error'}` 
-        };
+        console.log(`Raw swap output amount: ${outputAmountRaw.toString()}`);
+        
+        // Convert raw output BN to a number with correct decimals
+        const outputAmount = outputAmountRaw.toNumber() / Math.pow(10, DECIMALS);
+        console.log(`Formatted swap output amount: ${outputAmount}`);
+        
+        return { success: true, data: outputAmount };
+      } catch (sdkError: unknown) {
+        if (typeof sdkError === 'object' && sdkError !== null && 'message' in sdkError && 
+            typeof (sdkError as Error).message === 'string') {
+          console.error('SDK error in getSwapQuote:', (sdkError as Error).message);
+          
+          if ((sdkError as Error).message.includes('Invalid account discriminator')) {
+            console.warn('SDK returned Invalid account discriminator. Using fallback price simulation');
+            const simulatedOutputAmount = inputAmount * 0.95;
+            return { 
+              success: true, 
+              data: simulatedOutputAmount,
+              error: 'Used simulated price due to SDK error: Invalid account discriminator' 
+            };
+          }
+        }
+        const errorMessage = sdkError instanceof Error ? sdkError.message : String(sdkError);
+        return { success: false, error: `Failed to get swap quote: ${errorMessage}` };
       }
     } catch (error: any) {
       console.error('Error in getSwapQuote:', error);
@@ -359,40 +339,91 @@ export class PumpSwapClient {
     try {
       const { pool, inputAmount, direction, slippage = 0.5, userPublicKey } = params;
       
+      console.log(`Building swap transaction: pool=${pool}, direction=${direction}, amount=${inputAmount}`);
+      
       const userPubkey = new PublicKey(userPublicKey);
       const poolAddress = new PublicKey(pool);
       const slippageDecimal = slippage / 100;
       
-      // Convert input amount to BN
-      const inputAmountBN = new BN(inputAmount);
+      const INPUT_DECIMALS = 9;
+      const inputAmountRaw = Math.floor(inputAmount * Math.pow(10, INPUT_DECIMALS));
+      const inputAmountBN = new BN(inputAmountRaw);
       
-      // Create a new transaction
+      // Calculate minimum output amount based on quote and slippage
+      const OUTPUT_DECIMALS = 9;
+      let minOutputAmountBN: BN;
+      let minOutputAmountNum: number;
+      const numericDirectionForQuote = direction === Direction.BaseToQuote ? 1 : 0;
+      try {
+        let expectedOutputRaw: BN;
+        if (numericDirectionForQuote === 1) { // BaseToQuote
+          expectedOutputRaw = await this.sdk.swapAutocompleteQuoteFromBase(
+            poolAddress,
+            inputAmountBN,
+            0, // Use 0 slippage for expected amount
+            numericDirectionForQuote as any // Cast to any
+          );
+        } else { // QuoteToBase
+          expectedOutputRaw = await this.sdk.swapAutocompleteBaseFromQuote(
+            poolAddress,
+            inputAmountBN,
+            0, // Use 0 slippage for expected amount
+            numericDirectionForQuote as any // Cast to any
+          );
+        }
+        const factor = new BN(10000).sub(new BN(Math.floor(slippageDecimal * 10000)));
+        minOutputAmountBN = expectedOutputRaw.mul(factor).div(new BN(10000));
+        console.log(`Calculated minimum output amount (raw): ${minOutputAmountBN.toString()}`);
+        
+        // Convert BN to number 
+        minOutputAmountNum = minOutputAmountBN.toNumber();
+        console.log(`Minimum output amount (number): ${minOutputAmountNum}`);
+        
+      } catch (quoteError: any) {
+        console.error("Error calculating minimum output amount:", quoteError);
+        throw new Error(`Failed to calculate swap quote for minimum output: ${quoteError.message}`);
+      }
+      
       const tx = new Transaction();
       
-      // Calling different methods based on swap direction
-      // Due to linter errors, using placeholder implementation
-      if (direction === Direction.BaseToQuote) {
-        // SDK method signatures might be different - placeholder for now
-        // This might need additional parameters
-        tx.add(
-          // Placeholder instruction
-          new TransactionInstruction({
-            keys: [],
-            programId: new PublicKey('11111111111111111111111111111111'),
-            data: Buffer.from([])
-          })
-        );
-      } else {
-        // SDK method signatures might be different - placeholder for now
-        // This might need additional parameters
-        tx.add(
-          // Placeholder instruction
-          new TransactionInstruction({
-            keys: [],
-            programId: new PublicKey('11111111111111111111111111111111'),
-            data: Buffer.from([])
-          })
-        );
+      try {
+        console.log(`Getting swap instructions from SDK for direction: ${direction === Direction.BaseToQuote ? 'BaseToQuote' : 'QuoteToBase'}`);
+        
+        let swapInstructions: TransactionInstruction[];
+        const numericDirectionForSwap = direction === Direction.BaseToQuote ? 1 : 0;
+
+        if (numericDirectionForSwap === 1) { // BaseToQuote
+          if (typeof this.sdk.swapBaseInstructions !== 'function') {
+            throw new Error("SDK missing swapBaseInstructions method");
+          }
+          swapInstructions = await this.sdk.swapBaseInstructions(
+            poolAddress,
+            inputAmountBN,
+            minOutputAmountNum,
+            slippageDecimal as any,
+            userPubkey
+          );
+        } else { // QuoteToBase
+          if (typeof this.sdk.swapQuoteInstructions !== 'function') {
+            throw new Error("SDK missing swapQuoteInstructions method");
+          }
+          swapInstructions = await this.sdk.swapQuoteInstructions(
+            poolAddress,
+            inputAmountBN,
+            minOutputAmountNum,
+            slippageDecimal as any,
+            userPubkey
+          );
+        }
+          
+        console.log(`SDK generated ${swapInstructions.length} instructions for swap`);
+        
+        for (const instruction of swapInstructions) {
+          tx.add(instruction);
+        }
+      } catch (sdkError: any) {
+        console.error("Error generating swap instructions:", sdkError);
+        throw new Error(`SDK error generating swap instructions: ${sdkError.message || 'Unknown SDK error'}`);
       }
       
       // Get recent blockhash
