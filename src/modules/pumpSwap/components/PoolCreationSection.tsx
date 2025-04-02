@@ -11,7 +11,8 @@ import {
 import { useWallet } from '../../embeddedWalletProviders/hooks/useWallet';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { createPool } from '../services/pumpSwapService'; // <--- calls the server only
-
+import SelectTokenModal from '../../../core/thread/components/trade/SelectTokenModal';
+import { TokenInfo } from '../../../services/token/tokenService';
 
 // Default index for pool creation
 const DEFAULT_INDEX = 1; // Index used by the server/SDK
@@ -21,12 +22,12 @@ const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
 // Token metadata for common tokens
-const KNOWN_TOKENS: Record<string, { symbol: string, name: string }> = {
-    [SOL_MINT]: { symbol: 'SOL', name: 'Solana' },
-    [USDC_MINT]: { symbol: 'USDC', name: 'USD Coin' },
-    'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So': { symbol: 'mSOL', name: 'Marinade Staked SOL' },
-    'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': { symbol: 'USDT', name: 'USDT' },
-    'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': { symbol: 'BONK', name: 'Bonk' },
+const KNOWN_TOKENS: Record<string, { symbol: string, name: string, decimals: number }> = {
+    [SOL_MINT]: { symbol: 'SOL', name: 'Solana', decimals: 9 },
+    [USDC_MINT]: { symbol: 'USDC', name: 'USD Coin', decimals: 6 },
+    'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So': { symbol: 'mSOL', name: 'Marinade Staked SOL', decimals: 9 },
+    'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': { symbol: 'USDT', name: 'USDT', decimals: 6 },
+    'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': { symbol: 'BONK', name: 'Bonk', decimals: 5 },
 };
 
 interface PoolCreationSectionProps {
@@ -46,6 +47,20 @@ export function PoolCreationSection({
     // UI States
     const [baseMint, setBaseMint] = useState(SOL_MINT);
     const [quoteMint, setQuoteMint] = useState(USDC_MINT);
+    const [baseToken, setBaseToken] = useState<TokenInfo>({
+        address: SOL_MINT,
+        symbol: 'SOL',
+        name: 'Solana',
+        decimals: 9,
+        logoURI: '',
+    });
+    const [quoteToken, setQuoteToken] = useState<TokenInfo>({
+        address: USDC_MINT,
+        symbol: 'USDC',
+        name: 'USD Coin',
+        decimals: 6,
+        logoURI: '',
+    });
     const [baseAmount, setBaseAmount] = useState('');
     const [quoteAmount, setQuoteAmount] = useState('');
     const [initialPrice, setInitialPrice] = useState<number | null>(null);
@@ -53,9 +68,9 @@ export function PoolCreationSection({
     const [error, setError] = useState<string | null>(null);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-    // Get token symbols for display
-    const baseSymbol = KNOWN_TOKENS[baseMint]?.symbol || 'BASE';
-    const quoteSymbol = KNOWN_TOKENS[quoteMint]?.symbol || 'QUOTE';
+    // Token selection modal states
+    const [showBaseTokenModal, setShowBaseTokenModal] = useState(false);
+    const [showQuoteTokenModal, setShowQuoteTokenModal] = useState(false);
 
     // Recalculate initial pool price whenever amounts change
     const recalcPrice = useCallback((baseVal: string, quoteVal: string) => {
@@ -79,15 +94,18 @@ export function PoolCreationSection({
         recalcPrice(baseAmount, val);
     }, [baseAmount, recalcPrice]);
 
-    const handleBaseMintChange = useCallback((val: string) => {
-        setBaseMint(val);
-        // Reset the error when changing addresses
+    // Handle token selection from modal
+    const handleBaseTokenSelected = useCallback((token: TokenInfo) => {
+        setBaseToken(token);
+        setBaseMint(token.address);
+        setShowBaseTokenModal(false);
         setError(null);
     }, []);
 
-    const handleQuoteMintChange = useCallback((val: string) => {
-        setQuoteMint(val);
-        // Reset the error when changing addresses
+    const handleQuoteTokenSelected = useCallback((token: TokenInfo) => {
+        setQuoteToken(token);
+        setQuoteMint(token.address);
+        setShowQuoteTokenModal(false);
         setError(null);
     }, []);
 
@@ -143,8 +161,8 @@ export function PoolCreationSection({
             }
 
             // Define minimum amount thresholds
-            const minBaseAmount = baseMint === SOL_MINT ? 0.01 : 0.01; // Increased SOL minimum back to 0.01
-            const minQuoteAmount = quoteMint === SOL_MINT ? 0.01 : 0.01; // Increased SOL minimum back to 0.01
+            const minBaseAmount = 0.01; // Minimum amount for any token
+            const minQuoteAmount = 0.01; // Minimum amount for any token
 
             // Calculate final amounts, ensuring minimums
             const finalBaseAmount = Math.max(Number(b.toFixed(9)), minBaseAmount);
@@ -171,8 +189,8 @@ export function PoolCreationSection({
             Alert.alert(
                 'Create Pool',
                 `You are about to create a new pool with:\n\n` +
-                `${finalBaseAmount} ${baseSymbol} and ${finalQuoteAmount} ${quoteSymbol}\n\n` +
-                `Initial price: 1 ${baseSymbol} = ${displayPrice} ${quoteSymbol}` +
+                `${finalBaseAmount} ${baseToken.symbol} and ${finalQuoteAmount} ${quoteToken.symbol}\n\n` +
+                `Initial price: 1 ${baseToken.symbol} = ${displayPrice} ${quoteToken.symbol}` +
                 warningMessage +
                 `\n\nContinue?`,
                 [
@@ -230,8 +248,8 @@ export function PoolCreationSection({
         quoteMint,
         baseAmount,
         quoteAmount,
-        baseSymbol,
-        quoteSymbol,
+        baseToken.symbol,
+        quoteToken.symbol,
         isValidPublicKey,
         connection
     ]);
@@ -250,44 +268,52 @@ export function PoolCreationSection({
         <View style={styles.container}>
             <Text style={styles.sectionTitle}>Create a New Pool</Text>
 
-            {/* Base Mint Address */}
-            <Text style={styles.inputLabel}>Base Token Mint {baseSymbol !== 'BASE' ? `(${baseSymbol})` : ''}</Text>
-            <TextInput
-                style={styles.input}
-                value={baseMint}
-                onChangeText={handleBaseMintChange}
-                placeholder="Base token mint address (e.g. SOL mint)"
-                editable={!isLoading}
-            />
+            {/* Base Token Selection */}
+            <Text style={styles.inputLabel}>Base Token</Text>
+            <TouchableOpacity
+                style={styles.tokenSelector}
+                onPress={() => setShowBaseTokenModal(true)}
+                disabled={isLoading}
+            >
+                <View style={styles.tokenInfo}>
+                    <Text style={styles.tokenSymbol}>{baseToken.symbol}</Text>
+                    <Text style={styles.tokenName}>{baseToken.name}</Text>
+                </View>
+                <Text style={styles.tokenAddress}>{baseToken.address.slice(0, 4)}...{baseToken.address.slice(-4)}</Text>
+            </TouchableOpacity>
 
-            {/* Quote Mint Address */}
-            <Text style={styles.inputLabel}>Quote Token Mint {quoteSymbol !== 'QUOTE' ? `(${quoteSymbol})` : ''}</Text>
-            <TextInput
-                style={styles.input}
-                value={quoteMint}
-                onChangeText={handleQuoteMintChange}
-                placeholder="Quote token mint address (e.g. USDC mint)"
-                editable={!isLoading}
-            />
+            {/* Quote Token Selection */}
+            <Text style={styles.inputLabel}>Quote Token</Text>
+            <TouchableOpacity
+                style={styles.tokenSelector}
+                onPress={() => setShowQuoteTokenModal(true)}
+                disabled={isLoading}
+            >
+                <View style={styles.tokenInfo}>
+                    <Text style={styles.tokenSymbol}>{quoteToken.symbol}</Text>
+                    <Text style={styles.tokenName}>{quoteToken.name}</Text>
+                </View>
+                <Text style={styles.tokenAddress}>{quoteToken.address.slice(0, 4)}...{quoteToken.address.slice(-4)}</Text>
+            </TouchableOpacity>
 
             {/* Base Amount */}
-            <Text style={styles.inputLabel}>Base Token Amount ({baseSymbol})</Text>
+            <Text style={styles.inputLabel}>Base Token Amount ({baseToken.symbol})</Text>
             <TextInput
                 style={styles.input}
                 value={baseAmount}
                 onChangeText={handleBaseAmountChange}
-                placeholder={`Enter ${baseSymbol} amount`}
+                placeholder={`Enter ${baseToken.symbol} amount`}
                 keyboardType="numeric"
                 editable={!isLoading}
             />
 
             {/* Quote Amount */}
-            <Text style={styles.inputLabel}>Quote Token Amount ({quoteSymbol})</Text>
+            <Text style={styles.inputLabel}>Quote Token Amount ({quoteToken.symbol})</Text>
             <TextInput
                 style={styles.input}
                 value={quoteAmount}
                 onChangeText={handleQuoteAmountChange}
-                placeholder={`Enter ${quoteSymbol} amount`}
+                placeholder={`Enter ${quoteToken.symbol} amount`}
                 keyboardType="numeric"
                 editable={!isLoading}
             />
@@ -297,7 +323,7 @@ export function PoolCreationSection({
                 <View style={styles.priceContainer}>
                     <Text style={styles.priceLabel}>Initial Price:</Text>
                     <Text style={styles.priceValue}>
-                        1 {baseSymbol} = {initialPrice.toFixed(6)} {quoteSymbol}
+                        1 {baseToken.symbol} = {initialPrice.toFixed(6)} {quoteToken.symbol}
                     </Text>
                 </View>
             )}
@@ -310,20 +336,14 @@ export function PoolCreationSection({
                 <Text style={styles.infoTextDetail}>
                     Note: You must have both tokens in your wallet to create a pool.
                 </Text>
-                {baseMint === SOL_MINT || quoteMint === SOL_MINT ? (
-                    <Text style={styles.infoTextDetail}>
-                        <Text style={{ fontWeight: 'bold' }}>Important:</Text> When using SOL in a pool, the minimum
-                        amount required is 0.01 SOL (10,000,000 lamports). For other tokens, the minimum is 0.01 tokens.
-                    </Text>
-                ) : null}
+                <Text style={styles.infoTextDetail}>
+                    <Text style={{ fontWeight: 'bold' }}>Important:</Text> The minimum
+                    amount required for each token is 0.01 tokens.
+                </Text>
                 <Text style={[styles.infoTextDetail, { marginTop: 8, color: '#c75e16' }]}>
                     <Text style={{ fontWeight: 'bold' }}>Mainnet Notice:</Text> Creating a pool on mainnet requires enough SOL
                     to cover rent for new accounts. You need approximately 0.03-0.05 SOL (~$4-6) in your wallet to successfully
                     create a pool, in addition to the tokens you're providing as liquidity.
-                </Text>
-                <Text style={[styles.infoTextDetail, { marginTop: 8, color: '#c75e16' }]}>
-                    <Text style={{ fontWeight: 'bold' }}>Devnet Notice:</Text> On devnet, you may encounter
-                    "incorrect program id" errors due to differences in associated token accounts.
                 </Text>
             </View>
 
@@ -373,6 +393,19 @@ export function PoolCreationSection({
                     )}
                 </View>
             )}
+
+            {/* Token Selection Modals */}
+            <SelectTokenModal
+                visible={showBaseTokenModal}
+                onClose={() => setShowBaseTokenModal(false)}
+                onTokenSelected={handleBaseTokenSelected}
+            />
+
+            <SelectTokenModal
+                visible={showQuoteTokenModal}
+                onClose={() => setShowQuoteTokenModal(false)}
+                onTokenSelected={handleQuoteTokenSelected}
+            />
         </View>
     );
 }
@@ -396,6 +429,32 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: '#64748B',
         marginBottom: 4,
+    },
+    tokenSelector: {
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 12,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    tokenInfo: {
+        flexDirection: 'column',
+    },
+    tokenSymbol: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#334155',
+    },
+    tokenName: {
+        fontSize: 12,
+        color: '#64748B',
+    },
+    tokenAddress: {
+        fontSize: 12,
+        color: '#94A3B8',
     },
     input: {
         borderWidth: 1,
