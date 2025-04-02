@@ -10,14 +10,14 @@ import {
   SystemProgram,
   TransactionInstruction,
 } from '@solana/web3.js';
-import TokenMillIDL from '../idl/token_mill.json';
+import TokenMillIDL from '../../idl/token_mill.json';
 import BN from 'bn.js';
 import {
   StakingParams,
   TokenMillResponse,
   SwapParams,
-} from '../types/interfaces';
-import {TokenMillType} from '../idl/token_mill';
+} from '../../types/interfaces';
+import {TokenMillType} from '../../idl/token_mill';
 import axios from 'axios';
 import {LAMPORTS_PER_SOL} from '@solana/web3.js';
 import {
@@ -29,7 +29,7 @@ import {
   parseSwapAmounts,
   getBlockhashWithFallback,
   serializeTransaction,
-} from '../utils/tokenMillHelpers';
+} from '../../utils/tokenMillHelpers';
 
 dotenv.config();
 
