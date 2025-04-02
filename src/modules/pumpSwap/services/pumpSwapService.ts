@@ -6,7 +6,7 @@
 
 import { PublicKey, Connection } from '@solana/web3.js';
 import { 
-  SwapParams, 
+  SwapParams as OriginalSwapParams, 
   AddLiquidityParams, 
   RemoveLiquidityParams, 
   CreatePoolParams
@@ -22,7 +22,10 @@ export enum Direction {
 
 import {SERVER_URL} from '@env';
 
-
+// Modify SwapParams to accept both local Direction and SDK Direction
+export interface SwapParams extends Omit<OriginalSwapParams, 'direction'> {
+  direction: Direction | number;
+}
 
 const API_BASE_URL = SERVER_URL;
 
@@ -45,9 +48,34 @@ export async function createPool({
   onStatusUpdate?: (status: string) => void;
 }): Promise<string> {
   try {
-    onStatusUpdate?.('Preparing pool creation...');
+    onStatusUpdate?.('Starting pool creation process...');
+    onStatusUpdate?.('Validating token addresses and amounts...');
     
-    const response = await fetch(`${API_BASE_URL}/build-create-pool`, {
+    // Basic validation for display purposes
+    if (!baseMint || !quoteMint) {
+      throw new Error('Invalid token mint addresses');
+    }
+    
+    if (baseAmount <= 0 || quoteAmount <= 0) {
+      throw new Error('Token amounts must be greater than zero');
+    }
+    
+    if (baseMint === quoteMint) {
+      throw new Error('Base and quote tokens cannot be the same');
+    }
+    
+    // Identify if any of the tokens are SOL, which requires special handling
+    const isBaseSol = baseMint === 'So11111111111111111111111111111111111111112';
+    const isQuoteSol = quoteMint === 'So11111111111111111111111111111111111111112';
+    
+    console.log(`Creating pool: baseMint=${baseMint} (${isBaseSol ? 'SOL' : 'SPL'}), quoteMint=${quoteMint} (${isQuoteSol ? 'SOL' : 'SPL'})`);
+    console.log(`Amounts: base=${baseAmount}, quote=${quoteAmount}`);
+    
+    onStatusUpdate?.(`Creating pool with ${isBaseSol ? 'SOL' : 'SPL'} and ${isQuoteSol ? 'SOL' : 'SPL'}...`);
+    
+    onStatusUpdate?.('Requesting transaction from server...');
+    
+    const response = await fetch(`${API_BASE_URL}/api/pump-swap/build-create-pool`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -64,10 +92,22 @@ export async function createPool({
 
     const data = await response.json();
     if (!data.success) {
-      throw new Error(data.error || 'Failed to create pool');
+      const serverError = data.error || 'Failed to create pool';
+      console.error('Server error:', serverError);
+      
+      // If server provided detailed error, show it
+      if (data.details) {
+        console.error('Error details:', data.details);
+      }
+      
+      throw new Error(serverError);
+    }
+    
+    if (!data.data || !data.data.transaction) {
+      throw new Error('Server returned invalid transaction data');
     }
 
-    onStatusUpdate?.('Transaction received, sending to wallet...');
+    onStatusUpdate?.('Transaction received. Sending to wallet for approval...');
     
     // Create a filtered status callback that prevents error messages
     const filteredCallback = (status: string) => {
@@ -78,21 +118,79 @@ export async function createPool({
       }
     };
 
-    const signature = await TransactionService.signAndSendTransaction(
-      { type: 'base64', data: data.data.transaction },
-      solanaWallet,
-      { 
-        connection,
-        statusCallback: filteredCallback
-      }
-    );
+    onStatusUpdate?.('Waiting for transaction approval and confirmation...');
     
-    onStatusUpdate?.('Pool created successfully!');
-    return signature;
+    try {
+      onStatusUpdate?.('Sending transaction to network...');
+      console.log('Sending transaction to network...');
+      
+      const signature = await TransactionService.signAndSendTransaction(
+        { type: 'base64', data: data.data.transaction },
+        solanaWallet,
+        { 
+          connection,
+          statusCallback: filteredCallback
+        }
+      );
+      
+      onStatusUpdate?.(`Pool created successfully! Tx: ${signature.slice(0, 8)}...${signature.slice(-8)}`);
+      return signature;
+    } catch (txError) {
+      console.error('Transaction Error:', txError);
+      
+      // Log detailed error for debugging
+      console.log('==== Transaction Error Details ====');
+      const txErrorMsg = txError instanceof Error ? txError.message : String(txError);
+      console.log('Error message:', txErrorMsg);
+      
+      // Check for specific error patterns to provide better feedback
+      const isInsufficientFunds = 
+        txErrorMsg.includes('insufficient lamports') || 
+        txErrorMsg.includes('0x1') || // Custom program error code for insufficient funds
+        txErrorMsg.includes('Attempt to debit an account but found no record of a prior credit');
+      
+      // Get transaction logs for debugging if available
+      if (txError && typeof txError === 'object' && 'logs' in txError) {
+        console.log('Transaction logs:', (txError as any).logs);
+        
+        // Check logs for insufficient funds message
+        const logs = (txError as any).logs || [];
+        const insufficientLamportsLog = logs.find((log: string) => log.includes('insufficient lamports'));
+        if (insufficientLamportsLog) {
+          // Extract the required amount from the log message if available
+          const matches = insufficientLamportsLog.match(/insufficient lamports (\d+), need (\d+)/);
+          if (matches && matches.length === 3) {
+            const have = parseInt(matches[1], 10) / 1_000_000_000; // Convert lamports to SOL
+            const need = parseInt(matches[2], 10) / 1_000_000_000; // Convert lamports to SOL
+            
+            const friendlyError = new Error(
+              `Insufficient SOL balance for creating pool. You have ${have.toFixed(6)} SOL, but need at least ${need.toFixed(6)} SOL. ` +
+              `Please add more SOL to your wallet and try again.`
+            );
+            onStatusUpdate?.(`Transaction failed: ${friendlyError.message}`);
+            throw friendlyError;
+          }
+        }
+      }
+      
+      // Provide a friendly error message for insufficient funds
+      if (isInsufficientFunds) {
+        const friendlyError = new Error(
+          'Insufficient SOL balance for creating pool. Creating a pool requires approximately 0.03-0.05 SOL to cover the rent for all necessary accounts. ' +
+          'Please add more SOL to your wallet and try again.'
+        );
+        onStatusUpdate?.(`Transaction failed: ${friendlyError.message}`);
+        throw friendlyError;
+      }
+      
+      throw txError;
+    }
   } catch (error) {
     console.error('Error in createPool:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
     // Don't send raw error through status update
-    onStatusUpdate?.('Transaction failed');
+    onStatusUpdate?.(`Transaction failed: ${errorMessage}`);
     TransactionService.showError(error);
     throw error;
   }
@@ -107,7 +205,7 @@ export async function getDepositQuoteFromBase(
   slippage: number
 ): Promise<{ quote: number; lpToken: number }> {
   try {
-    const response = await fetch(`${API_BASE_URL}/quote-liquidity`, {
+    const response = await fetch(`${API_BASE_URL}/api/pump-swap/quote-liquidity`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -140,7 +238,7 @@ export async function getDepositQuoteFromQuote(
   slippage: number
 ): Promise<{ base: number; lpToken: number }> {
   try {
-    const response = await fetch(`${API_BASE_URL}/quote-liquidity`, {
+    const response = await fetch(`${API_BASE_URL}/api/pump-swap/quote-liquidity`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -171,12 +269,19 @@ export async function addLiquidity({
   pool,
   baseAmount,
   quoteAmount,
+  lpTokenAmount,
   slippage,
   userPublicKey,
   connection,
   solanaWallet,
   onStatusUpdate,
-}: AddLiquidityParams & {
+}: {
+  pool: string;
+  baseAmount: number | null;
+  quoteAmount: number | null;
+  lpTokenAmount: number;
+  slippage: number;
+  userPublicKey: string;
   connection: Connection;
   solanaWallet: StandardWallet | any;
   onStatusUpdate?: (status: string) => void;
@@ -184,7 +289,7 @@ export async function addLiquidity({
   try {
     onStatusUpdate?.('Preparing liquidity addition...');
     
-    const response = await fetch(`${API_BASE_URL}/build-add-liquidity`, {
+    const response = await fetch(`${API_BASE_URL}/api/pump-swap/build-add-liquidity`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -193,6 +298,7 @@ export async function addLiquidity({
         pool,
         baseAmount,
         quoteAmount,
+        lpTokenAmount,
         slippage,
         userPublicKey,
       }),
@@ -243,7 +349,7 @@ export async function getSwapQuoteFromBase(
   slippage: number
 ): Promise<number> {
   try {
-    const response = await fetch(`${API_BASE_URL}/quote-swap`, {
+    const response = await fetch(`${API_BASE_URL}/api/pump-swap/quote-swap`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -277,7 +383,7 @@ export async function getSwapQuoteFromQuote(
   slippage: number
 ): Promise<number> {
   try {
-    const response = await fetch(`${API_BASE_URL}/quote-swap`, {
+    const response = await fetch(`${API_BASE_URL}/api/pump-swap/quote-swap`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -322,7 +428,7 @@ export async function swapTokens({
   try {
     onStatusUpdate?.('Preparing swap transaction...');
     
-    const response = await fetch(`${API_BASE_URL}/build-swap`, {
+    const response = await fetch(`${API_BASE_URL}/api/pump-swap/build-swap`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -381,7 +487,7 @@ export async function getWithdrawalQuote(
   slippage: number
 ): Promise<{ base: number; quote: number }> {
   try {
-    const response = await fetch(`${API_BASE_URL}/quote-liquidity`, {
+    const response = await fetch(`${API_BASE_URL}/api/pump-swap/quote-liquidity`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -424,7 +530,7 @@ export async function removeLiquidity({
   try {
     onStatusUpdate?.('Preparing liquidity removal...');
     
-    const response = await fetch(`${API_BASE_URL}/build-remove-liquidity`, {
+    const response = await fetch(`${API_BASE_URL}/api/pump-swap/build-remove-liquidity`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
