@@ -6,6 +6,9 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "ENVFILE": ".env.local"
+      },
       "android": {
         "gradleCommand": ":app:assembleDebug",
         "buildType": "apk"
@@ -16,12 +19,18 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "ENVFILE": ".env.local"
+      },
       "ios": {
         "resourceClass": "m-medium"
       }
     },
     "production": {
       "autoIncrement": true,
+      "env": {
+        "ENVFILE": ".env.local"
+      },
       "ios": {
         "resourceClass": "m-medium"
       }
@@ -29,11 +38,17 @@
     "apk": {
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "ENVFILE": ".env.local"
       }
     },
     "testflight": {
       "distribution": "store",
       "autoIncrement": true,
+      "env": {
+        "ENVFILE": ".env.local"
+      },
       "ios": {
         "resourceClass": "m-medium"
       }
