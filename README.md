@@ -63,12 +63,33 @@ A modern React Native social application built on the Solana blockchain, providi
    ```
 
 3. Set up environment variables:
-   Create a `.env` file in the root directory with the following variables:
+   Create a `.env.local` file in the root directory with the necessary variables as shown in the example below:
    ```
    PRIVY_APP_ID=your_privy_app_id
    PRIVY_CLIENT_ID=your_privy_client_id
-   SOLANA_RPC_URL=your_solana_rpc_url
+   TURNKEY_BASE_URL=https://api.turnkey.com
+   TURNKEY_RP_ID=host.exp.exponent
+   TURNKEY_RP_NAME=send-fi
+   DYNAMIC_ENVIRONMENT_ID=your_dynamic_env_id
+   HELIUS_RPC_URL=your_helius_rpc_url
+   HELIUS_API_KEY=your_helius_api_key
+   SERVER_URL=your_server_url
+   TENSOR_API_KEY=your_tensor_api_key
+   CLUSTER=mainnet-beta
+   PARA_API_KEY=your_para_api_key
+   COINGECKO_API_KEY=your_coingecko_api_key
    ```
+
+### Environment Variables for EAS Builds
+
+The project is configured to use the `.env.local` file for both local development and EAS builds. When building with EAS, the environment file is automatically loaded:
+
+```sh
+# Example for a development build on Android
+npx eas build --profile development --platform android
+```
+
+The configuration in `eas.json` specifies the `.env.local` file for each build profile. The babel configuration dynamically loads this file during the build process.
 
 ### Running the App
 
