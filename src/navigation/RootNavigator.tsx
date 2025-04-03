@@ -17,6 +17,7 @@ import FollowersFollowingListScreen from '../core/thread/components/FollowersFol
 import ProfileScreen from '../screens/SampleUI/Threads/ProfileScreen/ProfileScreen';
 import { TokenMillScreen } from '../modules/tokenMill';
 import { PumpfunScreen } from '../modules/pumpFun';
+import PumpSwapScreen from '../modules/pumpSwap/screens/PumpSwapScreen';
 
 export type RootStackParamList = {
   LoginOptions: undefined;
@@ -28,6 +29,7 @@ export type RootStackParamList = {
   TokenMill: undefined;
   NftScreen: undefined;
   ChatScreen: undefined;
+  PumpSwap: undefined;
   // NEW ROUTE
   OtherProfile: { userId: string };
   PostThread: { postId: string };
@@ -51,6 +53,7 @@ export default function RootNavigator() {
           <Stack.Screen name="TokenMill" component={TokenMillScreen} />
           <Stack.Screen name="NftScreen" component={NftScreen} />
           <Stack.Screen name="ChatScreen" component={ChatScreen} />
+          <Stack.Screen name="PumpSwap" component={PumpSwapScreen} />
 
           {/* NEW SCREEN for viewing other user's profile */}
           <Stack.Screen name="OtherProfile" component={OtherProfileScreen} />
