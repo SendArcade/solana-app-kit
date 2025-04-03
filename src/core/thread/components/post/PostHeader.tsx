@@ -51,6 +51,8 @@ function ProfileAvatarView({
 
   // State to track if image has loaded *successfully*
   const [imageLoaded, setImageLoaded] = useState(false);
+  // Track if we should use a fallback gateway after failing with the first one
+  const [useBackupGateway, setUseBackupGateway] = useState(false);
 
   // Get user initials for the placeholder
   const initials = user?.username
@@ -60,11 +62,23 @@ function ProfileAvatarView({
   // Get consistent background color based on username
   const backgroundColor = getAvatarColor(user?.username || user?.handle || '?');
 
-  // *** DIRECT APPROACH FIX to use reliable IPFS gateways WITHOUT cache buster ***
+  // Reset fallback gateway when user changes
+  useEffect(() => {
+    setUseBackupGateway(false);
+  }, [user?.id, user?.avatar]);
+
+  // *** DIRECT APPROACH FIX to use reliable IPFS gateways WITHOUT cache buster (ANDROID ONLY) ***
   const source = (() => {
     // Default if no avatar
     if (!user?.avatar) return DEFAULT_AVATAR;
 
+    // On iOS, use the original avatar directly - no transformations needed 
+    if (Platform.OS === 'ios') {
+      // Simply return the original avatar as provided by the API
+      return user.avatar;
+    }
+
+    // ANDROID ONLY - Below code only runs on Android
     let ipfsHash: string | null = null;
     let originalUrl: string | null = null;
 
@@ -87,12 +101,31 @@ function ProfileAvatarView({
       }
     }
 
-    // If we found an IPFS hash, construct the corrected source
+    // If we found an IPFS hash, construct the corrected source using a gateway that works on Android
     if (ipfsHash) {
-      const gatewayUri = Platform.OS === 'android'
-        ? `https://gateway.pinata.cloud/ipfs/${ipfsHash}`
-        : `https://cloudflare-ipfs.com/ipfs/${ipfsHash}`;
-      console.log('[PostHeader] Using transformed IPFS URL:', gatewayUri);
+      // Problematic hash that's hitting rate limits on Pinata - use additional gateways
+      const knownProblematicHashes = ['QmVcntn6HWYG9f13YKBoevhCdtVq7wi1URZuHzSb91CZgZ'];
+
+      let gatewayUri;
+
+      // If we've already had an error with the first gateway, or this is a known problematic hash
+      if (useBackupGateway || knownProblematicHashes.includes(ipfsHash)) {
+        // Use a different gateway to avoid rate limits
+        const fallbackGateways = [
+          `https://nftstorage.link/ipfs/${ipfsHash}`,
+          `https://cloudflare-ipfs.com/ipfs/${ipfsHash}`,
+          `https://ipfs.io/ipfs/${ipfsHash}`  // Try original as last resort
+        ];
+
+        // Use one of the fallback gateways
+        gatewayUri = fallbackGateways[0];
+        console.log('[PostHeader] Using fallback gateway for IPFS hash:', gatewayUri);
+      } else {
+        // For all other hashes on first try, continue using Pinata as it works for them
+        gatewayUri = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+        console.log('[PostHeader] Using transformed IPFS URL on Android:', gatewayUri);
+      }
+
       // Construct the source object, keeping original headers if present in an object avatar
       const headers = (typeof user.avatar === 'object' && !Array.isArray(user.avatar) && user.avatar.headers) ? user.avatar.headers : { 'Accept': '*/*' };
       return { uri: gatewayUri, headers };
@@ -110,14 +143,13 @@ function ProfileAvatarView({
     return user.avatar || DEFAULT_AVATAR;
   })();
 
-  // --- DEBUGGING START ---
-  // console.log('[PostHeader] ProfileAvatarView final source for IPFSAwareImage:', JSON.stringify(source));
-  // --- DEBUGGING END ---
-
   // Use a STABLE key based on user ID and the original avatar string/URI if possible
   const originalAvatarString = typeof user?.avatar === 'string' ? user.avatar :
     (typeof user?.avatar === 'object' && !Array.isArray(user?.avatar) && user?.avatar?.uri ? user.avatar.uri as string : null);
-  const imageKey = `avatar-${user?.id || 'local'}-${originalAvatarString || 'no-avatar'}`;
+
+  // Include the backup gateway state in the key to force a reload with the new gateway
+  const gatewayState = useBackupGateway ? '-backup' : '-primary';
+  const imageKey = `avatar-${user?.id || 'local'}-${originalAvatarString || 'no-avatar'}${gatewayState}`;
 
   return (
     <View style={[
@@ -157,7 +189,7 @@ function ProfileAvatarView({
           left: 0,
           opacity: imageLoaded ? 1 : 0, // Fade in when loaded
         }}
-        key={imageKey} // Use the stable key
+        key={imageKey} // Use the stable key that includes gateway state
         onLoad={() => {
           // console.log('[PostHeader] IPFSAwareImage onLoad triggered for source:', JSON.stringify(source));
           setImageLoaded(true);
@@ -165,6 +197,12 @@ function ProfileAvatarView({
         onError={(error) => {
           console.error('[PostHeader] IPFSAwareImage onError triggered! Source:', JSON.stringify(source), 'Error:', error?.nativeEvent?.error || 'Unknown error');
           setImageLoaded(false); // Ensure initials show on error
+
+          // If we're on Android and haven't tried the backup gateway yet, try it now
+          if (Platform.OS === 'android' && !useBackupGateway) {
+            console.log('[PostHeader] Trying fallback gateway for image...');
+            setUseBackupGateway(true);
+          }
         }}
         fadeDuration={Platform.OS === 'android' ? 0 : 150} // Optional fade-in
       />
