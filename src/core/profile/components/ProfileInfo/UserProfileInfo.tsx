@@ -7,6 +7,7 @@ import {
   Alert,
   Modal,
   TextInput,
+  Platform,
 } from 'react-native';
 import { findMentioned } from '../../../../utils/common/findMentioned';
 import AddButton from '../addButton/addButton';
@@ -21,6 +22,7 @@ import {
 import { tokenModalStyles } from './profileInfoTokenModal.style';
 import COLORS from '../../../../assets/colors';
 import { UserProfileInfoProps } from '../../types';
+import { IPFSAwareImage, getValidImageSource } from '../../../../utils/IPFSImage';
 
 /**
  * TokenAttachModal - Component for the token attachment modal
@@ -248,13 +250,11 @@ const ProfileHeader = memo(({
         style={styles.profImgContainer}
         onPress={onAvatarPress}
         disabled={!isOwnProfile}>
-        <Image
+        <IPFSAwareImage
           style={styles.profImg}
-          source={
-            profilePicUrl
-              ? { uri: profilePicUrl }
-              : require('../../../../assets/images/User.png')
-          }
+          source={profilePicUrl ? getValidImageSource(profilePicUrl) : require('../../../../assets/images/User.png')}
+          defaultSource={require('../../../../assets/images/User.png')}
+          key={Platform.OS === 'android' ? `profile-${Date.now()}` : 'profile'}
         />
       </TouchableOpacity>
 

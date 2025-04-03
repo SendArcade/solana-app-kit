@@ -9,6 +9,7 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import Icons from '../../../assets/svgs';
 import { useAppDispatch, useAppSelector } from '../../../hooks/useReduxHooks';
@@ -27,6 +28,7 @@ import TradeModal from './trade/TradeModal';
 import { DEFAULT_IMAGES } from '../../../config/constants';
 import { NftListingModal, useFetchNFTs, NftItem } from '../../../modules/nft';
 import { uploadThreadImage } from '../../../services/threadImageService';
+import { IPFSAwareImage, getValidImageSource, fixIPFSUrl } from '../../../utils/IPFSImage';
 
 /**
  * Props for the ThreadComposer component
@@ -129,19 +131,6 @@ export const ThreadComposer = forwardRef<{ focus: () => void }, ThreadComposerPr
     userStyleSheet,
   );
 
-  // Reuse shared NFT hook
-  const fixImageUrl = (url: string): string => {
-    if (!url) return '';
-    if (url.startsWith('ipfs://'))
-      return url.replace('ipfs://', 'https://ipfs.io/ipfs/');
-    if (url.startsWith('ar://'))
-      return url.replace('ar://', 'https://arweave.net/');
-    if (url.startsWith('/')) return `https://arweave.net${url}`;
-    if (!url.startsWith('http') && !url.startsWith('data:'))
-      return `https://${url}`;
-    return url;
-  };
-
   // Add this function to fetch active listings
   const fetchActiveListings = useCallback(async () => {
     if (!userPublicKey) return;
@@ -171,7 +160,7 @@ export const ThreadComposer = forwardRef<{ focus: () => void }, ThreadComposerPr
             ? item.mint.onchainId
             : item.mint;
           const nftName = mintObj?.name || 'Unnamed NFT';
-          const nftImage = fixImageUrl(mintObj?.imageUri || '');
+          const nftImage = fixIPFSUrl(mintObj?.imageUri || '');
           const nftCollection = mintObj?.collName || '';
           const lamports = parseInt(item.grossAmount || '0', 10);
           const priceSol = lamports / SOL_TO_LAMPORTS;
@@ -380,19 +369,28 @@ export const ThreadComposer = forwardRef<{ focus: () => void }, ThreadComposerPr
     setShowListingModal(false);
   };
 
+  console.log(storedProfilePic, "///////////////////")
+
+  // Add debug logging for Android IPFS image handling
+  if (Platform.OS === 'android' && storedProfilePic) {
+    console.log('Profile image source being used:', JSON.stringify(getValidImageSource(storedProfilePic)));
+  }
+
   return (
     <View>
       <View style={styles.composerContainer}>
         <View style={styles.composerAvatarContainer}>
-          <Image
+          <IPFSAwareImage
             source={
               storedProfilePic
-                ? { uri: storedProfilePic }
+                ? getValidImageSource(storedProfilePic)
                 : currentUser.avatar
-                  ? currentUser.avatar
+                  ? getValidImageSource(currentUser.avatar)
                   : DEFAULT_IMAGES.user
             }
             style={styles.composerAvatar}
+            defaultSource={DEFAULT_IMAGES.user}
+            key={Platform.OS === 'android' ? `profile-${Date.now()}` : 'profile'}
           />
         </View>
 
@@ -411,10 +409,12 @@ export const ThreadComposer = forwardRef<{ focus: () => void }, ThreadComposerPr
           {/* Selected image preview */}
           {selectedImage && (
             <View style={styles.imagePreviewContainer}>
-              <Image
-                source={{ uri: selectedImage }}
+              <IPFSAwareImage
+                source={getValidImageSource(selectedImage)}
                 style={styles.imagePreview}
                 resizeMode="cover"
+                defaultSource={DEFAULT_IMAGES.user}
+                key={Platform.OS === 'android' ? `preview-${Date.now()}` : 'preview'}
               />
               <TouchableOpacity
                 style={styles.removeImageButton}
@@ -427,9 +427,11 @@ export const ThreadComposer = forwardRef<{ focus: () => void }, ThreadComposerPr
           {/* NFT listing preview */}
           {selectedListingNft && (
             <View style={styles.composerTradePreview}>
-              <Image
-                source={{ uri: selectedListingNft.image }}
+              <IPFSAwareImage
+                source={getValidImageSource(selectedListingNft.image)}
                 style={styles.composerTradeImage}
+                defaultSource={DEFAULT_IMAGES.user}
+                key={Platform.OS === 'android' ? `nft-${Date.now()}` : 'nft'}
               />
               <View style={{ marginLeft: 8, flex: 1 }}>
                 <Text style={styles.composerTradeName} numberOfLines={1}>

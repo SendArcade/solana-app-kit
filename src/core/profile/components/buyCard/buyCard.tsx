@@ -12,10 +12,12 @@ import {
   ActivityIndicator,
   ImageBackground,
   TextInput,
+  Platform,
 } from 'react-native';
 import { styles as buyCardStyles } from './buyCard.style';
 import Icons from '../../../../assets/svgs/index';
 import { DEFAULT_IMAGES } from '../../../../config/constants';
+import { IPFSAwareImage, getValidImageSource } from '../../../../utils/IPFSImage';
 
 import { AssetItem, useFetchPortfolio, fixImageUrl } from '../../../../hooks/useFetchTokens';
 import { useAppSelector } from '../../../../hooks/useReduxHooks';
@@ -123,10 +125,12 @@ const PortfolioAssetItem: React.FC<{
         {/* Token Logo */}
         <View style={portfolioStyles.tokenLogoContainer}>
           {imageUrl ? (
-            <Image
-              source={{ uri: imageUrl }}
+            <IPFSAwareImage
+              source={getValidImageSource(imageUrl)}
               style={portfolioStyles.tokenLogo}
               resizeMode="cover"
+              defaultSource={DEFAULT_IMAGES.token}
+              key={Platform.OS === 'android' ? `token-${asset.mint || asset.id}-${Date.now()}` : `token-${asset.mint || asset.id}`}
             />
           ) : (
             <View style={portfolioStyles.tokenLogoPlaceholder}>
@@ -184,10 +188,12 @@ const PortfolioAssetItem: React.FC<{
           style={portfolioStyles.fallbackImage}
           resizeMode="cover"
         />
-        <Image
-          source={{ uri: imageUrl }}
+        <IPFSAwareImage
+          source={getValidImageSource(imageUrl)}
           style={portfolioStyles.assetImage}
           resizeMode="cover"
+          defaultSource={require('../../../../assets/images/SENDlogo.png')}
+          key={Platform.OS === 'android' ? `nft-${asset.mint || asset.id}-${Date.now()}` : `nft-${asset.mint || asset.id}`}
         />
       </View>
     );
@@ -474,19 +480,22 @@ const BuyCard: React.FC<BuyCardProps> = ({
               style={cardStyles.imgBackground}
               resizeMode="cover"
             />
-            <Image
-              source={{ uri: fixImageUrl(tokenImage) }}
+            <IPFSAwareImage
+              source={getValidImageSource(tokenImage)}
               style={cardStyles.img}
               resizeMode="cover"
+              defaultSource={require('../../../../assets/images/SENDlogo.png')}
+              key={Platform.OS === 'android' ? `buycard-${Date.now()}` : 'buycard'}
             />
           </View>
         );
       } else {
         return (
-          <Image
+          <IPFSAwareImage
             source={tokenImage}
             style={cardStyles.img}
             resizeMode="cover"
+            defaultSource={require('../../../../assets/images/SENDlogo.png')}
           />
         );
       }
@@ -522,15 +531,15 @@ const BuyCard: React.FC<BuyCardProps> = ({
 
   return (
     <View style={[
-      cardStyles.container,
-      isPinYourCoin ? cardStyles.pinYourCoinContainer : null,
+      buyCardStyles.container,
+      isPinYourCoin ? buyCardStyles.pinYourCoinContainer : null,
       containerStyle
     ]}>
       {/* Left section with image + name/desc */}
-      <View style={cardStyles.contentContainer}>
+      <View style={buyCardStyles.contentContainer}>
         {renderBuyCardImage() && (
           <TouchableOpacity
-            style={cardStyles.imgContainer}
+            style={buyCardStyles.imgContainer}
             activeOpacity={0.8}
             onPress={!isPinYourCoin ? handleTokenDetailsPress : undefined}
             disabled={isPinYourCoin}
@@ -571,13 +580,13 @@ const BuyCard: React.FC<BuyCardProps> = ({
       </View>
 
       {/* Right section: Buy buttons + optional arrow */}
-      <View style={cardStyles.buyButtonContainer}>
+      <View style={buyCardStyles.buyButtonContainer}>
         {!isPinYourCoin && (
           <>
             {/* Simple check - if it has a UUID-like tokenMint, it's an NFT collection */}
             {tokenMint && tokenMint.includes('-') ? (
               <TouchableOpacity
-                style={cardStyles.buyButton}
+                style={buyCardStyles.buyButton}
                 onPress={() => {
                   console.log('NFT View button pressed - opening NFTCollectionDrawer for marketplace actions', tokenMint);
                   // For View NFT button, open NFTCollectionDrawer for marketplace actions
@@ -586,11 +595,11 @@ const BuyCard: React.FC<BuyCardProps> = ({
                   setShowNftCollectionDrawer(true);
                 }}
               >
-                <Text style={cardStyles.buyButtonText}>View NFT</Text>
+                <Text style={buyCardStyles.buyButtonText}>View NFT</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                style={cardStyles.buyButton}
+                style={buyCardStyles.buyButton}
                 onPress={() => {
                   console.log('Token Buy button pressed, tokenMint:', tokenMint);
                   setShowTradeModal(true);
@@ -598,7 +607,7 @@ const BuyCard: React.FC<BuyCardProps> = ({
                   setShowNftCollectionDrawer(false);
                 }}
               >
-                <Text style={cardStyles.buyButtonText}>Buy</Text>
+                <Text style={buyCardStyles.buyButtonText}>Buy</Text>
               </TouchableOpacity>
             )}
           </>
@@ -607,12 +616,12 @@ const BuyCard: React.FC<BuyCardProps> = ({
         {/* Only show arrow if showDownArrow is true */}
         {showDownArrow && (
           <TouchableOpacity
-            style={[cardStyles.arrowButton, isPinYourCoin ? cardStyles.pinArrowButton : null]}
+            style={[buyCardStyles.arrowButton, isPinYourCoin ? buyCardStyles.pinArrowButton : null]}
             onPress={handleArrowPress}
           >
             {isPinYourCoin ? (
               <>
-                <Text style={cardStyles.pinButtonText}>Add Coin</Text>
+                <Text style={buyCardStyles.pinButtonText}>Add Coin</Text>
               </>
             ) : (
               <Icons.Arrow />
