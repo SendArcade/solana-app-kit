@@ -1,4 +1,3 @@
-// File: src/hooks/useAuth.ts
 import {useCallback} from 'react';
 import {useDispatch} from 'react-redux';
 import {loginSuccess, logoutSuccess} from '../../../state/auth/reducer';

@@ -1,4 +1,3 @@
-// File: src/components/wallet/EmbeddedWallet.tsx
 import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, Alert, Platform } from 'react-native';
 import Icons from '../../../../assets/svgs';

@@ -1,4 +1,4 @@
-package com.bhu1tyagi.solanasocialstarter
+package com.sendai.solanaappkit
 
 import android.app.Application
 import android.content.res.Configuration
