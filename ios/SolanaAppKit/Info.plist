@@ -9,7 +9,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>solana-social-kit</string>
+    <string>Solana App Kit</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -29,8 +29,14 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>solanasocialstarter</string>
-          <string>com.bhu1tyagi.solanasocialstarter</string>
+          <string>solanaappkit</string>
+          <string>com.sendai.solanaappkit</string>
+        </array>
+      </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>exp+solana-app-kit</string>
         </array>
       </dict>
     </array>

@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "solanasocialkit.app"
-               BlueprintName = "solanasocialkit"
-               ReferencedContainer = "container:solanasocialkit.xcodeproj">
+               BuildableName = "SolanaAppKit.app"
+               BlueprintName = "SolanaAppKit"
+               ReferencedContainer = "container:SolanaAppKit.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "solanasocialkitTests.xctest"
-               BlueprintName = "solanasocialkitTests"
-               ReferencedContainer = "container:solanasocialkit.xcodeproj">
+               BuildableName = "SolanaAppKitTests.xctest"
+               BlueprintName = "SolanaAppKitTests"
+               ReferencedContainer = "container:SolanaAppKit.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "solanasocialkit.app"
-            BlueprintName = "solanasocialkit"
-            ReferencedContainer = "container:solanasocialkit.xcodeproj">
+            BuildableName = "SolanaAppKit.app"
+            BlueprintName = "SolanaAppKit"
+            ReferencedContainer = "container:SolanaAppKit.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "solanasocialkit.app"
-            BlueprintName = "solanasocialkit"
-            ReferencedContainer = "container:solanasocialkit.xcodeproj">
+            BuildableName = "SolanaAppKit.app"
+            BlueprintName = "SolanaAppKit"
+            ReferencedContainer = "container:SolanaAppKit.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
