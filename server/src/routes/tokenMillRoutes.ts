@@ -214,7 +214,7 @@ router.post(
  * Claim vested tokens for a specific market
  * @route POST /vesting/release
  */
-router.post('/vesting/release', async (req: Request, res: Response) => {
+router.post('/vesting/release', async (req: any, res: any) => {
   try {
     const {
       marketAddress,
