@@ -8,7 +8,7 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
-import { SwapTransaction } from '../../../../services/swapTransactions';
+import { SwapTransaction, TokenMetadata } from '../../../../services/swapTransactions';
 import { format } from 'date-fns';
 import { FontAwesome5 } from '@expo/vector-icons';
 
@@ -18,6 +18,37 @@ interface PastSwapItemProps {
   swap: SwapTransaction;
   onSelect: (swap: SwapTransaction) => void;
   selected: boolean;
+  inputTokenLogoURI?: string;  // New prop for input token logo
+  outputTokenLogoURI?: string; // New prop for output token logo
+}
+
+/**
+ * Get token image URL from token metadata
+ * This handles both the standard 'image' property and any custom 'logoURI' property
+ * that might be added during enrichment
+ */
+function getTokenImageUrl(token: TokenMetadata): string | undefined {
+  // Use type assertion to access possible runtime properties
+  const tokenAny = token as any;
+
+  // For debugging
+  console.log('[PastSwapItem] getTokenImageUrl token:', {
+    mint: token.mint,
+    symbol: token.symbol,
+    image: token.image,
+    logoURI: tokenAny.logoURI
+  });
+
+  // Try all possible image sources
+  const imageUrl = token.image || tokenAny.logoURI;
+
+  if (imageUrl) {
+    console.log('[PastSwapItem] Using image URL:', imageUrl);
+  } else {
+    console.log('[PastSwapItem] No image found for token:', token.symbol);
+  }
+
+  return imageUrl;
 }
 
 /**
@@ -52,12 +83,24 @@ function formatDate(timestamp: number): string {
 /**
  * Component for displaying a past swap transaction item with Jupiter-inspired UI
  */
-const PastSwapItem: React.FC<PastSwapItemProps> = ({ swap, onSelect, selected }) => {
+const PastSwapItem: React.FC<PastSwapItemProps> = ({ swap, onSelect, selected, inputTokenLogoURI, outputTokenLogoURI }) => {
   const { inputToken, outputToken, timestamp } = swap;
 
   // Format the token amounts with proper decimals
   const formattedInputAmount = formatTokenAmount(inputToken.amount, inputToken.decimals);
   const formattedOutputAmount = formatTokenAmount(outputToken.amount, outputToken.decimals);
+
+  // Determine image sources with clean fallbacks
+  const inputImageSource = inputTokenLogoURI || inputToken.logoURI || inputToken.image;
+  const outputImageSource = outputTokenLogoURI || outputToken.logoURI || outputToken.image;
+
+  // Debug
+  console.log('[PastSwapItem] Image sources:', {
+    inputImageSource,
+    outputImageSource,
+    inputToken: `${inputToken.symbol} (${inputToken.mint?.substring(0, 6)}...)`,
+    outputToken: `${outputToken.symbol} (${outputToken.mint?.substring(0, 6)}...)`
+  });
 
   return (
     <TouchableOpacity
@@ -80,9 +123,9 @@ const PastSwapItem: React.FC<PastSwapItemProps> = ({ swap, onSelect, selected })
         {/* Input Token */}
         <View style={styles.tokenSide}>
           <View style={styles.tokenIconContainer}>
-            {inputToken.logoURI ? (
+            {inputImageSource ? (
               <Image
-                source={{ uri: inputToken.logoURI }}
+                source={{ uri: inputImageSource }}
                 style={styles.tokenIcon}
                 resizeMode="contain"
               />
@@ -112,9 +155,9 @@ const PastSwapItem: React.FC<PastSwapItemProps> = ({ swap, onSelect, selected })
         {/* Output Token */}
         <View style={styles.tokenSide}>
           <View style={styles.tokenIconContainer}>
-            {outputToken.logoURI ? (
+            {outputImageSource ? (
               <Image
-                source={{ uri: outputToken.logoURI }}
+                source={{ uri: outputImageSource }}
                 style={styles.tokenIcon}
                 resizeMode="contain"
               />

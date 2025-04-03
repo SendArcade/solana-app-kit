@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { View, StyleSheet, StatusBar, Platform, SafeAreaView } from 'react-native';
 import Profile from '../../../../core/profile/components/profile';
 import { useAppSelector, useAppDispatch } from '../../../../hooks/useReduxHooks';
 import { ThreadPost } from '../../../../core/thread/components/thread.types';
@@ -25,6 +25,9 @@ export default function ProfileScreen() {
 
   // Get all posts from Redux
   const allPosts = useAppSelector(state => state.thread.allPosts);
+
+  // Get the status bar height for Android
+  const STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0;
 
   // Filter posts belonging to the current user, including replies
   const myPosts = useMemo(() => {
@@ -91,16 +94,33 @@ export default function ProfileScreen() {
   }, [userWallet, storedProfilePic, storedUsername, storedDescription]);
 
   return (
-    <View style={{ flex: 1 }}>
-      <Profile
-        isOwnProfile={true}
-        user={user}
-        posts={myPosts}
-        nfts={nfts}
-        loadingNfts={loadingNfts}
-        fetchNftsError={fetchNftsError}
-        key={`profile-${followersCount}-${followingCount}`} // Force refresh when counts change
-      />
-    </View>
+    <>
+      {Platform.OS === 'android' && <View style={{ height: STATUSBAR_HEIGHT, backgroundColor: '#fff' }} />}
+      <SafeAreaView style={[styles.container, Platform.OS === 'android' && androidStyles.container]}>
+        <Profile
+          isOwnProfile={true}
+          user={user}
+          posts={myPosts}
+          nfts={nfts}
+          loadingNfts={loadingNfts}
+          fetchNftsError={fetchNftsError}
+          key={`profile-${followersCount}-${followingCount}`} // Force refresh when counts change
+        />
+      </SafeAreaView>
+    </>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+});
+
+// Android-specific styles to handle camera cutout/notch areas
+const androidStyles = StyleSheet.create({
+  container: {
+    paddingTop: 0, // We're handling this with the extra View above
+  },
+});
