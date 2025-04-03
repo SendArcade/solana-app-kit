@@ -15,8 +15,9 @@ import {
   StyleSheet,
   Text,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
-import {LineChart} from 'react-native-chart-kit';
+import { LineChart } from 'react-native-chart-kit';
 import {
   Circle,
   ClipPath,
@@ -84,10 +85,10 @@ const LineGraph: React.FC<LineGraphProps> = ({
 
   // Precompute min/max
   const dataRange = useMemo(() => {
-    if (!data || data.length === 0) return {min: 0, max: 0, range: 0};
+    if (!data || data.length === 0) return { min: 0, max: 0, range: 0 };
     const min = Math.min(...data);
     const max = Math.max(...data);
-    return {min, max, range: max - min};
+    return { min, max, range: max - min };
   }, [data]);
 
   // Convert potentially second-based timestamps to ms
@@ -132,7 +133,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
       const dataPoint = displayData[index];
       const y = interpolateY(dataPoint);
 
-      setTooltipPos({x: clampedX, y, index, price: dataPoint});
+      setTooltipPos({ x: clampedX, y, index, price: dataPoint });
     },
     [data, displayData, usableChartWidth, interpolateY],
   );
@@ -181,7 +182,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
     }).start();
 
     // Linear interpolation for the displayed data
-    const id = animatedData.addListener(({value}) => {
+    const id = animatedData.addListener(({ value }) => {
       const newData = data.map((target, i) => {
         const start = prevData[i] ?? target;
         return start + (target - start) * value;
@@ -221,8 +222,51 @@ const LineGraph: React.FC<LineGraphProps> = ({
   // Convert userAvatar into a string URI if possible
   const avatarUri = useMemo(() => {
     if (!userAvatar) return null;
-    if (typeof userAvatar === 'string') return userAvatar;
-    if (userAvatar.uri) return userAvatar.uri;
+
+    // For iOS, use original avatar directly without transformation
+    if (Platform.OS === 'ios') {
+      if (typeof userAvatar === 'string') return userAvatar;
+      if (userAvatar.uri) return userAvatar.uri;
+      return null;
+    }
+
+    // For Android - handle IPFS URLs to avoid 403/429 errors
+    if (typeof userAvatar === 'string') {
+      const avatarStr = String(userAvatar);
+      // Handle IPFS URLs
+      if (avatarStr.includes('ipfs.io/ipfs/')) {
+        const parts = avatarStr.split('/ipfs/');
+        if (parts.length > 1) {
+          const ipfsHash = parts[1].split('?')[0]?.split('#')[0];
+          if (ipfsHash) {
+            return `https://nftstorage.link/ipfs/${ipfsHash}`;
+          }
+        }
+      } else if (avatarStr.startsWith('ipfs://')) {
+        const ipfsHash = avatarStr.slice(7).split('?')[0]?.split('#')[0];
+        if (ipfsHash) {
+          return `https://nftstorage.link/ipfs/${ipfsHash}`;
+        }
+      }
+      // Not an IPFS URL or couldn't extract hash
+      return avatarStr;
+    }
+
+    // Handle object with URI
+    if (userAvatar.uri) {
+      const uriStr = String(userAvatar.uri);
+      if (uriStr.includes('ipfs.io/ipfs/')) {
+        const parts = uriStr.split('/ipfs/');
+        if (parts.length > 1) {
+          const ipfsHash = parts[1].split('?')[0]?.split('#')[0];
+          if (ipfsHash) {
+            return `https://nftstorage.link/ipfs/${ipfsHash}`;
+          }
+        }
+      }
+      return uriStr;
+    }
+
     return null;
   }, [userAvatar]);
 
@@ -284,10 +328,10 @@ const LineGraph: React.FC<LineGraphProps> = ({
       color: () => '#318EF8',
       labelColor: () => '#666666',
       formatYLabel: (v: string) => `$${v}`,
-      style: {borderRadius: 16},
-      propsForDots: {r: '0'},
-      propsForBackgroundLines: {strokeWidth: 0},
-      propsForLabels: {fontSize: 10},
+      style: { borderRadius: 16 },
+      propsForDots: { r: '0' },
+      propsForBackgroundLines: { strokeWidth: 0 },
+      propsForLabels: { fontSize: 10 },
     }),
     [],
   );
@@ -308,7 +352,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
   );
 
   // Keep track of each data point's (x, y)
-  const pointsRef = useRef<{x: number; y: number}[]>([]);
+  const pointsRef = useRef<{ x: number; y: number }[]>([]);
 
   // Build the tooltip's SVG elements
   const renderTooltip = useCallback(
@@ -397,8 +441,8 @@ const LineGraph: React.FC<LineGraphProps> = ({
 
   // Called by the chart for each data point
   const renderDotContent = useCallback(
-    ({x, y, index}: {x: number; y: number; index: number}) => {
-      pointsRef.current[index] = {x, y};
+    ({ x, y, index }: { x: number; y: number; index: number }) => {
+      pointsRef.current[index] = { x, y };
 
       const elements: JSX.Element[] = [];
 
@@ -426,7 +470,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
                   y={y - 8}
                   width={20}
                   height={20}
-                  href={{uri: avatarUri}}
+                  href={{ uri: avatarUri }}
                   clipPath={`url(#avatar-clip-${index})`}
                   preserveAspectRatio="xMidYMid slice"
                 />
@@ -491,12 +535,12 @@ const LineGraph: React.FC<LineGraphProps> = ({
 
     let fillPoints = '';
     for (let i = 0; i <= hoveredIndex; i++) {
-      const {x, y} = pointsRef.current[i];
+      const { x, y } = pointsRef.current[i];
       fillPoints += `${x},${y} `;
     }
 
-    const {x: lastX} = pointsRef.current[hoveredIndex];
-    const {x: firstX} = pointsRef.current[0];
+    const { x: lastX } = pointsRef.current[hoveredIndex];
+    const { x: firstX } = pointsRef.current[0];
 
     // go down to bottom
     fillPoints += `${lastX},${chartHeight - 10} ${firstX},${chartHeight - 10}`;

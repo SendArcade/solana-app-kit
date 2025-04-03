@@ -151,12 +151,12 @@ export default function TradeModal({
   useEffect(() => {
     // Set mounted flag
     isMounted.current = true;
-    
+
     // Return cleanup function
     return () => {
       console.log('[TradeModal] Component unmounting, cleaning up');
       isMounted.current = false;
-      
+
       // Clear any pending timeouts
       pendingTokenOps.current = { input: false, output: false };
     };
@@ -176,11 +176,11 @@ export default function TradeModal({
     try {
       console.log(`[TradeModal] Fetching balance for ${tokenForBalance.symbol}...`);
       const balance = await TokenService.fetchTokenBalance(userPublicKey, tokenForBalance);
-      
+
       // Only update state if component is still mounted and balance is non-null
       if (isMounted.current) {
         console.log(`[TradeModal] Token balance fetched for ${tokenForBalance.symbol}: ${balance}`);
-        
+
         // Even if balance is 0, we'll set it (instead of null) to indicate we've successfully fetched
         setCurrentBalance(balance);
         return balance;
@@ -235,7 +235,7 @@ export default function TradeModal({
 
       // Mark operations as pending
       pendingTokenOps.current = { input: true, output: true };
-      
+
       console.log('[TradeModal] Initializing tokens...');
 
       // If initialInputToken is provided, ensure it's a complete TokenInfo
@@ -258,10 +258,10 @@ export default function TradeModal({
 
       if (isMounted.current) {
         // Batch state updates to reduce rerenders
-        const tokensChanged = 
-          completeInputToken.address !== inputToken.address || 
+        const tokensChanged =
+          completeInputToken.address !== inputToken.address ||
           completeOutputToken.address !== outputToken.address;
-        
+
         setInputToken(completeInputToken);
         setOutputToken(completeOutputToken);
         pendingTokenOps.current = { input: false, output: false };
@@ -282,12 +282,12 @@ export default function TradeModal({
       pendingTokenOps.current = { input: false, output: false };
     }
   }, [
-    initialInputToken, 
-    initialOutputToken, 
-    fetchTokenBalance, 
-    fetchTokenPrice, 
-    inputToken.address, 
-    outputToken.address, 
+    initialInputToken,
+    initialOutputToken,
+    fetchTokenBalance,
+    fetchTokenPrice,
+    inputToken.address,
+    outputToken.address,
     currentBalance
   ]);
 
@@ -309,7 +309,7 @@ export default function TradeModal({
       } else if (connected && userPublicKey) {
         // If tokens are already initialized, fetch both balance and price
         console.log('[TradeModal] Modal visible, fetching balance and price for initialized tokens');
-        
+
         // Use a small timeout to avoid state updates colliding
         const timer = setTimeout(() => {
           if (isMounted.current) {
@@ -320,7 +320,7 @@ export default function TradeModal({
             });
           }
         }, 100);
-        
+
         return () => clearTimeout(timer);
       }
     }
@@ -396,7 +396,7 @@ export default function TradeModal({
         }
       } catch (err: any) {
         console.error('Trade error:', err);
-        
+
         // Check if this is a signature verification error
         if (err.message.includes('signature verification') && retryCount < MAX_RETRIES) {
           console.log(`Retrying transaction (attempt ${retryCount + 1} of ${MAX_RETRIES})...`);
@@ -416,7 +416,7 @@ export default function TradeModal({
           } else {
             errorMessage += err.message;
           }
-          
+
           setErrorMsg(errorMessage);
           console.error('Detailed error:', err.message);
         }
@@ -832,43 +832,43 @@ export default function TradeModal({
       setSolAmount(String(currentBalance));
       return;
     }
-    
+
     // Otherwise, fetch fresh balance
     if (isMounted.current) {
       setResultMsg("Fetching your balance...");
     }
-    
+
     try {
       const balance = await fetchTokenBalance();
-      
+
       if (isMounted.current) {
         setResultMsg("");
       }
-      
+
       // Check if we have a balance after fetching
       if (balance !== null && balance > 0 && isMounted.current) {
         console.log("[TradeModal] Setting max amount from fetched balance:", balance);
         setSolAmount(String(balance));
       } else if (isMounted.current) {
         console.log("[TradeModal] Balance fetch returned:", balance);
-        
+
         // Check if we actually have lamports but they're below the threshold
         if (balance === 0) {
           // This is likely a case where the user has a very small SOL balance
           // Get the raw balance through connection for SOL
-          if (inputToken.symbol === 'SOL' || 
-              inputToken.address === 'So11111111111111111111111111111111111111112') {
+          if (inputToken.symbol === 'SOL' ||
+            inputToken.address === 'So11111111111111111111111111111111111111112') {
             try {
               // We checked userPublicKey above, but TypeScript doesn't track that through the async function
               // So we need to check again
               if (!userPublicKey) {
                 throw new Error("Public key not available");
               }
-              
+
               const rpcUrl = ENDPOINTS.helius || clusterApiUrl(CLUSTER as Cluster);
               const connection = new Connection(rpcUrl, 'confirmed');
               const rawBalance = await connection.getBalance(userPublicKey);
-              
+
               if (rawBalance > 0) {
                 // We have some lamports, but not enough for transactions
                 Alert.alert(
@@ -881,7 +881,7 @@ export default function TradeModal({
               console.error("[TradeModal] Error checking raw balance:", e);
             }
           }
-          
+
           // If we reach here, show the generic message
           Alert.alert(
             "Balance Unavailable",
@@ -904,17 +904,17 @@ export default function TradeModal({
    */
   const handleTokenSelected = useCallback(async (token: any) => {
     if (!isMounted.current) return;
-    
+
     try {
       console.log(`[TradeModal] Token selected: ${token.symbol || 'Unknown'}`);
-      
+
       // Mark token operation as pending
       if (selectingWhichSide === 'input') {
         pendingTokenOps.current.input = true;
       } else {
         pendingTokenOps.current.output = true;
       }
-      
+
       // Ensure we have complete token info
       const completeToken = await TokenService.ensureCompleteTokenInfo(token);
 
@@ -922,15 +922,15 @@ export default function TradeModal({
 
       if (selectingWhichSide === 'input') {
         console.log('[TradeModal] Input token changed to', completeToken.symbol);
-        
+
         // Update input token state
         setInputToken(completeToken);
         pendingTokenOps.current.input = false;
-        
+
         // Clear any existing amount since token changed
         setSolAmount('0');
         setCurrentBalance(null);
-        
+
         // Fetch balance and price for new token with small delay
         setTimeout(async () => {
           if (isMounted.current) {
@@ -959,7 +959,7 @@ export default function TradeModal({
       } else {
         pendingTokenOps.current.output = false;
       }
-      
+
       if (isMounted.current) {
         setErrorMsg('Failed to load token information');
         setTimeout(() => isMounted.current && setErrorMsg(''), 3000);
@@ -1020,15 +1020,46 @@ export default function TradeModal({
                 ) : (
                   <FlatList
                     data={swaps}
-                    renderItem={({ item }) => (
-                      <View style={styles.swapItemContainer}>
-                        <PastSwapItem
-                          swap={item}
-                          onSelect={handlePastSwapSelected}
-                          selected={selectedPastSwap?.signature === item.signature}
-                        />
-                      </View>
-                    )}
+                    renderItem={({ item }) => {
+                      // Debug logging to see what's available
+                      console.log(`[TradeModal] Rendering swap item:`, {
+                        inputTokenImage: item.inputToken.image,
+                        inputTokenLogoURI: (item.inputToken as any).logoURI,
+                        outputTokenImage: item.outputToken.image,
+                        outputTokenLogoURI: (item.outputToken as any).logoURI
+                      });
+
+                      // Helper function to get token logo URL with fallbacks
+                      const getTokenLogoUrl = (token: any) => {
+                        // Try the properties we know about
+                        if (token.logoURI) return token.logoURI;
+                        if (token.image) return token.image;
+
+                        // Fallbacks for common tokens
+                        if (token.symbol === 'SOL' || token.mint === 'So11111111111111111111111111111111111111112') {
+                          return 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png';
+                        }
+
+                        if (token.symbol === 'USDC' || token.mint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') {
+                          return 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png';
+                        }
+
+                        // No logo found
+                        return null;
+                      };
+
+                      return (
+                        <View style={styles.swapItemContainer}>
+                          <PastSwapItem
+                            swap={item}
+                            onSelect={handlePastSwapSelected}
+                            selected={selectedPastSwap?.signature === item.signature}
+                            inputTokenLogoURI={getTokenLogoUrl(item.inputToken)}
+                            outputTokenLogoURI={getTokenLogoUrl(item.outputToken)}
+                          />
+                        </View>
+                      );
+                    }}
                     keyExtractor={item => item.signature}
                     contentContainerStyle={styles.swapsList}
                     showsVerticalScrollIndicator={true}

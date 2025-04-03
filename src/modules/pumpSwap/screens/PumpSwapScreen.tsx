@@ -9,7 +9,8 @@ import {
     KeyboardAvoidingView,
     Platform,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    StatusBar
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Connection } from '@solana/web3.js';
@@ -40,6 +41,9 @@ const PumpSwapScreen: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabType>('swap');
     const [loading, setLoading] = useState(false);
     const insets = useSafeAreaInsets();
+
+    // Get the status bar height for Android
+    const STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0;
 
     // Make sure we have a valid public key string
     const publicKey = (myWallet || address || solanaWallet?.wallets?.[0]?.publicKey) || '';
@@ -153,47 +157,50 @@ const PumpSwapScreen: React.FC = () => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView
-                style={styles.keyboardAvoidingView}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-            >
-                <ScrollView
-                    contentContainerStyle={[
-                        styles.scrollContent,
-                        { paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }
-                    ]}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
+        <>
+            {Platform.OS === 'android' && <View style={{ height: STATUSBAR_HEIGHT, backgroundColor: '#F8FAFC' }} />}
+            <SafeAreaView style={[styles.container, Platform.OS === 'android' && androidStyles.container]}>
+                <KeyboardAvoidingView
+                    style={styles.keyboardAvoidingView}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
                 >
-                    <View style={styles.header}>
-                        <Text style={styles.title}>PumpSwap</Text>
-                        <Text style={styles.subtitle}>
-                            Swap, provide liquidity, and create pools
-                        </Text>
-                        <Text style={styles.walletAddress}>
-                            Your Wallet: {publicKey.slice(0, 4)}...{publicKey.slice(-4)}
-                        </Text>
-                    </View>
-
-                    {loading && (
-                        <ActivityIndicator
-                            color="#6E56CF"
-                            style={styles.loader}
-                            size="large"
-                        />
-                    )}
-
-                    <View style={styles.card}>
-                        {renderTabBar()}
-                        <View style={styles.tabContent}>
-                            {renderTabContent()}
+                    <ScrollView
+                        contentContainerStyle={[
+                            styles.scrollContent,
+                            { paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }
+                        ]}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                    >
+                        <View style={styles.header}>
+                            <Text style={styles.title}>PumpSwap</Text>
+                            <Text style={styles.subtitle}>
+                                Swap, provide liquidity, and create pools
+                            </Text>
+                            <Text style={styles.walletAddress}>
+                                Your Wallet: {publicKey.slice(0, 4)}...{publicKey.slice(-4)}
+                            </Text>
                         </View>
-                    </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
+
+                        {loading && (
+                            <ActivityIndicator
+                                color="#6E56CF"
+                                style={styles.loader}
+                                size="large"
+                            />
+                        )}
+
+                        <View style={styles.card}>
+                            {renderTabBar()}
+                            <View style={styles.tabContent}>
+                                {renderTabContent()}
+                            </View>
+                        </View>
+                    </ScrollView>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </>
     );
 };
 
@@ -289,6 +296,13 @@ const styles = StyleSheet.create({
     loader: {
         marginVertical: 20,
     },
+});
+
+// Add Android-specific styles
+const androidStyles = StyleSheet.create({
+    container: {
+        paddingTop: 0, // We're handling this with the extra View
+    }
 });
 
 export default PumpSwapScreen; 

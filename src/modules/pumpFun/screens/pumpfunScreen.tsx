@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useMemo} from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,11 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
+  StatusBar
 } from 'react-native';
 
-import {styles} from './pumpfunScreen.style';
+import { styles } from './pumpfunScreen.style';
 import { useAuth } from '../../embeddedWalletProviders/hooks/useAuth';
 import { fetchSolBalance, fetchTokenAccounts, TokenEntry } from '../../../utils/common/fetch';
 import PumpfunBuySection from '../components/PumpfunBuySection';
@@ -44,7 +46,7 @@ const customStyles = StyleSheet.create({
 });
 
 export default function PumpfunScreen() {
-  const {solanaWallet} = useAuth();
+  const { solanaWallet } = useAuth();
   const myWallet = useAppSelector(state => state.auth.address);
 
   const userPublicKey = solanaWallet?.wallets?.[0]?.publicKey || myWallet || null;
@@ -57,6 +59,9 @@ export default function PumpfunScreen() {
   const [selectedSellToken, setSelectedSellToken] = useState<TokenEntry | null>(
     null,
   );
+
+  // Get the status bar height for Android
+  const STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0;
 
   async function refreshAll() {
     if (!userPublicKey) return;
@@ -78,9 +83,12 @@ export default function PumpfunScreen() {
 
   if (!userPublicKey) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.warnText}>Please connect your wallet first!</Text>
-      </SafeAreaView>
+      <>
+        {Platform.OS === 'android' && <View style={{ height: STATUSBAR_HEIGHT, backgroundColor: styles.container.backgroundColor }} />}
+        <SafeAreaView style={[styles.container, Platform.OS === 'android' && androidStyles.container]}>
+          <Text style={styles.warnText}>Please connect your wallet first!</Text>
+        </SafeAreaView>
+      </>
     );
   }
 
@@ -89,7 +97,7 @@ export default function PumpfunScreen() {
     return (solBalance / 1e9).toFixed(4);
   }, [solBalance]);
 
-  const renderTokenItem = ({item}: {item: TokenEntry}) => (
+  const renderTokenItem = ({ item }: { item: TokenEntry }) => (
     <View style={styles.tokenRow}>
       <Text style={styles.tokenMint}>
         {item.mintPubkey.slice(0, 6)}...{item.mintPubkey.slice(-6)}
@@ -107,7 +115,7 @@ export default function PumpfunScreen() {
   );
 
   const renderListHeader = () => (
-    <View style={{marginBottom: 16}}>
+    <View style={{ marginBottom: 16 }}>
       <Text style={styles.header}>Pumpfun Dashboard</Text>
       <View style={styles.balanceContainer}>
         <Text style={styles.balanceLabel}>SOL Balance: </Text>
@@ -124,7 +132,7 @@ export default function PumpfunScreen() {
   );
 
   const renderListFooter = () => (
-    <View style={{paddingBottom: 40}}>
+    <View style={{ paddingBottom: 40 }}>
       <View style={styles.tabsRow}>
         <TouchableOpacity
           style={[
@@ -215,22 +223,32 @@ export default function PumpfunScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <FlatList
-        data={tokens}
-        keyExtractor={item => item.accountPubkey}
-        renderItem={renderTokenItem}
-        ListHeaderComponent={renderListHeader}
-        ListEmptyComponent={
-          !loading ? (
-            <Text style={styles.emptyText}>
-              No tokens found. Press Refresh.
-            </Text>
-          ) : null
-        }
-        ListFooterComponent={renderListFooter}
-        contentContainerStyle={styles.listContentContainer}
-      />
-    </SafeAreaView>
+    <>
+      {Platform.OS === 'android' && <View style={{ height: STATUSBAR_HEIGHT, backgroundColor: styles.container.backgroundColor }} />}
+      <SafeAreaView style={[styles.container, Platform.OS === 'android' && androidStyles.container]}>
+        <FlatList
+          data={tokens}
+          keyExtractor={item => item.accountPubkey}
+          renderItem={renderTokenItem}
+          ListHeaderComponent={renderListHeader}
+          ListEmptyComponent={
+            !loading ? (
+              <Text style={styles.emptyText}>
+                No tokens found. Press Refresh.
+              </Text>
+            ) : null
+          }
+          ListFooterComponent={renderListFooter}
+          contentContainerStyle={styles.listContentContainer}
+        />
+      </SafeAreaView>
+    </>
   );
 }
+
+// Add Android-specific styles
+const androidStyles = StyleSheet.create({
+  container: {
+    paddingTop: 0, // We're handling this with the extra View
+  }
+});
