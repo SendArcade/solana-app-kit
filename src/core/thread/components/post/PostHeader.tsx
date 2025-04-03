@@ -1,6 +1,6 @@
 // FILE: src/components/thread/post/PostHeader.tsx
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,167 @@ import {
   Alert,
   ImageSourcePropType,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import Icons from '../../../../assets/svgs';
 import { createThreadStyles, getMergedTheme } from '../thread.styles';
 import { ThreadPost, ThreadUser } from '../thread.types';
 import { DEFAULT_IMAGES } from '../../../../config/constants';
 import { useWallet } from '../../../../modules/embeddedWalletProviders/hooks/useWallet';
+import { getValidImageSource, IPFSAwareImage } from '../../../../utils/IPFSImage';
+
+// Always available direct reference to an image in the bundle
+const DEFAULT_AVATAR = require('../../../../assets/images/User.png');
+
+// Generate random background colors for placeholders
+function getAvatarColor(username: string): string {
+  // Simple hash function to generate consistent colors for the same username
+  let hash = 0;
+  for (let i = 0; i < username.length; i++) {
+    hash = username.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  // Get a pastel hue
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 60%, 80%)`;
+}
+
+// The ProfileAvatarView component - simplified to rely on IPFSAwareImage but with a 403/429 fix
+function ProfileAvatarView({
+  user,
+  style,
+  size = 40
+}: {
+  user: ThreadUser,
+  style?: any,
+  size?: number
+}) {
+  // --- DEBUGGING START ---
+  // console.log('[PostHeader] ProfileAvatarView received user:', JSON.stringify(user));
+  // --- DEBUGGING END ---
+
+  // State to track if image has loaded *successfully*
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  // Get user initials for the placeholder
+  const initials = user?.username
+    ? user.username.charAt(0).toUpperCase()
+    : user?.handle ? user.handle.charAt(0).toUpperCase() : '?';
+
+  // Get consistent background color based on username
+  const backgroundColor = getAvatarColor(user?.username || user?.handle || '?');
+
+  // *** DIRECT APPROACH FIX to use reliable IPFS gateways WITHOUT cache buster ***
+  const source = (() => {
+    // Default if no avatar
+    if (!user?.avatar) return DEFAULT_AVATAR;
+
+    let ipfsHash: string | null = null;
+    let originalUrl: string | null = null;
+
+    // Process string avatars
+    if (typeof user.avatar === 'string') {
+      originalUrl = String(user.avatar);
+      if (originalUrl.includes('ipfs.io/ipfs/')) {
+        const parts = originalUrl.split('/ipfs/');
+        if (parts.length > 1) ipfsHash = parts[1].split('?')[0]?.split('#')[0];
+      } else if (originalUrl.startsWith('ipfs://')) {
+        ipfsHash = originalUrl.slice(7).split('?')[0]?.split('#')[0];
+      }
+    }
+    // Process object avatars
+    else if (typeof user.avatar === 'object' && user.avatar && !Array.isArray(user.avatar) && 'uri' in user.avatar) {
+      originalUrl = user.avatar.uri as string;
+      if (originalUrl && originalUrl.includes('ipfs.io/ipfs/')) {
+        const parts = originalUrl.split('/ipfs/');
+        if (parts.length > 1) ipfsHash = parts[1].split('?')[0]?.split('#')[0];
+      }
+    }
+
+    // If we found an IPFS hash, construct the corrected source
+    if (ipfsHash) {
+      const gatewayUri = Platform.OS === 'android'
+        ? `https://gateway.pinata.cloud/ipfs/${ipfsHash}`
+        : `https://cloudflare-ipfs.com/ipfs/${ipfsHash}`;
+      console.log('[PostHeader] Using transformed IPFS URL:', gatewayUri);
+      // Construct the source object, keeping original headers if present in an object avatar
+      const headers = (typeof user.avatar === 'object' && !Array.isArray(user.avatar) && user.avatar.headers) ? user.avatar.headers : { 'Accept': '*/*' };
+      return { uri: gatewayUri, headers };
+    }
+
+    // If it wasn't an IPFS URL needing transformation, return the original source
+    if (originalUrl) {
+      // If the original was an object, return it directly (handles headers etc.)
+      if (typeof user.avatar === 'object' && !Array.isArray(user.avatar)) return user.avatar;
+      // Otherwise, return a simple URI object from the string
+      return { uri: originalUrl };
+    }
+
+    // Fallback / Default (handles require() or array sources)
+    return user.avatar || DEFAULT_AVATAR;
+  })();
+
+  // --- DEBUGGING START ---
+  // console.log('[PostHeader] ProfileAvatarView final source for IPFSAwareImage:', JSON.stringify(source));
+  // --- DEBUGGING END ---
+
+  // Use a STABLE key based on user ID and the original avatar string/URI if possible
+  const originalAvatarString = typeof user?.avatar === 'string' ? user.avatar :
+    (typeof user?.avatar === 'object' && !Array.isArray(user?.avatar) && user?.avatar?.uri ? user.avatar.uri as string : null);
+  const imageKey = `avatar-${user?.id || 'local'}-${originalAvatarString || 'no-avatar'}`;
+
+  return (
+    <View style={[
+      {
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: backgroundColor, // Always show background color initially
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden', // Ensure image stays within bounds
+      },
+      style
+    ]}>
+      {/* Initials Text - show only if image hasn't loaded */}
+      {!imageLoaded && (
+        <Text style={{
+          fontSize: size * 0.45,
+          fontWeight: '700',
+          color: '#333',
+          textAlign: 'center',
+        }}>
+          {initials}
+        </Text>
+      )}
+
+      {/* Use IPFSAwareImage - it will handle its own errors/defaults */}
+      <IPFSAwareImage
+        source={source}
+        defaultSource={DEFAULT_AVATAR} // IPFSAwareImage handles showing this on error
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          position: 'absolute', // Overlay on top of the background/initials
+          top: 0,
+          left: 0,
+          opacity: imageLoaded ? 1 : 0, // Fade in when loaded
+        }}
+        key={imageKey} // Use the stable key
+        onLoad={() => {
+          // console.log('[PostHeader] IPFSAwareImage onLoad triggered for source:', JSON.stringify(source));
+          setImageLoaded(true);
+        }} // Mark as loaded successfully
+        onError={(error) => {
+          console.error('[PostHeader] IPFSAwareImage onError triggered! Source:', JSON.stringify(source), 'Error:', error?.nativeEvent?.error || 'Unknown error');
+          setImageLoaded(false); // Ensure initials show on error
+        }}
+        fadeDuration={Platform.OS === 'android' ? 0 : 150} // Optional fade-in
+      />
+    </View>
+  );
+}
 
 interface PostHeaderProps {
   /** The post data to display in the header */
@@ -35,7 +190,8 @@ interface PostHeaderProps {
   onPressUser?: (user: ThreadUser) => void;
 }
 
-export default function PostHeader({
+// Wrap the component in React.memo to prevent unnecessary re-renders
+export default React.memo(function PostHeader({
   post,
   onDeletePost,
   onEditPost,
@@ -91,19 +247,6 @@ export default function PostHeader({
     );
   };
 
-  /**
-   * Safely returns the image source for a user's avatar
-   */
-  function getUserAvatar(u: ThreadUser): ImageSourcePropType {
-    if (u.avatar) {
-      if (typeof u.avatar === 'string') {
-        return { uri: u.avatar };
-      }
-      return u.avatar;
-    }
-    return DEFAULT_IMAGES.user;
-  }
-
   const handleUserPress = () => {
     if (onPressUser) {
       onPressUser(user);
@@ -124,8 +267,8 @@ export default function PostHeader({
         <TouchableOpacity
           onPress={handleUserPress}
           style={{ position: 'relative' }}>
-          <Image
-            source={getUserAvatar(user)}
+          <ProfileAvatarView
+            user={user}
             style={styles.threadItemAvatar}
           />
           <Icons.addUserIcon
@@ -191,7 +334,7 @@ export default function PostHeader({
       )}
     </View>
   );
-}
+});
 
 const localHeaderStyles = StyleSheet.create({
   overlay: {

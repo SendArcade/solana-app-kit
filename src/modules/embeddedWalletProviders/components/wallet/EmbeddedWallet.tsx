@@ -20,15 +20,32 @@ let transact: TransactFunction | undefined;
 let PublicKey: typeof SolanaPublicKey | undefined;
 let Buffer: { from: (data: string, encoding: string) => Uint8Array } | undefined;
 
+// Only attempt to load Android-specific modules if we're on Android
+// And wrap in try/catch to handle Expo Go environment
 if (Platform.OS === 'android') {
-  const mwaModule = require('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
-  transact = mwaModule.transact as TransactFunction;
+  try {
+    // Attempt to load MWA module
+    const mwaModule = require('@solana-mobile/mobile-wallet-adapter-protocol-web3js');
+    transact = mwaModule.transact as TransactFunction;
+  } catch (error) {
+    console.warn('Mobile Wallet Adapter not available:', error);
+  }
 
-  const web3Module = require('@solana/web3.js');
-  PublicKey = web3Module.PublicKey;
+  try {
+    // Attempt to load Web3 module
+    const web3Module = require('@solana/web3.js');
+    PublicKey = web3Module.PublicKey;
+  } catch (error) {
+    console.warn('Solana Web3 module not available:', error);
+  }
 
-  const bufferModule = require('buffer');
-  Buffer = bufferModule.Buffer;
+  try {
+    // Attempt to load Buffer module
+    const bufferModule = require('buffer');
+    Buffer = bufferModule.Buffer;
+  } catch (error) {
+    console.warn('Buffer module not available:', error);
+  }
 }
 
 export interface EmbeddedWalletAuthProps {
@@ -71,12 +88,18 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
   }, [authConfig.provider, status, user, onWalletConnected, navigation]);
 
   const loginWithMWA = async () => {
+    // Check if we're on Android AND if all required modules are available
     if (Platform.OS !== 'android') {
       Alert.alert('Not Supported', 'Mobile Wallet Adapter is only available on Android devices');
       return;
     }
+
+    // Check if MWA modules are available (might not be in Expo Go)
     if (!transact || !PublicKey || !Buffer) {
-      Alert.alert('Error', 'Required modules for MWA not available');
+      Alert.alert(
+        'Not Available',
+        'Mobile Wallet Adapter is not available in this environment. Please use another login method.'
+      );
       return;
     }
 
@@ -184,7 +207,7 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
 
   return (
     <View style={styles.bottomButtonsContainer}>
-      {Platform.OS === 'android' && (
+      {Platform.OS === 'android' && transact && PublicKey && Buffer && (
         <TouchableOpacity style={styles.loginButton} onPress={loginWithMWA}>
           <Icons.Google width={24} height={24} />
           <Text style={styles.buttonText}>Continue with MWA</Text>
