@@ -3,7 +3,7 @@ import { Buffer } from 'buffer';
 import { ENDPOINTS } from '../../config/constants';
 import { CLUSTER } from '@env';
 import { TokenInfo } from '../token/tokenService';
-import { TransactionService } from '../transaction/transactionService';
+import { TransactionService } from '../../modules/embeddedWalletProviders/services/transaction/transactionService';
 
 export interface TradeResponse {
   success: boolean;

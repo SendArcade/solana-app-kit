@@ -14,23 +14,23 @@ import {
 import { RouteProp, useRoute } from '@react-navigation/native';
 
 import { RootStackParamList } from '../../../../navigation/RootNavigator';
-import PostHeader from '../../../../components/thread/post/PostHeader';
-import PostBody from '../../../../components/thread/post/PostBody';
-import PostFooter from '../../../../components/thread/post/PostFooter';
-import PostCTA from '../../../../components/thread/post/PostCTA';
-import ThreadComposer from '../../../../components/thread/ThreadComposer';
+import PostHeader from '../../../../core/thread/components/post/PostHeader';
+import PostBody from '../../../../core/thread/components/post/PostBody';
+import PostFooter from '../../../../core/thread/components/post/PostFooter';
+import PostCTA from '../../../../core/thread/components/post/PostCTA';
+import ThreadComposer from '../../../../core/thread/components/ThreadComposer';
 import { useAppSelector, useAppDispatch } from '../../../../hooks/useReduxHooks';
 import { useAppNavigation } from '../../../../hooks/useAppNavigation';
 
 import {
   ThreadPost,
   ThreadUser,
-} from '../../../../components/thread/thread.types';
+} from '../../../../core/thread/components/thread.types';
 import { DEFAULT_IMAGES } from '../../../../config/constants';
-import { flattenPosts } from '../../../../components/thread/thread.utils';
+import { flattenPosts } from '../../../../core/thread/components/thread.utils';
 import { deletePostAsync } from '../../../../state/thread/reducer';
-import ThreadEditModal from '../../../../components/thread/ThreadEditModal';
-import RetweetPreview from '../../../../components/thread/retweet/RetweetPreview';
+import ThreadEditModal from '../../../../core/thread/components/ThreadEditModal';
+import RetweetPreview from '../../../../core/thread/components/retweet/RetweetPreview';
 import Icons from '../../../../assets/svgs';
 
 /**
@@ -123,12 +123,12 @@ export default function PostThreadScreen() {
     if (commentInputRef.current) {
       // Set the highlighted state
       setIsCommentHighlighted(true);
-      
+
       // Scroll to the bottom first
       if (scrollViewRef.current) {
         scrollViewRef.current.scrollToEnd({ animated: true });
       }
-      
+
       // Animate the background dimming effect
       Animated.timing(backgroundOpacity, {
         toValue: 1,
@@ -136,7 +136,7 @@ export default function PostThreadScreen() {
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true
       }).start();
-      
+
       // Animate a subtle lift effect on the composer
       Animated.timing(composerTranslateY, {
         toValue: -3,
@@ -144,12 +144,12 @@ export default function PostThreadScreen() {
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true
       }).start();
-      
+
       // Focus the input with a slight delay
       setTimeout(() => {
         commentInputRef.current?.focus();
       }, 250);
-      
+
       // Reset the highlight after a delay
       setTimeout(() => {
         Animated.parallel([
@@ -255,10 +255,10 @@ export default function PostThreadScreen() {
                   ))}
                 </View>
               )}
-            
+
               {/* Display original post content for retweets */}
               {post.retweetOf && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={twitterRowStyles.originalPostContainer}
                   activeOpacity={0.8}
                   onPress={() => navigation.push('PostThread', { postId: post.retweetOf!.id })}
@@ -277,9 +277,9 @@ export default function PostThreadScreen() {
                     themeOverrides={{}}
                     styleOverrides={{}}
                   />
-                  <PostFooter 
+                  <PostFooter
                     post={post.retweetOf}
-                    onPressComment={focusCommentInput} 
+                    onPressComment={focusCommentInput}
                   />
                 </TouchableOpacity>
               )}
@@ -301,8 +301,8 @@ export default function PostThreadScreen() {
                 themeOverrides={{}}
                 styleOverrides={{}}
               />
-              <PostFooter 
-                post={post} 
+              <PostFooter
+                post={post}
                 onPressComment={focusCommentInput}
               />
             </>
@@ -361,10 +361,10 @@ export default function PostThreadScreen() {
                   ))}
                 </View>
               )}
-              
+
               {/* Display original post content for retweets */}
               {post.retweetOf && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={twitterRowStyles.originalPostContainer}
                   activeOpacity={0.8}
                   onPress={() => navigation.push('PostThread', { postId: post.retweetOf!.id })}
@@ -383,9 +383,9 @@ export default function PostThreadScreen() {
                     themeOverrides={{}}
                     styleOverrides={{}}
                   />
-                  <PostFooter 
+                  <PostFooter
                     post={post.retweetOf}
-                    onPressComment={focusCommentInput} 
+                    onPressComment={focusCommentInput}
                   />
                 </TouchableOpacity>
               )}
@@ -407,8 +407,8 @@ export default function PostThreadScreen() {
                 themeOverrides={{}}
                 styleOverrides={{}}
               />
-              <PostFooter 
-                post={post} 
+              <PostFooter
+                post={post}
                 onPressComment={focusCommentInput}
               />
             </>
@@ -432,7 +432,7 @@ export default function PostThreadScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView 
+      <ScrollView
         ref={scrollViewRef}
         contentContainerStyle={styles.scrollContent}>
         {currentPost ? (
@@ -462,7 +462,7 @@ export default function PostThreadScreen() {
         <>
           {/* Semi-transparent overlay for dimming effect */}
           {isCommentHighlighted && (
-            <Animated.View 
+            <Animated.View
               style={{
                 position: 'absolute',
                 top: 0,
@@ -475,8 +475,8 @@ export default function PostThreadScreen() {
               }}
             />
           )}
-          
-          <Animated.View 
+
+          <Animated.View
             style={[
               styles.composerContainer,
               {

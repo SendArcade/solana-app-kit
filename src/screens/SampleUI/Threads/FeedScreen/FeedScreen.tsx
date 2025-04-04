@@ -3,12 +3,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView, StyleSheet, Platform, ActivityIndicator, View } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 
-import { Thread } from '../../../../components/thread/Thread';
+import { Thread } from '../../../../core/thread/components/Thread';
 import {
   ThreadUser,
   ThreadPost,
   ThreadCTAButton,
-} from '../../../../components/thread/thread.types';
+} from '../../../../core/thread/components/thread.types';
 import { useAppDispatch, useAppSelector } from '../../../../hooks/useReduxHooks';
 import { fetchAllPosts } from '../../../../state/thread/reducer';
 import { fetchUserProfile } from '../../../../state/auth/reducer';
@@ -157,7 +157,7 @@ export default function FeedScreen() {
             navigation.navigate('PostThread', { postId: post.id });
           }
         }}
-        themeOverrides={{ 
+        themeOverrides={{
           '--thread-bg-primary': '#F0F0F0',
           '--retweet-border-color': '#E1E8ED',
           '--retweet-bg-color': '#F8F8F8',

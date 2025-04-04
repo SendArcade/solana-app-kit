@@ -3,7 +3,7 @@ import {createSlice, createAsyncThunk, PayloadAction} from '@reduxjs/toolkit';
 import type {
   ThreadPost,
   ThreadSection,
-} from '../../components/thread/thread.types';
+} from '../../core/thread/components/thread.types';
 import {allposts as fallbackPosts} from '../../mocks/posts';
 import {SERVER_URL} from '@env';
 

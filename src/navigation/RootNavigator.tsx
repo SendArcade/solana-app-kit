@@ -3,20 +3,21 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { useSelector } from 'react-redux';
 import { RootState } from '../state/store';
 import MainTabs from './MainTabs';
-import TokenMillScreen from '../screens/Common/TokenMillScreen/TokenMillScreen';
 import ChatScreen from '../screens/SampleUI/Chat/ChatScreen/ChatScreen';
 import CoinDetailPage from '../screens/SampleUI/Threads/CoinDetailPage/CoinDetailPage';
 import BlinkScreen from '../screens/Common/BlinkScreen';
-import PumpfunScreen from '../screens/Common/pumpfunScreen/pumpfunScreen';
-import NftScreen from '../screens/Common/NftScreen/NftScreen';
+import NftScreen from '../modules/nft/screens/NftScreen';
 import IntroScreen from '../screens/Common/IntroScreen/IntroScreen';
 import LoginScreen from '../screens/Common/LoginScreen/LoginScreen';
 
 // NEW IMPORT
 import OtherProfileScreen from '../screens/SampleUI/Threads/OtherProfileScreen/OtherProfileScreen';
 import PostThreadScreen from '../screens/SampleUI/Threads/PostThreadScreen/PostthreadScreen';
-import FollowersFollowingListScreen from '../components/thread/FollowersFollowingListScreen/FollowersFollowingListScreen';
+import FollowersFollowingListScreen from '../core/thread/components/FollowersFollowingListScreen/FollowersFollowingListScreen';
 import ProfileScreen from '../screens/SampleUI/Threads/ProfileScreen/ProfileScreen';
+import { TokenMillScreen } from '../modules/tokenMill';
+import { PumpfunScreen } from '../modules/pumpFun';
+import PumpSwapScreen from '../modules/pumpSwap/screens/PumpSwapScreen';
 
 export type RootStackParamList = {
   LoginOptions: undefined;
@@ -28,10 +29,11 @@ export type RootStackParamList = {
   TokenMill: undefined;
   NftScreen: undefined;
   ChatScreen: undefined;
+  PumpSwap: undefined;
   // NEW ROUTE
   OtherProfile: { userId: string };
   PostThread: { postId: string };
-  FollowersFollowingList : undefined;
+  FollowersFollowingList: undefined;
   ProfileScreen: undefined;
 };
 
@@ -51,6 +53,7 @@ export default function RootNavigator() {
           <Stack.Screen name="TokenMill" component={TokenMillScreen} />
           <Stack.Screen name="NftScreen" component={NftScreen} />
           <Stack.Screen name="ChatScreen" component={ChatScreen} />
+          <Stack.Screen name="PumpSwap" component={PumpSwapScreen} />
 
           {/* NEW SCREEN for viewing other user's profile */}
           <Stack.Screen name="OtherProfile" component={OtherProfileScreen} />
