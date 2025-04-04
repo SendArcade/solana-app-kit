@@ -119,11 +119,9 @@ function ProfileAvatarView({
 
         // Use one of the fallback gateways
         gatewayUri = fallbackGateways[0];
-        console.log('[PostHeader] Using fallback gateway for IPFS hash:', gatewayUri);
       } else {
         // For all other hashes on first try, continue using Pinata as it works for them
         gatewayUri = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
-        console.log('[PostHeader] Using transformed IPFS URL on Android:', gatewayUri);
       }
 
       // Construct the source object, keeping original headers if present in an object avatar

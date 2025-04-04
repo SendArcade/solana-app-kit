@@ -826,16 +826,25 @@ const BuyCard: React.FC<BuyCardProps> = ({
           onClose={() => setShowTokenDetailsDrawer(false)}
           tokenMint={tokenMint}
           initialData={{
-            symbol: cleanTokenName,
-            name: description || cleanTokenName,
-            logoURI: typeof tokenImage === 'string' ? fixImageUrl(tokenImage) : undefined,
+            symbol: cleanTokenName || '',
+            name: description || cleanTokenName || '',
+            logoURI: typeof tokenImage === 'string' ? (tokenImage ? fixImageUrl(tokenImage) : '') : undefined,
             isCollection: isNftCollection(),
             collectionData: isNftCollection() ? {
-              description: tokenDesc || `Collection of NFTs: ${description || tokenName}`,
+              description: tokenDesc || `Collection of NFTs: ${description || tokenName || ''}`,
               name: description || tokenName || 'NFT Collection',
-              imageUri: typeof tokenImage === 'string' ? fixImageUrl(tokenImage) : undefined,
+              imageUri: typeof tokenImage === 'string' ? (tokenImage ? fixImageUrl(tokenImage) : '') : undefined,
               tokenCount: 0,
               floorPrice: 0,
+              // Ensure all needed fields are initialized with default values
+              stats: {
+                numListed: 0,
+                pctListed: 0,
+                volume24h: '0',
+                volume7d: '0',
+                volumeAll: '0',
+                salesAll: 0
+              }
             } : undefined
           }}
           loading={drawerLoading}
