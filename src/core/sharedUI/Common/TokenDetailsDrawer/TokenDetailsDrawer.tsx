@@ -10,7 +10,6 @@ import {
   ScrollView,
   Linking,
   Dimensions,
-  LogBox,
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import LineGraph from '../TradeCard/LineGraph';
@@ -20,7 +19,6 @@ import { Timeframe, useCoingecko } from '../../../../hooks/useCoingecko';
 import { fetchJupiterTokenData } from '../../../../utils/tokenUtils';
 
 const { width } = Dimensions.get('window');
-LogBox.ignoreLogs(['Text strings must be rendered within a <Text> component']);
 
 interface TokenDetailsDrawerProps {
   visible: boolean;
@@ -214,7 +212,6 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
     </View>
   );
 
-
   const renderOverviewTab = () => {
     const isNftOrCollection = initialData?.isCollection || initialData?.nftData;
     if (isNftOrCollection) {
@@ -227,9 +224,9 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
             <Text style={styles.sectionText}>
               {initialData?.isCollection
                 ? initialData?.collectionData?.description ||
-                'No description available.'
+                  'No description available.'
                 : initialData?.nftData?.description ||
-                'No description available.'}
+                  'No description available.'}
             </Text>
           </View>
 
@@ -245,30 +242,27 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                     <View style={styles.statBox}>
                       <Text style={styles.collectionStatLabel}>Floor</Text>
                       <Text style={styles.collectionStatValue}>
-                        {initialData.collectionData.floorPrice?.toFixed(2)} SOL
+                        {initialData.collectionData.floorPrice ? initialData.collectionData.floorPrice.toFixed(2) : '0'} SOL
                       </Text>
                     </View>
                     <View style={styles.statBox}>
                       <Text style={styles.collectionStatLabel}>Listed</Text>
                       <Text style={styles.collectionStatValue}>
-                        {initialData.collectionData.stats.numListed || '0'}
+                        {initialData.collectionData.stats.numListed ? 
+                          initialData.collectionData.stats.numListed.toString() : '0'}
                       </Text>
                       <Text style={styles.statSubValue}>
-                        {initialData.collectionData.stats.pctListed?.toFixed(
-                          1,
-                        ) || '0'}
+                        {initialData.collectionData.stats.pctListed ? 
+                          initialData.collectionData.stats.pctListed.toFixed(1) : '0'}
                         %
                       </Text>
                     </View>
                     <View style={styles.statBox}>
                       <Text style={styles.collectionStatLabel}>24h Vol</Text>
                       <Text style={styles.collectionStatValue}>
-                        {(
-                          parseFloat(
-                            initialData.collectionData.stats.volume24h || '0',
-                          ) / 1_000_000_000
-                        ).toFixed(1)}{' '}
-                        SOL
+                        {initialData.collectionData.stats.volume24h ? 
+                          (parseFloat(initialData.collectionData.stats.volume24h) / 1_000_000_000).toFixed(1) : '0'}{' '}
+                        <Text>SOL</Text>
                       </Text>
                     </View>
                   </View>
@@ -294,11 +288,12 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                   </View>
                 )}
 
-                {initialData.collectionData.floorPrice && (
+                {initialData.collectionData.floorPrice !== undefined && (
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Floor Price</Text>
                     <Text style={styles.detailValue}>
-                      {initialData.collectionData.floorPrice.toFixed(2)} SOL
+                      {initialData.collectionData.floorPrice ? 
+                        initialData.collectionData.floorPrice.toFixed(2) : '0'} SOL
                     </Text>
                   </View>
                 )}
@@ -307,11 +302,8 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>24h Volume</Text>
                     <Text style={styles.detailValue}>
-                      {(
-                        parseFloat(initialData.collectionData.stats.volume24h) /
-                        1_000_000_000
-                      ).toFixed(2)}{' '}
-                      SOL
+                      {(parseFloat(initialData.collectionData.stats.volume24h) / 1_000_000_000).toFixed(2)}{' '}
+                      <Text>SOL</Text>
                     </Text>
                   </View>
                 )}
@@ -320,11 +312,8 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>7d Volume</Text>
                     <Text style={styles.detailValue}>
-                      {(
-                        parseFloat(initialData.collectionData.stats.volume7d) /
-                        1_000_000_000
-                      ).toFixed(2)}{' '}
-                      SOL
+                      {(parseFloat(initialData.collectionData.stats.volume7d) / 1_000_000_000).toFixed(2)}{' '}
+                      <Text>SOL</Text>
                     </Text>
                   </View>
                 )}
@@ -333,30 +322,30 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Total Volume</Text>
                     <Text style={styles.detailValue}>
-                      {(
-                        parseFloat(initialData.collectionData.stats.volumeAll) /
-                        1_000_000_000
-                      ).toFixed(2)}{' '}
-                      SOL
+                      {(parseFloat(initialData.collectionData.stats.volumeAll) / 1_000_000_000).toFixed(2)}{' '}
+                      <Text>SOL</Text>
                     </Text>
                   </View>
                 )}
 
-                {initialData.collectionData.stats?.numListed && (
+                {initialData.collectionData.stats?.numListed !== undefined && (
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Listed</Text>
                     <Text style={styles.detailValue}>
-                      {initialData.collectionData.stats.numListed} (
-                      {initialData.collectionData.stats.pctListed?.toFixed(2)}%)
+                      {initialData.collectionData.stats.numListed ? 
+                        initialData.collectionData.stats.numListed.toString() : '0'} (
+                      {initialData.collectionData.stats.pctListed ? 
+                        initialData.collectionData.stats.pctListed.toFixed(2) : '0'}%)
                     </Text>
                   </View>
                 )}
 
-                {initialData.collectionData.stats?.salesAll && (
+                {initialData.collectionData.stats?.salesAll !== undefined && (
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Total Sales</Text>
                     <Text style={styles.detailValue}>
-                      {initialData.collectionData.stats.salesAll}
+                      {initialData.collectionData.stats.salesAll ? 
+                        initialData.collectionData.stats.salesAll.toString() : '0'}
                     </Text>
                   </View>
                 )}
@@ -465,11 +454,8 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Listed Price</Text>
                     <Text style={[styles.detailValue, { color: '#00C851' }]}>
-                      {(
-                        parseFloat(initialData.nftData.listing.price) /
-                        1_000_000_000
-                      ).toFixed(2)}{' '}
-                      SOL
+                      {(parseFloat(initialData.nftData.listing.price) / 1_000_000_000).toFixed(2)}{' '}
+                      <Text>SOL</Text>
                     </Text>
                   </View>
                 )}
@@ -478,11 +464,8 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Last Sale</Text>
                     <Text style={styles.detailValue}>
-                      {(
-                        parseFloat(initialData.nftData.lastSale.price) /
-                        1_000_000_000
-                      ).toFixed(2)}{' '}
-                      SOL
+                      {(parseFloat(initialData.nftData.lastSale.price) / 1_000_000_000).toFixed(2)}{' '}
+                      <Text>SOL</Text>
                     </Text>
                   </View>
                 )}
@@ -664,8 +647,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
             </View>
 
             <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Market Cap</Text>
-
+              <Text style={styles.statLabel}>Market Cap</Text>
               <Text style={[styles.statValue, styles.statValueText]}>
                 {formatLargeNumber(marketCap)}
               </Text>
@@ -724,7 +706,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
           <View style={styles.marketMetricItem}>
             <Text style={styles.marketMetricLabel}>Liquidity</Text>
             <Text style={styles.marketMetricValue}>
-              {liquidityScore.toFixed(2)}%
+              {liquidityScore ? liquidityScore.toFixed(2) : '0'}%
             </Text>
           </View>
         </View>
@@ -757,9 +739,9 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
             <Text style={styles.detailLabel}>Recent Price</Text>
             <Text style={styles.detailValue}>
               $
-              {heliusTokenData.token_info.price_info.price_per_token?.toFixed(
-                6,
-              ) || 'N/A'}
+              {heliusTokenData.token_info.price_info.price_per_token
+                ? heliusTokenData.token_info.price_info.price_per_token.toFixed(6)
+                : 'N/A'}
             </Text>
           </View>
         )}
@@ -840,7 +822,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
                 {tokenData?.symbol || initialData?.symbol || ''}
               </Text>
             )}
-            {timeframePrice &&
+            {timeframePrice > 0 &&
               !initialData?.isCollection &&
               !initialData?.nftData && (
                 <View style={styles.priceContainer}>

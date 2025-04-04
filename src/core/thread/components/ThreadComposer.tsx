@@ -369,7 +369,6 @@ export const ThreadComposer = forwardRef<{ focus: () => void }, ThreadComposerPr
     setShowListingModal(false);
   };
 
-  console.log(storedProfilePic, "///////////////////")
 
   // Add debug logging for Android IPFS image handling
   if (Platform.OS === 'android' && storedProfilePic) {

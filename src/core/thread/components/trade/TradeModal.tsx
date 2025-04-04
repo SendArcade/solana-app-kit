@@ -88,7 +88,6 @@ export default function TradeModal({
   const dispatch = useAppDispatch();
   // Use our wallet hook
   const { publicKey: userPublicKey, connected, sendTransaction } = useWallet();
-  console.log("[TradeModal] User public key:", userPublicKey);
   const [selectedTab, setSelectedTab] = useState<TabOption>(() =>
     initialActiveTab ?? 'PAST_SWAPS'
   );
