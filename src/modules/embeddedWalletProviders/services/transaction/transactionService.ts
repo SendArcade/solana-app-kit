@@ -919,9 +919,9 @@ export class TransactionService {
           const authResult = await wallet.authorize({
             cluster: CLUSTER || 'mainnet-beta',
             identity: {
-              name: 'MWA-enabled dApp',
-              uri: 'https://yourdapp.com',
-              icon: 'favicon.ico',
+              name: 'Solana App Kit',
+              uri: 'https://solanaappkit.com',
+              icon: 'https://solanaappkit.com/favicon.ico',
             },
           });
           
