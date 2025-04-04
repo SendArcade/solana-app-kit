@@ -38,10 +38,16 @@ export const PumpfunSellSection: React.FC<PumpfunSellSectionProps> = ({
   }, [selectedToken]);
 
   useEffect(() => {
-    // Simulated fee estimate for demonstration
-    const randomEstimateLamports = 5000 + Math.floor(Math.random() * 5000);
-    const estimateSol = randomEstimateLamports / 1e9;
-    setEstimatedFee(estimateSol);
+    // Only calculate fee when we have a valid number and not on every keystroke
+    const amount = parseFloat(tokenAmount);
+    if (!isNaN(amount) && amount > 0) {
+      // Use a fixed base fee instead of random values
+      const baseFeeInLamports = 5000;
+      // Small deterministic adjustment based on token amount (if needed)
+      const adjustedFee = baseFeeInLamports + (amount * 100); 
+      const estimateSol = adjustedFee / 1e9;
+      setEstimatedFee(estimateSol);
+    }
   }, [tokenAmount]);
 
   const handleSell = async () => {

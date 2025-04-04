@@ -1,5 +1,5 @@
 import {Router, Request, Response} from 'express';
-import {jupiterSwapHandler} from '../controllers/jupiterSwapController';
+import {jupiterSwapHandler} from '../../controllers/jupiterSwapController';
 
 const jupiterSwapRouter = Router();
 

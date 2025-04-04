@@ -12,8 +12,8 @@ import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import knex from '../db/knex';
-import {uploadToIpfs} from '../utils/ipfs';
+import knex from '../../db/knex';
+import {uploadToIpfs} from '../../utils/ipfs';
 // import fetch from 'node-fetch';
 
 const profileImageRouter = Router();

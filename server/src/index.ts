@@ -7,15 +7,15 @@ import {
   SwapAmounts,
 } from './types/interfaces';
 import { PublicKey } from '@solana/web3.js';
-import { launchRouter } from './routes/pumpfunLaunch';
+import { launchRouter } from './routes/pumpfun/pumpfunLaunch';
 // import { buildCompressedNftListingTx } from './utils/compressedNftListing';
-import { threadRouter } from './routes/threadRoutes';
 import knex from './db/knex';
-import jupiterSwapRouter from './routes/jupiterSwapRoutes';
-import profileImageRouter from './routes/profileImageRoutes';
-import { threadImageRouter } from './routes/threadImageRoutes';
-import { pumpSwapRouter } from './routes/pumpSwapRoutes';
-import tokenMillRouter from './routes/tokenMillRoutes';
+import jupiterSwapRouter from './routes/swap/jupiterSwapRoutes';
+import { threadImageRouter } from './routes/feed/threadImageRoutes';
+import tokenMillRouter from './routes/tokenmill/tokenMillRoutes';
+import { threadRouter } from './routes/feed/threadRoutes';
+import profileImageRouter from './routes/user/userRoutes';
+import { pumpSwapRouter } from './routes/pumpfun/pumpSwapRoutes';
 
 const app = express();
 app.use(express.json());

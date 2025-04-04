@@ -1,6 +1,6 @@
 // FILE: server/src/routes/profileWalletRoutes.ts
 import {Router, Request, Response} from 'express';
-import knex from '../db/knex';
+import knex from '../../db/knex';
 
 const profileWalletRouter = Router();
 

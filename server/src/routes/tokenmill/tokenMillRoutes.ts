@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { TokenMillClient } from '../service/TokenMill/tokenMill';
+import { TokenMillClient } from '../../service/TokenMill/tokenMill';
 import {
   MarketParams,
   StakingParams,
@@ -7,7 +7,7 @@ import {
   TokenParams,
   VestingParams,
   FreeMarketParams,
-} from '../types/interfaces';
+} from '../../types/interfaces';
 import { PublicKey } from '@solana/web3.js';
 
 const router = express.Router();
