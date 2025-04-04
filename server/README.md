@@ -1,247 +1,195 @@
-# TokenMill Backend
+# Solana Social Starter - Backend Server
 
-A Solana-based backend service for TokenMill, providing token management, staking, and vesting functionality.
+A comprehensive backend server for the Solana Social Starter kit, providing token management, social features, and various API endpoints for interacting with the Solana blockchain.
 
 ## Overview
 
-TokenMill Backend is an Express.js server that interfaces with the TokenMill Solana program, providing REST API endpoints for:
-- Token creation and management
-- Market operations
-- Staking functionality
-- Vesting schedules
-- Configuration management
+This backend server is built with Express.js and TypeScript, offering a robust API for:
+
+- Token creation and management via TokenMill
+- Social features including threads and profiles
+- Image upload and management
+- Token swapping via Jupiter and PumpSwap
+- Staking and vesting functionality
+- IPFS integration via Pinata
+- Google Cloud Storage integration
 
 ## Prerequisites
 
 - Node.js (v16 or higher)
-- npm or yarn
-- Solana CLI tools
+- Yarn package manager
 - A Solana wallet with some SOL for transactions
+- PostgreSQL database
+- Google Cloud Storage account (for image storage)
+- Pinata account (for IPFS storage)
 
 ## Installation
 
 1. Clone the repository:
+
 ```bash
-git clone <repository-url>
-cd token-mill-be
+git clone https://github.com/your-username/solana-social-starter.git
+cd solana-social-starter/server
 ```
 
 2. Install dependencies:
+
 ```bash
-npm install
+yarn install
 ```
 
-3. Create a `.env` file in the root directory:
+3. Create a `.env` file in the server directory with the following variables:
+
 ```env
-RPC_URL=https://api.devnet.solana.com
-PROGRAM_ID=JoeaRXgtME3jAoz5WuFXGEndfv4NPH9nBxsLq44hk9J
+# Solana Configuration
+WALLET_PRIVATE_KEY="your-wallet-private-key"
+RPC_URL="your-solana-rpc-url"
+TOKEN_MILL_PROGRAMID="JoeaRXgtME3jAoz5WuFXGEndfv4NPH9nBxsLq44hk9J"
+TOKEN_MILL_CONFIG_PDA="your-token-mill-config-pda"
+SWAP_AUTHORITY_KEY="your-swap-authority-key"
+
+# Pinata Configuration (for IPFS)
+PINATA_JWT="your-pinata-jwt"
+PINATA_GATEWAY="your-pinata-gateway"
+PINATA_SECRET="your-pinata-secret"
+PINATA_API_KEY="your-pinata-api-key"
+
+# Database Configuration
+DATABASE_URL="postgresql://username:password@hostname:port/database_name"
+
+# Google Cloud Storage
+GCS_BUCKET_NAME="your-gcs-bucket-name"
+SERVICE_ACCOUNT_EMAIL="your-service-account-email"
 ```
 
 ## Development
 
-Start the development server:
+Start the development server with auto-reload:
+
 ```bash
-npm run dev
+yarn dev
 ```
 
-Build the project:
+This will start the server on port 8080 (or the port specified in your environment variables).
+
+## Production Build
+
+Build the production-ready code:
+
 ```bash
-npm run build
+yarn build
 ```
 
-## API Endpoints
+Start the production server:
 
-### Configuration
-- `POST /api/config` - Create a new TokenMill configuration
-  - Required body: `{ authority, protocolFeeRecipient, protocolFeeShare, referralFeeShare }`
-
-### Token Operations
-- `POST /api/quote-token-badge` - Get token badge quote
-- Required body: `{ quoteTokenMint, baseTokenMint, amount}`
-- `POST /api/tokens` - Create a new token
-  - Required body: `{ name, symbol, uri, totalSupply, creatorFeeShare, stakingFeeShare, quoteTokenMint `
-
-### Market Operations
-- `POST /api/markets` - Create a new market
-  - Required body: `{ name, symbol, uri, totalSupply, creatorFeeShare, stakingFeeShare, quoteTokenMint }`
-
-### Staking
-- `POST /api/stake` - Create a new staking position
-  - Required body: `{ marketAddress }`
-
-### Vesting
-- `POST /api/vesting` - Create a new vesting schedule
-- Required body: `{ marketAddress, recipient, baseTokenMint, amount, duration, cliffDuration }`
-- `POST /api/vesting/:marketAddress/claim` - Claim vested tokens
-  - Required params: marketAddress
-  - Required body: Claim parameters
-
-### Swapping
-- `POST /api/swap` - Excutes swap using swap authority 
--  Required body - `{ action, tradeType, amount, otherAmountThreshold, market, quoteTokenMint }`
-
-### Get Asset Metadata
-- `POST /api/get-asset` -  executes get asset metadata using mint address to give the metadata
-- Required body: `{ assetId }`
+```bash
+yarn start
+```
 
 ## Project Structure
 
 ```
-token-mill-be/
-├── src/
-│   ├── idl/            # Solana program interface definitions
-│   ├── types/          # TypeScript type definitions
-│   ├── utils/          # Utility functions and classes
-│   └── index.ts        # Main application entry point
-├── dist/               # Compiled JavaScript output
-├── .env               # Environment variables
-└── package.json
+server/
+├── src/                   # Source code
+│   ├── controllers/       # Controller functions
+│   ├── db/                # Database configuration and migrations
+│   ├── idl/               # Interface Definition Language files for Solana programs
+│   ├── routes/            # API route definitions
+│   ├── service/           # Service implementations
+│   │   └── TokenMill/     # TokenMill service implementation
+│   ├── types/             # TypeScript type definitions
+│   ├── utils/             # Utility functions
+│   ├── index.ts           # Main application entry point
+│   └── program-init.ts    # Solana program initialization
+├── dist/                  # Compiled JavaScript output
+├── uploads/               # Temporary upload directory
+├── .env                   # Environment variables
+├── package.json           # Project dependencies
+├── tsconfig.json          # TypeScript configuration
+└── README.md              # This file
 ```
 
-## Dependencies
+## API Endpoints
 
-- `@coral-xyz/anchor` - Solana development framework
-- `@solana/web3.js` - Solana web3 library
-- `@solana/spl-token` - SPL Token program interactions
-- `express` - Web server framework
-- `typescript` - Type support
-- Additional utilities- `big.js`, `bn.js`, `bs58`, `dotenv`
-- IDL for the program - https://github.com/SendArcade/Token-Mill/tree/main/src/idl
+### TokenMill Endpoints
 
-### Token-Mill Client
+These endpoints interact with the TokenMill Solana program:
 
-The `TokenMillClient` class provides an interface for interacting with the Token-Mill backend.
+| Endpoint                 | Method | Description                             |
+| ------------------------ | ------ | --------------------------------------- |
+| `/api/config`            | POST   | Create a new TokenMill configuration    |
+| `/api/quote-token-badge` | POST   | Get token badge quote                   |
+| `/api/markets`           | POST   | Create a new token market               |
+| `/api/free-market`       | POST   | Free a market from restrictions         |
+| `/api/tokens`            | POST   | Create a new token                      |
+| `/api/swap`              | POST   | Swap tokens between markets             |
+| `/api/stake`             | POST   | Create a new staking position           |
+| `/api/vesting`           | POST   | Create a new vesting schedule           |
+| `/api/vesting/release`   | POST   | Release vested tokens                   |
+| `/api/set-curve`         | POST   | Set market curve parameters             |
+| `/api/quote-swap`        | POST   | Get quote for a swap                    |
+| `/api/get-asset`         | POST   | Get asset metadata                      |
+| `/api/graduation`        | GET    | Get graduation information for a market |
 
-## Initialization
+### Social Features Endpoints
 
-The `TokenMillClient` requires `RPC_URL` and `WALLET_PRIVATE_KEY` to be set in the environment variables. It initializes:
+| Endpoint             | Method  | Description                                |
+| -------------------- | ------- | ------------------------------------------ |
+| `/api/thread`        | Various | Thread creation, retrieval, and management |
+| `/api/profile`       | Various | User profile management                    |
+| `/api/thread/images` | Various | Thread image management                    |
 
-- A Solana connection
-- A wallet from the provided private key
-- An Anchor provider and program instance
+### Swap Endpoints
 
-## Methods
+| Endpoint         | Method  | Description              |
+| ---------------- | ------- | ------------------------ |
+| `/api/jupiter`   | Various | Jupiter DEX integration  |
+| `/api/pump-swap` | Various | PumpSwap integration     |
+| `/api/pumpfun`   | Various | PumpFun launch endpoints |
 
-### `createConfig`
+## Core Services
 
-Creates a new Token-Mill configuration.
-function link: https://github.com/SendArcade/Token-Mill/blob/main/src/utils/tokenMill.ts#L94
+### TokenMill Service
 
-- **Params:**
-    - `authority` - The address with configuration management rights
-    - `protocolFeeRecipient` - Address to receive protocol fees
-    - `protocolFeeShare` - Percentage of fees allocated to the protocol
-    - `referralFeeShare` - Percentage of fees allocated to referrals
-- **Functionality:**
-    - Generates a new keypair for the configuration
-    - Calls the Solana program to create a new config
-    - Sets the new configuration public key
+The TokenMill service (`src/service/TokenMill/`) provides functionality for:
 
-### `getTokenBadge`
+- Token creation and market management
+- Setting bonding curves for token pricing
+- Token swapping (buy/sell)
+- Staking tokens for rewards
+- Creating and releasing vesting plans
+- Fund markets with SOL
 
-Creates a quote token badge for Wrapped SOL (`wSOL`).
-function link: https://github.com/SendArcade/Token-Mill/blob/main/src/utils/tokenMill.ts#L128
+### Database Integration
 
+The server uses PostgreSQL with Knex.js for:
 
+- User data storage
+- Thread and profile information
+- Migration management
 
-- **Params:**
-    - `params` - (Currently unused)
-- **Functionality:**
-    - Fetches account info for `wSOL`
-    - Calls the program to create a quote asset badge
-    - Signs and sends the transaction
-    - Confirms the transaction and logs the result
+### File Storage
 
-### `createMarket`
+Two file storage options are integrated:
 
-Creates a new market on the Token-Mill platform.
-function link: https://github.com/SendArcade/Token-Mill/blob/main/src/utils/tokenMill.ts#L199
+1. **Google Cloud Storage** - For profile images and thread attachments
+2. **IPFS via Pinata** - For decentralized, permanent storage of metadata
 
-- **Params:**
-    - `name` - Market name
-    - `symbol` - Token symbol
-    - `uri` - Token metadata URI
-    - `totalSupply` - Total token supply
-    - `creatorFeeShare` - Percentage of fees allocated to creators
-    - `stakingFeeShare` - Percentage of fees allocated to staking
-- **Functionality:**
-    - Generates a new base token mint
-    - Derives necessary PDAs (Program Derived Addresses) for the market and quote token badge
-    - Creates the market and initializes it with a locked state
-    - Locks the market using a swap authority
-    - Calls `setPrices` to establish initial pricing
+## Error Handling
 
+The server implements robust error handling with:
 
-### `createToken`
+- Proper error messages
+- Transaction validation
+- Response formatting with success/error flags
+- Logging for debugging
 
-Creates a new SPL token on Solana.
-function link: https://github.com/SendArcade/Token-Mill/blob/main/src/utils/tokenMill.ts#L399
+## Security Considerations
 
-- **Functionality:**
-    - Generates a new mint keypair
-    - Creates a new mint using the SPL token program
-    - Creates an associated token account for the user
-    - Mints an initial supply of 100,000,000 tokens to the user's account
-    - Returns the mint address and transaction signature
-
-
-### `vesting`
-
-Handles vesting schedules and claiming tokens.
-function link: https://github.com/SendArcade/Token-Mill/blob/main/src/utils/tokenMill.ts#L538
-
-- **Params:**
-    - `marketAddress` - The address of the market
-    - `vestingSchedule` - Schedule details (start time, duration, cliff period, etc.)
-    - `userAddress` - Address of the beneficiary
-- **Functionality:**
-    - Creates a new vesting schedule by locking tokens in the smart contract
-    - Allows users to claim vested tokens periodically
-    - Ensures that tokens are only released according to the defined schedule
-    - Calls the Solana program to manage vesting logic
-
-### `setPrices`
-
-Sets the market bid and ask prices.
-function link: https://github.com/SendArcade/Token-Mill/blob/main/src/utils/tokenMill.ts#L342
-
-- **Params:**
-    - `market` - The market public key
-- **Functionality:**
-    - Defines predefined bid and ask price tiers
-    - Calls the Solana program to set the prices
-    - Confirms the transaction and logs the result
-
-### `stake`
-
-Creates a new staking position for a market.
-function link: https://github.com/SendArcade/Token-Mill/blob/main/src/utils/tokenMill.ts#L490
-
-- **Params:**
-    - `marketAddress` - The address of the market
-- **Functionality:**
-    - Fetches the market details
-    - Retrieves or creates the staking account
-    - Calls the Solana program to stake tokens
-    - Returns the transaction signature
-
-
-### `executeSwap`
-
-Executes a token swap using the swap authority.
-function link: https://github.com/SendArcade/Token-Mill/blob/main/src/utils/tokenMill.ts#L818
-
-
-- **Params:**
-    - `marketAddress` - The address of the market
-    - `amount` - Amount of tokens to swap
-    - `userAddress` - Address of the user executing the swap
-- **Functionality:**
-    - Fetches the market details
-    - Ensures the user has sufficient balance
-    - Calls the Solana program to execute the swap
-    - Returns the transaction signature
-
+- All transactions require signature with appropriate authority
+- Error messages are sanitized before being sent to clients
+- Sensitive operation details are kept secure
+- Database uses parameterized queries to prevent SQL injection
 
 ## Contributing
 
@@ -253,7 +201,7 @@ function link: https://github.com/SendArcade/Token-Mill/blob/main/src/utils/toke
 
 ## License
 
-ISC License
+This project is licensed under the ISC License.
 
 ## Support
 

@@ -25,8 +25,9 @@
         <action android:name="android.intent.action.VIEW"/>
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
-        <data android:scheme="solanasocialstarter"/>
-        <data android:scheme="com.bhu1tyagi.solanasocialstarter"/>
+        <data android:scheme="solanaappkit"/>
+        <data android:scheme="com.sendai.solanaappkit"/>
+        <data android:scheme="exp+solana-app-kit"/>
       </intent-filter>
     </activity>
   </application>

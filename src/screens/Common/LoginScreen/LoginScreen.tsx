@@ -7,7 +7,7 @@ import styles from './LoginScreen.styles';
 import { useDispatch, useSelector } from 'react-redux';
 import { useAppNavigation } from '../../../hooks/useAppNavigation';
 import COLORS from '../../../assets/colors';
-import EmbeddedWalletAuth from '../../../components/wallet/EmbeddedWallet';
+import EmbeddedWalletAuth from '../../../modules/embeddedWalletProviders/components/wallet/EmbeddedWallet';
 import { loginSuccess } from '../../../state/auth/reducer';
 import { RootState } from '../../../state/store';
 import axios from 'axios';

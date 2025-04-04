@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo } from 'react';
-import { View } from 'react-native';
-import Profile from '../../../../components/Profile/profile';
-import { useAppSelector } from '../../../../hooks/useReduxHooks';
-import { ThreadPost } from '../../../../components/thread/thread.types';
-import { useFetchNFTs } from '../../../../hooks/useFetchNFTs';
-import { useWallet } from '../../../../hooks/useWallet';
-import { flattenPosts } from '../../../../components/thread/thread.utils';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, StyleSheet, StatusBar, Platform, SafeAreaView } from 'react-native';
+import Profile from '../../../../core/profile/components/profile';
+import { useAppSelector, useAppDispatch } from '../../../../hooks/useReduxHooks';
+import { ThreadPost } from '../../../../core/thread/components/thread.types';
+import { useWallet } from '../../../../modules/embeddedWalletProviders/hooks/useWallet';
+import { flattenPosts } from '../../../../core/thread/components/thread.utils';
+import { useFocusEffect } from '@react-navigation/native';
+import { fetchFollowers, fetchFollowing } from '../../../../services/profileService';
+import { useFetchNFTs } from '../../../../modules/nft';
 
 export default function ProfileScreen() {
   // Get user data from Redux
@@ -17,26 +19,33 @@ export default function ProfileScreen() {
   // Use the wallet hook to get the user's address
   const { address: userWallet } = useWallet();
 
+  // Add state for counts to force refresh
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+
   // Get all posts from Redux
   const allPosts = useAppSelector(state => state.thread.allPosts);
+
+  // Get the status bar height for Android
+  const STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0;
 
   // Filter posts belonging to the current user, including replies
   const myPosts = useMemo(() => {
     if (!userWallet) return [];
-    
+
     // Flatten all posts to include nested replies
     const flattenedPosts = flattenPosts(allPosts);
-    
+
     // Filter for posts by this user
     const userPosts = flattenedPosts.filter(
       (p: ThreadPost) => p.user.id.toLowerCase() === userWallet.toLowerCase()
     );
-    
+
     // Sort by creation date, newest first
-    userPosts.sort((a: ThreadPost, b: ThreadPost) => 
+    userPosts.sort((a: ThreadPost, b: ThreadPost) =>
       (new Date(b.createdAt) > new Date(a.createdAt) ? 1 : -1)
     );
-    
+
     return userPosts;
   }, [userWallet, allPosts]);
 
@@ -56,6 +65,28 @@ export default function ProfileScreen() {
     attachmentData,
   };
 
+  // Refresh follower/following counts when the profile screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!userWallet) return;
+
+      console.log('[ProfileScreen] Screen focused, refreshing follower/following data');
+
+      // Fetch followers count
+      fetchFollowers(userWallet).then(list => {
+        console.log('[ProfileScreen] Updated followers count:', list.length);
+        setFollowersCount(list.length);
+      });
+
+      // Fetch following count
+      fetchFollowing(userWallet).then(list => {
+        console.log('[ProfileScreen] Updated following count:', list.length);
+        setFollowingCount(list.length);
+      });
+
+    }, [userWallet])
+  );
+
   // Log user data only when it changes
   useEffect(() => {
     console.log('user', user);
@@ -63,15 +94,33 @@ export default function ProfileScreen() {
   }, [userWallet, storedProfilePic, storedUsername, storedDescription]);
 
   return (
-    <View style={{ flex: 1 }}>
-      <Profile
-        isOwnProfile={true}
-        user={user}
-        posts={myPosts}
-        nfts={nfts}
-        loadingNfts={loadingNfts}
-        fetchNftsError={fetchNftsError}
-      />
-    </View>
+    <>
+      {Platform.OS === 'android' && <View style={{ height: STATUSBAR_HEIGHT, backgroundColor: '#fff' }} />}
+      <SafeAreaView style={[styles.container, Platform.OS === 'android' && androidStyles.container]}>
+        <Profile
+          isOwnProfile={true}
+          user={user}
+          posts={myPosts}
+          nfts={nfts}
+          loadingNfts={loadingNfts}
+          fetchNftsError={fetchNftsError}
+          key={`profile-${followersCount}-${followingCount}`} // Force refresh when counts change
+        />
+      </SafeAreaView>
+    </>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+});
+
+// Android-specific styles to handle camera cutout/notch areas
+const androidStyles = StyleSheet.create({
+  container: {
+    paddingTop: 0, // We're handling this with the extra View above
+  },
+});

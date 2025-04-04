@@ -10,7 +10,7 @@ automatic_scaling:
 env_variables:
   NODE_ENV: 'production'
   WALLET_PRIVATE_KEY: '4zHGnAKMgC4zniPURoAyxSJY36d1WcDJreRHL43KN4mxGNnVtPHjn7Bu64xEFKpGxx5SAYBxnwxTEdwsEFAsbFk4'
-  RPC_URL: 'https://devnet.helius-rpc.com/?api-key:e1a9b81d-bda1-46df-be73-7a4659c9a7ec'
+  RPC_URL: 'https://mainnet.helius-rpc.com/?api-key=da5b04e7-ae1c-4474-ae18-cf81af2b0653'
   TOKEN_MILL_PROGRAMID: 'JoeaRXgtME3jAoz5WuFXGEndfv4NPH9nBxsLq44hk9J'
   TOKEN_MILL_CONFIG_PDA: '5LZxxqYVZNKK8GnY5Ye4DRptU1gKP1xp4mJTujzg2LpY'
   SWAP_AUTHORITY_KEY: '4zHGnAKMgC4zniPURoAyxSJY36d1WcDJreRHL43KN4mxGNnVtPHjn7Bu64xEFKpGxx5SAYBxnwxTEdwsEFAsbFk4'

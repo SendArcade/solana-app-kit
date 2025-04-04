@@ -15,6 +15,7 @@ export interface TokenMetadata {
   decimals: number;
   amount: number;
   image?: string;
+  logoURI?: string;
   price_info?: {
     price_per_token?: number;
     total_price?: number;
@@ -184,6 +185,7 @@ export const enrichSwapTransactions = async (swaps: SwapTransaction[]): Promise<
               enrichedSwap.inputToken.decimals = metadata.decimals || enrichedSwap.inputToken.decimals;
               if (metadata.logoURI) {
                 enrichedSwap.inputToken.image = metadata.logoURI;
+                enrichedSwap.inputToken.logoURI = metadata.logoURI;
               }
             }
             
@@ -194,6 +196,7 @@ export const enrichSwapTransactions = async (swaps: SwapTransaction[]): Promise<
               enrichedSwap.outputToken.decimals = metadata.decimals || enrichedSwap.outputToken.decimals;
               if (metadata.logoURI) {
                 enrichedSwap.outputToken.image = metadata.logoURI;
+                enrichedSwap.outputToken.logoURI = metadata.logoURI;
               }
             }
             

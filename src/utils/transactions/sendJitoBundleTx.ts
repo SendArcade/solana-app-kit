@@ -10,7 +10,7 @@ import {
 } from '@solana/web3.js';
 import type {TransactionInstruction} from '@solana/web3.js';
 import { CLUSTER } from '@env';
-import { TransactionService } from '../../services/transaction/transactionService';
+import { TransactionService } from '../../modules/embeddedWalletProviders/services/transaction/transactionService';
 
 export async function sendJitoBundleTransaction(
   provider: any,
