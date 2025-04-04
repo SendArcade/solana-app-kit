@@ -7,7 +7,7 @@ import {
   addReaction,
   createRetweet,
   updatePost,
-} from '../controllers/threadController';
+} from '../../controllers/threadController';
 
 const threadRouter = Router();
 

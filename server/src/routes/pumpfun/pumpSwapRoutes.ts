@@ -1,13 +1,5 @@
 import express, { Request, Response } from 'express';
-import { PumpSwapClient } from '../service/pumpSwap/pumpSwapService';
-import { 
-  SwapParams, 
-  LiquidityAddParams, 
-  LiquidityRemoveParams, 
-  CreatePoolParams,
-  SwapQuoteParams,
-  LiquidityQuoteParams
-} from '../service/pumpSwap/pumpSwapService';
+import { PumpSwapClient } from '../../service/pumpSwap/pumpSwapService';
 import { PublicKey } from '@solana/web3.js';
 
 // Create router and bypass type checking with 'as any' 

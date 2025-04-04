@@ -77,6 +77,7 @@ export default function BondingCurveConfigurator({
    * Refs
    ************************************/
   const onCurveChangeRef = useRef(onCurveChange);
+  const computeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     onCurveChangeRef.current = onCurveChange;
   }, [onCurveChange]);
@@ -121,69 +122,78 @@ export default function BondingCurveConfigurator({
       },
       overrideCurveType?: CurveType,
     ) => {
-      const localPoints = overrides?.points ?? points;
-      const localBase = overrides?.basePrice ?? basePrice;
-      const localTop = overrides?.topPrice ?? topPrice;
-      const localPower = overrides?.power ?? power;
-      const localFee = overrides?.feePercent ?? feePercent;
+      try {
+        const localPoints = overrides?.points ?? points;
+        const localBase = overrides?.basePrice ?? basePrice;
+        const localTop = overrides?.topPrice ?? topPrice;
+        const localPower = overrides?.power ?? power;
+        const localFee = overrides?.feePercent ?? feePercent;
 
-      // Use the overrideCurveType if provided; otherwise, use the current state value.
-      const currentCurveType = overrideCurveType ?? curveType;
+        // Use the overrideCurveType if provided; otherwise, use the current state value.
+        const currentCurveType = overrideCurveType ?? curveType;
 
-      const newAskBn: BN[] = [];
-      const newBidBn: BN[] = [];
+        const newAskBn: BN[] = [];
+        const newBidBn: BN[] = [];
 
-      for (let i = 0; i < localPoints; i++) {
-        const t = i / Math.max(localPoints - 1, 1);
-        let price: number;
-        switch (currentCurveType) {
-          case 'linear':
-            price = localBase + t * (localTop - localBase);
-            break;
-          case 'power':
-            price =
-              localBase + (localTop - localBase) * Math.pow(t, localPower);
-            break;
-          case 'exponential': {
-            const safeBase = localBase > 0 ? localBase : 1;
-            price = safeBase * Math.pow(localTop / safeBase, t);
-            break;
+        for (let i = 0; i < localPoints; i++) {
+          const t = i / Math.max(localPoints - 1, 1);
+          let price: number;
+          switch (currentCurveType) {
+            case 'linear':
+              price = localBase + t * (localTop - localBase);
+              break;
+            case 'power':
+              price =
+                localBase + (localTop - localBase) * Math.pow(t, localPower);
+              break;
+            case 'exponential': {
+              const safeBase = localBase > 0 ? localBase : 1;
+              price = safeBase * Math.pow(localTop / safeBase, t);
+              break;
+            }
+            case 'logarithmic': {
+              const logInput = 1 + 9 * t;
+              const safeLog = logInput > 0 ? Math.log10(logInput) : 0;
+              price = localBase + (localTop - localBase) * safeLog;
+              break;
+            }
+            default:
+              price = localBase + t * (localTop - localBase);
           }
-          case 'logarithmic': {
-            const logInput = 1 + 9 * t;
-            const safeLog = logInput > 0 ? Math.log10(logInput) : 0;
-            price = localBase + (localTop - localBase) * safeLog;
-            break;
-          }
-          default:
-            price = localBase + t * (localTop - localBase);
+          if (!Number.isFinite(price)) price = localBase;
+          if (price < 0) price = 0;
+          if (price > 1e9) price = 1e9;
+
+          const askVal = new BN(Math.floor(price));
+          let rawBid = price * (1 - localFee / 100);
+          if (!Number.isFinite(rawBid)) rawBid = price;
+          if (rawBid < 0) rawBid = 0;
+          if (rawBid > 1e9) rawBid = 1e9;
+          const bidVal = new BN(Math.floor(rawBid));
+
+          newAskBn.push(askVal);
+          newBidBn.push(bidVal);
         }
-        if (!Number.isFinite(price)) price = localBase;
-        if (price < 0) price = 0;
-        if (price > 1e9) price = 1e9;
-
-        const askVal = new BN(Math.floor(price));
-        let rawBid = price * (1 - localFee / 100);
-        if (!Number.isFinite(rawBid)) rawBid = price;
-        if (rawBid < 0) rawBid = 0;
-        if (rawBid > 1e9) rawBid = 1e9;
-        const bidVal = new BN(Math.floor(rawBid));
-
-        newAskBn.push(askVal);
-        newBidBn.push(bidVal);
+        setAskBn(newAskBn);
+        setBidBn(newBidBn);
+        
+        // Pass along the current parameters with the curve data
+        onCurveChangeRef.current(newAskBn, newBidBn, {
+          curveType: currentCurveType,
+          basePrice: localBase,
+          topPrice: localTop,
+          points: localPoints,
+          feePercent: localFee,
+          power: localPower
+        });
+      } catch (error) {
+        console.error('Error computing bonding curve:', error);
+      } finally {
+        // Ensure we reset loading state regardless of success/failure
+        if (Platform.OS === 'android') {
+          setIsLoading(false);
+        }
       }
-      setAskBn(newAskBn);
-      setBidBn(newBidBn);
-      
-      // Pass along the current parameters with the curve data
-      onCurveChangeRef.current(newAskBn, newBidBn, {
-        curveType: currentCurveType,
-        basePrice: localBase,
-        topPrice: localTop,
-        points: localPoints,
-        feePercent: localFee,
-        power: localPower
-      });
     },
     [points, basePrice, topPrice, power, feePercent, curveType],
   );
@@ -218,12 +228,34 @@ export default function BondingCurveConfigurator({
     if (disabled) return;
 
     setCurveType(type);
-    setIsLoading(true);
-    setTimeout(() => {
-      computeBondingCurve({}, type);
-      setIsLoading(false);
-    }, 0);
+    
+    if (Platform.OS === 'android') {
+      // Clear any pending computation
+      if (computeTimeoutRef.current) {
+        clearTimeout(computeTimeoutRef.current);
+      }
+      
+      setIsLoading(true);
+      computeTimeoutRef.current = setTimeout(() => {
+        try {
+          computeBondingCurve({}, type);
+        } catch (error) {
+          console.error('Error computing curve on type change:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      }, 50);
+    }
   };
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (computeTimeoutRef.current) {
+        clearTimeout(computeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   /************************************
    * Android: Slider Callbacks
@@ -232,6 +264,10 @@ export default function BondingCurveConfigurator({
    * Handles the start of slider interaction on Android
    */
   const onSlidingStartAndroid = () => {
+    // Clear any pending computation first
+    if (computeTimeoutRef.current) {
+      clearTimeout(computeTimeoutRef.current);
+    }
     setIsLoading(true);
   };
 
@@ -251,25 +287,40 @@ export default function BondingCurveConfigurator({
       power?: number;
       feePercent?: number;
     } = {};
-    if (sliderType === 'points' && val !== points) {
+    
+    // Update state based on slider type
+    if (sliderType === 'points') {
       overrides.points = val;
       setPoints(val);
-    } else if (sliderType === 'basePrice' && val !== basePrice) {
+    } else if (sliderType === 'basePrice') {
       overrides.basePrice = val;
       setBasePrice(val);
-    } else if (sliderType === 'topPrice' && val !== topPrice) {
+    } else if (sliderType === 'topPrice') {
       overrides.topPrice = val;
       setTopPrice(val);
-    } else if (sliderType === 'power' && val !== power) {
+    } else if (sliderType === 'power') {
       overrides.power = val;
       setPower(val);
-    } else if (sliderType === 'feePercent' && val !== feePercent) {
+    } else if (sliderType === 'feePercent') {
       overrides.feePercent = val;
       setFeePercent(val);
     }
-    // Compute bonding curve with the new value(s)
-    computeBondingCurve(overrides);
-    setIsLoading(false);
+    
+    // Clear any existing timeout
+    if (computeTimeoutRef.current) {
+      clearTimeout(computeTimeoutRef.current);
+    }
+    
+    // Compute bonding curve with the new value(s) with a small delay
+    computeTimeoutRef.current = setTimeout(() => {
+      try {
+        computeBondingCurve(overrides);
+      } catch (error) {
+        console.error('Error computing curve after slider change:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 50);
   };
 
   /**

@@ -1,6 +1,6 @@
 import {Router} from 'express';
 import multer from 'multer';
-import {UploadMetadataController} from '../controllers/uploadMetadataController';
+import {UploadMetadataController} from '../../controllers/uploadMetadataController';
 
 // We store uploads in ./uploads by default
 const upload = multer({ storage: multer.memoryStorage() });
