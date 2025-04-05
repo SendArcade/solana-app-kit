@@ -16,6 +16,7 @@ import tokenMillRouter from './routes/tokenmill/tokenMillRoutes';
 import { threadRouter } from './routes/feed/threadRoutes';
 import profileImageRouter from './routes/user/userRoutes';
 import { pumpSwapRouter } from './routes/pumpfun/pumpSwapRoutes';
+import { turnkeyAuthRouter } from './routes/auth/turnkeyAuthRoutes';
 
 const app = express();
 app.use(express.json());
@@ -59,22 +60,17 @@ app.use('/api/profile', profileImageRouter);
 app.use('/api/thread/images', threadImageRouter);
 app.use('/api/pump-swap', pumpSwapRouter);
 app.use('/api', tokenMillRouter);
+app.use('/api/auth', turnkeyAuthRouter);
 
-// app.post('/api/build-compressed-nft-listing-tx', async (req: any, res: any) => {
-//   try {
-//     const result = await buildCompressedNftListingTx(req.body);
-//     return res.json(result);
-//   } catch (err: any) {
-//     console.error('Failed to build compressed NFT listing tx:', err);
-//     return res.status(500).json({ success: false, error: err.message });
-//   }
-// });
+// Simple health check endpoint
+app.get('/health', (req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok' });
+});
 
 // Start the Express server.
 // Note: We now try connecting to the database and running migrations,
 // but if these fail we log the error and continue to start the server.
 const PORT = process.env.PORT || 8080;
-
 
 (async function startServer() {
   await testDbConnection();

@@ -7,6 +7,7 @@ import {
   TURNKEY_BASE_URL,
   TURNKEY_RP_ID,
   TURNKEY_RP_NAME,
+  TURNKEY_ORGANIZATION_ID,
 } from '@env';
 
 import {dummyProfileData} from '../mocks/profileInfoData';
@@ -30,6 +31,7 @@ export interface TurnkeyConfig {
   baseUrl: string;
   rpId: string;
   rpName: string;
+  organizationId: string;
 }
 
 /** The shape of our custom AuthProviderConfig */
@@ -64,7 +66,7 @@ export interface MockDataConfig {
 
 /** Provide default auth config, reading from env or fallback. */
 export const DefaultAuthConfig: AuthProviderConfig = {
-  provider: 'privy', // or 'dynamic', 'turnkey', etc.
+  provider: 'turnkey', // or 'dynamic', 'turnkey', etc.
   loginMethods: ['email', 'google', 'apple'],
 
   privy: {
@@ -83,6 +85,7 @@ export const DefaultAuthConfig: AuthProviderConfig = {
     baseUrl: TURNKEY_BASE_URL || '',
     rpId: TURNKEY_RP_ID || '',
     rpName: TURNKEY_RP_NAME || '',
+    organizationId: TURNKEY_ORGANIZATION_ID || '',
   },
 };
 

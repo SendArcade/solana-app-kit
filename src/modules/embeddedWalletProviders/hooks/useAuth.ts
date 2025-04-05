@@ -9,6 +9,7 @@ import {useAppSelector} from '../../../hooks/useReduxHooks';
 import {VersionedTransaction, PublicKey} from '@solana/web3.js';
 import {useLoginWithOAuth} from '@privy-io/expo';
 import { useDynamicWalletLogic } from './useDynamicWalletLogic';
+import { useTurnkeyWalletLogic } from './useTurnkeyWalletLogic';
 import { StandardWallet, LoginMethod, WalletMonitorParams } from '../types';
 
 /**
@@ -16,7 +17,7 @@ import { StandardWallet, LoginMethod, WalletMonitorParams } from '../types';
  *  1) Read which provider is set from config.
  *  2) If 'privy', we handle via `usePrivyWalletLogic`.
  *  3) If 'dynamic', we handle via `useDynamicWalletLogic`.
- *  4) If 'turnkey', we do not have a full usage example, but we show how you might do it.
+ *  4) If 'turnkey', we handle via `useTurnkeyWalletLogic`.
  */
 export function useAuth() {
   const {auth: authConfig} = useCustomization();
@@ -474,21 +475,137 @@ export function useAuth() {
     };
   } else if (selectedProvider === 'turnkey') {
     /** TURNKEY CASE */
-    // Example: you would implement the Turnkey logic similarly to above
+    const {
+      handleTurnkeyOtpLogin,
+      handleTurnkeyPasskeyLogin,
+      handleTurnkeyOAuthLogin,
+      handleTurnkeyLogout,
+      monitorTurnkeyWallet,
+      walletAddress,
+      isAuthenticated,
+      user
+    } = useTurnkeyWalletLogic();
+
+    // Create a standardized wallet object for Turnkey
+    const standardWallet: StandardWallet | null = walletAddress ? {
+      provider: 'turnkey',
+      address: walletAddress,
+      publicKey: walletAddress,
+      rawWallet: { address: walletAddress },
+      getWalletInfo: () => ({
+        walletType: 'Turnkey',
+        address: walletAddress,
+      }),
+      getProvider: async () => {
+        try {
+          // In a real implementation, this would connect to a Turnkey signer
+          // For now, just return a minimal provider interface
+          return {
+            _turnkeySdk: true,
+            wallet: { address: walletAddress },
+            address: walletAddress,
+            request: async ({ method, params }: any) => {
+              if (method === 'signAndSendTransaction') {
+                // This would use the Turnkey SDK to sign and send transactions
+                throw new Error('Turnkey signing not yet fully implemented');
+              }
+              throw new Error(`Method ${method} not supported by Turnkey provider`);
+            }
+          };
+        } catch (error) {
+          console.error('Error getting Turnkey wallet provider:', error);
+          throw error;
+        }
+      }
+    } : null;
+
+    // Create solanaWallet object for backward compatibility
+    const solanaWallet = walletAddress ? {
+      wallets: [{
+        publicKey: walletAddress,
+        address: walletAddress
+      }],
+      getProvider: standardWallet?.getProvider
+    } : null;
+
+    const handleSuccessfulLogin = useCallback((info: {provider: 'turnkey', address: string}) => {
+      dispatch(loginSuccess({provider: 'turnkey', address: info.address}));
+      navigation.navigate('MainTabs');
+    }, [dispatch, navigation]);
+
+    const loginWithEmail = useCallback(async () => {
+      await handleTurnkeyOtpLogin({
+        loginMethod: 'email',
+        contact: '', // UI will prompt for email
+        setStatusMessage: () => {},
+        onSuccess: handleSuccessfulLogin
+      });
+    }, [handleTurnkeyOtpLogin, handleSuccessfulLogin]);
+
+    const loginWithSMS = useCallback(async () => {
+      await handleTurnkeyOtpLogin({
+        loginMethod: 'sms',
+        contact: '', // UI will prompt for phone number
+        setStatusMessage: () => {},
+        onSuccess: handleSuccessfulLogin
+      });
+    }, [handleTurnkeyOtpLogin, handleSuccessfulLogin]);
+
+    const loginWithGoogle = useCallback(async () => {
+      // The actual OAuth token will be obtained by the OAuth component
+      // This is just a placeholder until the OAuth flow is triggered
+      await handleTurnkeyOAuthLogin({
+        oidcToken: '',
+        providerName: 'google',
+        setStatusMessage: () => {},
+        onSuccess: handleSuccessfulLogin
+      });
+    }, [handleTurnkeyOAuthLogin, handleSuccessfulLogin]);
+
+    const loginWithApple = useCallback(async () => {
+      // The actual OAuth token will be obtained by the OAuth component
+      // This is just a placeholder until the OAuth flow is triggered
+      await handleTurnkeyOAuthLogin({
+        oidcToken: '',
+        providerName: 'apple',
+        setStatusMessage: () => {},
+        onSuccess: handleSuccessfulLogin
+      });
+    }, [handleTurnkeyOAuthLogin, handleSuccessfulLogin]);
+
+    const loginWithPasskey = useCallback(async () => {
+      await handleTurnkeyPasskeyLogin({
+        isSignUp: false, // Default to login
+        setStatusMessage: () => {},
+        onSuccess: handleSuccessfulLogin
+      });
+    }, [handleTurnkeyPasskeyLogin, handleSuccessfulLogin]);
+
+    const signUpWithPasskey = useCallback(async () => {
+      await handleTurnkeyPasskeyLogin({
+        isSignUp: true,
+        setStatusMessage: () => {},
+        onSuccess: handleSuccessfulLogin
+      });
+    }, [handleTurnkeyPasskeyLogin, handleSuccessfulLogin]);
+
     const logout = useCallback(async () => {
-      // For Turnkey, you might do some session reset
+      await handleTurnkeyLogout(() => {});
       dispatch(logoutSuccess());
-    }, [dispatch]);
+    }, [handleTurnkeyLogout, dispatch]);
 
     return {
-      status: '',
-      loginWithEmail: async () => {
-        // Turnkey login not fully implemented in this example
-      },
+      status: isAuthenticated ? 'authenticated' : '',
+      loginWithEmail,
+      loginWithSMS,
+      loginWithGoogle,
+      loginWithApple,
+      loginWithPasskey,
+      signUpWithPasskey,
       logout,
-      user: null,
-      solanaWallet: null,
-      wallet: null,
+      user: walletAddress ? {id: walletAddress} : user,
+      solanaWallet,
+      wallet: standardWallet,
     };
   }
 

@@ -77,9 +77,9 @@ export async function sendPriorityTransaction(
     if (confirmation.value && confirmation.value.err) {
       // Create a proper error object with logs if available
       const error = new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-      // Add logs if they exist on the err object
-      if (confirmation.value.err.logs) {
-        error.logs = confirmation.value.err.logs;
+      // Add logs if they exist on the confirmation object
+      if (confirmation.value && (confirmation.value as any).logs) {
+        (error as any).logs = (confirmation.value as any).logs;
       }
       TransactionService.showError(error);
       throw error;
@@ -206,10 +206,6 @@ export async function sendPriorityTransactionMWA(
       if (confirmation.value && confirmation.value.err) {
         // Create a proper error with logs
         const error = new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-        // Add logs if they exist
-        if (confirmation.value.err.logs) {
-          error.logs = confirmation.value.err.logs;
-        }
         TransactionService.showError(error);
         throw error;
       }

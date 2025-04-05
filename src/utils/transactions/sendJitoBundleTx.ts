@@ -59,10 +59,6 @@ export async function sendJitoBundleTransaction(
     if (confirmation.value && confirmation.value.err) {
       // Create a proper error with logs
       const error = new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
-      // Add logs if they exist
-      if (confirmation.value.err.logs) {
-        error.logs = confirmation.value.err.logs;
-      }
       TransactionService.showError(error);
       throw error;
     }
@@ -161,8 +157,8 @@ export async function sendJitoBundleTransactionMWA(
         // Create a proper error with logs
         const error = new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
         // Add logs if they exist
-        if (confirmation.value.err.logs) {
-          error.logs = confirmation.value.err.logs;
+        if (confirmation.value && confirmation.value.err) {
+          error.message += `, logs: ${JSON.stringify(confirmation.value)}`;
         }
         TransactionService.showError(error);
         throw error;

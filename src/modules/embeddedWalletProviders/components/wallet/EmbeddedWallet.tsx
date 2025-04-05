@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Alert, Platform } from 'react-native';
 import Icons from '../../../../assets/svgs';
 import { useAuth } from '../../hooks/useAuth';
@@ -7,6 +7,9 @@ import { useCustomization } from '../../../../CustomizationProvider';
 import { useAppNavigation } from '../../../../hooks/useAppNavigation';
 import { useAppDispatch } from '../../../../hooks/useReduxHooks';
 import { loginSuccess } from '../../../../state/auth/reducer';
+
+// Import Turnkey components
+import { TurnkeyEmailAuth } from '../turnkey';
 
 import type { Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import type { Cluster, PublicKey as SolanaPublicKey } from '@solana/web3.js';
@@ -65,9 +68,12 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
     loginWithGoogle,
     loginWithApple,
     loginWithEmail,
+    loginWithPasskey,
     user,
     solanaWallet,
   } = useAuth();
+
+  const [showTurnkeyEmail, setShowTurnkeyEmail] = useState(false);
 
   const { auth: authConfig } = useCustomization();
   const navigation = useAppNavigation();
@@ -203,12 +209,51 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
 
   const handleEmailLogin = async () => {
     try {
-      if (loginWithEmail) await loginWithEmail();
+      // For Turnkey, show the email auth screen
+      if (authConfig.provider === 'turnkey') {
+        console.log('Opening Turnkey email auth screen');
+        setShowTurnkeyEmail(true);
+        return;
+      }
+      
+      // For other providers, use their email login
+      if (loginWithEmail) {
+        console.log('Using standard email login for provider:', authConfig.provider);
+        await loginWithEmail();
+      } else {
+        console.error('No email login method available for provider:', authConfig.provider);
+        Alert.alert('Error', 'Email login is not supported with the current configuration');
+      }
     } catch (error) {
       console.error('Login error:', error);
       Alert.alert('Authentication Error', 'Failed to authenticate with Email. Please try again.');
     }
   };
+
+  const handlePasskeyLogin = async () => {
+    try {
+      if (loginWithPasskey) await loginWithPasskey();
+    } catch (error) {
+      console.error('Passkey login error:', error);
+      Alert.alert('Authentication Error', 'Failed to authenticate with Passkey. Please try again.');
+    }
+  };
+
+  // If showing Turnkey email auth, render that component
+  if (showTurnkeyEmail && authConfig.provider === 'turnkey') {
+    return (
+      <TurnkeyEmailAuth 
+        onSuccess={(info) => {
+          dispatch(loginSuccess({
+            provider: 'turnkey',
+            address: info.address,
+          }));
+          onWalletConnected(info);
+          navigation.navigate('MainTabs' as never);
+        }} 
+      />
+    );
+  }
 
   return (
     <View style={styles.bottomButtonsContainer}>
@@ -233,6 +278,13 @@ const EmbeddedWalletAuth: React.FC<EmbeddedWalletAuthProps> = ({
         <Icons.Device width={24} height={24} />
         <Text style={[styles.buttonText]}>Continue with Email</Text>
       </TouchableOpacity>
+
+      {authConfig.provider === 'turnkey' && (
+        <TouchableOpacity style={[styles.loginButton]} onPress={handlePasskeyLogin}>
+          <Icons.Device width={24} height={24} />
+          <Text style={[styles.buttonText]}>Continue with Passkey</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
