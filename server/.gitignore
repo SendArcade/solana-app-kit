@@ -18,3 +18,4 @@ tmp/
 temp/
 .nyc_output/
 *.tsbuildinfo
+app.yaml
