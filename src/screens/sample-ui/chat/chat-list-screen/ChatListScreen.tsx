@@ -570,6 +570,7 @@ const ChatListScreen: React.FC = () => {
                 placeholderTextColor={COLORS.lightGrey}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
+                keyboardAppearance="dark"
               />
               {searchQuery ? (
                 <TouchableOpacity

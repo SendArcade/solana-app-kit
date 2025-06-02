@@ -536,6 +536,7 @@ export default function SearchScreen({ showHeader = true }: SearchScreenProps) {
               placeholderTextColor={COLORS.greyDark}
               value={searchQuery}
               onChangeText={setSearchQuery}
+              keyboardAppearance="dark"
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity

@@ -57,7 +57,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
     const [imageUri, setImageUri] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<string | null>(null);
-    
+
     // Add state for initial buy options
     const [initialBuyEnabled, setInitialBuyEnabled] = useState(true);
     const [initialBuyAmount, setInitialBuyAmount] = useState('1'); // Default to 1 SOL
@@ -85,7 +85,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
     // Add a function to handle setting the image from URL
     const setImageFromUrl = () => {
         if (imageUrlInput && (
-            imageUrlInput.startsWith('http://') || 
+            imageUrlInput.startsWith('http://') ||
             imageUrlInput.startsWith('https://') ||
             imageUrlInput.startsWith('ipfs://')
         )) {
@@ -100,22 +100,22 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
             Alert.alert('Error', 'Please enter a token name');
             return false;
         }
-        
+
         if (!tokenSymbol) {
             Alert.alert('Error', 'Please enter a token symbol');
             return false;
         }
-        
+
         if (!description) {
             Alert.alert('Error', 'Please provide a token description');
             return false;
         }
-        
+
         if (!imageUri) {
             Alert.alert('Error', 'Please select an image for your token');
             return false;
         }
-        
+
         if (initialBuyEnabled) {
             const buyAmount = parseFloat(initialBuyAmount);
             if (isNaN(buyAmount) || buyAmount <= 0) {
@@ -123,7 +123,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
                 return false;
             }
         }
-        
+
         return true;
     };
 
@@ -149,7 +149,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
                 initialBuyEnabled: initialBuyEnabled,
                 initialBuyAmount: initialBuyAmount
             };
-            
+
             // In JustSendIt mode, we use the following default settings:
             // - Token supply: 1 billion tokens (1,000,000,000)
             // - SOL raised: 85 SOL threshold for migrating to AMM pool
@@ -157,7 +157,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
             // - Pool migration: 30 SOL threshold
             // - No vesting
             // - createOnly: false (will create token AND execute initial buy)
-            
+
             if (onJustSendIt) {
                 onJustSendIt(tokenData);
             } else {
@@ -189,7 +189,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
                 initialBuyEnabled: initialBuyEnabled,
                 initialBuyAmount: initialBuyAmount
             };
-            
+
             // Pass the token data to the parent component for advanced configuration
             onGoToLab(tokenData);
         }
@@ -211,6 +211,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
                     value={tokenName}
                     onChangeText={setTokenName}
                     editable={!loading}
+                    keyboardAppearance="dark"
                 />
             </View>
 
@@ -223,6 +224,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
                     value={tokenSymbol}
                     onChangeText={setTokenSymbol}
                     editable={!loading}
+                    keyboardAppearance="dark"
                 />
             </View>
 
@@ -236,6 +238,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
                     value={description}
                     onChangeText={setDescription}
                     editable={!loading}
+                    keyboardAppearance="dark"
                 />
             </View>
 
@@ -299,7 +302,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
                                 disabled={loading}>
                                 <Text style={styles.selectFileText}>select file</Text>
                             </TouchableOpacity>
-                            
+
                             <View style={styles.imageUrlInputContainer}>
                                 <Text style={styles.orText}>OR</Text>
                                 <TextInput
@@ -344,6 +347,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
                                 value={twitter}
                                 onChangeText={setTwitter}
                                 editable={!loading}
+                                keyboardAppearance="dark"
                             />
                         </View>
 
@@ -356,6 +360,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
                                 value={telegram}
                                 onChangeText={setTelegram}
                                 editable={!loading}
+                                keyboardAppearance="dark"
                             />
                         </View>
 
@@ -368,6 +373,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
                                 value={website}
                                 onChangeText={setWebsite}
                                 editable={!loading}
+                                keyboardAppearance="dark"
                             />
                         </View>
                     </View>
@@ -377,7 +383,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
             {/* Add initial buy options with better UI */}
             <View style={styles.verificationSection}>
                 <Text style={styles.verificationTitle}>Initial Buy Options</Text>
-                
+
                 <View style={styles.switchRow}>
                     <View style={styles.switchLabelContainer}>
                         <Text style={styles.switchLabel}>Execute Initial Buy</Text>
@@ -397,7 +403,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
                         disabled={loading}
                     />
                 </View>
-                
+
                 {initialBuyEnabled && (
                     <View style={styles.verificationOptionsContainer}>
                         <Text style={styles.fieldLabel}>Initial Buy Amount (SOL)</Text>
@@ -409,6 +415,7 @@ export const LaunchlabsLaunchSection: React.FC<LaunchlabsLaunchSectionProps> = (
                             onChangeText={setInitialBuyAmount}
                             keyboardType="numeric"
                             editable={!loading}
+                            keyboardAppearance="dark"
                         />
                         <Text style={styles.switchDescription}>
                             This amount of SOL will be used for your initial token purchase

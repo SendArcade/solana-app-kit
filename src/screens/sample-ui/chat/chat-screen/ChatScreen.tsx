@@ -1751,6 +1751,7 @@ function ChatScreen(): React.ReactElement {
                     placeholderTextColor={COLORS.greyMid}
                     autoFocus
                     selectionColor={COLORS.brandBlue}
+                    keyboardAppearance="dark"
                   />
 
                   <View style={styles.editButtons}>

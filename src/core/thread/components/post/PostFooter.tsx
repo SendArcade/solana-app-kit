@@ -241,6 +241,7 @@ function SimpleRetweetDrawer({
                 value={retweetText}
                 onChangeText={setRetweetText}
                 autoFocus
+                keyboardAppearance="dark"
               />
 
               <View style={drawerStyles.quoteButtons}>

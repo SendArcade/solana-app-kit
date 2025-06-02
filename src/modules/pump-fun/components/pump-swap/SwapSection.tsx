@@ -459,11 +459,12 @@ export function SwapSection({
             {/* Pool Address */}
             <Text style={styles.inputLabel}>Pool Address</Text>
             <TextInput
-                style={styles.input}
+                style={[styles.input, { keyboardAppearance: 'dark' }]}
                 value={poolAddress}
                 onChangeText={handlePoolAddressChange}
                 placeholder="Enter pool address"
                 editable={!isLoading && !isPoolLoading}
+                keyboardAppearance="dark"
             />
 
             {isPoolLoading && (
@@ -498,12 +499,13 @@ export function SwapSection({
                     {/* Input for "base" token */}
                     <Text style={styles.inputLabel}>Input {baseToken.symbol} Amount</Text>
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, { keyboardAppearance: 'dark' }]}
                         value={baseAmount}
                         onChangeText={handleBaseAmountChange}
                         placeholder={`Enter ${baseToken.symbol} amount`}
                         keyboardType="numeric"
                         editable={!isLoading && direction === Direction.BaseToQuote}
+                        keyboardAppearance="dark"
                     />
 
                     {/* Toggle direction button */}
@@ -514,12 +516,13 @@ export function SwapSection({
                     {/* Input for "quote" token */}
                     <Text style={styles.inputLabel}>Input {quoteToken.symbol} Amount</Text>
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, { keyboardAppearance: 'dark' }]}
                         value={quoteAmount}
                         onChangeText={handleQuoteAmountChange}
                         placeholder={`Enter ${quoteToken.symbol} amount`}
                         keyboardType="numeric"
                         editable={!isLoading && direction === Direction.QuoteToBase}
+                        keyboardAppearance="dark"
                     />
 
                     {/* Swap button */}

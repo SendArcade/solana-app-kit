@@ -279,6 +279,7 @@ export default function RetweetDrawer({
               value={retweetText}
               onChangeText={setRetweetText}
               autoFocus
+              keyboardAppearance="dark"
             />
 
             <View style={styles.quoteButtons}>

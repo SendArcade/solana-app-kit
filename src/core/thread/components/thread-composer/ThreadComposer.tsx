@@ -441,6 +441,7 @@ export const ThreadComposer = forwardRef<{ focus: () => void }, ThreadComposerPr
             value={textValue}
             onChangeText={setTextValue}
             multiline
+            keyboardAppearance="dark"
           />
 
           {/* Selected image preview */}

@@ -93,7 +93,7 @@ export default function TokenCreationForm({
     const wallet = useWallet();
     // Create a connection to the Solana network with better configuration
     const connection = new Connection(
-        HELIUS_STAKED_URL, 
+        HELIUS_STAKED_URL,
         {
             commitment: 'confirmed',
             confirmTransactionInitialTimeout: 120000, // 2 minutes 
@@ -406,6 +406,7 @@ export default function TokenCreationForm({
                         onChangeText={setTokenName}
                         placeholder="e.g. My Awesome Token"
                         placeholderTextColor={COLORS.greyDark}
+                        keyboardAppearance="dark"
                     />
                 </View>
 
@@ -418,6 +419,7 @@ export default function TokenCreationForm({
                         placeholder="e.g. MAT"
                         placeholderTextColor={COLORS.greyDark}
                         maxLength={10}
+                        keyboardAppearance="dark"
                     />
                 </View>
 
@@ -430,6 +432,7 @@ export default function TokenCreationForm({
                         placeholder="Describe your token's purpose"
                         placeholderTextColor={COLORS.greyDark}
                         multiline
+                        keyboardAppearance="dark"
                     />
                 </View>
 
@@ -441,6 +444,7 @@ export default function TokenCreationForm({
                         onChangeText={setTokenWebsite}
                         placeholder="e.g. https://example.com"
                         placeholderTextColor={COLORS.greyDark}
+                        keyboardAppearance="dark"
                     />
                     <Text style={styles.helperText}>Project website for token metadata</Text>
                 </View>
@@ -502,6 +506,7 @@ export default function TokenCreationForm({
                                         value={tokenLogo}
                                         onChangeText={setTokenLogo}
                                         editable={!isCreating}
+                                        keyboardAppearance="dark"
                                     />
                                     <TouchableOpacity
                                         onPress={setImageFromUrl}
@@ -539,6 +544,7 @@ export default function TokenCreationForm({
                                 placeholder="@username"
                                 placeholderTextColor={COLORS.greyDark}
                                 editable={!isCreating}
+                                keyboardAppearance="dark"
                             />
                         </View>
 
@@ -551,6 +557,7 @@ export default function TokenCreationForm({
                                 placeholder="t.me/community"
                                 placeholderTextColor={COLORS.greyDark}
                                 editable={!isCreating}
+                                keyboardAppearance="dark"
                             />
                         </View>
                     </View>
@@ -565,6 +572,7 @@ export default function TokenCreationForm({
                         placeholder="e.g. 1000000000"
                         placeholderTextColor={COLORS.greyDark}
                         keyboardType="numeric"
+                        keyboardAppearance="dark"
                     />
                 </View>
 
@@ -578,6 +586,7 @@ export default function TokenCreationForm({
                         placeholderTextColor={COLORS.greyDark}
                         keyboardType="numeric"
                         maxLength={1}
+                        keyboardAppearance="dark"
                     />
                 </View>
 
@@ -621,6 +630,7 @@ export default function TokenCreationForm({
                         placeholder="e.g. 100"
                         placeholderTextColor={COLORS.greyDark}
                         keyboardType="numeric"
+                        keyboardAppearance="dark"
                     />
                     <Text style={styles.helperText}>Starting market cap for your token.</Text>
                 </View>
@@ -634,6 +644,7 @@ export default function TokenCreationForm({
                         placeholder="e.g. 3000"
                         placeholderTextColor={COLORS.greyDark}
                         keyboardType="numeric"
+                        keyboardAppearance="dark"
                     />
                     <Text style={styles.helperText}>When reached, token graduates to DAMM V1.</Text>
                 </View>
@@ -660,6 +671,7 @@ export default function TokenCreationForm({
                             placeholder="e.g. 1"
                             placeholderTextColor={COLORS.greyDark}
                             keyboardType="numeric"
+                            keyboardAppearance="dark"
                         />
                         <Text style={styles.helperText}>Amount of SOL to spend buying your token after creation.</Text>
                     </View>
@@ -697,6 +709,7 @@ export default function TokenCreationForm({
                                 placeholderTextColor={COLORS.greyDark}
                                 keyboardType="numeric"
                                 maxLength={4}
+                                keyboardAppearance="dark"
                             />
                             <Text style={styles.helperText}>100 BPS = 1% trading fee</Text>
                         </View>
@@ -762,6 +775,7 @@ export default function TokenCreationForm({
                                     onChangeText={setPartnerLpPercentage}
                                     keyboardType="numeric"
                                     maxLength={3}
+                                    keyboardAppearance="dark"
                                 />
                                 <Text style={styles.lpPercent}>%</Text>
                             </View>
@@ -774,6 +788,7 @@ export default function TokenCreationForm({
                                     onChangeText={setCreatorLpPercentage}
                                     keyboardType="numeric"
                                     maxLength={3}
+                                    keyboardAppearance="dark"
                                 />
                                 <Text style={styles.lpPercent}>%</Text>
                             </View>
@@ -786,6 +801,7 @@ export default function TokenCreationForm({
                                     onChangeText={setPartnerLockedLpPercentage}
                                     keyboardType="numeric"
                                     maxLength={3}
+                                    keyboardAppearance="dark"
                                 />
                                 <Text style={styles.lpPercent}>%</Text>
                             </View>
@@ -798,6 +814,7 @@ export default function TokenCreationForm({
                                     onChangeText={setCreatorLockedLpPercentage}
                                     keyboardType="numeric"
                                     maxLength={3}
+                                    keyboardAppearance="dark"
                                 />
                                 <Text style={styles.lpPercent}>%</Text>
                             </View>
