@@ -248,38 +248,13 @@ export default function MainTabs() {
           tabBarBackground: () => (
             <BlurView
               tint="dark"
-              intensity={35}
+              intensity={Platform.OS === 'android' ? 15 : 35}
               style={StyleSheet.absoluteFill}
             >
               <View style={platformStyles.tabBarOverlay} />
             </BlurView>
           ),
         }}>
-        <Tab.Screen
-          name="Swap"
-          component={SwapScreen}
-          options={{
-            tabBarIcon: ({ focused, size }) => (
-              <AnimatedTabIcon
-                focused={focused}
-                size={size * 1}
-                icon={
-                  Icons.SwapNavIcon as React.ComponentType<{
-                    width: number;
-                    height: number;
-                  }>
-                }
-                iconSelected={
-                  Icons.SwapNavIconSelected as React.ComponentType<{
-                    width: number;
-                    height: number;
-                  }>
-                }
-                style={iconStyle}
-              />
-            ),
-          }}
-        />
         <Tab.Screen
           name="Feed"
           component={StableFeedComponent}
@@ -311,7 +286,31 @@ export default function MainTabs() {
             ),
           }}
         />
-
+        <Tab.Screen
+          name="Swap"
+          component={SwapScreen}
+          options={{
+            tabBarIcon: ({ focused, size }) => (
+              <AnimatedTabIcon
+                focused={focused}
+                size={size * 1}
+                icon={
+                  Icons.SwapNavIcon as React.ComponentType<{
+                    width: number;
+                    height: number;
+                  }>
+                }
+                iconSelected={
+                  Icons.SwapNavIconSelected as React.ComponentType<{
+                    width: number;
+                    height: number;
+                  }>
+                }
+                style={iconStyle}
+              />
+            ),
+          }}
+        />
         <Tab.Screen
           name="Search"
           component={ChatListScreen}
@@ -424,6 +423,8 @@ const platformStyles = StyleSheet.create({
   },
   tabBarOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(12, 16, 26, 0.75)',
+    backgroundColor: Platform.OS === 'android'
+      ? 'rgba(12, 16, 26, 0.95)' // Much higher opacity for Android
+      : 'rgba(12, 16, 26, 0.75)', // Original opacity for iOS
   }
 });

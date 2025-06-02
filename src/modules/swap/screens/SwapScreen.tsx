@@ -39,7 +39,7 @@ type SwapScreenRouteProp = RouteProp<RootStackParamList, 'SwapScreen'>;
 type SwapScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SwapScreen'>;
 
 // Swap providers
-const swapProviders: SwapProvider[] = ['Jupiter', 'Raydium', 'PumpSwap'];
+const swapProviders: SwapProvider[] = ['Jupiter', 'Raydium'/* , 'PumpSwap' */];
 
 export default function SwapScreen() {
   const navigation = useNavigation<SwapScreenNavigationProp>();
