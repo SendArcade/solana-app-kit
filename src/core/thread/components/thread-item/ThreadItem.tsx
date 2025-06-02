@@ -97,7 +97,7 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
         <View style={retweetStyles.retweetHeader}>
           <Icons.RetweetIdle width={12} height={12} color="#657786" />
           <Text style={retweetStyles.retweetHeaderText}>
-            {post.user.username} Retweeted
+            {post.user.username} Reposted
           </Text>
         </View>
       )}

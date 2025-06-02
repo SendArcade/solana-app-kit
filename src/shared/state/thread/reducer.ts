@@ -219,12 +219,14 @@ interface ThreadState {
   allPosts: ThreadPost[];
   loading: boolean;
   error: string | null;
+  activeReactionTrayPostId: string | null;
 }
 
 const initialState: ThreadState = {
   allPosts: fallbackPosts,
   loading: false,
   error: null,
+  activeReactionTrayPostId: null,
 };
 
 function removePostRecursive(
@@ -391,6 +393,21 @@ export const threadSlice = createSlice({
         
         // Decrement the original post's retweet count
         updateRetweetCount(state.allPosts, originalPostId, false);
+      }
+    },
+    /**
+     * Set which post's reaction tray is currently active (open)
+     * Pass null to close all reaction trays
+     */
+    setActiveReactionTray: (state, action: PayloadAction<string | null>) => {
+      state.activeReactionTrayPostId = action.payload;
+    },
+    /**
+     * Close the reaction tray for a specific post
+     */
+    closeReactionTray: (state, action: PayloadAction<string>) => {
+      if (state.activeReactionTrayPostId === action.payload) {
+        state.activeReactionTrayPostId = null;
       }
     },
   },
@@ -640,6 +657,12 @@ export const threadSlice = createSlice({
   },
 });
 
-export const {addPostLocally, addReplyLocally, addRetweetLocally, undoRetweetLocally} =
-  threadSlice.actions;
+export const {
+  addPostLocally, 
+  addReplyLocally, 
+  addRetweetLocally, 
+  undoRetweetLocally,
+  setActiveReactionTray,
+  closeReactionTray
+} = threadSlice.actions;
 export default threadSlice.reducer;

@@ -81,7 +81,7 @@ const PostItem = memo(({
         <View style={retweetStyles.retweetHeader}>
           <Icons.RetweetIdle width={12} height={12} />
           <Text style={retweetStyles.retweetHeaderText}>
-            {post.user.username} Retweeted
+            {post.user.username} Reposted
           </Text>
         </View>
       )}

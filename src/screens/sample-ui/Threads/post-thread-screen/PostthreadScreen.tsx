@@ -267,7 +267,7 @@ export default function PostThreadScreen() {
             <View style={styles.retweetIndicator}>
               <Icons.RetweetIdle width={12} height={12} color={COLORS.greyMid} />
               <Text style={styles.retweetText}>
-                {post.user.username} Retweeted
+                {post.user.username} Reposted
               </Text>
             </View>
           )}
@@ -371,7 +371,7 @@ export default function PostThreadScreen() {
             <View style={styles.retweetIndicator}>
               <Icons.RetweetIdle width={12} height={12} color={COLORS.greyMid} />
               <Text style={styles.retweetText}>
-                {post.user.username} Retweeted
+                {post.user.username} Reposted
               </Text>
             </View>
           )}

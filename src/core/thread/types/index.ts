@@ -119,6 +119,13 @@ export interface ThreadProps {
    * (used for feed, or anywhere we only want a preview).
    */
   disableReplies?: boolean;
+  /**
+   * Scroll UI context for hiding/showing tab bar based on scroll direction
+   */
+  scrollUI?: {
+    hideTabBar: () => void;
+    showTabBar: () => void;
+  };
 }
 
 export interface ThreadItemProps {
