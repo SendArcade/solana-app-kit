@@ -104,12 +104,20 @@ const TokenRowSkeleton = ({ isInput = true }: { isInput?: boolean }) => (
 
     <View style={styles.tokenInfo}>
       {/* Token symbol placeholder */}
-      <Shimmer
-        width={80}
-        height={20}
-        borderRadius={8}
-        style={{ marginBottom: 8, marginLeft: 8 }}
-      />
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Shimmer
+          width={80}
+          height={20}
+          borderRadius={8}
+          style={{ marginBottom: 8, marginLeft: 8 }}
+        />
+        <Ionicons
+          name="chevron-down"
+          size={16}
+          color={COLORS.greyMid}
+          style={{ marginLeft: 6, marginBottom: 8 }}
+        />
+      </View>
 
       {/* Balance placeholder - only show for input token */}
       {isInput && (
@@ -291,9 +299,17 @@ export const TokenRow = memo(({
         </View>
       )}
       <View style={styles.tokenInfo}>
-        <Text style={styles.tokenSymbol} numberOfLines={1} ellipsizeMode="tail">
-          {token?.symbol || 'Select'}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.tokenSymbol} numberOfLines={1} ellipsizeMode="tail">
+            {token?.symbol || 'Select'}
+          </Text>
+          <Ionicons
+            name="chevron-down"
+            size={16}
+            color={COLORS.greyMid}
+            style={{ marginLeft: 6 }}
+          />
+        </View>
         {isInput && (
           <Text style={styles.tokenBalance} numberOfLines={1} ellipsizeMode="tail">
             {balance !== null

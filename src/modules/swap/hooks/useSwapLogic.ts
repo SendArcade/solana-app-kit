@@ -582,6 +582,78 @@ export function useSwapLogic(
     }
   }, [currentBalance, fetchBalance, inputToken, userPublicKey, connected]);
 
+  // Handle percentage button clicks (25%, 50%)
+  const handlePercentageButtonClick = useCallback(async (percentage: number) => {
+    console.log(`[SwapScreen] ${percentage}% button clicked, current balance:`, currentBalance);
+
+    if (isMounted.current) {
+      setErrorMsg(''); // Clear any existing error messages
+    }
+
+    // Validate wallet connection
+    if (!connected || !userPublicKey || !inputToken) {
+      if (isMounted.current) {
+        Alert.alert(
+          "Wallet Not Connected",
+          "Please connect your wallet to view your balance."
+        );
+      }
+      return;
+    }
+
+    // If we already have a balance, use it
+    if (currentBalance !== null && currentBalance > 0) {
+      const percentageAmount = (currentBalance * percentage) / 100;
+      setInputValue(String(percentageAmount));
+      return;
+    }
+
+    // Otherwise, fetch fresh balance
+    if (isMounted.current) {
+      setLoading(true);
+      setResultMsg("Fetching your balance...");
+    }
+
+    try {
+      const balance = await fetchBalance(inputToken);
+
+      if (isMounted.current) {
+        setLoading(false);
+        setResultMsg("");
+      }
+
+      // Check if we have a balance after fetching
+      if (balance !== null && balance > 0 && isMounted.current) {
+        console.log(`[SwapScreen] Setting ${percentage}% amount from fetched balance:`, balance);
+        const percentageAmount = (balance * percentage) / 100;
+        setInputValue(String(percentageAmount));
+      } else if (isMounted.current) {
+        console.log("[SwapScreen] Balance fetch returned:", balance);
+        Alert.alert(
+          "Balance Unavailable",
+          `Could not get your ${inputToken.symbol} balance. Please check your wallet connection.`
+        );
+      }
+    } catch (error) {
+      console.error(`[SwapScreen] Error in ${percentage}% button handler:`, error);
+      if (isMounted.current) {
+        setLoading(false);
+        setResultMsg("");
+        setErrorMsg(`Failed to fetch your ${inputToken?.symbol || 'token'} balance`);
+        setTimeout(() => isMounted.current && setErrorMsg(''), 3000);
+      }
+    }
+  }, [currentBalance, fetchBalance, inputToken, userPublicKey, connected]);
+
+  // Handle clear button click
+  const handleClearButtonClick = useCallback(() => {
+    console.log("[SwapScreen] Clear button clicked");
+    setInputValue('0');
+    if (isMounted.current) {
+      setErrorMsg(''); // Clear any existing error messages
+    }
+  }, []);
+
   // Calculate conversion rate
   const getConversionRate = useCallback(() => {
     if (!inputToken || !outputToken || !estimatedOutputAmount || parseFloat(inputValue || '0') <= 0) {
@@ -1201,6 +1273,8 @@ export function useSwapLogic(
     // Action handlers
     handleTokenSelected,
     handleMaxButtonClick,
+    handlePercentageButtonClick,
+    handleClearButtonClick,
     handleKeyPress,
     handleSwap,
     viewTransaction,

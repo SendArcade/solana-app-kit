@@ -124,7 +124,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
 
   // Adjusted padding to ensure rightmost points are visible
   const HORIZONTAL_PADDING = 16;
-  const usableChartWidth = containerWidth;
+  const usableChartWidth = containerWidth - (HORIZONTAL_PADDING * 2);
 
   // We'll animate data changes
   const animatedData = useRef(new Animated.Value(0)).current;
@@ -182,8 +182,11 @@ const LineGraph: React.FC<LineGraphProps> = ({
         return;
       }
 
+      // Adjust for the horizontal padding
+      const adjustedX = rawX - HORIZONTAL_PADDING;
+
       // Clamp the X so it doesn't go beyond the chart
-      let clampedX = Math.max(0, Math.min(rawX, usableChartWidth));
+      let clampedX = Math.max(0, Math.min(adjustedX, usableChartWidth));
 
       const segmentWidth = usableChartWidth / (data.length - 1);
       let index = Math.round(clampedX / segmentWidth);
@@ -192,9 +195,10 @@ const LineGraph: React.FC<LineGraphProps> = ({
       const dataPoint = displayData[index];
       const y = interpolateY(dataPoint);
 
-      setTooltipPos({ x: clampedX, y, index, price: dataPoint });
+      // Add back the padding for display positioning
+      setTooltipPos({ x: clampedX + HORIZONTAL_PADDING, y, index, price: dataPoint });
     },
-    [data, displayData, usableChartWidth, interpolateY],
+    [data, displayData, usableChartWidth, interpolateY, HORIZONTAL_PADDING],
   );
 
   // PanResponder to track finger movement across the overlay
@@ -420,7 +424,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
       // Shift tooltip horizontally if near edges
       const tooltipWidth = 130;
       const isNearLeft = x < 100;
-      const isNearRight = x > usableChartWidth - 100;
+      const isNearRight = x > containerWidth - 100;
 
       let tX = x;
       let anchor: 'start' | 'middle' | 'end' = 'middle';
@@ -428,7 +432,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
       if (isNearLeft) {
         tX = tooltipWidth / 2 + 8;
       } else if (isNearRight) {
-        tX = usableChartWidth - tooltipWidth / 2 - 8;
+        tX = containerWidth - tooltipWidth / 2 - 8;
       }
 
       return (
@@ -496,7 +500,7 @@ const LineGraph: React.FC<LineGraphProps> = ({
         </React.Fragment>
       );
     },
-    [formatPrice, formatTimestamp, usableChartWidth, chartHeight, timestamps],
+    [formatPrice, formatTimestamp, containerWidth, chartHeight, timestamps],
   );
 
   // Called by the chart for each data point
@@ -642,8 +646,8 @@ const LineGraph: React.FC<LineGraphProps> = ({
             withShadow={false}
             style={{
               borderRadius: 0,
-              paddingRight: 0,
-              paddingLeft: 0,
+              paddingRight: HORIZONTAL_PADDING,
+              paddingLeft: HORIZONTAL_PADDING,
               paddingTop: 0,
               paddingBottom: 0,
               margin: 0,

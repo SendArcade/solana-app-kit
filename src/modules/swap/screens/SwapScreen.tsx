@@ -93,6 +93,8 @@ export default function SwapScreen() {
     // Action handlers
     handleTokenSelected,
     handleMaxButtonClick,
+    handlePercentageButtonClick,
+    handleClearButtonClick,
     handleKeyPress,
     handleSwap,
     viewTransaction,
@@ -204,13 +206,36 @@ export default function SwapScreen() {
                   />
                 </View>
 
-                {/* Max Button */}
-                <TouchableOpacity
-                  style={styles.maxButtonContainer}
-                  onPress={handleMaxButtonClick}
-                >
-                  <Text style={styles.maxButtonText}>MAX</Text>
-                </TouchableOpacity>
+                {/* Percentage Buttons */}
+                <View style={styles.percentageButtonsContainer}>
+                  <TouchableOpacity
+                    style={styles.percentageButton}
+                    onPress={handleMaxButtonClick}
+                  >
+                    <Text style={styles.percentageButtonText}>MAX</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.percentageButton}
+                    onPress={() => handlePercentageButtonClick(25)}
+                  >
+                    <Text style={styles.percentageButtonText}>25%</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.percentageButton}
+                    onPress={() => handlePercentageButtonClick(50)}
+                  >
+                    <Text style={styles.percentageButtonText}>50%</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.clearButton}
+                    onPress={handleClearButtonClick}
+                  >
+                    <Text style={styles.clearButtonText}>CLEAR</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Status Messages */}

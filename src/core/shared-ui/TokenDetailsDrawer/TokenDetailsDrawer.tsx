@@ -716,7 +716,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
             ) : graphData.length > 0 ? (
               <LineGraph
                 data={graphData}
-                width={width - 80}
+                width={width - 64}
                 timestamps={timestamps}
               />
             ) : (

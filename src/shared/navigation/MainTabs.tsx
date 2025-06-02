@@ -190,11 +190,13 @@ export default function MainTabs() {
           tabBarActiveTintColor: COLORS.brandPrimary,
           tabBarStyle: {
             paddingTop: Platform.OS === 'android' ? 5 : 10,
+            paddingBottom: Platform.OS === 'android' ? 5 : 0,
             backgroundColor: 'transparent',
             borderTopWidth: 0,
             position: 'absolute',
             elevation: 0,
-            height: 75,
+            height: Platform.OS === 'android' ? 55 : 75,
+            bottom: Platform.OS === 'android' ? 0 : 0,
           },
           tabBarBackground: () => (
             <BlurView
