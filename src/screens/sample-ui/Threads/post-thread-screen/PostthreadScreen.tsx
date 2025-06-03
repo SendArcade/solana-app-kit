@@ -14,6 +14,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { RouteProp, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PostHeader from '@/core/thread/components/post/PostHeader';
 import PostBody from '@/core/thread/components/post/PostBody';
@@ -35,6 +36,7 @@ import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
 import { useAppDispatch, useAppSelector } from '@/shared/hooks/useReduxHooks';
 import { deletePostAsync } from '@/shared/state/thread/reducer';
 import styles from './PostThreadScreen.style';
+import COLORS from '@/assets/colors';
 
 /**
  * Finds a post in the array by ID.
@@ -78,6 +80,7 @@ export default function PostThreadScreen() {
   const navigation = useAppNavigation();
   const dispatch = useAppDispatch();
   const { postId } = route.params;
+  const insets = useSafeAreaInsets();
 
   const commentInputRef = useRef<{ focus: () => void }>(null);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -235,7 +238,8 @@ export default function PostThreadScreen() {
       <SafeAreaView style={[
         styles.container,
         Platform.OS === 'android' && {
-          marginTop: StatusBar.currentHeight || 24,
+          paddingTop: insets.top,
+          backgroundColor: COLORS.background,
         }
       ]}>
         <AppHeader
