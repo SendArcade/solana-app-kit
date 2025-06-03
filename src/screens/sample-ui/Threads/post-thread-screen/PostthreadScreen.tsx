@@ -11,6 +11,7 @@ import {
   Easing,
   KeyboardAvoidingView,
   Keyboard,
+  StatusBar,
 } from 'react-native';
 import { RouteProp, useRoute } from '@react-navigation/native';
 
@@ -231,7 +232,12 @@ export default function PostThreadScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[
+        styles.container,
+        Platform.OS === 'android' && {
+          marginTop: StatusBar.currentHeight || 24,
+        }
+      ]}>
         <AppHeader
           title="Thread"
           showBackButton={true}
@@ -254,7 +260,7 @@ export default function PostThreadScreen() {
                 const isLastInMainThread = index === mainThreadPosts.length - 1;
                 const hasReplies = getDirectChildren(flatPosts, post.id).length > 0;
                 const showThreadLine = !isLastInMainThread || (isLastInMainThread && directChildren.length > 0);
-                
+
                 return (
                   <TouchableOpacity
                     key={post.id}
@@ -270,7 +276,7 @@ export default function PostThreadScreen() {
                       {showThreadLine && (
                         <View style={styles.threadLine} />
                       )}
-                      
+
                       {/* Avatar Column */}
                       <View style={styles.avatarColumn}>
                         <TouchableOpacity onPress={() => handleUserPress(post.user)}>
@@ -318,7 +324,7 @@ export default function PostThreadScreen() {
               {/* Replies */}
               {directChildren.map((reply, index) => {
                 const isLastReply = index === directChildren.length - 1;
-                
+
                 return (
                   <TouchableOpacity
                     key={reply.id}
