@@ -105,6 +105,44 @@ export default function SwapScreen() {
     handleSwapTokens,
   } = useSwapLogic(routeParams as SwapRouteParams, userPublicKey, connected, sendTransaction, navigation);
 
+  // Helper function to determine swap button text with user feedback
+  const getSwapButtonText = () => {
+    if (!connected) {
+      return 'Connect Wallet to Swap';
+    }
+
+    if (!isProviderAvailable(activeProvider)) {
+      return `${activeProvider} Coming Soon`;
+    }
+
+    if (activeProvider === 'PumpSwap' && !poolAddress) {
+      return 'Enter Pool Address';
+    }
+
+    if (loading) {
+      return 'Swapping...';
+    }
+
+    // Check if amount exceeds balance
+    const inputAmount = parseFloat(inputValue || '0');
+    if (inputAmount > 0 && currentBalance !== null && inputAmount > currentBalance) {
+      return `Insufficient ${inputToken?.symbol || 'Token'} Balance`;
+    }
+
+    // Check if amount is invalid
+    if (inputAmount <= 0) {
+      return 'Enter Amount to Swap';
+    }
+
+    return `Swap via ${activeProvider}`;
+  };
+
+  // Helper function to determine if we're in insufficient balance state
+  const isInsufficientBalance = () => {
+    const inputAmount = parseFloat(inputValue || '0');
+    return inputAmount > 0 && currentBalance !== null && inputAmount > currentBalance;
+  };
+
   // Handle paste from clipboard for transaction signatures
   const handlePasteFromClipboard = async () => {
     try {
@@ -262,16 +300,21 @@ export default function SwapScreen() {
               style={[
                 styles.swapActionButton,
                 !isSwapButtonEnabled() && { opacity: 0.6 },
+                isInsufficientBalance() && {
+                  backgroundColor: '#FF6B6B', // Reddish color for insufficient balance
+                  borderWidth: 1,
+                  borderColor: '#FF4444'
+                },
                 Platform.OS === 'android' && androidStyles.swapActionButton
               ]}
               onPress={handleSwap}
               disabled={!isSwapButtonEnabled()}
             >
-              <Text style={styles.swapActionButtonText}>
-                {!connected ? 'Connect Wallet to Swap' :
-                  !isProviderAvailable(activeProvider) ? `${activeProvider} Coming Soon` :
-                    activeProvider === 'PumpSwap' && !poolAddress ? 'Enter Pool Address' :
-                      loading ? 'Swapping...' : `Swap via ${activeProvider}`}
+              <Text style={[
+                styles.swapActionButtonText,
+                isInsufficientBalance() && { color: '#FFFFFF' } // White text on red background
+              ]}>
+                {getSwapButtonText()}
               </Text>
             </TouchableOpacity>
           </View>
