@@ -73,6 +73,7 @@ import RadyuimIcom from './Rayduim_icon.svg'
 import TokenMillIcon from './Tokenmill_icon.svg'
 import AddFundsIcon from './add-funds-icon.svg';
 import PlusCircleIcon from './plus-circle-icon.svg';
+import QrCodeIcon from './qr-code-icon.svg';
 
 // Login elements right
 import RightRectangle from './login-elements-right/rectangle-right.svg';
@@ -161,6 +162,7 @@ export default {
   TokenMillIcon,
   AddFundsIcon,
   PlusCircleIcon,
+  QrCodeIcon,
   
   // Login elements right
   RightRectangle,

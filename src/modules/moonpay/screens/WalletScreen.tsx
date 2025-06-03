@@ -23,6 +23,7 @@ import { useWallet } from '@/modules/wallet-providers/hooks/useWallet';
 import COLORS from '@/assets/colors';
 import Icons from '@/assets/svgs';
 import AppHeader from '@/core/shared-ui/AppHeader';
+import QRCodeModal from '../components/QRCodeModal';
 import { styles } from './WalletScreen.style';
 import { RootStackParamList } from '@/shared/navigation/RootNavigator';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -111,6 +112,7 @@ function WalletScreen({
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [copied, setCopied] = useState(false);
+  const [qrModalVisible, setQrModalVisible] = useState(false);
 
   // Use the wallet hook to get the address
   const { address } = useWallet();
@@ -299,6 +301,12 @@ function WalletScreen({
     if (!copied && walletAddress) {
       Clipboard.setString(walletAddress);
       setCopied(true);
+    }
+  };
+
+  const handleQRPress = () => {
+    if (walletAddress) {
+      setQrModalVisible(true);
     }
   };
 
@@ -499,35 +507,46 @@ function WalletScreen({
                 ? `${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}`
                 : walletAddress || 'No address found'}
             </Text>
-            <TouchableOpacity
-              onPress={copyToClipboard}
-              style={styles.copyIconButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              activeOpacity={0.7}
-              disabled={copied}
-            >
-              <View style={styles.iconContainer}>
-                {/* Copy Icon (animated) */}
-                <Animated.View style={{
-                  opacity: opacityAnim,
-                  transform: [{ scale: scaleAnim }, { rotate }],
-                  position: 'absolute',
-                }}>
-                  <Icons.copyIcon width={20} height={20} color={COLORS.white} />
-                </Animated.View>
+            <View style={styles.addressActions}>
+              <TouchableOpacity
+                onPress={handleQRPress}
+                style={styles.qrIconButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+                disabled={!walletAddress}
+              >
+                <Icons.QrCodeIcon width={20} height={20} color={COLORS.white} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={copyToClipboard}
+                style={styles.copyIconButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+                disabled={copied}
+              >
+                <View style={styles.iconContainer}>
+                  {/* Copy Icon (animated) */}
+                  <Animated.View style={{
+                    opacity: opacityAnim,
+                    transform: [{ scale: scaleAnim }, { rotate }],
+                    position: 'absolute',
+                  }}>
+                    <Icons.copyIcon width={20} height={20} color={COLORS.white} />
+                  </Animated.View>
 
-                {/* Checkmark (animated) */}
-                <Animated.View style={{
-                  opacity: checkmarkOpacityAnim,
-                  transform: [{ scale: scaleAnim }],
-                  position: 'absolute',
-                }}>
-                  <View style={styles.checkmarkContainer}>
-                    <Text style={styles.checkmarkText}>✓</Text>
-                  </View>
-                </Animated.View>
-              </View>
-            </TouchableOpacity>
+                  {/* Checkmark (animated) */}
+                  <Animated.View style={{
+                    opacity: checkmarkOpacityAnim,
+                    transform: [{ scale: scaleAnim }],
+                    position: 'absolute',
+                  }}>
+                    <View style={styles.checkmarkContainer}>
+                      <Text style={styles.checkmarkText}>✓</Text>
+                    </View>
+                  </Animated.View>
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -583,6 +602,13 @@ function WalletScreen({
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* QR Code Modal */}
+      <QRCodeModal
+        visible={qrModalVisible}
+        onClose={() => setQrModalVisible(false)}
+        walletAddress={walletAddress || ''}
+      />
     </View>
   );
 }
