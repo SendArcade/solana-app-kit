@@ -262,6 +262,7 @@ const TokenMillScreen = () => {
                   value={tokenName}
                   onChangeText={setTokenName}
                   editable={!loading}
+                  keyboardAppearance="dark"
                 />
               </View>
 
@@ -274,6 +275,7 @@ const TokenMillScreen = () => {
                   value={tokenSymbol}
                   onChangeText={setTokenSymbol}
                   editable={!loading}
+                  keyboardAppearance="dark"
                 />
               </View>
 
@@ -286,6 +288,7 @@ const TokenMillScreen = () => {
                   value={metadataUri}
                   onChangeText={setMetadataUri}
                   editable={!loading}
+                  keyboardAppearance="dark"
                 />
               </View>
 
@@ -299,6 +302,7 @@ const TokenMillScreen = () => {
                   onChangeText={setTotalSupply}
                   keyboardType="numeric"
                   editable={!loading}
+                  keyboardAppearance="dark"
                 />
               </View>
 
@@ -312,6 +316,7 @@ const TokenMillScreen = () => {
                   onChangeText={setCreatorFee}
                   keyboardType="numeric"
                   editable={!loading}
+                  keyboardAppearance="dark"
                 />
               </View>
 
@@ -325,6 +330,7 @@ const TokenMillScreen = () => {
                   onChangeText={setStakingFee}
                   keyboardType="numeric"
                   editable={!loading}
+                  keyboardAppearance="dark"
                 />
               </View>
 

@@ -470,6 +470,7 @@ export function LiquidityRemoveSection({
         onChangeText={handlePoolAddressChange}
         placeholder="Enter pool address"
         editable={!isLoading && !isPoolLoading}
+        keyboardAppearance="dark"
       />
 
       {isPoolLoading && (
@@ -504,12 +505,13 @@ export function LiquidityRemoveSection({
           {/* LP Token input */}
           <Text style={styles.inputLabel}>LP Token Amount</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, inputStyle]}
             value={lpTokenAmount}
             onChangeText={handleLpTokenAmountChange}
             placeholder="Enter LP token amount"
             keyboardType="numeric"
             editable={!isLoading}
+            keyboardAppearance="dark"
           />
 
           {/* Show expected base/quote amounts */}

@@ -27,6 +27,7 @@ import { ThreadPost } from '../../../thread/types';
 import PostHeader from '../../../thread/components/post/PostHeader';
 import PostBody from '../../../thread/components/post/PostBody';
 import PostFooter from '../../../thread/components/post/PostFooter';
+import EditPostModal from '../../../thread/components/EditPostModal';
 import { AssetItem, PortfolioData } from '@/modules/data-module';
 
 import COLORS from '@/assets/colors'; // Import COLORS if not already
@@ -81,7 +82,7 @@ const PostItem = memo(({
         <View style={retweetStyles.retweetHeader}>
           <Icons.RetweetIdle width={12} height={12} />
           <Text style={retweetStyles.retweetHeaderText}>
-            {post.user.username} Retweeted
+            {post.user.username} Reposted
           </Text>
         </View>
       )}
@@ -159,6 +160,10 @@ const PostsTab = memo(({
   const dispatch = useAppDispatch();
   const userWallet = useAppSelector(state => state.auth.address);
 
+  // Add edit modal state
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [postToEdit, setPostToEdit] = useState<ThreadPost | null>(null);
+
   const handleDeletePost = useCallback((post: ThreadPost) => {
     if (post.user.id !== userWallet) {
       alert('You are not the owner of this post.');
@@ -172,7 +177,8 @@ const PostsTab = memo(({
       alert('You are not the owner of this post.');
       return;
     }
-    // Editing logic would be here
+    setPostToEdit(post);
+    setEditModalVisible(true);
   }, [userWallet]);
 
   // Empty state check
@@ -194,16 +200,30 @@ const PostsTab = memo(({
   const keyExtractor = useCallback((post: ThreadPost) => post.id, []);
 
   return (
-    <FlatList
-      data={posts}
-      renderItem={renderPost}
-      keyExtractor={keyExtractor}
-      contentContainerStyle={styles.postList}
-      removeClippedSubviews={true} // Optimize memory usage
-      maxToRenderPerBatch={10}     // Optimize render performance
-      windowSize={5}               // Optimize render window
-      initialNumToRender={7}       // Initial render batch size
-    />
+    <>
+      <FlatList
+        data={posts}
+        renderItem={renderPost}
+        keyExtractor={keyExtractor}
+        contentContainerStyle={styles.postList}
+        removeClippedSubviews={true} // Optimize memory usage
+        maxToRenderPerBatch={10}     // Optimize render performance
+        windowSize={5}               // Optimize render window
+        initialNumToRender={7}       // Initial render batch size
+      />
+
+      {/* Edit Post Modal */}
+      {postToEdit && (
+        <EditPostModal
+          post={postToEdit}
+          isVisible={editModalVisible}
+          onClose={() => {
+            setEditModalVisible(false);
+            setPostToEdit(null);
+          }}
+        />
+      )}
+    </>
   );
 });
 

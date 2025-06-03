@@ -26,6 +26,8 @@ import {
   undoRetweetLocally,
   addRetweetLocally,
   updatePostAsync,
+  setActiveReactionTray,
+  closeReactionTray,
 } from '@/shared/state/thread/reducer';
 import { nanoid } from '@reduxjs/toolkit';
 import { DEFAULT_IMAGES } from '@/shared/config/constants';
@@ -239,6 +241,7 @@ function SimpleRetweetDrawer({
                 value={retweetText}
                 onChangeText={setRetweetText}
                 autoFocus
+                keyboardAppearance="dark"
               />
 
               <View style={drawerStyles.quoteButtons}>
@@ -291,13 +294,16 @@ export default function PostFooter({
   const [localReactionCount, setLocalReactionCount] = useState(post.reactionCount);
   const [localRetweetCount, setLocalRetweetCount] = useState(post.retweetCount);
   const [localQuoteCount, setLocalQuoteCount] = useState(post.quoteCount);
-  const [showReactions, setShowReactions] = useState(false);
   const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
   const [showRetweetDrawer, setShowRetweetDrawer] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const [commentPressed, setCommentPressed] = useState(false);
   const [isReactionProcessing, setIsReactionProcessing] = useState(false);
+
+  // Get global reaction tray state from Redux
+  const activeReactionTrayPostId = useAppSelector(state => state.thread.activeReactionTrayPostId);
+  const showReactions = activeReactionTrayPostId === post.id;
 
   // Animation refs for reactions
   const reactionButtonScale = useRef(new Animated.Value(1)).current;
@@ -385,14 +391,34 @@ export default function PostFooter({
     }
   }, [updatedPost.reactionCount, updatedPost.reactions, post.reactionCount, reactionPillsOpacity]);
 
+  // Handle animation when global reaction tray state changes
+  useEffect(() => {
+    if (showReactions) {
+      // Animate in when this tray becomes active
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Animate out when this tray becomes inactive
+      Animated.timing(scaleAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showReactions, scaleAnim]);
+
   const closeReactionBubble = () => {
-    Animated.timing(scaleAnim, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowReactions(false);
-    });
+    dispatch(closeReactionTray(post.id));
   };
 
   useEffect(() => {
@@ -430,7 +456,7 @@ export default function PostFooter({
     setIsReactionProcessing(true);
 
     // Close reaction bubble immediately for better UX
-    setShowReactions(false);
+    dispatch(closeReactionTray(post.id));
     Animated.timing(scaleAnim, {
       toValue: 0,
       duration: 150,
@@ -493,20 +519,14 @@ export default function PostFooter({
   };
 
   const handleShowReactions = () => {
-    setShowReactions(true);
-    // Animate in with a bounce effect
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 1.1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    // If this post's tray is already open, close it
+    if (showReactions) {
+      dispatch(closeReactionTray(post.id));
+      return;
+    }
+
+    // Otherwise, open this post's tray (which will close any other open tray)
+    dispatch(setActiveReactionTray(post.id));
   };
 
   const handleOpenRetweetDrawer = () => {

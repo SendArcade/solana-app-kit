@@ -8,7 +8,7 @@
     "ios": "expo run:ios",
     "lint": "eslint .",
     "start": "node scripts/start.js",
-    "dev": "npx expo start --dev",
+    "dev": "pnpm start --dev",
     "docs:generate": "typedoc --options typedoc.json",
     "docs:convert": "node scripts/convert-to-mintlify.js",
     "check-env": "node scripts/check-env.js"

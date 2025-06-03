@@ -217,7 +217,7 @@ export default function SearchScreen({ showHeader = true }: SearchScreenProps) {
           userId={item.id}
           profilePicUrl={item.profile_picture_url}
           username={item.username}
-          size={50}
+          size={width < 375 ? 44 : 50}
           style={styles.avatar}
           showInitials={true}
           autoGenerate={true}
@@ -251,7 +251,18 @@ export default function SearchScreen({ showHeader = true }: SearchScreenProps) {
   const memoizedFilteredUsers = useMemo(() => filteredUsers, [filteredUsers]);
 
   // TOKEN TAB COMPONENTS
-  const renderTokenItem = ({ item }: { item: Token }) => {
+  const TokenItem = React.memo(({ item, onPress }: { item: Token; onPress: (token: Token) => void }) => {
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [imageError, setImageError] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Reset states when item changes
+    useEffect(() => {
+      setImageLoaded(false);
+      setImageError(false);
+      setIsLoading(true);
+    }, [item.logoURI]);
+
     const priceChangeColor =
       !item.priceChange24h ? COLORS.greyMid :
         item.priceChange24h >= 0 ? '#4CAF50' : COLORS.errorRed;
@@ -278,10 +289,41 @@ export default function SearchScreen({ showHeader = true }: SearchScreenProps) {
       }
     };
 
+    // Validate and potentially transform the image URL for better Android compatibility
+    const getValidImageUri = (uri: string) => {
+      if (!uri) return null;
+
+      // Ensure HTTPS for Android security
+      if (uri.startsWith('http://')) {
+        uri = uri.replace('http://', 'https://');
+      }
+
+      // Handle common CDN issues on Android
+      if (uri.includes('raw.githubusercontent.com')) {
+        // GitHub raw URLs sometimes have issues on Android
+        return uri;
+      }
+
+      return uri;
+    };
+
+    const handleImageLoad = () => {
+      setImageLoaded(true);
+      setIsLoading(false);
+    };
+
+    const handleImageError = (error: any) => {
+      console.warn(`Failed to load image for ${item.symbol}:`, error?.nativeEvent?.error || 'Unknown error');
+      setImageError(true);
+      setIsLoading(false);
+    };
+
+    const validImageUri = item.logoURI ? getValidImageUri(item.logoURI) : null;
+
     return (
       <TouchableOpacity
         style={styles.tokenItem}
-        onPress={() => handleTokenPress(item)}
+        onPress={() => onPress(item)}
         activeOpacity={0.7}
       >
         {/* Rank Display */}
@@ -291,16 +333,49 @@ export default function SearchScreen({ showHeader = true }: SearchScreenProps) {
 
         {/* Token Logo */}
         <View style={styles.tokenLogoContainer}>
-          {item.logoURI ? (
-            <Image
-              source={{ uri: item.logoURI }}
-              style={styles.tokenLogo}
-              defaultSource={require('../../../assets/images/SENDlogo.png')}
-            />
+          {validImageUri && !imageError ? (
+            <>
+              {/* Loading indicator */}
+              {isLoading && (
+                <View style={[styles.tokenLogoPlaceholder, { position: 'absolute', zIndex: 1 }]}>
+                  <ActivityIndicator size="small" color={COLORS.greyMid} />
+                </View>
+              )}
+
+              {/* Actual image */}
+              <Image
+                source={{
+                  uri: validImageUri,
+                  ...(Platform.OS === 'android' && {
+                    cache: 'force-cache',
+                    headers: {
+                      'User-Agent': 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36',
+                    },
+                  }),
+                }}
+                style={[
+                  styles.tokenLogo,
+                  (!imageLoaded || isLoading) && { opacity: 0 }
+                ]}
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+                onLoadStart={() => setIsLoading(true)}
+                onLoadEnd={() => setIsLoading(false)}
+                resizeMode="cover"
+                // Android-specific optimizations
+                {...(Platform.OS === 'android' && {
+                  fadeDuration: 0,
+                  progressiveRenderingEnabled: true,
+                  borderRadius: 23,
+                  // Add timeout for Android
+                  timeout: 10000,
+                })}
+              />
+            </>
           ) : (
             <View style={styles.tokenLogoPlaceholder}>
               <Text style={styles.tokenLogoText}>
-                {item.symbol[0] || '?'}
+                {item.symbol?.[0]?.toUpperCase() || '?'}
               </Text>
             </View>
           )}
@@ -321,6 +396,12 @@ export default function SearchScreen({ showHeader = true }: SearchScreenProps) {
         </View>
       </TouchableOpacity>
     );
+  });
+
+  TokenItem.displayName = 'TokenItem';
+
+  const renderTokenItem = ({ item }: { item: Token }) => {
+    return <TokenItem item={item} onPress={handleTokenPress} />;
   };
 
   // TAB SCENES
@@ -367,6 +448,17 @@ export default function SearchScreen({ showHeader = true }: SearchScreenProps) {
           keyExtractor={item => item.address}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          // Performance optimizations for Android
+          removeClippedSubviews={Platform.OS === 'android'}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={8}
+          windowSize={10}
+          getItemLayout={(data, index) => ({
+            length: width < 375 ? 72 : 82, // Smaller height for smaller devices
+            offset: (width < 375 ? 72 : 82) * index,
+            index,
+          })}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
@@ -444,6 +536,7 @@ export default function SearchScreen({ showHeader = true }: SearchScreenProps) {
               placeholderTextColor={COLORS.greyDark}
               value={searchQuery}
               onChangeText={setSearchQuery}
+              keyboardAppearance="dark"
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity
@@ -486,15 +579,15 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
-    paddingTop: 16,
-    paddingBottom: 15,
-    paddingHorizontal: 20,
+    paddingTop: width < 375 ? 12 : 16,
+    paddingBottom: width < 375 ? 12 : 15,
+    paddingHorizontal: width < 375 ? 16 : 20,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderDarkColor,
     backgroundColor: COLORS.background,
   },
   headerTitle: {
-    fontSize: TYPOGRAPHY.size.xl,
+    fontSize: width < 375 ? TYPOGRAPHY.size.lg : TYPOGRAPHY.size.xl,
     fontWeight: String(TYPOGRAPHY.bold) as any,
     color: COLORS.white,
     letterSpacing: TYPOGRAPHY.letterSpacing,
@@ -543,7 +636,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.lightBackground,
     borderRadius: 12,
-    margin: 16,
+    margin: width < 375 ? 12 : 16,
     paddingHorizontal: 12,
     height: 46,
     shadowColor: COLORS.black,
@@ -569,7 +662,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingTop: 8,
-    paddingBottom: 20,
+    paddingBottom: width < 375 ? 16 : 20,
   },
   loaderContainer: {
     flex: 1,
@@ -588,10 +681,10 @@ const styles = StyleSheet.create({
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginHorizontal: 16,
-    marginVertical: 6,
+    paddingVertical: width < 375 ? 10 : 12,
+    paddingHorizontal: width < 375 ? 12 : 16,
+    marginHorizontal: width < 375 ? 12 : 16,
+    marginVertical: width < 375 ? 4 : 6,
     borderRadius: 12,
     backgroundColor: COLORS.lighterBackground,
     shadowColor: COLORS.black,
@@ -603,17 +696,17 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderDarkColor,
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: width < 375 ? 44 : 50,
+    height: width < 375 ? 44 : 50,
+    borderRadius: width < 375 ? 22 : 25,
     backgroundColor: COLORS.darkerBackground,
   },
   userInfo: {
-    marginLeft: 16,
+    marginLeft: width < 375 ? 12 : 16,
     flex: 1,
   },
   username: {
-    fontSize: TYPOGRAPHY.size.md,
+    fontSize: width < 375 ? TYPOGRAPHY.size.sm : TYPOGRAPHY.size.md,
     fontWeight: String(TYPOGRAPHY.semiBold) as any,
     color: COLORS.white,
     letterSpacing: TYPOGRAPHY.letterSpacing,
@@ -625,10 +718,10 @@ const styles = StyleSheet.create({
     letterSpacing: TYPOGRAPHY.letterSpacing,
   },
   arrowContainer: {
-    padding: 8,
+    padding: width < 375 ? 6 : 8,
   },
   arrow: {
-    fontSize: 20,
+    fontSize: width < 375 ? 18 : 20,
     color: COLORS.greyMid,
     fontWeight: '300',
   },
@@ -636,10 +729,10 @@ const styles = StyleSheet.create({
   tokenItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginHorizontal: 16,
-    marginVertical: 6,
+    paddingVertical: width < 375 ? 10 : 12,
+    paddingHorizontal: width < 375 ? 12 : 16,
+    marginHorizontal: width < 375 ? 12 : 16,
+    marginVertical: width < 375 ? 4 : 6,
     borderRadius: 12,
     backgroundColor: COLORS.lighterBackground,
     shadowColor: COLORS.black,
@@ -651,9 +744,9 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderDarkColor,
   },
   tokenLogoContainer: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: width < 375 ? 40 : 46,
+    height: width < 375 ? 40 : 46,
+    borderRadius: width < 375 ? 20 : 23,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.darkerBackground,
@@ -662,29 +755,29 @@ const styles = StyleSheet.create({
     borderColor: COLORS.borderDarkColor,
   },
   tokenLogo: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: width < 375 ? 40 : 46,
+    height: width < 375 ? 40 : 46,
+    borderRadius: width < 375 ? 20 : 23,
   },
   tokenLogoPlaceholder: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: width < 375 ? 40 : 46,
+    height: width < 375 ? 40 : 46,
+    borderRadius: width < 375 ? 20 : 23,
     backgroundColor: COLORS.darkerBackground,
     justifyContent: 'center',
     alignItems: 'center',
   },
   tokenLogoText: {
-    fontSize: TYPOGRAPHY.size.lg,
+    fontSize: width < 375 ? TYPOGRAPHY.size.md : TYPOGRAPHY.size.lg,
     fontWeight: String(TYPOGRAPHY.bold) as any,
     color: COLORS.greyMid,
   },
   tokenInfo: {
-    marginLeft: 16,
+    marginLeft: width < 375 ? 12 : 16,
     flex: 1,
   },
   tokenSymbol: {
-    fontSize: TYPOGRAPHY.size.md,
+    fontSize: width < 375 ? TYPOGRAPHY.size.sm : TYPOGRAPHY.size.md,
     fontWeight: String(TYPOGRAPHY.semiBold) as any,
     color: COLORS.white,
     letterSpacing: TYPOGRAPHY.letterSpacing,
@@ -697,10 +790,10 @@ const styles = StyleSheet.create({
   },
   tokenPriceContainer: {
     alignItems: 'flex-end',
-    marginRight: 8,
+    marginRight: width < 375 ? 6 : 8,
   },
   tokenPrice: {
-    fontSize: TYPOGRAPHY.size.md,
+    fontSize: width < 375 ? TYPOGRAPHY.size.sm : TYPOGRAPHY.size.md,
     fontWeight: String(TYPOGRAPHY.semiBold) as any,
     color: COLORS.white,
     letterSpacing: TYPOGRAPHY.letterSpacing,
@@ -713,11 +806,11 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 80,
-    paddingHorizontal: 30,
+    paddingTop: width < 375 ? 60 : 80,
+    paddingHorizontal: width < 375 ? 24 : 30,
   },
   emptyText: {
-    fontSize: TYPOGRAPHY.size.md,
+    fontSize: width < 375 ? TYPOGRAPHY.size.sm : TYPOGRAPHY.size.md,
     fontWeight: String(TYPOGRAPHY.semiBold) as any,
     color: COLORS.white,
     textAlign: 'center',
@@ -731,16 +824,16 @@ const styles = StyleSheet.create({
     letterSpacing: TYPOGRAPHY.letterSpacing,
   },
   rankContainer: {
-    width: 30,
+    width: width < 375 ? 26 : 30,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: width < 375 ? 6 : 8,
   },
   medalEmoji: {
-    fontSize: 20,
+    fontSize: width < 375 ? 18 : 20,
   },
   rankNumber: {
-    fontSize: TYPOGRAPHY.size.md,
+    fontSize: width < 375 ? TYPOGRAPHY.size.sm : TYPOGRAPHY.size.md,
     fontWeight: String(TYPOGRAPHY.semiBold) as any,
     color: COLORS.accessoryDarkColor,
   },

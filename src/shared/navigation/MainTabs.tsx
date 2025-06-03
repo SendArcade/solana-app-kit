@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, createContext, useContext } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Platform, TouchableOpacity, View, StyleSheet, Animated, Dimensions, Image, Text } from 'react-native';
 import { useNavigation, ParamListBase } from '@react-navigation/native';
@@ -16,8 +16,21 @@ import SwapScreen from '@/modules/swap/screens/SwapScreen';
 import { ChatListScreen } from '@/screens/sample-ui/chat';
 import ModuleScreen from '@/screens/Common/launch-modules-screen/LaunchModules';
 
+// Create context for scroll-based UI hiding
+interface ScrollUIContextType {
+  hideTabBar: () => void;
+  showTabBar: () => void;
+}
 
+const ScrollUIContext = createContext<ScrollUIContextType | null>(null);
 
+export const useScrollUI = () => {
+  const context = useContext(ScrollUIContext);
+  if (!context) {
+    throw new Error('useScrollUI must be used within ScrollUIProvider');
+  }
+  return context;
+};
 
 // Platform icons matching PlatformSelectionScreen
 const platformIcons = {
@@ -47,6 +60,9 @@ export default function MainTabs() {
   const [currentPlatform, setCurrentPlatform] = useState<'threads' | 'insta' | 'chats'>('threads');
   const [refreshKey, setRefreshKey] = useState(0); // Add a refresh key to force re-render
   const menuAnimation = useRef(new Animated.Value(0)).current;
+
+  // Tab bar animation for scroll-based hiding
+  const tabBarTranslateY = useRef(new Animated.Value(0)).current;
 
   // Function to toggle platform selection menu
   const togglePlatformMenu = () => {
@@ -79,6 +95,30 @@ export default function MainTabs() {
       useNativeDriver: true,
     }).start();
   };
+
+  // Scroll UI context functions
+  const hideTabBar = () => {
+    console.log('🔽 Hiding tab bar');
+    Animated.timing(tabBarTranslateY, {
+      toValue: 100, // Hide tab bar by moving it down
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const showTabBar = () => {
+    console.log('🔼 Showing tab bar');
+    Animated.timing(tabBarTranslateY, {
+      toValue: 0, // Show tab bar by moving it back to original position
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const scrollUIContextValue = useMemo(() => ({
+    hideTabBar,
+    showTabBar,
+  }), []);
 
   // Create a stable component that doesn't rerender on menu toggle         
   const StableFeedComponent = React.useMemo(() => {
@@ -122,7 +162,7 @@ export default function MainTabs() {
   });
 
   return (
-    <>
+    <ScrollUIContext.Provider value={scrollUIContextValue}>
       {/* Platform Selection Menu - appears above tab bar */}
       <Animated.View
         style={[
@@ -188,49 +228,33 @@ export default function MainTabs() {
           headerShown: false,
           tabBarShowLabel: false,
           tabBarActiveTintColor: COLORS.brandPrimary,
-          tabBarStyle: {
-            paddingTop: Platform.OS === 'android' ? 5 : 10,
-            backgroundColor: 'transparent',
-            borderTopWidth: 0,
-            position: 'absolute',
-            elevation: 0,
-            height: 75,
-          },
+          tabBarStyle: [
+            {
+              paddingTop: Platform.OS === 'android' ? 5 : 10,
+              paddingBottom: Platform.OS === 'android' ? 5 : 0,
+              backgroundColor: 'transparent',
+              borderTopWidth: 0,
+              position: 'absolute',
+              elevation: 0,
+              height: Platform.OS === 'android' ? 55 : 75,
+              bottom: Platform.OS === 'android' ? 0 : 0,
+              left: 0,
+              right: 0,
+            },
+            {
+              transform: [{ translateY: tabBarTranslateY }],
+            },
+          ],
           tabBarBackground: () => (
             <BlurView
               tint="dark"
-              intensity={35}
+              intensity={Platform.OS === 'android' ? 15 : 35}
               style={StyleSheet.absoluteFill}
             >
               <View style={platformStyles.tabBarOverlay} />
             </BlurView>
           ),
         }}>
-        <Tab.Screen
-          name="Swap"
-          component={SwapScreen}
-          options={{
-            tabBarIcon: ({ focused, size }) => (
-              <AnimatedTabIcon
-                focused={focused}
-                size={size * 1}
-                icon={
-                  Icons.SwapNavIcon as React.ComponentType<{
-                    width: number;
-                    height: number;
-                  }>
-                }
-                iconSelected={
-                  Icons.SwapNavIconSelected as React.ComponentType<{
-                    width: number;
-                    height: number;
-                  }>
-                }
-                style={iconStyle}
-              />
-            ),
-          }}
-        />
         <Tab.Screen
           name="Feed"
           component={StableFeedComponent}
@@ -262,7 +286,31 @@ export default function MainTabs() {
             ),
           }}
         />
-
+        <Tab.Screen
+          name="Swap"
+          component={SwapScreen}
+          options={{
+            tabBarIcon: ({ focused, size }) => (
+              <AnimatedTabIcon
+                focused={focused}
+                size={size * 1}
+                icon={
+                  Icons.SwapNavIcon as React.ComponentType<{
+                    width: number;
+                    height: number;
+                  }>
+                }
+                iconSelected={
+                  Icons.SwapNavIconSelected as React.ComponentType<{
+                    width: number;
+                    height: number;
+                  }>
+                }
+                style={iconStyle}
+              />
+            ),
+          }}
+        />
         <Tab.Screen
           name="Search"
           component={ChatListScreen}
@@ -314,7 +362,7 @@ export default function MainTabs() {
           }}
         />
       </Tab.Navigator>
-    </>
+    </ScrollUIContext.Provider>
   );
 }
 
@@ -375,6 +423,8 @@ const platformStyles = StyleSheet.create({
   },
   tabBarOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(12, 16, 26, 0.75)',
+    backgroundColor: Platform.OS === 'android'
+      ? 'rgba(12, 16, 26, 0.95)' // Much higher opacity for Android
+      : 'rgba(12, 16, 26, 0.75)', // Original opacity for iOS
   }
 });

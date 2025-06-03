@@ -522,7 +522,7 @@ function TradeCard({
         <View style={styles.chartContainer}>
           <LineGraph
             data={graphData && graphData.length > 0 ? graphData : []}
-            width={Dimensions.get('window').width - 130}
+            width={Dimensions.get('window').width - 64}
             executionPrice={executionPrice}
             executionTimestamp={executionTimestamp}
             timestamps={timestamps}

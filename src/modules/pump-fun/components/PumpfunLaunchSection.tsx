@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import {
   Text,
   TextInput,
@@ -10,12 +10,12 @@ import {
   Switch,
   StyleSheet,
 } from 'react-native';
-import Svg, {Path} from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
-import {usePumpFun} from '../hooks/usePumpFun';
+import { usePumpFun } from '../hooks/usePumpFun';
 // import { PumpfunLaunchStyles } from './Pumpfun.styles'; // Removed old styles
 import PumpfunCard from './PumpfunCard';
-import {PumpfunLaunchSectionProps} from '../types';
+import { PumpfunLaunchSectionProps } from '../types';
 import COLORS from '@/assets/colors';
 import TYPOGRAPHY from '@/assets/typography';
 import { TransactionService } from '@/modules/wallet-providers';
@@ -26,7 +26,7 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
   buttonStyle,
   launchButtonLabel = 'Launch Token',
 }) => {
-  const {launchToken} = usePumpFun();
+  const { launchToken } = usePumpFun();
 
   const [tokenName, setTokenName] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState('');
@@ -117,6 +117,7 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
           value={tokenName}
           onChangeText={setTokenName}
           editable={!loading}
+          keyboardAppearance="dark"
         />
       </View>
 
@@ -129,19 +130,21 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
           value={tokenSymbol}
           onChangeText={setTokenSymbol}
           editable={!loading}
+          keyboardAppearance="dark"
         />
       </View>
 
       <View style={styles.formField}>
         <Text style={styles.fieldLabel}>Description</Text>
         <TextInput
-          style={[styles.input, inputStyle, {height: 80}]}
+          style={[styles.input, inputStyle, { height: 80 }]}
           placeholder="..."
           placeholderTextColor={COLORS.greyMid}
           multiline
           value={description}
           onChangeText={setDescription}
           editable={!loading}
+          keyboardAppearance="dark"
         />
       </View>
 
@@ -155,6 +158,7 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
           value={solAmount}
           onChangeText={setSolAmount}
           editable={!loading}
+          keyboardAppearance="dark"
         />
       </View>
 
@@ -163,7 +167,7 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
         <View style={styles.imageUploadContainer}>
           {imageUri ? (
             <View style={styles.imagePreviewContainer}>
-              <Image source={{uri: imageUri}} style={styles.imagePreview} />
+              <Image source={{ uri: imageUri }} style={styles.imagePreview} />
               <View style={styles.imageControlsContainer}>
                 <TouchableOpacity
                   style={styles.imageControlButton}
@@ -236,6 +240,7 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
                 value={twitter}
                 onChangeText={setTwitter}
                 editable={!loading}
+                keyboardAppearance="dark"
               />
             </View>
 
@@ -248,6 +253,7 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
                 value={telegram}
                 onChangeText={setTelegram}
                 editable={!loading}
+                keyboardAppearance="dark"
               />
             </View>
 
@@ -260,6 +266,7 @@ export const PumpfunLaunchSection: React.FC<PumpfunLaunchSectionProps> = ({
                 value={website}
                 onChangeText={setWebsite}
                 editable={!loading}
+                keyboardAppearance="dark"
               />
             </View>
           </View>
@@ -436,7 +443,7 @@ const styles = StyleSheet.create({
     fontFamily: TYPOGRAPHY.fontFamily,
   },
   switchControl: {
-    transform: [{scaleX: 0.8}, {scaleY: 0.8}],
+    transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }],
   },
   verificationOptionsContainer: {
     marginTop: 8,

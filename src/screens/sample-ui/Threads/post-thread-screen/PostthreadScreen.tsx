@@ -28,7 +28,7 @@ import {
 } from '@/core/thread/components/thread.types';
 import { DEFAULT_IMAGES } from '@/shared/config/constants';
 import { flattenPosts } from '@/core/thread/components/thread.utils';
-import ThreadEditModal from '@/core/thread/components/ThreadEditModal';
+import EditPostModal from '@/core/thread/components/EditPostModal';
 import Icons from '@/assets/svgs';
 import { RootStackParamList } from '@/shared/navigation/RootNavigator';
 import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
@@ -267,7 +267,7 @@ export default function PostThreadScreen() {
             <View style={styles.retweetIndicator}>
               <Icons.RetweetIdle width={12} height={12} color={COLORS.greyMid} />
               <Text style={styles.retweetText}>
-                {post.user.username} Retweeted
+                {post.user.username} Reposted
               </Text>
             </View>
           )}
@@ -371,7 +371,7 @@ export default function PostThreadScreen() {
             <View style={styles.retweetIndicator}>
               <Icons.RetweetIdle width={12} height={12} color={COLORS.greyMid} />
               <Text style={styles.retweetText}>
-                {post.user.username} Retweeted
+                {post.user.username} Reposted
               </Text>
             </View>
           )}
@@ -534,11 +534,10 @@ export default function PostThreadScreen() {
         )}
 
         {postToEdit && (
-          <ThreadEditModal
+          <EditPostModal
             post={postToEdit}
-            visible={editModalVisible}
+            isVisible={editModalVisible}
             onClose={() => setEditModalVisible(false)}
-            currentUser={localUser}
           />
         )}
       </SafeAreaView>

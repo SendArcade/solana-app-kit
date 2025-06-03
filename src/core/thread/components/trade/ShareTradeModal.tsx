@@ -100,7 +100,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
 
   const isMounted = useRef(true);
   const pendingTokenOps = useRef<{ input: boolean, output: boolean }>({ input: false, output: false });
-  
+
   // Animation refs for smooth transitions
   const bottomActionAnimation = useRef(new Animated.Value(0)).current;
   const slideAnimation = useRef(new Animated.Value(0)).current;
@@ -149,7 +149,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
   useEffect(() => {
     if (swaps.length > 0) {
       const tokenAddresses: string[] = [];
-      
+
       swaps.forEach(swap => {
         if (swap.inputToken?.mint) {
           tokenAddresses.push(swap.inputToken.mint);
@@ -161,7 +161,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
 
       // Remove duplicates
       const uniqueAddresses = [...new Set(tokenAddresses)];
-      
+
       if (uniqueAddresses.length > 0) {
         fetchMetadataForTokens(uniqueAddresses);
       }
@@ -367,7 +367,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
-    
+
     if (diffHours < 1) {
       return 'Just now';
     } else if (diffHours < 24) {
@@ -376,7 +376,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
       return `${Math.floor(diffHours / 24)}d ago`;
     }
   }, []);
-  
+
   const renderSwapsList = () => {
     // Show skeletons during initial loading
     if (initialLoading && swaps.length === 0) {
@@ -434,60 +434,60 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
           <FlatList
             data={swaps}
             renderItem={({ item }) => {
-            const isSelected = selectedPastSwap?.uniqueId === item?.uniqueId;
+              const isSelected = selectedPastSwap?.uniqueId === item?.uniqueId;
 
-            // Ensure we have valid item data
-            if (!item || !item.inputToken || !item.outputToken) {
-              return null;
-            }
+              // Ensure we have valid item data
+              if (!item || !item.inputToken || !item.outputToken) {
+                return null;
+              }
 
-            return (
-              <View style={styles.swapItemWrapper}>
-                <TouchableOpacity
-                  style={[
-                    isSelected ? styles.swapItemSelected : styles.swapItemUnselected,
-                    { position: 'relative' },
-                    refreshing && { opacity: 0.6 }
-                  ]}
-                  onPress={() => handlePastSwapSelected(item)}
-                  activeOpacity={0.7}
-                  disabled={refreshing}>
-                  
-                  {isSelected && (
-                    <View style={styles.swapItemCheckmark}>
-                      <FontAwesome5 name="check" size={12} color={COLORS.white} />
+              return (
+                <View style={styles.swapItemWrapper}>
+                  <TouchableOpacity
+                    style={[
+                      isSelected ? styles.swapItemSelected : styles.swapItemUnselected,
+                      { position: 'relative' },
+                      refreshing && { opacity: 0.6 }
+                    ]}
+                    onPress={() => handlePastSwapSelected(item)}
+                    activeOpacity={0.7}
+                    disabled={refreshing}>
+
+                    {isSelected && (
+                      <View style={styles.swapItemCheckmark}>
+                        <FontAwesome5 name="check" size={12} color={COLORS.white} />
+                      </View>
+                    )}
+
+                    <View style={{ padding: 16 }}>
+                      <PastSwapItem
+                        swap={item}
+                        onSelect={() => { }}
+                        selected={isSelected}
+                        inputTokenLogoURI={getTokenLogoUrl(item.inputToken?.mint) || undefined}
+                        outputTokenLogoURI={getTokenLogoUrl(item.outputToken?.mint) || undefined}
+                      />
                     </View>
-                  )}
-                  
-                  <View style={{ padding: 16 }}>
-                    <PastSwapItem
-                      swap={item}
-                      onSelect={() => {}}
-                      selected={isSelected}
-                      inputTokenLogoURI={getTokenLogoUrl(item.inputToken?.mint) || undefined}
-                      outputTokenLogoURI={getTokenLogoUrl(item.outputToken?.mint) || undefined}
-                    />
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </View>
+              );
+            }}
+            keyExtractor={(item, index) => item?.uniqueId || item?.signature || `swap-${index}`}
+            contentContainerStyle={styles.swapsList}
+            showsVerticalScrollIndicator={true}
+            initialNumToRender={5}
+            onRefresh={forceRefreshPastSwaps}
+            refreshing={false}
+            ListHeaderComponent={
+              <View style={styles.listHeaderContainer}>
+                <Text style={styles.swapsCountText}>
+                  {swaps.length > 0 ? `${swaps.length} ${swaps.length === 1 ? 'swap' : 'swaps'} found` : ''}
+                  {apiError && swaps.length > 0 ? ' (Error loading more)' : ''}
+                </Text>
+                {swaps.length > 0 && <View style={styles.swapsListDivider} />}
               </View>
-            );
-          }}
-          keyExtractor={(item, index) => item?.uniqueId || item?.signature || `swap-${index}`}
-          contentContainerStyle={styles.swapsList}
-          showsVerticalScrollIndicator={true}
-          initialNumToRender={5}
-          onRefresh={forceRefreshPastSwaps}
-          refreshing={false}
-          ListHeaderComponent={
-            <View style={styles.listHeaderContainer}>
-              <Text style={styles.swapsCountText}>
-                {swaps.length > 0 ? `${swaps.length} ${swaps.length === 1 ? 'swap' : 'swaps'} found` : ''}
-                {apiError && swaps.length > 0 ? ' (Error loading more)' : ''} 
-              </Text>
-              {swaps.length > 0 && <View style={styles.swapsListDivider} />}
-            </View>
-          }
-        />
+            }
+          />
         )}
       </View>
     );
@@ -524,7 +524,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
                 {formatSwapTimestamp(selectedPastSwap.timestamp)}
               </Text>
             </View>
-            
+
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <TouchableOpacity
                 style={styles.quickShareButton}
@@ -533,7 +533,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
                 <FontAwesome5 name="share" size={12} color={COLORS.brandBlue} />
                 <Text style={styles.quickShareButtonText}>Share</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={styles.continueButton}
                 onPress={handleContinueToMessage}
@@ -556,7 +556,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
         <Text style={styles.selectedSwapHeader}>Selected Swap</Text>
         <PastSwapItem
           swap={selectedPastSwap}
-          onSelect={() => {}}
+          onSelect={() => { }}
           selected={true}
           inputTokenLogoURI={getTokenLogoUrl(selectedPastSwap.inputToken?.mint) || undefined}
           outputTokenLogoURI={getTokenLogoUrl(selectedPastSwap.outputToken?.mint) || undefined}
@@ -614,7 +614,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
   );
 
   const renderMessageInputScreen = () => (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.keyboardAvoidingContainer}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
@@ -634,7 +634,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
 
       <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
         {renderSelectedSwapPreview()}
-        
+
         <View style={styles.messageInputContainer}>
           <Text style={styles.messageInputLabel}>Message (Optional)</Text>
           <View style={{ position: 'relative', flex: 1 }}>
@@ -649,6 +649,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
               returnKeyType="done"
               textAlignVertical="top"
               autoFocus
+              keyboardAppearance="dark"
             />
             {messageText.length > 0 && (
               <Text style={styles.characterCount}>
@@ -683,7 +684,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
       </View>
     </KeyboardAvoidingView>
   );
-  
+
   return (
     <Modal
       visible={visible}
@@ -703,8 +704,8 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
             <TouchableWithoutFeedback>
               <View style={{ flex: 1 }}>
                 <View style={styles.dragHandle} />
-                {currentScreen === 'SWAP_SELECTION' 
-                  ? renderSwapSelectionScreen() 
+                {currentScreen === 'SWAP_SELECTION'
+                  ? renderSwapSelectionScreen()
                   : renderMessageInputScreen()
                 }
                 {!!resultMsg && (
