@@ -105,7 +105,7 @@ function PostBody({
   const renderedSections = useMemo(() => {
     return sections.map(section => (
       <View key={section.id} style={styles.extraContentContainer}>
-        <View style={{ width: '84%' }}>
+        <View style={{ width: '100%' }}>
           {renderSection(section, user, createdAt, externalRefreshTrigger)}
         </View>
       </View>

@@ -11,11 +11,11 @@ export function createPostFooterStyles(
     footerContainer: {
       marginTop: 6,
       width: '100%',
-      alignItems: 'flex-end',
+      alignItems: 'flex-start',
       ...overrideStyles?.footerContainer,
     },
     itemIconsRow: {
-      width: '84%', // Consider making this customizable
+      width: '100%', // Consider making this customizable
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',

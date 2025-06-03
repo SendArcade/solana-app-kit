@@ -8,39 +8,50 @@ export function getThreadItemBaseStyles(
 ) {
   return StyleSheet.create({
     threadItemContainer: {
-      flex: 1,
-      paddingHorizontal: 16, // Replaced theme['--thread-post-padding-horizontal']
-      paddingVertical: 12, // Replaced theme['--thread-post-padding-vertical']
-      borderBottomWidth: 1,
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: COLORS.borderDarkColor,
+      backgroundColor: COLORS.background,
+    },
+    avatarColumn: {
+      width: 40,
+      alignItems: 'flex-start',
+      marginRight: 12,
+      paddingTop: 2, // Slight adjustment to align with text baseline
+    },
+    contentColumn: {
+      flex: 1,
+      minWidth: 0, // Prevents text overflow issues
     },
     threadItemReplyLine: {
       borderLeftWidth: 1,
-      borderLeftColor: '#E0E0E0', // Replaced theme['--thread-reply-line-color']
+      borderLeftColor: COLORS.borderDarkColor,
       marginLeft: 12,
       paddingLeft: 12,
     },
     threadItemAvatar: {
-      width: 40, // Replaced theme['--thread-avatar-size']
-      height: 40, // Replaced theme['--thread-avatar-size']
-      borderRadius: 20, // Replaced theme['--thread-avatar-size'] / 2
-      marginRight: 8,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
     },
     replyingContainer: {
-      backgroundColor: '#F9F9F9', // Replaced theme['--thread-replying-bg']
-      padding: 8, // Replaced theme['--thread-replying-padding']
-      marginVertical: 8, // Replaced theme['--thread-replying-margin-vertical']
-      borderRadius: 6, // Replaced theme['--thread-replying-border-radius']
+      backgroundColor: COLORS.lighterBackground,
+      padding: 8,
+      marginVertical: 8,
+      borderRadius: 6,
     },
     replyingText: {
       fontSize: 13,
-      color: '#666',
+      color: COLORS.greyMid,
+      fontFamily: TYPOGRAPHY.fontFamily,
     },
     replyingHandle: {
-      color: '#2B8EF0', // Replaced theme['--thread-link-color']
-      fontWeight: '600',
+      color: COLORS.brandBlue,
+      fontWeight: TYPOGRAPHY.fontWeightToString(TYPOGRAPHY.semiBold),
+      fontFamily: TYPOGRAPHY.fontFamily,
     },
-    // Merging logic is removed here
   });
 }
 
@@ -49,15 +60,16 @@ export const retweetStyles = StyleSheet.create({
   retweetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
-    paddingLeft: 6,
-    paddingTop: 4,
+    marginBottom: 8,
+    paddingLeft: 0,
+    paddingTop: 0,
   },
   retweetHeaderText: {
     fontSize: 13,
     color: COLORS.greyMid,
     marginLeft: 6,
     fontWeight: '500',
+    fontFamily: TYPOGRAPHY.fontFamily,
   },
   retweetedContent: {
     marginTop: 4,
@@ -67,15 +79,18 @@ export const retweetStyles = StyleSheet.create({
     width: '100%',
     borderRadius: 12,
     backgroundColor: COLORS.lighterBackground,
-    padding: 10,
+    padding: 12,
     borderWidth: 1,
     borderColor: COLORS.borderDarkColor,
+    marginTop: 8,
   },
   quoteContent: {
-    marginBottom: 4,
+    marginBottom: 8,
   },
   quoteText: {
-    fontSize: 13,
-    color: COLORS.greyMid,
+    fontSize: 15,
+    color: COLORS.white,
+    lineHeight: 20,
+    fontFamily: TYPOGRAPHY.fontFamily,
   },
 }); 

@@ -11,7 +11,7 @@ export function createPostBodyStyles(
     extraContentContainer: {
       marginVertical: 8,
       width: '100%',
-      alignItems: 'flex-end',
+      alignItems: 'flex-start',
       ...overrideStyles?.extraContentContainer,
     },
     threadItemText: {

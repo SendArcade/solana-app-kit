@@ -1,6 +1,8 @@
 // FILE: src/components/thread/sections/SectionTextVideo.tsx
 import React from 'react';
 import {View, Text} from 'react-native';
+import COLORS from '@/assets/colors';
+import TYPOGRAPHY from '@/assets/typography';
 
 /**
  * Props for the SectionTextVideo component
@@ -45,7 +47,7 @@ export default function SectionTextVideo({
   return (
     <View>
       {!!text && (
-        <Text style={{fontSize: 14, color: '#000', marginBottom: 4}}>
+        <Text style={{fontSize: 15, color: COLORS.white, marginBottom: 8, lineHeight: 20, fontFamily: TYPOGRAPHY.fontFamily}}>
           {text}
         </Text>
       )}

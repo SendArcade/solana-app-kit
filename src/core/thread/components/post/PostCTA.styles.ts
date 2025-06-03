@@ -9,7 +9,7 @@ export function createPostCTAStyles(
   const baseStyles: { [key: string]: any } = StyleSheet.create({
     /* CTA (PostCTA) - Migrated from thread.styles.ts */
     threadPostCTAContainer: {
-      width: '84%' as DimensionValue,
+      width: '100%' as DimensionValue,
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 8,

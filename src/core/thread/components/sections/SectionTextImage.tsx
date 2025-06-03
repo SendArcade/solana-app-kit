@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { View, Text, ImageSourcePropType, StyleSheet, ActivityIndicator, TouchableOpacity, Modal, Dimensions, Platform } from 'react-native';
 import { IPFSAwareImage, getValidImageSource } from '@/shared/utils/IPFSImage';
 import { DEFAULT_IMAGES } from '@/shared/config/constants';
+import COLORS from '@/assets/colors';
+import TYPOGRAPHY from '@/assets/typography';
 
 /**
  * Props for the SectionTextImage component
@@ -114,10 +116,11 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   text: {
-    fontSize: 14,
-    color: '#000',
+    fontSize: 15,
+    color: COLORS.white,
     marginBottom: 8,
     lineHeight: 20,
+    fontFamily: TYPOGRAPHY.fontFamily,
   },
   imageContainer: {
     width: '100%',
