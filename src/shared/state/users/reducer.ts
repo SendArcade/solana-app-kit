@@ -8,16 +8,20 @@ import { SERVER_URL } from '@env';
 // For local fallback
 const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 
+// Debug environment variable loading
+console.log('[Users Reducer] SERVER_URL from @env:', SERVER_URL);
+console.log('[Users Reducer] SERVER_BASE_URL resolved to:', SERVER_BASE_URL);
+
 export interface UserProfile {
-  id: string;               // user’s wallet address
+  id: string;               // user's wallet address
   username: string | null;
   profilePicUrl: string | null;
   followers: string[];      // array of userIds who follow this user
   following: string[];      // array of userIds this user is following
 
-  // Convenient booleans for “follows you” or “you are following them”
-  followsYou?: boolean;     // if the user has your ID in their “following” list
-  isFollowing?: boolean;    // if your ID is in your “following” list
+  // Convenient booleans for "follows you" or "you are following them"
+  followsYou?: boolean;     // if the user has your ID in their "following" list
+  isFollowing?: boolean;    // if your ID is in your "following" list
 }
 
 interface UsersState {
@@ -34,8 +38,8 @@ const initialState: UsersState = {
 };
 
 /**
- * Fetch a user’s profile from the server, plus followers/following arrays.
- * We can optionally pass the currentUserId to check “followsYou” or “isFollowing.”
+ * Fetch a user's profile from the server, plus followers/following arrays.
+ * We can optionally pass the currentUserId to check "followsYou" or "isFollowing."
  */
 export const fetchUserFullProfile = createAsyncThunk<
   // Return type of fulfilled
@@ -73,21 +77,21 @@ export const fetchUserFullProfile = createAsyncThunk<
         followingIds = followingData.following.map((f: any) => f.id);
       }
 
-      // Check “followsYou” if we have currentUserId => see if userId’s “following” array includes currentUserId
+      // Check "followsYou" if we have currentUserId => see if userId's "following" array includes currentUserId
       let followsYou = false;
       let isFollowing = false;
 
       if (currentUserId) {
-        // userId “follows you” if your ID is in userId’s following list => means userId is following currentUserId
-        // Actually we want to check if “currentUserId” is in userId’s “followers,” or equivalently,
-        // userId is in “currentUserId’s following.” But the simplest is we just also fetch the “following” of userId above.
-        // If userId’s following includes currentUserId => userId is following me => “followsYou = true”
+        // userId "follows you" if your ID is in userId's following list => means userId is following currentUserId
+        // Actually we want to check if "currentUserId" is in userId's "followers," or equivalently,
+        // userId is in "currentUserId's following." But the simplest is we just also fetch the "following" of userId above.
+        // If userId's following includes currentUserId => userId is following me => "followsYou = true"
         if (followingIds.includes(currentUserId)) {
           followsYou = true;
         }
 
-        // “isFollowing” if the currentUserId is following userId => means currentUserId’s following includes userId
-        // But we only fetched userId’s following. So we might do a separate fetch for currentUserId’s following
+        // "isFollowing" if the currentUserId is following userId => means currentUserId's following includes userId
+        // But we only fetched userId's following. So we might do a separate fetch for currentUserId's following
         // or rely on a single approach. For simplicity, we can do an additional small fetch:
         const yourFollowingResp = await fetch(
           `${SERVER_BASE_URL}/api/profile/following?userId=${currentUserId}`,
@@ -195,7 +199,7 @@ const usersSlice = createSlice({
     // followUser
     builder.addCase(followUser.fulfilled, (state, action) => {
       const { followerId, followingId } = action.payload;
-      // Follower now has followingId in their “following”
+      // Follower now has followingId in their "following"
       if (!state.byId[followerId]) {
         state.byId[followerId] = {
           id: followerId,
@@ -209,7 +213,7 @@ const usersSlice = createSlice({
         state.byId[followerId].following.push(followingId);
       }
 
-      // Following user now has followerId in their “followers”
+      // Following user now has followerId in their "followers"
       if (!state.byId[followingId]) {
         state.byId[followingId] = {
           id: followingId,
@@ -227,13 +231,13 @@ const usersSlice = createSlice({
     // unfollowUser
     builder.addCase(unfollowUser.fulfilled, (state, action) => {
       const { followerId, followingId } = action.payload;
-      // Remove followingId from followerId’s “following”
+      // Remove followingId from followerId's "following"
       const followerObj = state.byId[followerId];
       if (followerObj) {
         followerObj.following = followerObj.following.filter(u => u !== followingId);
       }
 
-      // Remove followerId from followingId’s “followers”
+      // Remove followerId from followingId's "followers"
       const followingObj = state.byId[followingId];
       if (followingObj) {
         followingObj.followers = followingObj.followers.filter(u => u !== followerId);

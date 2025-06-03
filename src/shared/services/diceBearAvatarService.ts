@@ -209,10 +209,6 @@ export async function generateAndStoreAvatar(
   forceRegenerate: boolean = false
 ): Promise<string> {
   try {
-    console.log('[DiceBearService] generateAndStoreAvatar called:', {
-      userId: userId.substring(0, 8) + '...',
-      forceRegenerate
-    });
 
     if (!userId || userId.trim() === '') {
       throw new Error('Invalid user ID provided');
@@ -225,9 +221,6 @@ export async function generateAndStoreAvatar(
     if (!forceRegenerate) {
       const cachedUrl = await getCachedAvatarUrl(userId);
       if (cachedUrl) {
-        console.log('[DiceBearService] Using cached avatar:', cachedUrl);
-        
-        // Validate the cached URL format
         if (cachedUrl.includes('dicebear.com') && cachedUrl.includes(userId)) {
           return cachedUrl;
         } else {
@@ -270,11 +263,6 @@ export async function generateAndStoreAvatar(
       console.warn('[DiceBearService] Failed to cache avatar URL:', cacheError);
       // Don't fail the whole operation for cache errors
     }
-
-    console.log('[DiceBearService] Generated and cached avatar for user:', {
-      userId: userId.substring(0, 8) + '...',
-      avatarUrl: avatarUrl!
-    });
 
     return avatarUrl!;
   } catch (error) {

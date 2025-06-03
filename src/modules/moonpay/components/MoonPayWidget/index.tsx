@@ -6,7 +6,7 @@ import { useWallet } from '@/modules/wallet-providers/hooks/useWallet';
 import 'react-native-url-polyfill/auto';
 
 import { MoonPayWidgetProps } from '../../types';
-import { parseErrorMessage } from '../../utils/moonpayUtils';
+import { parseErrorMessage, getDefaultParameters } from '../../utils/moonpayUtils';
 import { styles } from './styles';
 
 /**
@@ -16,10 +16,13 @@ import { styles } from './styles';
 function MoonPayWidget({
   apiKey,
   environment = 'sandbox',
+  parameters = {},
   onOpen,
   onError,
   height = 500,
   onRetry,
+  onTransactionCompleted,
+  onClose,
 }: MoonPayWidgetProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -66,28 +69,51 @@ function MoonPayWidget({
     ]
   };
 
+  // Prepare MoonPay parameters with Solana defaults
+  const solanaDefaults = getDefaultParameters('solana');
+  const moonpayParams = {
+    // Start with Solana defaults
+    ...solanaDefaults,
+    // Use wallet address if provided or from wallet context
+    ...(parameters.walletAddress || address ? { 
+      walletAddress: parameters.walletAddress || address 
+    } : {}),
+    // Override with brand styling
+    theme: 'dark',
+    colorCode: COLORS.brandBlue.replace('#', ''),
+    showWalletAddressForm: false,
+    // Override with any custom parameters provided
+    ...parameters,
+    // Ensure apiKey is always present (this will override any accidental override)
+    apiKey: apiKey,
+  };
+
+  // Remove undefined values and convert boolean to string where needed
+  const cleanedParams = Object.entries(moonpayParams).reduce((acc, [key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      // Convert booleans to strings for MoonPay API
+      if (typeof value === 'boolean') {
+        acc[key] = value.toString();
+      } else {
+        acc[key] = value;
+      }
+    }
+    return acc;
+  }, {} as any);
+
   // Initialize MoonPay SDK
   const { MoonPayWebViewComponent } = useMoonPaySdk({
     sdkConfig: {
       flow: 'buy',
       environment: environment,
-      params: {
-        apiKey: apiKey,
-        // Only include walletAddress if it's a non-null string
-        ...(address && { walletAddress: address }),
-        baseCurrencyAmount: '50',
-        baseCurrencyCode: 'usd',
-        theme: 'dark',
-        colorCode: COLORS.brandBlue.replace('#', ''),
-        showWalletAddressForm: 'false',
-      },
+      params: cleanedParams,
     },
   });
 
   // Setup callback handlers
   useEffect(() => {
     // The component is now available for rendering
-    console.log('MoonPay widget initialized successfully');
+    console.log('MoonPay widget initialized successfully with params:', cleanedParams);
   }, [MoonPayWebViewComponent]);
 
   // Initialize the widget with a timer
