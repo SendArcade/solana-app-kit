@@ -215,11 +215,13 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginBottom: 10,
+    alignItems: 'center',
   },
   statLabel: {
     fontSize: TYPOGRAPHY.size.xs,
     color: COLORS.textLight,
     marginBottom: 4,
+    textAlign: 'center',
   },
   statValue: {
     fontSize: TYPOGRAPHY.size.sm,
@@ -337,7 +339,7 @@ export const styles = StyleSheet.create({
     height: 250,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
+    marginBottom: 8,
     backgroundColor: COLORS.lightBackground,
     borderRadius: 16,
     padding: 16,
