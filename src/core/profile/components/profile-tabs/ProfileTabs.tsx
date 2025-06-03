@@ -27,6 +27,7 @@ import { ThreadPost } from '../../../thread/types';
 import PostHeader from '../../../thread/components/post/PostHeader';
 import PostBody from '../../../thread/components/post/PostBody';
 import PostFooter from '../../../thread/components/post/PostFooter';
+import { ProfileAvatarView } from '../../../thread/components/post/PostHeader';
 import EditPostModal from '../../../thread/components/EditPostModal';
 import { AssetItem, PortfolioData } from '@/modules/data-module';
 
@@ -68,79 +69,102 @@ const PostItem = memo(({
   const isRetweet = !!post.retweetOf;
   const isQuoteRetweet = isRetweet && post.sections && post.sections.length > 0;
 
+  const handleUserPress = (user: any) => {
+    // Handle user press if needed
+    console.log('User pressed:', user);
+  };
+
   return (
     <View style={styles.postCard}>
-      {isReply ? (
-        <TouchableOpacity
-          onPress={() => onPressPost?.(post)}>
-          <Text style={styles.replyLabel}>Reply Post</Text>
-        </TouchableOpacity>
-      ) : null}
-
-      {/* Retweet indicator */}
-      {isRetweet && (
-        <View style={retweetStyles.retweetHeader}>
-          <Icons.RetweetIdle width={12} height={12} />
-          <Text style={retweetStyles.retweetHeaderText}>
-            {post.user.username} Reposted
-          </Text>
+      {/* Twitter-like layout with avatar column + content column */}
+      <View style={styles.postItemContainer}>
+        {/* Avatar Column */}
+        <View style={styles.avatarColumn}>
+          <ProfileAvatarView
+            user={post.user}
+            style={styles.avatar}
+            size={40}
+          />
         </View>
-      )}
 
-      {/* Retweet content */}
-      {isRetweet ? (
-        <View style={retweetStyles.retweetedContent}>
-          {/* Quote retweet text */}
-          {isQuoteRetweet && (
-            <View style={retweetStyles.quoteContent}>
-              {post.sections.map(section => (
-                <Text key={section.id} style={retweetStyles.quoteText}>
-                  {section.text}
-                </Text>
-              ))}
+        {/* Content Column */}
+        <View style={styles.contentColumn}>
+          {isReply && (
+            <TouchableOpacity onPress={() => onPressPost?.(post)}>
+              <Text style={styles.replyLabel}>Reply Post</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Retweet indicator */}
+          {isRetweet && (
+            <View style={retweetStyles.retweetHeader}>
+              <Icons.RetweetIdle width={12} height={12} />
+              <Text style={retweetStyles.retweetHeaderText}>
+                {post.user.username} Reposted
+              </Text>
             </View>
           )}
 
-          {/* Original post content */}
-          {post.retweetOf && (
-            <TouchableOpacity
-              style={retweetStyles.originalPostContainer}
-              activeOpacity={0.8}
-              onPress={() => onPressPost?.(post.retweetOf!)}>
-              <PostHeader
-                post={post.retweetOf}
-                onDeletePost={onDeletePost}
-                onEditPost={onEditPost}
-              />
-              <PostBody
-                post={post.retweetOf}
-                externalRefreshTrigger={externalRefreshTrigger}
-                isRetweet={true}
-              />
-              <PostFooter
-                post={post.retweetOf}
-                onPressComment={() => onPressPost?.(post.retweetOf!)}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : (
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => onPressPost?.(post)}>
-          {/* Regular post */}
+          {/* Header without avatar (since avatar is in left column) */}
           <PostHeader
             post={post}
             onDeletePost={onDeletePost}
             onEditPost={onEditPost}
+            onPressUser={handleUserPress}
           />
-          <PostBody
-            post={post}
-            externalRefreshTrigger={externalRefreshTrigger}
-          />
-          <PostFooter post={post} />
-        </TouchableOpacity>
-      )}
+
+          {/* Retweet content */}
+          {isRetweet ? (
+            <View style={retweetStyles.retweetedContent}>
+              {/* Quote retweet text */}
+              {isQuoteRetweet && (
+                <View style={retweetStyles.quoteContent}>
+                  {post.sections.map(section => (
+                    <Text key={section.id} style={retweetStyles.quoteText}>
+                      {section.text}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Original post content */}
+              {post.retweetOf && (
+                <TouchableOpacity
+                  style={retweetStyles.originalPostContainer}
+                  activeOpacity={0.8}
+                  onPress={() => onPressPost?.(post.retweetOf!)}>
+                  <PostHeader
+                    post={post.retweetOf}
+                    onDeletePost={onDeletePost}
+                    onEditPost={onEditPost}
+                    onPressUser={handleUserPress}
+                  />
+                  <PostBody
+                    post={post.retweetOf}
+                    externalRefreshTrigger={externalRefreshTrigger}
+                    isRetweet={true}
+                  />
+                  <PostFooter
+                    post={post.retweetOf}
+                    onPressComment={() => onPressPost?.(post.retweetOf!)}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => onPressPost?.(post)}>
+              {/* Regular post content */}
+              <PostBody
+                post={post}
+                externalRefreshTrigger={externalRefreshTrigger}
+              />
+              <PostFooter post={post} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
     </View>
   );
 });
