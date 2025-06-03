@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: width < 375 ? 12 : 16,
-    paddingBottom: width < 375 ? 12 : 15,
+    paddingBottom: width < 375 ? 12 : 12,
     paddingHorizontal: width < 375 ? 16 : 20,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderDarkColor,
@@ -636,7 +636,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.lightBackground,
     borderRadius: 12,
-    margin: width < 375 ? 12 : 16,
+    marginHorizontal: width < 375 ? 12 : 12,
+    marginVertical: width < 375 ? 4 : 6,
     paddingHorizontal: 12,
     height: 46,
     shadowColor: COLORS.black,
@@ -849,7 +850,7 @@ const androidStyles = StyleSheet.create({
     paddingBottom: 15,
   },
   searchContainer: {
-    marginTop: -24, // Reduce space between header and search bar on Android
+    marginTop: -40, // Reduce space between header and search bar on Android
   },
   // Add any other Android-specific style overrides here
 });

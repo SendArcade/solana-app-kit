@@ -409,7 +409,7 @@ export const Thread: React.FC<ThreadProps> = ({
           />
         </View>
       ) : (
-        <View style={{ flex: 1, paddingTop: showHeader ? 160 : 80 }}>
+        <View style={{ flex: 1, paddingTop: showHeader ? 136 : 80 }}>
           <SearchScreen showHeader={false} />
         </View>
       )}
