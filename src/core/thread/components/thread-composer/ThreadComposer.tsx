@@ -34,7 +34,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { TENSOR_API_KEY } from '@env';
 import { useWallet } from '../../../../modules/wallet-providers/hooks/useWallet';
-import TradeModal, { ShareTradeModalRef } from '../trade/ShareTradeModal';
+import TradeModal from '../trade/ShareTradeModal';
 import { DEFAULT_IMAGES } from '@/shared/config/constants';
 import { NftListingModal, useFetchNFTs, NftItem } from '../../../../modules/nft';
 import { uploadThreadImage } from '../../services/threadImageService';
@@ -46,6 +46,7 @@ import {
 import { AutoAvatar } from '@/shared/components/AutoAvatar';
 import COLORS from '@/assets/colors';
 import Svg, { Path } from 'react-native-svg';
+import { ShareTradeModalRef } from '../trade/ShareTradeModal.types';
 
 /**
  * Props for the ThreadComposer component
@@ -422,12 +423,15 @@ export const ThreadComposer = forwardRef<{ focus: () => void }, ThreadComposerPr
         <View style={[styles.composerAvatarContainer, { backgroundColor: COLORS.background }]}>
           <AutoAvatar
             userId={currentUser.id}
-            profilePicUrl={storedProfilePic || currentUser.avatar}
+            profilePicUrl={
+              storedProfilePic ||
+              (typeof currentUser.avatar === 'string' ? currentUser.avatar : 
+               (currentUser.avatar && typeof currentUser.avatar === 'object' && 'uri' in currentUser.avatar ? currentUser.avatar.uri : null))
+            }
             username={currentUser.username}
             size={40}
             style={styles.composerAvatar}
             showInitials={true}
-            autoGenerate={true}
           />
         </View>
 

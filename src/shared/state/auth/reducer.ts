@@ -291,6 +291,9 @@ const authSlice = createSlice({
       if (action.payload.description || !state.description) {
         state.description = action.payload.description || state.description;
       }
+
+      // If no profile picture is set after login, we'll let the fetchUserProfile handle avatar generation
+      // This way we don't duplicate avatar generation logic here
     },
     logoutSuccess(state) {
       console.log('[AuthReducer] logoutSuccess: Resetting state.');

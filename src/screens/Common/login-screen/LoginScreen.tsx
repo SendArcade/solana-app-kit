@@ -7,11 +7,12 @@ import * as Application from 'expo-application';
 import * as Linking from 'expo-linking';
 import Icons from '@/assets/svgs/index';
 import styles from '@/screens/Common/login-screen/LoginScreen.styles';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
+import { useAppDispatch } from '@/shared/hooks/useReduxHooks';
 import { useAppNavigation } from '@/shared/hooks/useAppNavigation';
 import EmbeddedWalletAuth from '@/modules/wallet-providers/components/wallet/EmbeddedWallet';
 import TurnkeyWalletAuth from '@/modules/wallet-providers/components/turnkey/TurnkeyWallet';
-import { loginSuccess } from '@/shared/state/auth/reducer';
+import { loginSuccess, fetchUserProfile, updateProfilePic } from '@/shared/state/auth/reducer';
 import { RootState } from '@/shared/state/store';
 import { useCustomization } from '@/shared/config/CustomizationProvider';
 import axios from 'axios';
@@ -19,6 +20,7 @@ import { SERVER_URL } from '@env';
 import COLORS from '@/assets/colors';
 import { useEnvError } from '@/shared/context/EnvErrorContext';
 import { useDevMode } from '@/shared/context/DevModeContext';
+import { generateAndStoreAvatar } from '@/shared/services/diceBearAvatarService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -94,7 +96,7 @@ const SVG_CONFIG = {
 
 export default function LoginScreen() {
   const navigation = useAppNavigation();
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   const isLoggedIn = useSelector((state: RootState) => state.auth.isLoggedIn);
   const { auth: authConfig } = useCustomization();
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -466,6 +468,7 @@ export default function LoginScreen() {
     setIsAuthenticating(true);
     try {
       // First check if user already exists
+      let isNewUser = false;
       try {
         // Try to create the user entry in the database
         const response = await axios.post(`${SERVER_BASE_URL}/api/profile/createUser`, {
@@ -475,6 +478,11 @@ export default function LoginScreen() {
         });
 
         console.log('User creation response:', response.data);
+        
+        // Check if this was actually a new user creation (not just returning existing user)
+        if (response.data?.user && !response.data?.user?.profile_picture_url) {
+          isNewUser = true;
+        }
       } catch (createError: any) {
         // Log error information once, but don't show response details that might include stack traces
         console.log('User creation error (might be already existing):', createError?.response?.status || createError.message);
@@ -510,6 +518,38 @@ export default function LoginScreen() {
           address: info.address,
         }),
       );
+
+      // After login, fetch user profile to get existing data
+      try {
+        const profileResult = await dispatch(fetchUserProfile(info.address)).unwrap();
+
+        // Generate DiceBear avatar only for new users without profile pictures
+        if (!profileResult?.profilePicUrl) {
+          console.log('[LoginScreen] Generating DiceBear avatar for new user...');
+          try {
+            const avatarUrl = await generateAndStoreAvatar(info.address);
+            dispatch(updateProfilePic(avatarUrl));
+          } catch (avatarError) {
+            console.error('[LoginScreen] Failed to generate DiceBear avatar:', avatarError);
+            // Don't fail the login process if avatar generation fails
+          }
+        }
+        
+      } catch (profileError) {
+        console.warn('[LoginScreen] Failed to fetch profile after login (non-critical):', profileError);
+        // Don't fail the login process if profile fetch fails
+        // Generate avatar for new users as fallback
+        if (isNewUser) {
+          try {
+            console.log('[LoginScreen] Generating DiceBear avatar for new user as fallback...');
+            const avatarUrl = await generateAndStoreAvatar(info.address);
+            dispatch(updateProfilePic(avatarUrl));
+          } catch (fallbackAvatarError) {
+            console.warn('[LoginScreen] Failed to generate fallback avatar:', fallbackAvatarError);
+          }
+        }
+      }
+      
     } catch (error) {
       console.error('Error handling wallet connection:', error);
       Alert.alert(

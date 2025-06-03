@@ -220,7 +220,6 @@ export default function SearchScreen({ showHeader = true }: SearchScreenProps) {
           size={width < 375 ? 44 : 50}
           style={styles.avatar}
           showInitials={true}
-          autoGenerate={true}
           showShimmer={true}
           showLoading={false}
           onError={() => {

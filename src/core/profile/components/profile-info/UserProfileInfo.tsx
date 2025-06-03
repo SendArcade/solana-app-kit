@@ -318,7 +318,6 @@ const ProfileHeader = memo(({
           size={72}
           style={styles.profImg}
           showInitials={true}
-          autoGenerate={true}
         />
       </TouchableOpacity>
 

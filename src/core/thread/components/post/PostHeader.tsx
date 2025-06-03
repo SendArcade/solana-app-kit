@@ -37,7 +37,7 @@ function getAvatarColor(username: string): string {
   return `hsl(${hue}, 60%, 80%)`;
 }
 
-// The ProfileAvatarView component - now using AutoAvatar for automatic DiceBear generation
+// The ProfileAvatarView component - displays existing profile pictures with initials fallback
 export function ProfileAvatarView({
   user,
   style,
@@ -62,7 +62,6 @@ export function ProfileAvatarView({
       size={size}
       style={style}
       showInitials={true}
-      autoGenerate={true}
     />
   );
 }

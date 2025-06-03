@@ -259,7 +259,9 @@ export default function PostThreadScreen() {
               {mainThreadPosts.map((post, index) => {
                 const isLastInMainThread = index === mainThreadPosts.length - 1;
                 const hasReplies = getDirectChildren(flatPosts, post.id).length > 0;
-                const showThreadLine = !isLastInMainThread || (isLastInMainThread && directChildren.length > 0);
+                const isFirstPost = index === 0;
+                // Show thread line if not the last post, or if last post has replies
+                const showThreadLine = !isLastInMainThread || hasReplies;
 
                 return (
                   <TouchableOpacity
@@ -274,7 +276,7 @@ export default function PostThreadScreen() {
                     <View style={[styles.threadPostContainer, { position: 'relative' }]}>
                       {/* Thread connecting line */}
                       {showThreadLine && (
-                        <View style={styles.threadLine} />
+                        <View style={isFirstPost && hasReplies ? styles.threadLineFromCenter : styles.threadLine} />
                       )}
 
                       {/* Avatar Column */}
@@ -332,6 +334,11 @@ export default function PostThreadScreen() {
                     onPress={() => navigation.push('PostThread', { postId: reply.id })}
                   >
                     <View style={[styles.threadPostContainer, { position: 'relative' }]}>
+                      {/* Thread line for replies */}
+                      {!isLastReply && (
+                        <View style={styles.threadLine} />
+                      )}
+
                       {/* Avatar Column */}
                       <View style={styles.avatarColumn}>
                         <TouchableOpacity onPress={() => handleUserPress(reply.user)}>

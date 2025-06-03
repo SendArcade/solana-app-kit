@@ -81,11 +81,21 @@ export default StyleSheet.create({
     paddingTop: 2,
   },
   
-  // Thread line for replies
+  // Thread line for main posts and replies - simplified approach
   threadLine: {
     position: 'absolute',
-    left: 20, // Center of 40px avatar column
-    top: 52, // Start below avatar
+    left: 36, // 16px padding + 20px (center of 40px avatar)
+    top: 42, // Start below avatar (2px paddingTop + 40px avatar height)
+    bottom: 0,
+    width: 2,
+    backgroundColor: COLORS.borderDarkColor,
+  },
+  
+  // Thread line that starts from avatar center (for connecting posts)
+  threadLineFromCenter: {
+    position: 'absolute',
+    left: 36, // 16px padding + 20px (center of 40px avatar)
+    top: 22, // Start from center of avatar (2px paddingTop + 20px half avatar)
     bottom: 0,
     width: 2,
     backgroundColor: COLORS.borderDarkColor,
