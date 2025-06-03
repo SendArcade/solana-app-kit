@@ -686,8 +686,17 @@ export function useSwapLogic(
     // For PumpSwap, we need a pool address
     if (activeProvider === 'PumpSwap' && !poolAddress) return false;
 
+    // Check if input amount is valid and not greater than balance
+    const inputAmount = parseFloat(inputValue || '0');
+    if (inputAmount <= 0) return false;
+
+    // If we have a current balance, check if input amount exceeds it
+    if (currentBalance !== null && inputAmount > currentBalance) {
+      return false;
+    }
+
     return true;
-  }, [connected, loading, activeProvider, isProviderAvailable, poolAddress]);
+  }, [connected, loading, activeProvider, isProviderAvailable, poolAddress, inputValue, currentBalance]);
 
   // Function to handle keypad input
   const handleKeyPress = (key: string) => {
