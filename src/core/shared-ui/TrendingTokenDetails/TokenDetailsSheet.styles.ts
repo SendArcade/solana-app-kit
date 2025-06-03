@@ -134,7 +134,7 @@ export const styles = StyleSheet.create({
     timeframeContainer: {
         flexDirection: 'row',
         justifyContent: 'space-around',
-        marginBottom: 20,
+        marginBottom: 8,
         backgroundColor: COLORS.darkerBackground,
         borderRadius: 12,
         padding: 4,

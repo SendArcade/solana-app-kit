@@ -709,7 +709,6 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
       contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}>
       {tokenData?.extensions?.coingeckoId && (
         <>
-          {renderTimeframeSelector()}
           <View style={styles.chartContainer}>
             {loadingOHLC ? (
               <ActivityIndicator size="large" color={COLORS.brandPrimary} />
@@ -723,6 +722,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
               <Text style={styles.chartEmptyText}>No chart data available</Text>
             )}
           </View>
+          {renderTimeframeSelector()}
         </>
       )}
 

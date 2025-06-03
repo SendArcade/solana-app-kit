@@ -55,6 +55,19 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: TYPOGRAPHY.fontFamily,
   },
+  addressActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  qrIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.lighterBackground,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   copyIconButton: {
     width: 36,
     height: 36,
