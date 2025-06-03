@@ -19,7 +19,8 @@ import COLORS from '@/assets/colors';
 import { MOONPAY_API_KEY } from '@env';
 
 import { styles } from './styles';
-import { formatWalletAddress } from '../../utils/moonpayUtils';
+import { formatWalletAddress, getDefaultParameters, getEnvironmentFromConfig } from '../../utils/moonpayUtils';
+import { MoonPayParameters } from '../../types';
 
 // Use your real API key in production
 const API_KEY = MOONPAY_API_KEY || 'pk_test_Pe3k41cRXJNfPvYN7iQDYQtafGRasCx'; 
@@ -41,6 +42,26 @@ function OnrampScreen() {
   const isPortrait = height > width;
   const widgetHeight = Math.round(height * (isPortrait ? 0.7 : 0.7));
 
+  // Determine environment from API key
+  const environment = getEnvironmentFromConfig(API_KEY);
+
+  // Configure MoonPay parameters optimized for Solana
+  const moonpayParameters: Partial<MoonPayParameters> = {
+    ...getDefaultParameters('solana'),
+    // Override with specific configuration
+    baseCurrencyAmount: '50',
+    baseCurrencyCode: 'usd',
+    colorCode: COLORS.brandBlue,
+    theme: 'dark',
+    showWalletAddressForm: false,
+    // Include wallet address if available
+    ...(address && { walletAddress: address }),
+    // Add app-specific identifiers for tracking
+    externalCustomerId: address ? `solana-app-kit-${address.slice(-8)}` : undefined,
+    // Set up redirect handling
+    redirectURL: 'solana-app-kit://onramp-success',
+  };
+
   // Fade in animation for the content
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -59,6 +80,12 @@ function OnrampScreen() {
   const handleWidgetError = useCallback((error: Error) => {
     console.log('MoonPay widget error:', error);
     setWidgetError(error);
+  }, []);
+
+  const handleTransactionCompleted = useCallback((transactionId: string, status: string) => {
+    console.log('MoonPay transaction completed:', { transactionId, status });
+    // You can handle successful transactions here
+    // For example, refresh wallet balance, show success message, etc.
   }, []);
 
   const handleRetry = useCallback(() => {
@@ -105,9 +132,11 @@ function OnrampScreen() {
             <MoonPayWidget
               key={`moonpay-widget-${retryCount}`}
               apiKey={API_KEY}
-              environment="sandbox"
+              environment={environment}
+              parameters={moonpayParameters}
               onOpen={handleWidgetOpen}
               onError={handleWidgetError}
+              onTransactionCompleted={handleTransactionCompleted}
               onRetry={handleRetry}
               height={widgetHeight}
             />
