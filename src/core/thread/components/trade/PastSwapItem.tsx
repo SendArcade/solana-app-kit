@@ -34,27 +34,36 @@ interface PastSwapItemProps {
   hopCount?: number; // Number of hops in the transaction
 }
 
-
-
 /**
  * Format token amount with proper decimals
  */
 function formatTokenAmount(amount: number, decimals: number): string {
   if (decimals === 0) return amount.toString();
-  const divisor = Math.pow(10, decimals);
-  const result = amount / divisor;
+  
+  try {
+    const divisor = Math.pow(10, decimals);
+    const result = amount / divisor;
 
-  if (result < 0.001) {
-    return result.toFixed(6);
-  } else if (result < 0.01) {
-    return result.toFixed(5);
-  } else if (result < 1) {
-    return result.toFixed(4);
-  } else if (result < 1000) {
-    return result.toFixed(2);
+    // Handle very small amounts
+    if (result < 0.000001) {
+      return '< 0.000001';
+    } else if (result < 0.001) {
+      return result.toFixed(6);
+    } else if (result < 0.01) {
+      return result.toFixed(5);
+    } else if (result < 1) {
+      return result.toFixed(4);
+    } else if (result < 1000) {
+      return result.toFixed(2);
+    } else if (result < 1000000) {
+      return (result / 1000).toFixed(1) + 'K';
+    } else {
+      return (result / 1000000).toFixed(1) + 'M';
+    }
+  } catch (error) {
+    console.warn('[formatTokenAmount] Error formatting amount:', { amount, decimals, error });
+    return '0';
   }
-
-  return result.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 /**
@@ -69,11 +78,13 @@ function formatDate(timestamp: number): string {
 
     // Ensure the date is valid
     if (isNaN(date.getTime())) {
+      console.warn('[formatDate] Invalid timestamp:', timestamp);
       return 'Invalid date';
     }
 
     return format(date, 'MMM d, h:mm a');
   } catch (error) {
+    console.warn('[formatDate] Error formatting date:', { timestamp, error });
     return 'Unknown date';
   }
 }
@@ -92,14 +103,26 @@ const PastSwapItem: React.FC<PastSwapItemProps> = ({
 }) => {
   const { inputToken, outputToken, timestamp } = swap;
 
+  // Validate required data
+  if (!inputToken || !outputToken || !swap?.signature) {
+    console.warn('[PastSwapItem] Missing required swap data:', swap);
+    return null;
+  }
+
+  // Additional validation for token data
+  if (!inputToken.mint || !outputToken.mint) {
+    console.warn('[PastSwapItem] Missing token mint addresses:', { inputToken, outputToken });
+    return null;
+  }
+
   // Format the token amounts with proper decimals
   const formattedInputAmount = formatTokenAmount(
-    inputToken.amount,
-    inputToken.decimals,
+    inputToken.amount || 0,
+    inputToken.decimals || 0,
   );
   const formattedOutputAmount = formatTokenAmount(
-    outputToken.amount,
-    outputToken.decimals,
+    outputToken.amount || 0,
+    outputToken.decimals || 0,
   );
 
   // Determine image sources with clean fallbacks
@@ -108,11 +131,6 @@ const PastSwapItem: React.FC<PastSwapItemProps> = ({
   const outputImageSource =
     outputTokenLogoURI || outputToken?.logoURI || outputToken?.image;
 
-  // Ensure we have valid token data
-  if (!inputToken || !outputToken || !swap?.signature) {
-    return null;
-  }
-
   return (
     <View style={[styles.swapItem, selected && styles.selectedSwapItem]}>
       <View style={styles.swapHeader}>
@@ -120,9 +138,9 @@ const PastSwapItem: React.FC<PastSwapItemProps> = ({
 
         <View style={styles.headerRightContainer}>
           {/* Multi-hop indicator */}
-          {isMultiHop && hopCount && (
+          {(isMultiHop || swap.isMultiHop) && (hopCount || swap.hopCount) && (
             <View style={styles.multiHopBadge}>
-              <Text style={styles.multiHopText}>{hopCount}-hop</Text>
+              <Text style={styles.multiHopText}>{hopCount || swap.hopCount}-hop</Text>
             </View>
           )}
 
@@ -144,11 +162,14 @@ const PastSwapItem: React.FC<PastSwapItemProps> = ({
                 source={{ uri: inputImageSource }}
                 style={styles.tokenIcon}
                 resizeMode="contain"
+                onError={(error) => {
+                  console.warn('[PastSwapItem] Failed to load input token image:', inputImageSource, error);
+                }}
               />
             ) : (
               <View style={[styles.tokenIcon, styles.placeholderIcon]}>
                 <Text style={styles.placeholderText}>
-                  {inputToken.symbol?.charAt(0) || '?'}
+                  {inputToken.symbol?.charAt(0)?.toUpperCase() || '?'}
                 </Text>
               </View>
             )}
@@ -172,7 +193,7 @@ const PastSwapItem: React.FC<PastSwapItemProps> = ({
         {/* Arrow */}
         <View style={styles.arrowContainer}>
           <FontAwesome5
-            name={isMultiHop ? "route" : "arrow-right"}
+            name={(isMultiHop || swap.isMultiHop) ? "route" : "arrow-right"}
             size={12}
             color={COLORS.brandBlue}
           />
@@ -186,11 +207,14 @@ const PastSwapItem: React.FC<PastSwapItemProps> = ({
                 source={{ uri: outputImageSource }}
                 style={styles.tokenIcon}
                 resizeMode="contain"
+                onError={(error) => {
+                  console.warn('[PastSwapItem] Failed to load output token image:', outputImageSource, error);
+                }}
               />
             ) : (
               <View style={[styles.tokenIcon, styles.placeholderIcon]}>
                 <Text style={styles.placeholderText}>
-                  {outputToken.symbol?.charAt(0) || '?'}
+                  {outputToken.symbol?.charAt(0)?.toUpperCase() || '?'}
                 </Text>
               </View>
             )}
@@ -211,7 +235,7 @@ const PastSwapItem: React.FC<PastSwapItemProps> = ({
           </View>
         </View>
       </View>
-        </View>
+    </View>
   );
 };
 

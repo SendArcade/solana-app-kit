@@ -163,7 +163,10 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
       const uniqueAddresses = [...new Set(tokenAddresses)];
 
       if (uniqueAddresses.length > 0) {
-        fetchMetadataForTokens(uniqueAddresses);
+        fetchMetadataForTokens(uniqueAddresses)
+          .catch((error) => {
+            console.error('[ShareTradeModal] Error fetching token metadata:', error);
+          });
       }
     }
   }, [swaps, fetchMetadataForTokens]);
@@ -254,45 +257,76 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
   }, [selectedPastSwap]);
 
   const createTradeDataFromSwap = useCallback(async (swap: EnhancedSwapTransaction): Promise<TradeData> => {
-    const inputQty = swap.inputToken.amount / Math.pow(10, swap.inputToken.decimals);
-    const outputQty = swap.outputToken.amount / Math.pow(10, swap.outputToken.decimals);
-    const timestampMs = swap.timestamp < 10000000000 ? swap.timestamp * 1000 : swap.timestamp;
-
-    let inputUsdValue: string;
-    let outputUsdValue: string;
-
-    if ('volumeUsd' in swap && swap.volumeUsd !== undefined && typeof swap.volumeUsd === 'number') {
-      inputUsdValue = `$${swap.volumeUsd.toFixed(2)}`;
-      outputUsdValue = `$${swap.volumeUsd.toFixed(2)}`;
-    } else {
-      inputUsdValue = await estimateTokenUsdValue(
-        swap.inputToken.amount,
-        swap.inputToken.decimals,
-        swap.inputToken.mint,
-        swap.inputToken.symbol
-      );
-      outputUsdValue = await estimateTokenUsdValue(
-        swap.outputToken.amount,
-        swap.outputToken.decimals,
-        swap.outputToken.mint,
-        swap.outputToken.symbol
-      );
+    // Validate swap data
+    if (!swap || !swap.inputToken || !swap.outputToken) {
+      throw new Error('Invalid swap data: missing token information');
     }
 
-    return {
-      inputMint: swap.inputToken.mint,
-      outputMint: swap.outputToken.mint,
-      aggregator: 'Jupiter',
-      inputSymbol: swap.inputToken.symbol || 'Unknown',
-      inputQuantity: inputQty.toFixed(4),
-      inputUsdValue,
-      outputSymbol: swap.outputToken.symbol || 'Unknown',
-      inputAmountLamports: String(swap.inputToken.amount),
-      outputAmountLamports: String(swap.outputToken.amount),
-      outputQuantity: outputQty.toFixed(4),
-      outputUsdValue,
-      executionTimestamp: timestampMs,
-    };
+    if (!swap.inputToken.mint || !swap.outputToken.mint) {
+      throw new Error('Invalid swap data: missing token mint addresses');
+    }
+
+    if (typeof swap.inputToken.amount !== 'number' || typeof swap.outputToken.amount !== 'number') {
+      throw new Error('Invalid swap data: token amounts must be numbers');
+    }
+
+    if (typeof swap.inputToken.decimals !== 'number' || typeof swap.outputToken.decimals !== 'number') {
+      throw new Error('Invalid swap data: token decimals must be numbers');
+    }
+
+    try {
+      const inputQty = swap.inputToken.amount / Math.pow(10, swap.inputToken.decimals);
+      const outputQty = swap.outputToken.amount / Math.pow(10, swap.outputToken.decimals);
+      const timestampMs = swap.timestamp < 10000000000 ? swap.timestamp * 1000 : swap.timestamp;
+
+      let inputUsdValue: string;
+      let outputUsdValue: string;
+
+      if ('volumeUsd' in swap && swap.volumeUsd !== undefined && typeof swap.volumeUsd === 'number' && swap.volumeUsd > 0) {
+        inputUsdValue = `$${swap.volumeUsd.toFixed(2)}`;
+        outputUsdValue = `$${swap.volumeUsd.toFixed(2)}`;
+      } else {
+        try {
+          inputUsdValue = await estimateTokenUsdValue(
+            swap.inputToken.amount,
+            swap.inputToken.decimals,
+            swap.inputToken.mint,
+            swap.inputToken.symbol
+          );
+          outputUsdValue = await estimateTokenUsdValue(
+            swap.outputToken.amount,
+            swap.outputToken.decimals,
+            swap.outputToken.mint,
+            swap.outputToken.symbol
+          );
+        } catch (error) {
+          console.warn('[ShareTradeModal] Failed to estimate USD values:', error);
+          inputUsdValue = '$0.00';
+          outputUsdValue = '$0.00';
+        }
+      }
+
+      const tradeData = {
+        inputMint: swap.inputToken.mint,
+        outputMint: swap.outputToken.mint,
+        aggregator: 'Jupiter',
+        inputSymbol: swap.inputToken.symbol || 'Unknown',
+        inputQuantity: inputQty.toFixed(4),
+        inputUsdValue,
+        outputSymbol: swap.outputToken.symbol || 'Unknown',
+        inputAmountLamports: String(swap.inputToken.amount),
+        outputAmountLamports: String(swap.outputToken.amount),
+        outputQuantity: outputQty.toFixed(4),
+        outputUsdValue,
+        executionTimestamp: timestampMs,
+      };
+
+      return tradeData;
+
+    } catch (error) {
+      console.error('[ShareTradeModal] Error creating trade data:', error);
+      throw new Error(`Failed to process swap data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }, []);
 
   const handlePastSwapSelected = useCallback((swap: EnhancedSwapTransaction) => {
@@ -433,11 +467,16 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
           // Show actual content
           <FlatList
             data={swaps}
-            renderItem={({ item }) => {
+            renderItem={({ item, index }) => {
               const isSelected = selectedPastSwap?.uniqueId === item?.uniqueId;
 
               // Ensure we have valid item data
               if (!item || !item.inputToken || !item.outputToken) {
+                return null;
+              }
+
+              // Additional validation
+              if (!item.inputToken.mint || !item.outputToken.mint) {
                 return null;
               }
 
@@ -449,7 +488,9 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
                       { position: 'relative' },
                       refreshing && { opacity: 0.6 }
                     ]}
-                    onPress={() => handlePastSwapSelected(item)}
+                    onPress={() => {
+                      handlePastSwapSelected(item);
+                    }}
                     activeOpacity={0.7}
                     disabled={refreshing}>
 
@@ -466,13 +507,20 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
                         selected={isSelected}
                         inputTokenLogoURI={getTokenLogoUrl(item.inputToken?.mint) || undefined}
                         outputTokenLogoURI={getTokenLogoUrl(item.outputToken?.mint) || undefined}
+                        isMultiHop={item.isMultiHop}
+                        hopCount={item.hopCount}
                       />
                     </View>
                   </TouchableOpacity>
                 </View>
               );
             }}
-            keyExtractor={(item, index) => item?.uniqueId || item?.signature || `swap-${index}`}
+            keyExtractor={(item, index) => {
+              // Improved key extraction with fallbacks
+              if (item?.uniqueId) return item.uniqueId;
+              if (item?.signature) return item.signature;
+              return `swap-${index}-${item?.timestamp || Date.now()}`;
+            }}
             contentContainerStyle={styles.swapsList}
             showsVerticalScrollIndicator={true}
             initialNumToRender={5}
@@ -483,9 +531,21 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
                 <Text style={styles.swapsCountText}>
                   {swaps.length > 0 ? `${swaps.length} ${swaps.length === 1 ? 'swap' : 'swaps'} found` : ''}
                   {apiError && swaps.length > 0 ? ' (Error loading more)' : ''}
+                  {metadataLoading ? ' • Loading token info...' : ''}
                 </Text>
                 {swaps.length > 0 && <View style={styles.swapsListDivider} />}
               </View>
+            }
+            ListEmptyComponent={
+              !initialLoading && !refreshing ? (
+                <View style={styles.emptySwapsList}>
+                  <View style={styles.emptySwapsIcon}>
+                    <FontAwesome5 name="exchange-alt" size={24} color={COLORS.white} />
+                  </View>
+                  <Text style={styles.emptySwapsText}>No Swaps Available</Text>
+                  <Text style={styles.emptySwapsSubtext}>Unable to load swap data</Text>
+                </View>
+              ) : null
             }
           />
         )}

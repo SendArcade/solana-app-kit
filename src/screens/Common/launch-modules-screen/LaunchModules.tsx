@@ -43,7 +43,7 @@ const modules = [
   {
     key: 'launchlab',
     title: 'Launch Lab',
-    subtitle: 'Launch Tokens via Rayduim',
+    subtitle: 'Launch Tokens via Raydium',
     navigateTo: 'LaunchlabsScreen',
     iconComponent: Icons.RadyuimIcom,
     backgroundImage: require('@/assets/images/Rayduim_bg.png'),
