@@ -177,10 +177,10 @@ export default function LoginScreen() {
       shouldShowWarning,
       showWarning
     });
-    
+
     if (hasMissingEnvVars) {
       console.log('[LoginScreen] Missing ENV variables found:', missingEnvVars?.slice(0, 5));
-      
+
       // Force the warning to show after a small delay if conditions are met
       if (!isDevMode) {
         setTimeout(() => {
@@ -478,7 +478,7 @@ export default function LoginScreen() {
         });
 
         console.log('User creation response:', response.data);
-        
+
         // Check if this was actually a new user creation (not just returning existing user)
         if (response.data?.user && !response.data?.user?.profile_picture_url) {
           isNewUser = true;
@@ -528,13 +528,33 @@ export default function LoginScreen() {
           console.log('[LoginScreen] Generating DiceBear avatar for new user...');
           try {
             const avatarUrl = await generateAndStoreAvatar(info.address);
+
+            // Update Redux state
             dispatch(updateProfilePic(avatarUrl));
+
+            // Save the generated avatar URL to the database
+            try {
+              const saveAvatarResponse = await axios.post(`${SERVER_BASE_URL}/api/profile/updateProfilePic`, {
+                userId: info.address,
+                profilePicUrl: avatarUrl,
+              });
+
+              if (saveAvatarResponse.data.success) {
+                console.log('[LoginScreen] DiceBear avatar saved to database successfully');
+              } else {
+                console.warn('[LoginScreen] Failed to save avatar to database:', saveAvatarResponse.data.error);
+              }
+            } catch (dbError) {
+              console.error('[LoginScreen] Error saving avatar to database:', dbError);
+              // Don't fail the login process if database save fails
+            }
+
           } catch (avatarError) {
             console.error('[LoginScreen] Failed to generate DiceBear avatar:', avatarError);
             // Don't fail the login process if avatar generation fails
           }
         }
-        
+
       } catch (profileError) {
         console.warn('[LoginScreen] Failed to fetch profile after login (non-critical):', profileError);
         // Don't fail the login process if profile fetch fails
@@ -544,12 +564,30 @@ export default function LoginScreen() {
             console.log('[LoginScreen] Generating DiceBear avatar for new user as fallback...');
             const avatarUrl = await generateAndStoreAvatar(info.address);
             dispatch(updateProfilePic(avatarUrl));
+
+            // Save the generated avatar URL to the database
+            try {
+              const saveAvatarResponse = await axios.post(`${SERVER_BASE_URL}/api/profile/updateProfilePic`, {
+                userId: info.address,
+                profilePicUrl: avatarUrl,
+              });
+
+              if (saveAvatarResponse.data.success) {
+                console.log('[LoginScreen] Fallback DiceBear avatar saved to database successfully');
+              } else {
+                console.warn('[LoginScreen] Failed to save fallback avatar to database:', saveAvatarResponse.data.error);
+              }
+            } catch (dbError) {
+              console.error('[LoginScreen] Error saving fallback avatar to database:', dbError);
+              // Don't fail the login process if database save fails
+            }
+
           } catch (fallbackAvatarError) {
             console.warn('[LoginScreen] Failed to generate fallback avatar:', fallbackAvatarError);
           }
         }
       }
-      
+
     } catch (error) {
       console.error('Error handling wallet connection:', error);
       Alert.alert(
