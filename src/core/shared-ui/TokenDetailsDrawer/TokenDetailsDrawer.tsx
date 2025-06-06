@@ -14,6 +14,8 @@ import {
   StyleProp,
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { styles } from './TokenDetailsDrawer.styles';
 import { fetchUserAssets } from '@/modules/data-module/utils/fetch';
 import { Timeframe, useCoingecko } from '@/modules/data-module/hooks/useCoingecko';
@@ -21,8 +23,13 @@ import { fetchJupiterTokenData } from '@/modules/data-module/utils/tokenUtils';
 import { getTokenRiskReport, TokenRiskReport, getRiskScoreColor, getRiskLevel, getRiskLevelColor, RiskLevel } from '@/shared/services/rugCheckService';
 import LineGraph from '@/core/shared-ui/TradeCard/LineGraph';
 import COLORS from '@/assets/colors';
+import { RootStackParamList } from '@/shared/navigation/RootNavigator';
+import { TokenInfo } from '@/modules/data-module';
 
 const { width } = Dimensions.get('window');
+
+// Navigation type
+type TokenDetailsDrawerNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SwapScreen'>;
 
 interface TokenDetailsDrawerProps {
   visible: boolean;
@@ -64,6 +71,8 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
   loading,
   initialData,
 }) => {
+  const navigation = useNavigation<TokenDetailsDrawerNavigationProp>();
+  
   const [tokenData, setTokenData] = useState<any>(null);
   const [heliusTokenData, setHeliusTokenData] = useState<any>(null);
   const [loadingTokenData, setLoadingTokenData] = useState(false);
@@ -193,6 +202,32 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
     } else {
       Linking.openURL(`${base}/item-details/${tokenMint}`);
     }
+  };
+
+  const handleNavigateToSwap = () => {
+    // Don't navigate for NFTs or collections as they can't be swapped
+    if (initialData?.isCollection || initialData?.nftData) {
+      return;
+    }
+
+    // Prepare token data for swap
+    const inputTokenData: Partial<TokenInfo> = {
+      address: tokenMint,
+      symbol: tokenData?.symbol || initialData?.symbol || 'Unknown',
+      name: tokenData?.name || initialData?.name || 'Unknown Token',
+      decimals: tokenData?.decimals || 9,
+      logoURI: tokenData?.logoURI || initialData?.logoURI || '',
+    };
+
+    // Close the current drawer
+    onClose();
+
+    // Navigate to SwapScreen with the token pre-selected as input
+    navigation.navigate('SwapScreen', {
+      inputToken: inputTokenData,
+      shouldInitialize: true,
+      showBackButton: true,
+    });
   };
 
   const renderTabButtons = () => (
@@ -696,7 +731,10 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
           </View>
         )}
 
-        <TouchableOpacity style={[styles.explorerButton, { minWidth: 150 }]} onPress={openExplorer}>
+        <TouchableOpacity 
+          style={[styles.explorerButton, { minWidth: 150 }]} 
+          onPress={openExplorer}
+        >
           <Text style={[styles.explorerButtonText, styles.noWrap]}>View on Solscan</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -994,6 +1032,26 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
               )}
           </View>
         </View>
+
+        {/* Elegant Swap Button - Only for tokens, not NFTs/collections */}
+        {!initialData?.isCollection && !initialData?.nftData && (
+          <TouchableOpacity 
+            style={styles.elegantSwapButton} 
+            onPress={handleNavigateToSwap}
+            activeOpacity={0.8}
+          >
+            <View style={styles.swapButtonContent}>
+              <View style={styles.swapIconContainer}>
+                <FontAwesome5 name="exchange-alt" size={18} color="#FFFFFF" />
+              </View>
+              <View style={styles.swapButtonTextContainer}>
+                <Text style={styles.swapButtonTitle}>Swap Token</Text>
+                <Text style={styles.swapButtonSubtitle}>Trade instantly</Text>
+              </View>
+              <FontAwesome5 name="chevron-right" size={14} color="#FFFFFF" style={styles.swapButtonArrow} />
+            </View>
+          </TouchableOpacity>
+        )}
 
         {!initialData?.isCollection && !initialData?.nftData ? (
           <>
