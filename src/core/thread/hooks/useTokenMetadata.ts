@@ -30,45 +30,8 @@ interface BirdeyeTokenMetadataResponse {
   };
 }
 
-// Cache to store token metadata globally
+// Cache to store token metadata globally - NO HARDCODED DATA
 const tokenMetadataCache = new Map<string, TokenMetadata>();
-
-// Common token addresses with their metadata
-const COMMON_TOKENS: Record<string, TokenMetadata> = {
-  'So11111111111111111111111111111111111111112': {
-    address: 'So11111111111111111111111111111111111111112',
-    symbol: 'SOL',
-    name: 'Solana',
-    decimals: 9,
-    logoURI: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png',
-  },
-  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': {
-    address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-    symbol: 'USDC',
-    name: 'USD Coin',
-    decimals: 6,
-    logoURI: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png',
-  },
-  'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': {
-    address: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
-    symbol: 'USDT',
-    name: 'Tether USD',
-    decimals: 6,
-    logoURI: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png',
-  },
-  'SEDDd5UrYYCpvi9ajsuhbahTFbmQGCwinRcxpHtZoAd': {
-    address: 'SEDDd5UrYYCpvi9ajsuhbahTFbmQGCwinRcxpHtZoAd',
-    symbol: 'SEND',
-    name: 'SendAI',
-    decimals: 6,
-    logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/SEDDd5UrYYCpvi9ajsuhbahTFbmQGCwinRcxpHtZoAd/logo.png',
-  },
-};
-
-// Initialize cache with common tokens
-Object.values(COMMON_TOKENS).forEach(token => {
-  tokenMetadataCache.set(token.address, token);
-});
 
 /**
  * Fetches token metadata from Birdeye API for multiple addresses
@@ -94,8 +57,6 @@ const fetchTokenMetadata = async (addresses: string[]): Promise<Map<string, Toke
     return result;
   }
 
-
-
   try {
     // Birdeye API supports up to 50 addresses at once
     const chunks = [];
@@ -119,6 +80,7 @@ const fetchTokenMetadata = async (addresses: string[]): Promise<Map<string, Toke
       });
 
       if (!response.ok) {
+        console.error(`[useTokenMetadata] Birdeye metadata API error: ${response.status} ${response.statusText}`);
         continue; // Continue with other chunks
       }
 
@@ -126,6 +88,11 @@ const fetchTokenMetadata = async (addresses: string[]): Promise<Map<string, Toke
 
       if (result.success && result.data) {
         Object.entries(result.data).forEach(([address, metadata]) => {
+          if (!metadata) {
+            console.warn(`[useTokenMetadata] No metadata for address: ${address}`);
+            return;
+          }
+
           const tokenMetadata: TokenMetadata = {
             address: metadata.address,
             symbol: metadata.symbol || 'Unknown',
@@ -148,14 +115,16 @@ const fetchTokenMetadata = async (addresses: string[]): Promise<Map<string, Toke
     addresses.forEach(addr => {
       if (!results.has(addr)) {
         const cached = tokenMetadataCache.get(addr);
-        if (cached) results.set(addr, cached);
+        if (cached) {
+          results.set(addr, cached);
+        }
       }
     });
-
 
     return results;
 
   } catch (error) {
+    console.error('[useTokenMetadata] Error fetching token metadata:', error);
     // Return cached data for requested addresses if available
     const fallbackResults = new Map<string, TokenMetadata>();
     addresses.forEach(addr => {
