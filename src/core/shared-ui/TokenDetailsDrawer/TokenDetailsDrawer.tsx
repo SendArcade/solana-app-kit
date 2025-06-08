@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   Dimensions,
   ImageStyle,
   StyleProp,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { styles } from './TokenDetailsDrawer.styles';
@@ -22,7 +24,7 @@ import { getTokenRiskReport, TokenRiskReport, getRiskScoreColor, getRiskLevel, g
 import LineGraph from '@/core/shared-ui/TradeCard/LineGraph';
 import COLORS from '@/assets/colors';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 interface TokenDetailsDrawerProps {
   visible: boolean;
@@ -93,6 +95,52 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
   } = useCoingecko();
 
   const isLoading = loading || loadingTokenData;
+
+  // --- DRAG LOGIC ---
+  const panY = useRef(new Animated.Value(height)).current;
+  const lastPanY = useRef(0);
+
+  useEffect(() => {
+    if (visible) {
+      // Instantly show the drawer at position 0
+      panY.setValue(0);
+    } else {
+      // Instantly hide the drawer off-screen
+      panY.setValue(height);
+    }
+  }, [visible, panY]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, { dy }) => {
+        // Only allow dragging down
+        if (dy > 0) {
+          panY.setValue(dy);
+        }
+      },
+      onPanResponderRelease: (_, { dy, vy }) => {
+        if (dy > 150 || vy > 0.5) {
+          // Animate out (close)
+          Animated.timing(panY, {
+            toValue: height,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            onClose();
+            panY.setValue(height);
+          });
+        } else {
+          // Snap back to open
+          Animated.timing(panY, {
+            toValue: 0,
+            duration: 100,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    }),
+  ).current;
 
   useEffect(() => {
     if (visible && tokenMint) {
@@ -709,20 +757,20 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
       contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}>
       {tokenData?.extensions?.coingeckoId && (
         <>
+          {renderTimeframeSelector()}
           <View style={styles.chartContainer}>
             {loadingOHLC ? (
               <ActivityIndicator size="large" color={COLORS.brandPrimary} />
             ) : graphData.length > 0 ? (
               <LineGraph
                 data={graphData}
-                width={width - 64}
+                width={width - 80}
                 timestamps={timestamps}
               />
             ) : (
               <Text style={styles.chartEmptyText}>No chart data available</Text>
             )}
           </View>
-          {renderTimeframeSelector()}
         </>
       )}
 
@@ -917,7 +965,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
 
   return (
     <Modal
-      animationType="slide"
+      animationType="none"
       transparent
       visible={visible}
       onRequestClose={onClose}>
@@ -925,11 +973,12 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
         <View style={styles.modalOverlay} />
       </TouchableWithoutFeedback>
 
-      <View style={styles.drawerContainer}>
-        <View style={styles.drawerHeader}>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>{'\u2715'}</Text>
-          </TouchableOpacity>
+      <Animated.View
+        style={[styles.drawerContainer, { transform: [{ translateY: panY }] }]}
+        pointerEvents={visible ? 'auto' : 'none'}
+      >
+        <View style={styles.dragHandleContainer} {...panResponder.panHandlers}>
+          <View style={styles.dragHandle} />
         </View>
 
         {isLoading && (
@@ -1003,7 +1052,7 @@ const TokenDetailsDrawer: React.FC<TokenDetailsDrawerProps> = ({
         ) : (
           renderOverviewTab()
         )}
-      </View>
+      </Animated.View>
     </Modal>
   );
 };

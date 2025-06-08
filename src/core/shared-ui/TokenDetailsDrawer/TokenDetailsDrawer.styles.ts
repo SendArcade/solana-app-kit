@@ -29,11 +29,21 @@ export const styles = StyleSheet.create({
     shadowRadius: 4.65,
     elevation: 6,
   },
+  dragHandleContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  dragHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: COLORS.borderDarkColor,
+  },
   drawerContent: {
     paddingBottom: 20,
   },
   drawerHeader: {
-    paddingTop: 12,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderDarkColor,
@@ -215,13 +225,11 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginBottom: 10,
-    alignItems: 'center',
   },
   statLabel: {
     fontSize: TYPOGRAPHY.size.xs,
     color: COLORS.textLight,
     marginBottom: 4,
-    textAlign: 'center',
   },
   statValue: {
     fontSize: TYPOGRAPHY.size.sm,
@@ -339,7 +347,7 @@ export const styles = StyleSheet.create({
     height: 250,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 24,
     backgroundColor: COLORS.lightBackground,
     borderRadius: 16,
     padding: 16,

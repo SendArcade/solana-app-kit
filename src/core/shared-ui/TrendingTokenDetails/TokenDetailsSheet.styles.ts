@@ -134,7 +134,7 @@ export const styles = StyleSheet.create({
     timeframeContainer: {
         flexDirection: 'row',
         justifyContent: 'space-around',
-        marginBottom: 8,
+        marginBottom: 20,
         backgroundColor: COLORS.darkerBackground,
         borderRadius: 12,
         padding: 4,
@@ -260,5 +260,16 @@ export const styles = StyleSheet.create({
     },
     disabledText: {
         opacity: 0.5,
+    },
+    handleContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingBottom: 8,
+    },
+    handle: {
+        width: 40,
+        height: 5,
+        borderRadius: 2.5,
+        backgroundColor: COLORS.borderDarkColor,
     },
 }); 
