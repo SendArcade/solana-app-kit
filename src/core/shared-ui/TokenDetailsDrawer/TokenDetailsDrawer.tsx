@@ -34,7 +34,7 @@ const { width, height } = Dimensions.get('window');
 type TokenDetailsDrawerNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SwapScreen'>;
 
 // Navigation type
-type TokenDetailsDrawerNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SwapScreen'>;
+// type TokenDetailsDrawerNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SwapScreen'>;
 
 interface TokenDetailsDrawerProps {
   visible: boolean;
