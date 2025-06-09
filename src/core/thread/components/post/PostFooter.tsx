@@ -55,6 +55,12 @@ interface SimpleRetweetDrawerProps {
   onUndoRepost: () => Promise<void>;
 }
 
+// Add interface for reaction data
+interface ReactionData {
+  count: number;
+  timestamp?: number;
+}
+
 // Simplified inline RetweetDrawer component
 function SimpleRetweetDrawer({
   visible,
@@ -542,9 +548,26 @@ export default function PostFooter({
       return null;
     }
 
-    const reactionEntries = Object.entries(updatedPost.reactions || {});
+    // Convert reactions to array and sort by timestamp (oldest first)
+    const reactionEntries = Object.entries(updatedPost.reactions || {})
+      .sort((a, b) => {
+        const aData = typeof a[1] === 'number' ? { count: a[1] } : a[1] as ReactionData;
+        const bData = typeof b[1] === 'number' ? { count: b[1] } : b[1] as ReactionData;
+        
+        // If timestamps exist, sort by them
+        if (aData.timestamp && bData.timestamp) {
+          return aData.timestamp - bData.timestamp;
+        }
+        // If no timestamps, maintain original order
+        return 0;
+      })
+      .map(([emoji, data]): [string, number] => [String(emoji), typeof data === 'number' ? data : (data as ReactionData).count]);
+
     const userReaction = updatedPost.userReaction;
-    const totalReactions = Object.values(updatedPost.reactions || {}).reduce((a: number, b) => a + (typeof b === 'number' ? b : 0), 0);
+    const totalReactions = Object.values(updatedPost.reactions || {}).reduce((a: number, b) => {
+      const count = typeof b === 'number' ? b : (b as ReactionData).count;
+      return a + count;
+    }, 0);
 
     // If there are many reactions, show a compact summary
     if (reactionEntries.length > 3) {
@@ -714,8 +737,10 @@ export default function PostFooter({
         </TouchableWithoutFeedback>
       )}
 
-      <View style={styles.itemIconsRow}>
-        <View style={{ flexDirection: 'row', gap: 16 }}>
+      {/* New flex row: left icons and right reactions */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        {/* Left icons */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {/* Comment icon */}
           <TouchableOpacity
             style={[
@@ -772,17 +797,11 @@ export default function PostFooter({
                 ]}
                 disabled={isReactionProcessing}
               >
-                {updatedPost.userReaction ? (
-                  <Text style={reactionStyles.userReactionIcon}>
-                    {updatedPost.userReaction}
-                  </Text>
-                ) : (
-                  <Icons.ReactionIdle
-                    width={20}
-                    height={20}
-                    color={updatedPost.userReaction ? COLORS.brandBlue : undefined}
-                  />
-                )}
+                <Icons.ReactionIdle
+                  width={20}
+                  height={20}
+                  color={updatedPost.userReaction ? COLORS.brandBlue : undefined}
+                />
               </TouchableOpacity>
             </Animated.View>
             <Animated.Text style={[
@@ -804,7 +823,7 @@ export default function PostFooter({
                   },
                 ]}>
                 <View style={reactionStyles.emojiRow}>
-                  {['👍', '🚀', '❤️', '😂'].map((emoji, index) => {
+                  {['🚀', '❤️', '😂'].map((emoji, index) => {
                     const isSelected = updatedPost.userReaction === emoji;
                     return (
                       <TouchableOpacity
@@ -842,8 +861,10 @@ export default function PostFooter({
           </View>
         </View>
 
-        {/* Right side - Display existing reactions inline */}
-        {renderExistingReactions()}
+        {/* Right: Reacted emoji pill */}
+        <View style={{ flexShrink: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', minWidth: 0 }}>
+          {renderExistingReactions()}
+        </View>
       </View>
 
       {/* Use our inline SimpleRetweetDrawer component */}
@@ -910,13 +931,21 @@ const reactionStyles = StyleSheet.create({
     borderRadius: 12,
   },
   selectedEmojiButton: {
-    backgroundColor: COLORS.darkerBackground,
+    backgroundColor: COLORS.brandBlue,
+    borderWidth: 2,
+    borderColor: COLORS.white,
+    shadowColor: COLORS.brandBlue,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   emojiText: {
     fontSize: TYPOGRAPHY.size.lg,
   },
   selectedEmojiText: {
     transform: [{ scale: 1.1 }],
+    color: COLORS.white,
+    fontWeight: 'bold',
   },
   reactionButton: {
     padding: 4,

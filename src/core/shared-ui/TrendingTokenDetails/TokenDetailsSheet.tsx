@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,8 @@ import {
     Dimensions,
     ScrollView,
     ActivityIndicator,
+    Animated,
+    PanResponder,
 } from 'react-native';
 import { styles } from './TokenDetailsSheet.styles';
 import { TokenDetailsSheetProps } from '@/modules/data-module/types/tokenDetails.types';
@@ -24,7 +26,7 @@ import RiskAnalysisSection from './RiskAnalysisSection';
 import LineGraph from '@/core/shared-ui/TradeCard/LineGraph';
 import COLORS from '@/assets/colors';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const TokenDetailsSheet: React.FC<TokenDetailsSheetProps> = ({
     visible,
@@ -47,6 +49,39 @@ const TokenDetailsSheet: React.FC<TokenDetailsSheetProps> = ({
         visible
     });
 
+    const panY = useRef(new Animated.Value(0)).current;
+
+    const panResponder = useRef(
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onPanResponderMove: (_, { dy }) => {
+          panY.setValue(Math.max(0, dy));
+        },
+        onPanResponderRelease: (_, { dy, vy }) => {
+          if (dy > 150 || vy > 0.5) {
+            Animated.timing(panY, {
+              toValue: height,
+              duration: 200,
+              useNativeDriver: true,
+            }).start(() => {
+              onClose();
+            });
+          } else {
+            Animated.spring(panY, {
+              toValue: 0,
+              useNativeDriver: true,
+            }).start();
+          }
+        },
+      }),
+    ).current;
+  
+    useEffect(() => {
+      if (visible) {
+        panY.setValue(0);
+      }
+    }, [visible]);
+
     return (
         <Modal
             animationType="slide"
@@ -58,7 +93,10 @@ const TokenDetailsSheet: React.FC<TokenDetailsSheetProps> = ({
                 <View style={styles.overlay} />
             </TouchableWithoutFeedback>
 
-            <View style={styles.container}>
+            <Animated.View style={[styles.container, { transform: [{ translateY: panY }] }]}>
+                <View style={styles.handleContainer} {...panResponder.panHandlers}>
+                    <View style={styles.handle} />
+                </View>
                 <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                     <Text style={styles.closeButtonText}>×</Text>
                 </TouchableOpacity>
@@ -100,24 +138,6 @@ const TokenDetailsSheet: React.FC<TokenDetailsSheetProps> = ({
 
                     {/* Update Chart Section */}
                     <View style={styles.chartContainer}>
-                        {loading ? (
-                            <View style={styles.loadingContainer}>
-                                <ActivityIndicator size="large" color={COLORS.brandPrimary} />
-                                <Text style={styles.loadingText}>Loading price data...</Text>
-                            </View>
-                        ) : priceHistory.length > 0 ? (
-                            <View style={styles.graphWrapper}>
-                                <LineGraph
-                                    data={getGraphData(priceHistory.map(item => item.value))}
-                                    width={width - 72}
-                                    timestamps={getTimestamps()}
-                                />
-                            </View>
-                        ) : (
-                            <View style={styles.noDataContainer}>
-                                <Text style={styles.noDataText}>No price data available</Text>
-                            </View>
-                        )}
                         <View style={styles.timeframeContainer}>
                             {['1H', '1D', '1W', '1M', 'YTD', 'ALL'].map((tf) => (
                                 <TouchableOpacity
@@ -140,6 +160,24 @@ const TokenDetailsSheet: React.FC<TokenDetailsSheetProps> = ({
                                 </TouchableOpacity>
                             ))}
                         </View>
+                        {loading ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator size="large" color={COLORS.brandPrimary} />
+                                <Text style={styles.loadingText}>Loading price data...</Text>
+                            </View>
+                        ) : priceHistory.length > 0 ? (
+                            <View style={styles.graphWrapper}>
+                                <LineGraph
+                                    data={getGraphData(priceHistory.map(item => item.value))}
+                                    width={width - 72}
+                                    timestamps={getTimestamps()}
+                                />
+                            </View>
+                        ) : (
+                            <View style={styles.noDataContainer}>
+                                <Text style={styles.noDataText}>No price data available</Text>
+                            </View>
+                        )}
                     </View>
 
                     {/* Risk Analysis Section */}
@@ -153,16 +191,10 @@ const TokenDetailsSheet: React.FC<TokenDetailsSheetProps> = ({
                         <Text style={styles.sectionTitle}>Info</Text>
                         <View style={styles.infoGrid}>
                             <View style={styles.infoItem}>
-                                <Text style={styles.infoLabel}>Liquidity</Text>
+                                <Text style={styles.infoLabel}>Created On</Text>
                                 <Text style={styles.infoValue}>
-                                    {(() => {
-                                        // Use liquidity from marketData or tokenOverview
-                                        const liquidity = marketData?.liquidity || tokenOverview?.liquidity;
-                                        if (liquidity && liquidity > 0) {
-                                            return `$${formatNumber(liquidity)}`;
-                                        }
-                                        return 'N/A';
-                                    })()}
+                                    {tokenOverview?.created_on ||
+                                        (tokenOverview?.created_at ? new Date(tokenOverview.created_at * 1000).toLocaleDateString() : 'N/A')}
                                 </Text>
                             </View>
                             <View style={styles.infoItem}>
@@ -178,38 +210,22 @@ const TokenDetailsSheet: React.FC<TokenDetailsSheetProps> = ({
                             <View style={styles.infoItem}>
                                 <Text style={styles.infoLabel}>Market Cap</Text>
                                 <Text style={styles.infoValue}>
-                                    ${formatNumber(tokenOverview?.market_cap || tokenOverview?.marketCap || marketData?.marketcap)}
+                                    ${formatNumber(tokenOverview?.market_cap || tokenOverview?.marketCap)}
                                 </Text>
                             </View>
                             <View style={styles.infoItem}>
                                 <Text style={styles.infoLabel}>Circulating Supply</Text>
                                 <Text style={styles.infoValue}>
                                     {formatNumber(tokenOverview?.supply?.circulating ||
-                                        tokenOverview?.circulatingSupply ||
-                                        marketData?.circulating_supply)}
+                                        tokenOverview?.circulatingSupply)}
                                 </Text>
                             </View>
                             <View style={styles.infoItem}>
                                 <Text style={styles.infoLabel}>Holders</Text>
                                 <Text style={styles.infoValue}>
                                     {(() => {
-                                        // Try multiple sources for holder count
-                                        const count = tokenOverview?.holder_count ||
-                                            tokenOverview?.holderCount ||
-                                            tokenOverview?.holder ||
-                                            tokenSecurity?.top_holders?.length ||
-                                            tokenOverview?.top_holders?.length;
-
-                                        if (count && count > 0) {
-                                            return count.toLocaleString();
-                                        }
-
-                                        // If we have top holders data, we know there are at least that many
-                                        if (tokenSecurity?.top_holders?.length) {
-                                            return `${tokenSecurity.top_holders.length}+`;
-                                        }
-
-                                        return 'N/A';
+                                        const count = tokenOverview?.holder_count || tokenOverview?.holderCount;
+                                        return count ? count.toLocaleString() : 'N/A';
                                     })()}
                                 </Text>
                             </View>
@@ -264,7 +280,7 @@ const TokenDetailsSheet: React.FC<TokenDetailsSheetProps> = ({
                         </View>
                     </View>
                 </ScrollView>
-            </View>
+            </Animated.View>
         </Modal>
     );
 };
