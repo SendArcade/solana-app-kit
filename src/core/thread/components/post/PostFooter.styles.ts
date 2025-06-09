@@ -15,24 +15,27 @@ export function createPostFooterStyles(
       ...overrideStyles?.footerContainer,
     },
     itemIconsRow: {
-      width: '100%', // Consider making this customizable
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
       marginTop: 8,
-      gap: 16,
+      justifyContent: 'flex-end',
+      paddingRight: 12,
+      gap: 6,
       ...overrideStyles?.itemIconsRow,
     },
     itemLeftIcons: {
       flexDirection: 'row',
-      gap: 6,
+      gap: 4,
       alignItems: 'center',
+      flexWrap: 'wrap',
+      justifyContent: 'flex-start',
       ...overrideStyles?.itemLeftIcons,
     },
     itemRightIcons: {
       flexDirection: 'row',
       gap: 16,
       alignItems: 'center',
+      justifyContent: 'flex-end',
       ...overrideStyles?.itemRightIcons,
     },
     iconText: {

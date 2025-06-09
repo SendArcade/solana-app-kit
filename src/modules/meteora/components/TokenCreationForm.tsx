@@ -482,6 +482,7 @@ export default function TokenCreationForm({
                             </View>
                         ) : (
                             <View style={styles.uploadContent}>
+                                <View style={{ paddingTop: 10 }} />
                                 <TouchableOpacity
                                     onPress={pickImage}
                                     style={styles.uploadImageButton}
@@ -834,7 +835,7 @@ export default function TokenCreationForm({
                     <TouchableOpacity style={styles.backButton} onPress={handleBack}>
                         <Text style={styles.backButtonText}>Back</Text>
                     </TouchableOpacity>
-
+                    <View style={{ width: 12 }} />
                     <TouchableOpacity
                         style={[styles.actionButton, styles.createButton]}
                         onPress={handleCreateToken}
@@ -993,13 +994,13 @@ const styles = StyleSheet.create({
         fontSize: TYPOGRAPHY.size.sm,
     },
     actionButton: {
-        marginTop: 16,
         overflow: 'hidden',
         borderRadius: 12,
     },
     actionButtonGradient: {
         paddingVertical: 14,
         alignItems: 'center',
+        borderRadius: 12,
     },
     actionButtonText: {
         color: COLORS.white,
@@ -1080,18 +1081,21 @@ const styles = StyleSheet.create({
     },
     buttonRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         alignItems: 'center',
         marginTop: 16,
+        paddingHorizontal: 16,
     },
     backButton: {
-        padding: 14,
+        padding: 0,
         borderRadius: 12,
         borderWidth: 1,
         borderColor: COLORS.borderDarkColor,
-        width: '30%',
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
+        height: 50,
+        backgroundColor: 'transparent',
     },
     backButtonText: {
         color: COLORS.white,
@@ -1099,7 +1103,10 @@ const styles = StyleSheet.create({
         fontWeight: TYPOGRAPHY.weights.medium,
     },
     createButton: {
-        width: '65%',
+        flex: 1,
+        height: 50,
+        borderRadius: 12,
+        overflow: 'hidden',
     },
     imageUploadContainer: {
         backgroundColor: COLORS.lighterBackground,
@@ -1107,7 +1114,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: COLORS.borderDarkColor,
         borderStyle: 'dashed',
-        height: 200,
+        height: 230,
         overflow: 'hidden',
         justifyContent: 'center',
         alignItems: 'center',
