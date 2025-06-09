@@ -568,6 +568,72 @@ profileImageRouter.post('/updateDescription', async (req: any, res: any) => {
   }
 });
 
+/**
+ * ------------------------------------------
+ *  NEW: Update user's profile picture URL directly
+ *  Body: { userId, profilePicUrl }
+ * ------------------------------------------
+ */
+profileImageRouter.post('/updateProfilePic', async (req: any, res: any) => {
+  try {
+    const { userId, profilePicUrl } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing userId' 
+      });
+    }
+    
+    if (!profilePicUrl) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing profilePicUrl' 
+      });
+    }
+
+    console.log(`[updateProfilePic] Updating profile picture for userId: ${userId}`);
+    console.log(`[updateProfilePic] New profile picture URL: ${profilePicUrl}`);
+
+    // Check if user exists
+    const existingUser = await knex('users').where({ id: userId }).first();
+    
+    if (!existingUser) {
+      // Create new user if doesn't exist
+      console.log(`[updateProfilePic] User ${userId} not found, creating new record`);
+      await knex('users').insert({
+        id: userId,
+        username: userId.slice(0, 6), // Default username
+        handle: '@' + userId.slice(0, 6), // Default handle
+        profile_picture_url: profilePicUrl,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+      console.log(`[updateProfilePic] New user created with profile picture`);
+    } else {
+      // Update existing user
+      console.log(`[updateProfilePic] Updating existing user ${userId}`);
+      await knex('users').where({ id: userId }).update({
+        profile_picture_url: profilePicUrl,
+        updated_at: new Date(),
+      });
+      console.log(`[updateProfilePic] Profile picture updated successfully`);
+    }
+
+    return res.json({ 
+      success: true, 
+      profilePicUrl: profilePicUrl,
+      message: 'Profile picture updated successfully'
+    });
+  } catch (error: any) {
+    console.error('[updateProfilePic error]', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
 // Simple authentication middleware for delete-account route
 const requireAuthForDelete = async (req: any, res: any, next: NextFunction) => {
   try {
