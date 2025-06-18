@@ -27,6 +27,7 @@ import QRCodeModal from '../components/QRCodeModal';
 import { styles } from './WalletScreen.style';
 import { RootStackParamList } from '@/shared/navigation/RootNavigator';
 import { StackNavigationProp } from '@react-navigation/stack';
+import LuloRebalancingYieldCard from './LuloRebalancingYieldCard';
 
 const SOL_DECIMAL = 1000000000; // 1 SOL = 10^9 lamports
 
@@ -571,6 +572,9 @@ function WalletScreen({
               <Text style={styles.actionBadgeText}>MoonPay</Text>
             </View>
           </TouchableOpacity>
+
+          {/* Lulo Rebalancing Yield Card */}
+          <LuloRebalancingYieldCard />
         </View>
 
         {/* Legal Links Section */}

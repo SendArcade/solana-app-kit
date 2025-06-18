@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Image,
@@ -10,7 +10,9 @@ import {
   Dimensions,
   ScrollView,
   RefreshControl,
-  ImageBackground
+  ImageBackground,
+  Modal,
+  TextInput
 } from 'react-native';
 import { styles, portfolioStyles } from './collectibles.style';
 
@@ -21,6 +23,10 @@ import TokenDetailsDrawer from '@/core/shared-ui/TokenDetailsDrawer/TokenDetails
 import { AssetItem } from '@/modules/data-module';
 import COLORS from '@/assets/colors';
 import { IPFSAwareImage, getValidImageSource, fixAllImageUrls } from '@/shared/utils/IPFSImage';
+import { useWallet } from '@/modules/wallet-providers/hooks/useWallet';
+import { VersionedTransaction, Connection } from '@solana/web3.js';
+import bs58 from 'bs58';
+import { HELIUS_STAKED_URL, SERVER_URL } from '@env';
 
 export interface PortfolioSectionProps {
   sectionTitle: string;
@@ -72,6 +78,8 @@ const SOL_DECIMAL = 1000000000; // 1 SOL = 10^9 lamports
 
 // NFT data cache to prevent redundant fetches
 const nftDataCache = new Map<string, any>();
+
+const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 
 // List renderer for token items
 const TokenListItem: React.FC<{
@@ -291,6 +299,11 @@ const PortfolioSection: React.FC<PortfolioSectionProps> = ({
   );
 };
 
+const connection = new Connection(
+  HELIUS_STAKED_URL || 'https://api.mainnet-beta.solana.com',
+  'confirmed'
+);
+
 /**
  * Renders a complete portfolio view with tokens, NFTs, and compressed NFTs
  */
@@ -304,11 +317,22 @@ const Collectibles: React.FC<CollectiblesProps> = ({
   refreshing,
   onItemPress,
 }) => {
+  const { publicKey, address, connected, sendBase64Transaction } = useWallet();
   const [activeTab, setActiveTab] = useState<'all' | 'tokens' | 'nfts'>('all');
   const [selectedAsset, setSelectedAsset] = useState<AssetItem | null>(null);
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [detailedNftData, setDetailedNftData] = useState<any>(null);
+
+  const mountedRef = useRef(true);
+  const [isProcessingTransaction, setIsProcessingTransaction] = useState(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Handle asset item press
   const handleAssetPress = async (item: AssetItem) => {

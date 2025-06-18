@@ -15,10 +15,11 @@ const COLORS = {
   brandPrimary: '#32D4DE',
   brandPurple: '#B591FF',
   brandPurpleBg: '#EDECFF',
-  brandBlue: '#00ABE4',
+  brandBlue: '#3B82F6',
   brandPink: '#F53987',
-  brandGreen: '#00C851',
-  errorRed: '#e0245e',
+  brandGreen: '#22C55E',
+  errorRed: '#EF4444',
+  warningOrange: '#F97316',
 
   // Other usage
   textDark: '#1E1E1E',
@@ -27,7 +28,7 @@ const COLORS = {
   cyan: '#32D4DE',
 
   // DarkBackground colors
-  background: '#0C101A',
+  background: '#141414',
   lightBackground: '#141926',
   lighterBackground: '#1D212D',
   darkerBackground: '#101521',

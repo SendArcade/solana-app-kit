@@ -60,7 +60,7 @@ export interface AssetItem {
   };
   inscription?: any;
   spl20?: any;
-  assetType?: 'token' | 'nft' | 'cnft';
+  assetType?: 'token' | 'nft' | 'cnft' | 'defi';
 }
 
 export interface PortfolioData {
