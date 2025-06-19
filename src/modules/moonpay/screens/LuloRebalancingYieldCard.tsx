@@ -11,12 +11,19 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Dimensions,
 } from 'react-native';
-import { Connection } from '@solana/web3.js';
+import { Connection, PublicKey } from '@solana/web3.js';
 import { HELIUS_STAKED_URL, SERVER_URL } from '@env';
 import { useWallet } from '@/modules/wallet-providers/hooks/useWallet';
 import COLORS from '@/assets/colors';
 import Icons from '@/assets/svgs';
+import { Keypad } from '@/modules/swap/components/SwapComponents';
+import { fetchTokenBalance } from '@/modules/data-module/services/tokenService';
+import { TokenInfo } from '@/modules/data-module/types/tokenTypes';
+import Slider from '@react-native-community/slider';
+import { useAppSelector, useAppDispatch } from '@/shared/hooks/useReduxHooks';
+import { showSuccessNotification, showErrorNotification } from '@/shared/state/notification/reducer';
 
 const connection = new Connection(
   HELIUS_STAKED_URL || 'https://api.mainnet-beta.solana.com',
@@ -25,9 +32,9 @@ const connection = new Connection(
 
 const LuloRebalancingYieldCard = () => {
   const { address, connected, sendBase64Transaction } = useWallet();
+  const dispatch = useAppDispatch();
   const [modalContent, setModalContent] = useState<'hidden' | 'details' | 'amount' | 'pending_list'>('hidden');
   const [isProcessingTransaction, setIsProcessingTransaction] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Lulo data states
   const [luloApy, setLuloApy] = useState<{
@@ -55,6 +62,31 @@ const LuloRebalancingYieldCard = () => {
   const [amount, setAmount] = useState('');
   const [pendingWithdrawals, setPendingWithdrawals] = useState<any[]>([]);
   const [autoCompleteAlertShown, setAutoCompleteAlertShown] = useState(false);
+  const [usdcBalance, setUsdcBalance] = useState<number | null>(null);
+  const [sliderValue, setSliderValue] = useState(0);
+
+  const USDC_TOKEN_INFO: TokenInfo = {
+    address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    symbol: 'USDC',
+    name: 'USD Coin',
+    decimals: 6,
+    logoURI: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png'
+  };
+
+  const fetchUSDCBalance = useCallback(async () => {
+    if (!address) return;
+    try {
+      const balance = await fetchTokenBalance(new PublicKey(address), USDC_TOKEN_INFO);
+      if (mountedRef.current) {
+        setUsdcBalance(balance);
+      }
+    } catch (e) {
+      console.error('Failed to fetch USDC balance', e);
+      if (mountedRef.current) {
+        setUsdcBalance(0);
+      }
+    }
+  }, [address]);
 
   const fetchPendingWithdrawals = useCallback(async () => {
     if (!address) return;
@@ -76,7 +108,6 @@ const LuloRebalancingYieldCard = () => {
   const fetchLuloData = useCallback(async () => {
     if (!address) return;
     setLuloLoading(true);
-    setError(null);
     try {
       const apyRes = await fetch(`${SERVER_URL}/api/lulo/apy`);
       const apyJson = await apyRes.json();
@@ -86,155 +117,15 @@ const LuloRebalancingYieldCard = () => {
       const balJson = await balRes.json();
       if (balJson.success) setLuloBalance(balJson.balance?.totalUsdValue ?? 0);
     } catch (e) {
-      setError('Failed to fetch Lulo data.');
+      dispatch(showErrorNotification({ message: 'Failed to fetch Lulo data.' }));
     } finally {
       setLuloLoading(false);
     }
-  }, [address]);
-
-  // Handle deposit
-  const handleDeposit = async () => {
-    console.log('handleDeposit function called with amount:', amount);
-
-    const depositValue = parseFloat(amount);
-    if (!address || !amount || isNaN(depositValue) || depositValue <= 0) {
-      console.log('Exiting handleDeposit: invalid amount or no address.', { address, amount, depositValue });
-      setError('Please enter a valid deposit amount.');
-      return;
-    }
-
-    if (!connected) {
-      console.log('Exiting handleDeposit: wallet not connected.');
-      setError('Please connect your wallet first.');
-      return;
-    }
-
-    console.log('Proceeding with deposit...');
-    setIsProcessingTransaction(true);
-    setError(null);
-    try {
-      console.log('Fetching transaction from server...');
-      const res = await fetch(`${SERVER_URL}/api/lulo/lend`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userPublicKey: address, amount: depositValue })
-      });
-
-      if (!mountedRef.current) return;
-      console.log('Received response from server.');
-      const data = await res.json();
-      console.log('Server response data:', data);
-
-      if (!data.success || !data.transaction) {
-        throw new Error(data.error || 'Failed to get transaction for deposit');
-      }
-
-      console.log('Awaiting transaction signature from wallet...');
-      // Send transaction with timeout
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Transaction approval timed out. Please try again.')), 30000)
-      );
-
-      const transactionPromise = sendBase64Transaction(data.transaction, connection);
-      await Promise.race([transactionPromise, timeoutPromise]);
-      
-      if (!mountedRef.current) return;
-      console.log('Transaction sent successfully.');
-
-      // Update UI
-      await fetchLuloData();
-      setModalContent('details'); // Go back to details view
-      setAmount('');
-      setError(null);
-      Alert.alert('Success', 'Your deposit has been processed successfully.');
-    } catch (e) {
-      console.error('Deposit error:', e);
-      if (mountedRef.current) {
-        if (e instanceof Error) {
-          if (e.message.includes('timeout')) {
-            setError('Transaction approval timed out. Please try again and make sure to approve the transaction in your wallet.');
-          } else if (e.message.includes('wallets:connect')) {
-            setError('Wallet connection lost. Please reconnect your wallet and try again.');
-          } else {
-            setError(e.message || 'Deposit failed. Please try again.');
-          }
-        } else {
-          setError('An unknown error occurred during deposit. Please try again.');
-        }
-      }
-    } finally {
-      if (mountedRef.current) {
-        setIsProcessingTransaction(false);
-      }
-    }
-  };
-
-  const handleInitiateWithdraw = async () => {
-    const withdrawValue = parseFloat(amount);
-    if (!address || !amount || isNaN(withdrawValue) || withdrawValue <= 0) {
-      setError('Please enter a valid withdrawal amount.');
-      return;
-    }
-    if (withdrawValue < 1) {
-      setError('Withdrawal amount must be at least 1 USDC.');
-      return;
-    }
-
-    setIsProcessingTransaction(true);
-    setError(null);
-    try {
-      console.log('Fetching transaction from server for withdrawal initiation...');
-      const res1 = await fetch(`${SERVER_URL}/api/lulo/initiate-withdraw`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userPublicKey: address, amount: withdrawValue })
-      });
-
-      if (!mountedRef.current) return;
-      console.log('Received response from server.');
-      const data1 = await res1.json();
-      console.log('Server response data:', data1);
-      
-      if (!data1.success || !data1.transaction) {
-        throw new Error(data1.error || 'Failed to get transaction for initiate withdraw');
-      }
-
-      console.log('Awaiting transaction signature from wallet for withdrawal initiation...');
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Transaction approval timed out. Please try again.')), 30000)
-      );
-
-      const transactionPromise = sendBase64Transaction(data1.transaction, connection);
-      await Promise.race([transactionPromise, timeoutPromise]);
-      if (!mountedRef.current) return;
-      console.log('Withdrawal initiation transaction sent successfully.');
-
-      // Update UI
-      await fetchLuloData();
-      await fetchPendingWithdrawals();
-      setModalContent('details'); // Go back to details
-      setAmount('');
-      setError(null);
-      Alert.alert('Success', 'Your withdrawal has been initiated. You must wait 24 hours to complete it.');
-    } catch (e: any) {
-      console.error('Withdraw initiation error:', e);
-      if (mountedRef.current) {
-        if (e.message.includes('timeout')) {
-          setError('Transaction approval timed out. Please try again and make sure to approve the transaction in your wallet.');
-        } else {
-          setError(e.message || 'Withdraw initiation failed. Please try again.');
-        }
-      }
-    } finally {
-      if (mountedRef.current) {
-        setIsProcessingTransaction(false);
-      }
-    }
-  };
+  }, [address, dispatch]);
 
   const handleCompleteWithdraw = useCallback(async (withdrawalToComplete: any) => {
     if (!address || !withdrawalToComplete?.nativeAmount) {
-      setError('No pending withdrawal amount found to complete.');
+      dispatch(showErrorNotification({ message: 'No pending withdrawal amount found to complete.' }));
       return;
     }
 
@@ -244,40 +135,56 @@ const LuloRebalancingYieldCard = () => {
       const res = await fetch(`${SERVER_URL}/api/lulo/complete-withdraw`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           userPublicKey: address,
           amount: withdrawalToComplete.nativeAmount,
         })
       });
-
       if (!mountedRef.current) return;
+
       const data = await res.json();
+      if (!mountedRef.current) return;
+
       if (!data.success || !data.transaction) {
         throw new Error(data.error || 'Failed to get transaction for complete withdraw');
       }
 
-      // Send second transaction
-      await sendBase64Transaction(data.transaction, connection);
+      dispatch(showSuccessNotification({ message: 'Please approve the transaction in your wallet to complete the withdrawal.' }));
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Transaction approval timed out. Please try again.')), 30000)
+      );
+
+      const transactionPromise = sendBase64Transaction(data.transaction, connection);
+      const signature = await Promise.race([transactionPromise, timeoutPromise]);
 
       if (!mountedRef.current) return;
-      // Update UI
-      await fetchLuloData();
-      await fetchPendingWithdrawals();
-      
-      setModalContent('details'); // Go back to details
-      setError(null);
-      Alert.alert('Success', 'Your withdrawal has been completed successfully.');
+
+      if (signature) {
+          // Update UI
+          await fetchLuloData();
+          if (!mountedRef.current) return;
+          await fetchPendingWithdrawals();
+          if (!mountedRef.current) return;
+
+          setModalContent('details'); // Go back to details
+          dispatch(showSuccessNotification({ message: 'Your withdrawal has been completed successfully.' }));
+      }
 
     } catch (e: any) {
       if (mountedRef.current) {
-        setError(e.message || 'Withdraw completion failed. Please try again.');
+        if (e.message.includes('timeout')) {
+            dispatch(showErrorNotification({ message: 'Transaction approval timed out. Please try again and make sure to approve the transaction in your wallet.' }));
+        } else {
+            dispatch(showErrorNotification({ message: e.message || 'Withdraw completion failed. Please try again.' }));
+        }
       }
     } finally {
       if (mountedRef.current) {
         setIsProcessingTransaction(false);
       }
     }
-  }, [address, fetchLuloData, fetchPendingWithdrawals, sendBase64Transaction]);
+  }, [address, fetchLuloData, fetchPendingWithdrawals, sendBase64Transaction, dispatch]);
 
   const getWithdrawCountdown = useCallback((withdrawal: any) => {
     if (!withdrawal?.createdTimestamp) return { total: -1, text: null };
@@ -293,12 +200,13 @@ const LuloRebalancingYieldCard = () => {
     return { total: secondsLeft, text: `${hours}h ${minutes}m remaining` };
   }, []);
 
-  // Fetch data on mount and when address changes
+  // All useEffects moved here to ensure dependencies are declared first.
   useEffect(() => {
     if (address) {
       fetchLuloData();
+      fetchUSDCBalance();
     }
-  }, [address, fetchLuloData]);
+  }, [address, fetchLuloData, fetchUSDCBalance]);
 
   useEffect(() => {
     if (modalContent === 'details') {
@@ -306,7 +214,10 @@ const LuloRebalancingYieldCard = () => {
       fetchPendingWithdrawals();
       setAutoCompleteAlertShown(false); // Reset alert flag when modal opens
     }
-  }, [modalContent, fetchLuloData, fetchPendingWithdrawals]);
+    if (modalContent === 'amount') {
+      fetchUSDCBalance();
+    }
+  }, [modalContent, fetchLuloData, fetchPendingWithdrawals, fetchUSDCBalance]);
 
   useEffect(() => {
     const { total: countdownTotal } = getWithdrawCountdown(pendingWithdrawals[0]);
@@ -320,7 +231,6 @@ const LuloRebalancingYieldCard = () => {
     }
   }, [pendingWithdrawals, autoCompleteAlertShown, getWithdrawCountdown, handleCompleteWithdraw]);
 
-  // Cleanup on unmount
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -332,13 +242,168 @@ const LuloRebalancingYieldCard = () => {
     setModalType(type);
     setAmount('');
     setModalContent('amount');
-    setError(null);
   };
 
   const closeModals = () => {
     setModalContent('hidden');
     setModalType(null);
-  }
+  };
+
+  const handleKeyPress = (key: string) => {
+    if (isProcessingTransaction) return;
+
+    if (key === 'delete') {
+      setAmount(prev => (prev.length > 0 ? prev.slice(0, -1) : ''));
+    } else if (key === '.') {
+      if (!amount.includes('.')) {
+        setAmount(prev => (prev === '' ? '0.' : prev + '.'));
+      }
+    } else if (amount === '0' && key !== '.') {
+      setAmount(key);
+    } else {
+      if (amount.includes('.') && amount.split('.')[1].length >= 6) return;
+      setAmount(prev => prev + key);
+    }
+  };
+
+  const handlePercentageSelect = (percentage: number) => {
+    const balance = modalType === 'deposit' ? usdcBalance : luloBalance;
+    if (balance === null) return;
+    const value = balance * percentage;
+    setAmount(value.toFixed(6));
+    setSliderValue(percentage);
+  };
+
+  // Handle deposit
+  const handleDeposit = async () => {
+    const depositValue = parseFloat(amount);
+    if (!address || !amount || isNaN(depositValue) || depositValue <= 0) {
+      dispatch(showErrorNotification({ message: 'Please enter a valid deposit amount.' }));
+      return;
+    }
+
+    if (!connected) {
+      dispatch(showErrorNotification({ message: 'Please connect your wallet first.' }));
+      return;
+    }
+
+    setIsProcessingTransaction(true);
+    try {
+      const res = await fetch(`${SERVER_URL}/api/lulo/lend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userPublicKey: address, amount: depositValue })
+      });
+      
+      console.log('res', res);
+
+      if (!mountedRef.current) return;
+      const data = await res.json();
+      if (!mountedRef.current) return;
+
+      if (!data.success || !data.transaction) {
+        throw new Error(data.error || 'Failed to get transaction for deposit');
+      }
+
+      console.log('data', data);
+
+      dispatch(showSuccessNotification({ message: 'Please approve the transaction to deposit.' }));
+      if (!mountedRef.current) return;
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Transaction approval timed out. Please try again.')), 30000)
+      );
+
+      const transactionPromise = sendBase64Transaction(data.transaction, connection);
+      const signature = await Promise.race([transactionPromise, timeoutPromise]);
+
+      if (!mountedRef.current) return;
+      if (signature) {
+        await fetchLuloData();
+        if (!mountedRef.current) return;
+        dispatch(showSuccessNotification({ message: 'Your deposit has been processed successfully.' }));
+        setModalContent('details');
+        setAmount('');
+      }
+    } catch (e) {
+      if (mountedRef.current) {
+        if (e instanceof Error) {
+          if (e.message.includes('timeout')) {
+            dispatch(showErrorNotification({ message: 'Transaction approval timed out. Please try again and make sure to approve the transaction in your wallet.' }));
+          } else if (e.message.includes('wallets:connect')) {
+            dispatch(showErrorNotification({ message: 'Wallet connection lost. Please reconnect your wallet and try again.' }));
+          } else {
+            dispatch(showErrorNotification({ message: e.message || 'Deposit failed. Please try again.' }));
+          }
+        } else {
+          dispatch(showErrorNotification({ message: 'An unknown error occurred during deposit. Please try again.' }));
+        }
+      }
+    } finally {
+      if (mountedRef.current) {
+        setIsProcessingTransaction(false);
+      }
+    }
+  };
+
+  const handleInitiateWithdraw = async () => {
+    const withdrawValue = parseFloat(amount);
+    if (!address || !amount || isNaN(withdrawValue) || withdrawValue <= 0) {
+      dispatch(showErrorNotification({ message: 'Please enter a valid withdrawal amount.' }));
+      return;
+    }
+    if (withdrawValue < 1) {
+      dispatch(showErrorNotification({ message: 'Withdrawal amount must be at least 1 USDC.' }));
+      return;
+    }
+
+    setIsProcessingTransaction(true);
+    try {
+      const res1 = await fetch(`${SERVER_URL}/api/lulo/initiate-withdraw`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userPublicKey: address, amount: withdrawValue })
+      });
+
+      if (!mountedRef.current) return;
+      const data1 = await res1.json();
+      
+      if (!data1.success || !data1.transaction) {
+        throw new Error(data1.error || 'Failed to get transaction for initiate withdraw');
+      }
+
+      dispatch(showSuccessNotification({ message: 'Please approve the transaction to initiate withdrawal.' }));
+      if (!mountedRef.current) return;
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Transaction approval timed out. Please try again.')), 30000)
+      );
+
+      const transactionPromise = sendBase64Transaction(data1.transaction, connection);
+      const signature = await Promise.race([transactionPromise, timeoutPromise]);
+
+      if (!mountedRef.current) return;
+      if (signature) {
+        await fetchLuloData();
+        if (!mountedRef.current) return;
+        await fetchPendingWithdrawals();
+        if (!mountedRef.current) return;
+        dispatch(showSuccessNotification({ message: 'Your withdrawal has been initiated. You must wait 24 hours to complete it.' }));
+        setModalContent('details');
+        setAmount('');
+      }
+    } catch (e: any) {
+      if (mountedRef.current) {
+        if (e.message.includes('timeout')) {
+          dispatch(showErrorNotification({ message: 'Transaction approval timed out. Please try again and make sure to approve the transaction in your wallet.' }));
+        } else {
+          dispatch(showErrorNotification({ message: e.message || 'Withdraw initiation failed. Please try again.' }));
+        }
+      }
+    } finally {
+      if (mountedRef.current) {
+        setIsProcessingTransaction(false);
+      }
+    }
+  };
 
   const renderModalContent = () => {
     if (modalContent === 'details') {
@@ -458,67 +523,96 @@ const LuloRebalancingYieldCard = () => {
 
           {/* Fixed Deposit Button */}
           <View style={styles.fixedButtonContainer}>
-            {error && (
-              <Text style={styles.errorText}>{error}</Text>
-            )}
           </View>
         </View>
       );
     }
 
     if (modalContent === 'amount') {
-      return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <View style={{ backgroundColor: COLORS.background, borderRadius: 12, padding: 24, width: '80%', maxWidth: 400 }}>
-            <Text style={{ color: COLORS.white, fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
-              {isProcessingTransaction ? 'Processing Transaction...' : (modalType === 'deposit' ? 'Deposit Amount' : 'Withdraw Amount')}
-            </Text>
-            
-            {!isProcessingTransaction ? (
-              <>
-                <TextInput
-                  style={{ backgroundColor: COLORS.lighterBackground, color: COLORS.white, borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 20, width: '100%' }}
-                  placeholder="Enter amount"
-                  placeholderTextColor={COLORS.greyMid}
-                  keyboardType="numeric"
-                  value={amount}
-                  onChangeText={setAmount}
-                />
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12, width: '100%' }}>
-                  <TouchableOpacity
-                    style={{ borderRadius: 8, paddingVertical: 10, paddingHorizontal: 18, alignItems: 'center', minWidth: 90, backgroundColor: COLORS.lighterBackground }}
-                    onPress={() => setModalContent('details')} // Go back to details
-                  >
-                    <Text style={{ color: COLORS.white, fontSize: 15, fontWeight: 'bold' }}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{ borderRadius: 8, paddingVertical: 10, paddingHorizontal: 18, alignItems: 'center', minWidth: 90, backgroundColor: modalType === 'deposit' ? COLORS.brandBlue : COLORS.errorRed }}
-                    onPress={() => {
-                      if (modalType === 'deposit') {
-                        handleDeposit();
-                      } else if (modalType === 'withdraw') {
-                        handleInitiateWithdraw();
-                      }
-                    }}
-                    disabled={isProcessingTransaction}
-                  >
-                    <Text style={{ color: COLORS.white, fontSize: 15, fontWeight: 'bold' }}>
-                      {isProcessingTransaction ? 'Processing...' : 'Confirm'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : (
-              <View style={{ alignItems: 'center', marginBottom: 20, paddingVertical: 20 }}>
-                <ActivityIndicator size="large" color={COLORS.brandPrimary} />
-              </View>
-            )}
+      const balance = modalType === 'deposit' ? usdcBalance : luloBalance;
 
-            {error && (
-              <Text style={{ color: COLORS.errorRed, textAlign: 'center', marginTop: 12, fontSize: 14 }}>
-                {error}
-              </Text>
-            )}
+      return (
+        <View style={styles.amountModalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setModalContent('details')}
+              style={styles.backButton}
+            >
+              <Icons.ArrowLeft width={24} height={24} color={COLORS.white} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>{modalType === 'deposit' ? 'Deposit' : 'Withdraw'}</Text>
+            <View style={styles.providerContainer}>
+               <Image
+                source={require('@/assets/images/lulolog.jpg')}
+                style={styles.providerLogo}
+                resizeMode="contain"
+              />
+              <Text style={styles.providerName}>Rebalancing Yield</Text>
+            </View>
+          </View>
+          
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+            <View style={styles.amountDisplayContainer}>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <Icons.CryptoIcon width={32} height={32} color={COLORS.brandBlue} />
+                <Text style={styles.usdcText}>USDC</Text>
+              </View>
+              <Text style={styles.amountText} numberOfLines={1} adjustsFontSizeToFit>{amount || '0'}</Text>
+              <View style={styles.maxButtonContainer}>
+                <TouchableOpacity style={styles.maxButton} onPress={() => handlePercentageSelect(1)}>
+                  <Text style={styles.maxButtonText}>MAX</Text>
+                </TouchableOpacity>
+                <Text style={styles.balanceText}>
+                  {balance !== null ? `Balance: ${balance.toFixed(4)}` : <ActivityIndicator size="small" color={COLORS.greyMid} />}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.sliderContainer}>
+              <Slider
+                style={{width: '100%', height: 40}}
+                minimumValue={0}
+                maximumValue={1}
+                value={sliderValue}
+                onValueChange={(value) => {
+                  const balance = modalType === 'deposit' ? usdcBalance : luloBalance;
+                  if (balance !== null) {
+                    setAmount((balance * value).toFixed(6));
+                  }
+                  setSliderValue(value);
+                }}
+                minimumTrackTintColor={COLORS.brandBlue}
+                maximumTrackTintColor={COLORS.greyDark}
+                thumbTintColor="transparent"
+              />
+              <View style={styles.sliderTrack}>
+                {[...Array(21)].map((_, i) => (
+                  <View key={i} style={[styles.tick, i % 5 === 0 ? styles.majorTick : styles.minorTick]} />
+                ))}
+              </View>
+              <View style={styles.sliderLabels}>
+                <Text style={styles.sliderText}>0%</Text>
+                <Text style={styles.sliderText}>25%</Text>
+                <Text style={styles.sliderText}>50%</Text>
+                <Text style={styles.sliderText}>75%</Text>
+                <Text style={styles.sliderText}>100%</Text>
+              </View>
+            </View>
+            <View style={{flex: 1}} />
+          </ScrollView>
+
+          <View style={styles.bottomContainer}>
+             <TouchableOpacity
+              style={[styles.confirmButton, (isProcessingTransaction || !amount) && styles.disabledButton]}
+              onPress={() => {
+                if (modalType === 'deposit') handleDeposit();
+                else handleInitiateWithdraw();
+              }}
+              disabled={isProcessingTransaction || !amount}
+            >
+              {isProcessingTransaction ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.actionButtonText}>{modalType === 'deposit' ? 'Deposit' : 'Initiate Withdraw'}</Text>}
+            </TouchableOpacity>
+            <Keypad onKeyPress={handleKeyPress} />
           </View>
         </View>
       );
@@ -855,12 +949,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.lightBackground,
   },
-  errorText: {
-    color: COLORS.errorRed,
-    fontSize: 14,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
   actionButtonText: {
     color: COLORS.white,
     fontWeight: 'bold',
@@ -908,6 +996,123 @@ const styles = StyleSheet.create({
     color: COLORS.greyDark,
     fontSize: 12,
   },
+  amountModalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    justifyContent: 'space-between',
+  },
+  amountDisplayContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    alignItems: 'center',
+  },
+  usdcText: {
+    color: COLORS.white,
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginLeft: 8
+  },
+  amountText: {
+    color: COLORS.white,
+    fontSize: 72,
+    fontWeight: 'bold',
+    marginVertical: 12,
+    textAlign: 'center'
+  },
+  maxButtonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  maxButton: {
+    backgroundColor: COLORS.lightBackground,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  maxButtonText: {
+    color: COLORS.white,
+    fontWeight: 'bold',
+  },
+  balanceText: {
+    color: COLORS.greyMid,
+    fontSize: 14,
+  },
+  sliderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    marginVertical: 32,
+    position: 'relative',
+  },
+  sliderTrack: {
+    position: 'absolute',
+    top: 20,
+    left: 24,
+    right: 24,
+    height: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  tick: {
+    backgroundColor: COLORS.greyDark,
+  },
+  majorTick: {
+    width: 2,
+    height: 10,
+  },
+  minorTick: {
+    width: 1,
+    height: 5,
+  },
+  sliderLabels: {
+    position: 'absolute',
+    bottom: -5,
+    left: 24,
+    right: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  sliderLine: {
+    height: 1,
+    backgroundColor: COLORS.greyDark,
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  sliderText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  bottomContainer: {
+    paddingBottom: 20,
+  },
+  errorBanner: {
+    backgroundColor: COLORS.errorRed,
+    padding: 12,
+    borderRadius: 8,
+    marginHorizontal: 24,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  errorBannerText: {
+    color: COLORS.white,
+    fontWeight: 'bold',
+  },
+  confirmButton: {
+    backgroundColor: COLORS.brandBlue,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginHorizontal: 24,
+    marginBottom: 12,
+  },
+  disabledButton: {
+    backgroundColor: COLORS.greyMid,
+  },
 });
 
-export default LuloRebalancingYieldCard; 
+export default LuloRebalancingYieldCard;

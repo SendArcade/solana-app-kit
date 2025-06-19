@@ -23,6 +23,15 @@ export interface LuloApyRates {
   protected: LuloTimePeriodRates;
 }
 
+export interface LuloPendingWithdrawal {
+  owner: string;
+  withdrawalId: number;
+  nativeAmount: string;
+  createdTimestamp: number;
+  cooldownSeconds: string;
+  mintAddress: string;
+}
+
 export class LuloService {
   private static getHeaders() {
     return {
@@ -113,7 +122,7 @@ export class LuloService {
     }
   }
 
-  static async fetchPendingWithdrawals(userPublicKey: string): Promise<any[]> {
+  static async fetchPendingWithdrawals(userPublicKey: string): Promise<LuloPendingWithdrawal[]> {
     const response = await fetch(
       `https://api.lulo.fi/v1/account.withdrawals.listPendingWithdrawals?owner=${userPublicKey}`,
       {
@@ -124,8 +133,17 @@ export class LuloService {
     return data.pendingWithdrawals || [];
   }
 
-  static async completeWithdraw(userPublicKey: string): Promise<{ transaction: string } | null> {
+  static async fetchAvailableWithdrawals(userPublicKey: string): Promise<LuloPendingWithdrawal[]> {
     const pendingWithdrawals = await this.fetchPendingWithdrawals(userPublicKey);
+    const now = Math.floor(Date.now() / 1000);
+    return pendingWithdrawals.filter(withdrawal => {
+      const cooldownEnds = withdrawal.createdTimestamp + parseInt(withdrawal.cooldownSeconds, 10);
+      return now >= cooldownEnds;
+    });
+  }
+
+  static async completeWithdraw(userPublicKey: string): Promise<{ transaction: string } | null> {
+    const pendingWithdrawals = await this.fetchAvailableWithdrawals(userPublicKey);
     if (!pendingWithdrawals.length) {
       return null;
     }
