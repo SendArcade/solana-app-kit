@@ -39,12 +39,17 @@ type SwapScreenRouteProp = RouteProp<RootStackParamList, 'SwapScreen'>;
 type SwapScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SwapScreen'>;
 
 // Swap providers
-const swapProviders: SwapProvider[] = ['Jupiter', 'Raydium'/* , 'PumpSwap' */];
+const swapProviders: SwapProvider[] = ['JupiterUltra', 'Raydium'/* , 'PumpSwap' */];
 
 export default function SwapScreen() {
   const navigation = useNavigation<SwapScreenNavigationProp>();
   const route = useRoute<SwapScreenRouteProp>();
-  const { publicKey: userPublicKey, connected, sendTransaction } = useWallet();
+  const { 
+    publicKey: userPublicKey, 
+    connected, 
+    sendTransaction,
+    sendBase64Transaction
+  } = useWallet();
 
   // Get parameters from route if they exist
   const routeParams = route.params || {};
@@ -103,7 +108,7 @@ export default function SwapScreen() {
     isSwapButtonEnabled,
     pendingTokenOps,
     handleSwapTokens,
-  } = useSwapLogic(routeParams as SwapRouteParams, userPublicKey, connected, sendTransaction, navigation);
+  } = useSwapLogic(routeParams as SwapRouteParams, userPublicKey, connected, { sendTransaction, sendBase64Transaction }, navigation);
 
   // Helper function to determine swap button text with user feedback
   const getSwapButtonText = () => {

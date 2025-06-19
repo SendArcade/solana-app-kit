@@ -11,6 +11,7 @@ import { launchRouter } from './routes/pumpfun/pumpfunLaunch';
 // import { buildCompressedNftListingTx } from './utils/compressedNftListing';
 import knex from './db/knex';
 import jupiterSwapRouter from './routes/swap/jupiterSwapRoutes';
+import jupiterUltraSwapRouter from './routes/swap/jupiterUltraSwapRoutes';
 import raydiumSwapRouter from './routes/swap/raydiumSwapRoutes';
 import { threadImageRouter } from './routes/feed/threadImageRoutes';
 import tokenMillRouter from './routes/tokenmill/tokenMillRoutes';
@@ -197,6 +198,7 @@ app.get('/health', (req, res) => {
 app.use('/api/pumpfun', launchRouter);
 app.use('/api', threadRouter);
 app.use('/api/jupiter', jupiterSwapRouter);
+app.use('/api/jupiter/ultra', jupiterUltraSwapRouter);
 app.use('/api/raydium/swap', raydiumSwapRouter);
 app.use('/api/raydium/launchpad', raydiumLaunchpadRoutes);
 app.use('/api/profile', profileImageRouter);

@@ -1,6 +1,6 @@
 import { Connection, Transaction, VersionedTransaction, PublicKey, SystemProgram } from '@solana/web3.js';
 import { TokenInfo } from '../../data-module/types/tokenTypes';
-import { JupiterService, JupiterSwapResponse } from './jupiterService';
+import { JupiterUltraService } from './jupiterUltraService';
 import { RaydiumService } from '../../raydium/services/raydiumService';
 import { Direction } from '../../pump-fun/services/pumpSwapService';
 import { TransactionService } from '../../wallet-providers/services/transaction/transactionService';
@@ -9,7 +9,7 @@ import { Alert } from 'react-native';
 
 const API_BASE_URL = SERVER_URL || 'http://localhost:8080';
 
-export type SwapProvider = 'Jupiter' | 'Raydium' | 'PumpSwap';
+export type SwapProvider = 'JupiterUltra' | 'Raydium' | 'PumpSwap';
 
 export interface TradeResponse {
   success: boolean;
@@ -33,7 +33,7 @@ const FEE_RECIPIENT = COMMISSION_WALLET;
  * TradeService - Provider-agnostic service for executing token swaps
  * 
  * This service delegates to provider-specific services based on the requested provider:
- * - Jupiter: JupiterService in dataModule
+ * - JupiterUltra: JupiterUltraService in this module
  * - Raydium: RaydiumService in raydium module
  * - PumpSwap: PumpSwapService in pumpFun module
  */
@@ -41,7 +41,7 @@ export class TradeService {
   /**
    * Calculate fee amount from an output amount
    */
-  static calculateFeeAmount(outputAmount: number, provider: SwapProvider = 'Jupiter'): number {
+  static calculateFeeAmount(outputAmount: number, provider: SwapProvider = 'JupiterUltra'): number {
     // Different fee percentage based on provider
     const feePercentage = provider === 'Raydium' ? RAYDIUM_FEE_PERCENTAGE : FEE_PERCENTAGE;
     
@@ -62,7 +62,7 @@ export class TradeService {
       options?: { statusCallback?: (status: string) => void, confirmTransaction?: boolean }
     ) => Promise<string>,
     statusCallback?: (status: string) => void,
-    provider: SwapProvider = 'Jupiter'
+    provider: SwapProvider = 'JupiterUltra'
   ): Promise<string | null> {
     console.log(`[TradeService] 🔍 STARTING FEE COLLECTION FOR ${provider}`);
     console.log(`[TradeService] 🔍 Output amount: ${outputAmount}`);
@@ -159,13 +159,12 @@ export class TradeService {
     outputToken: TokenInfo,
     inputAmount: string,
     walletPublicKey: PublicKey,
-    sendTransaction: (
-      transaction: Transaction | VersionedTransaction,
-      connection: Connection, 
-      options?: { statusCallback?: (status: string) => void, confirmTransaction?: boolean }
-    ) => Promise<string>,
+    transactionSender: { 
+      sendTransaction: (transaction: any, connection: any, options?: any) => Promise<string>,
+      sendBase64Transaction: (base64Tx: string, connection: any, options?: any) => Promise<string> 
+    },
     callbacks?: SwapCallback,
-    provider: SwapProvider = 'Jupiter',
+    provider: SwapProvider = 'JupiterUltra',
     options?: {
       poolAddress?: string;
       slippage?: number;
@@ -179,18 +178,18 @@ export class TradeService {
 
       // Select provider implementation
       switch (provider) {
-        case 'Jupiter':
-          console.log('[TradeService] 🪐 Using JupiterService for swap');
-          // Use JupiterService for Jupiter swaps
-          swapResponse = await JupiterService.executeSwap(
+        case 'JupiterUltra':
+          console.log('[TradeService] 🪐 Using JupiterUltraService for swap');
+          swapResponse = await JupiterUltraService.executeUltraSwap(
             inputToken,
             outputToken,
             inputAmount,
             walletPublicKey,
-            sendTransaction,
+            transactionSender.sendBase64Transaction,
+            connection,
             callbacks
           );
-          console.log('[TradeService] 🪐 Jupiter swap response:', JSON.stringify(swapResponse));
+          console.log('[TradeService] 🪐 Jupiter Ultra swap response:', JSON.stringify(swapResponse));
           break;
           
         case 'Raydium':
@@ -201,7 +200,7 @@ export class TradeService {
             outputToken,
             inputAmount,
             walletPublicKey,
-            sendTransaction,
+            transactionSender.sendTransaction,
             callbacks
           );
           console.log('[TradeService] 🌊 Raydium swap response:', JSON.stringify(swapResponse));
@@ -303,7 +302,7 @@ export class TradeService {
             console.log('[TradeService] Sending transaction to wallet');
             let signature: string;
             try {
-              signature = await sendTransaction(tx, connection, {
+              signature = await transactionSender.sendTransaction(tx, connection, {
                 statusCallback: updateStatus,
                 confirmTransaction: true
               });
@@ -402,7 +401,7 @@ export class TradeService {
             const feeSignature = await this.collectFee(
               swapResponse.outputAmount,
               walletPublicKey,
-              sendTransaction,
+              transactionSender.sendTransaction,
               statusCallback,
               provider
             );
@@ -502,5 +501,5 @@ export class TradeService {
     const val = parseFloat(amount);
     if (isNaN(val)) return 0;
     return val * Math.pow(10, decimals);
-  }
+  } 
 } 
