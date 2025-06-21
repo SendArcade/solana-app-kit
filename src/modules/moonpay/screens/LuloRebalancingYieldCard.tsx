@@ -12,6 +12,7 @@ import {
   Alert,
   FlatList,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { HELIUS_STAKED_URL, SERVER_URL } from '@env';
@@ -24,6 +25,7 @@ import { TokenInfo } from '@/modules/data-module/types/tokenTypes';
 import Slider from '@react-native-community/slider';
 import { useAppSelector, useAppDispatch } from '@/shared/hooks/useReduxHooks';
 import { showSuccessNotification, showErrorNotification } from '@/shared/state/notification/reducer';
+import TYPOGRAPHY from '@/assets/typography';
 
 const connection = new Connection(
   HELIUS_STAKED_URL || 'https://api.mainnet-beta.solana.com',
@@ -467,10 +469,10 @@ const LuloRebalancingYieldCard = () => {
 
                 {pendingWithdrawals.length > 0 && (
                   <TouchableOpacity
-                    style={[styles.actionButton, { marginTop: 20, backgroundColor: COLORS.brandPurple }]}
+                    style={styles.pendingWithdrawalsButton}
                     onPress={() => setModalContent('pending_list')}
                   >
-                    <Text style={styles.actionButtonText}>
+                    <Text style={styles.pendingWithdrawalsButtonText}>
                       View Pending Withdrawals ({pendingWithdrawals.length})
                     </Text>
                   </TouchableOpacity>
@@ -478,16 +480,16 @@ const LuloRebalancingYieldCard = () => {
                 
                 <View style={{ flexDirection: 'row', gap: 12, marginTop: 20 }}>
                   <TouchableOpacity
-                    style={{ flex: 1, backgroundColor: COLORS.brandBlue, borderRadius: 12, padding: 16, alignItems: 'center' }}
-                    onPress={() => openAmountScreen('deposit')}
-                  >
-                    <Text style={{ color: COLORS.white, fontWeight: 'bold', fontSize: 16 }}>Deposit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{ flex: 1, backgroundColor: COLORS.errorRed, borderRadius: 12, padding: 16, alignItems: 'center' }}
+                    style={styles.withdrawButton}
                     onPress={() => openAmountScreen('withdraw')}
                   >
-                    <Text style={{ color: COLORS.white, fontWeight: 'bold', fontSize: 16 }}>Withdraw</Text>
+                    <Text style={styles.actionButtonText}>Withdraw</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.depositButton}
+                    onPress={() => openAmountScreen('deposit')}
+                  >
+                    <Text style={styles.actionButtonText}>Deposit</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -509,11 +511,16 @@ const LuloRebalancingYieldCard = () => {
               </View>
             </View>
 
-            {/* About section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>About</Text>
-              <Text style={styles.aboutText}>
-                Lulo dynamically allocates funds across Kamino, Drift, Marinade, and Jito to optimize yields while maintaining stability.
+            {/* Powered by Lulo section */}
+            <View style={styles.poweredByContainer}>
+              <View style={styles.poweredByLine}>
+                <Text style={styles.poweredByText}>Powered by </Text>
+                <TouchableOpacity onPress={() => Linking.openURL('https://lulo.fi').catch(err => console.error("Couldn't load page", err))}>
+                  <Text style={styles.luloLinkText}>Lulo</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.poweredBySubtitle}>
+                Best yields, dynamically rebalanced across Solana yield protocols.
               </Text>
             </View>
 
@@ -603,7 +610,11 @@ const LuloRebalancingYieldCard = () => {
 
           <View style={styles.bottomContainer}>
              <TouchableOpacity
-              style={[styles.confirmButton, (isProcessingTransaction || !amount) && styles.disabledButton]}
+              style={[
+                styles.confirmButton,
+                { backgroundColor: modalType === 'deposit' ? '#049FB4' : COLORS.errorRed },
+                (isProcessingTransaction || !amount) && styles.disabledButton
+              ]}
               onPress={() => {
                 if (modalType === 'deposit') handleDeposit();
                 else handleInitiateWithdraw();
@@ -951,8 +962,9 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: COLORS.white,
-    fontWeight: 'bold',
-    fontSize: 16,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    fontSize: TYPOGRAPHY.size.lg,
+    fontFamily: TYPOGRAPHY.fontFamily,
   },
   completeButton: {
     backgroundColor: COLORS.brandGreen,
@@ -1103,7 +1115,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   confirmButton: {
-    backgroundColor: COLORS.brandBlue,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -1112,6 +1123,71 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: COLORS.greyMid,
+  },
+  poweredByContainer: {
+    paddingTop: 10,
+    paddingBottom: 24,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  poweredByLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  poweredByText: {
+    color: COLORS.white,
+    fontSize: 16,
+  },
+  luloLinkText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
+  },
+  poweredBySubtitle: {
+    color: COLORS.greyDark,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: '80%',
+  },
+  modalActionButton: {
+    flex: 1,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  pendingWithdrawalsButton: {
+    backgroundColor: COLORS.lightBackground,
+    borderWidth: 1,
+    borderColor: '#049FB4',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  pendingWithdrawalsButtonText: {
+    color: '#049FB4',
+    fontWeight: TYPOGRAPHY.weights.bold,
+    fontSize: TYPOGRAPHY.size.lg,
+    fontFamily: TYPOGRAPHY.fontFamily,
+  },
+  withdrawButton: {
+    flex: 1,
+    backgroundColor: COLORS.lightBackground,
+    borderWidth: 1,
+    borderColor: COLORS.white,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  depositButton: {
+    flex: 1,
+    backgroundColor: '#049FB4',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
   },
 });
 
