@@ -263,7 +263,7 @@ const LuloRebalancingYieldCard = () => {
     } else if (amount === '0' && key !== '.') {
       setAmount(key);
     } else {
-      if (amount.includes('.') && amount.split('.')[1].length >= 6) return;
+      if (amount.includes('.') && amount.split('.')[1].length >= 2) return;
       setAmount(prev => prev + key);
     }
   };
@@ -272,7 +272,7 @@ const LuloRebalancingYieldCard = () => {
     const balance = modalType === 'deposit' ? usdcBalance : luloBalance;
     if (balance === null) return;
     const value = balance * percentage;
-    setAmount(value.toFixed(6));
+    setAmount(value.toFixed(2));
     setSliderValue(percentage);
   };
 
@@ -584,7 +584,7 @@ const LuloRebalancingYieldCard = () => {
                 onValueChange={(value) => {
                   const balance = modalType === 'deposit' ? usdcBalance : luloBalance;
                   if (balance !== null) {
-                    setAmount((balance * value).toFixed(6));
+                    setAmount((balance * value).toFixed(2));
                   }
                   setSliderValue(value);
                 }}
