@@ -27,11 +27,14 @@ export function useSwapLogic(
   routeParams: SwapRouteParams = {},
   userPublicKey: PublicKey | null,
   connected: boolean,
-  sendTransaction: any,
+  transactionSender: { 
+    sendTransaction: (transaction: any, connection: any, options?: any) => Promise<string>,
+    sendBase64Transaction: (base64Tx: string, connection: any, options?: any) => Promise<string> 
+  },
   navigation: any
 ) {
   // UI States
-  const [activeProvider, setActiveProvider] = useState<SwapProvider>('Jupiter');
+  const [activeProvider, setActiveProvider] = useState<SwapProvider>('JupiterUltra');
   const [inputValue, setInputValue] = useState(routeParams.inputAmount || '0');
   const [showSelectTokenModal, setShowSelectTokenModal] = useState(false);
   const [selectingWhichSide, setSelectingWhichSide] = useState<'input' | 'output'>('input');
@@ -673,7 +676,7 @@ export function useSwapLogic(
   // Check if a provider is available for selection
   const isProviderAvailable = useCallback((provider: SwapProvider) => {
     // Now Jupiter, Raydium, and PumpSwap are fully implemented
-    return provider === 'Jupiter' || provider === 'Raydium' || provider === 'PumpSwap';
+    return provider === 'JupiterUltra' || provider === 'Raydium' || provider === 'PumpSwap';
   }, []);
 
   // Check if the swap button should be enabled
@@ -810,7 +813,7 @@ export function useSwapLogic(
         outputToken,
         inputValue,
         userPublicKey,
-        sendTransaction,
+        transactionSender,
         {
           statusCallback: (status) => {
             console.log('[SwapScreen] Status update:', status);
@@ -851,7 +854,11 @@ export function useSwapLogic(
         }
       } else {
         console.log('[SwapScreen] Swap response not successful:', response);
-
+        const errorString = response.error?.toString() || '';
+        if (errorString.includes('Component unmounted')) {
+          console.log('[SwapScreen] Component unmounted during swap, ignoring error.');
+          return; // Exit silently
+        }
         // For PumpSwap, check if we might have had a transaction timeout but it could have succeeded
         if (activeProvider === 'PumpSwap' && response.error) {
           const errorMsg = response.error.toString();
@@ -1025,7 +1032,7 @@ export function useSwapLogic(
     inputValue,
     inputToken,
     outputToken,
-    sendTransaction,
+    transactionSender,
     fetchBalance,
     estimatedOutputAmount,
     activeProvider,

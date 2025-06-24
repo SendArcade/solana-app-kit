@@ -21,16 +21,10 @@ A comprehensive token swapping module that integrates multiple DEX providers (Ju
   - `Keypad`: Numeric input interface
 
 ### Services
-- **TradeService**: Provider-agnostic service for executing token swaps
-  - Fee calculation and collection
-  - Transaction building and execution
-  - Status updates and error handling
-
-- **JupiterService**: Jupiter-specific operations
-  - Quote fetching
-  - Route optimization
-  - Transaction building
-  - Price impact calculation
+- **TradeService**: A provider-agnostic service for executing swaps. It delegates to the appropriate provider-specific service.
+- **JupiterUltraService**: Jupiter-specific operations, such as getting quotes and building swap transactions.
+- **RaydiumService**: Raydium-specific swap logic.
+- **PumpSwapService**: Handles swaps on Pump.fun.
 
 ### Hooks
 - **useSwapLogic**: Custom hook managing swap functionality

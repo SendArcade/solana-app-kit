@@ -11,6 +11,7 @@ import { launchRouter } from './routes/pumpfun/pumpfunLaunch';
 // import { buildCompressedNftListingTx } from './utils/compressedNftListing';
 import knex from './db/knex';
 import jupiterSwapRouter from './routes/swap/jupiterSwapRoutes';
+import jupiterUltraSwapRouter from './routes/swap/jupiterUltraSwapRoutes';
 import raydiumSwapRouter from './routes/swap/raydiumSwapRoutes';
 import { threadImageRouter } from './routes/feed/threadImageRoutes';
 import tokenMillRouter from './routes/tokenmill/tokenMillRoutes';
@@ -30,6 +31,7 @@ import { setupConnection } from './utils/connection';
 import raydiumLaunchpadRoutes from './routes/raydium/launchpad.routes';
 import nftRoutes from './routes/nft';
 import notificationRoutes from './routes/notifications/notificationRoutes';
+import luloRouter from './routes/lulo';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -196,6 +198,7 @@ app.get('/health', (req, res) => {
 app.use('/api/pumpfun', launchRouter);
 app.use('/api', threadRouter);
 app.use('/api/jupiter', jupiterSwapRouter);
+app.use('/api/jupiter/ultra', jupiterUltraSwapRouter);
 app.use('/api/raydium/swap', raydiumSwapRouter);
 app.use('/api/raydium/launchpad', raydiumLaunchpadRoutes);
 app.use('/api/profile', profileImageRouter);
@@ -209,6 +212,7 @@ app.use('/api/chat', chatRouter); // Add the chat routes
 app.use('/api/meteora', meteoraDBCRouter);
 app.use('/api/nft', nftRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/lulo', luloRouter);
 
 // app.post('/api/build-compressed-nft-listing-tx', async (req: any, res: any) => {
 //   try {
