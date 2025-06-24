@@ -28,7 +28,7 @@ const COLORS = {
   cyan: '#32D4DE',
 
   // DarkBackground colors
-  background: '#141414',
+  background: '#0C101A',
   lightBackground: '#141926',
   lighterBackground: '#1D212D',
   darkerBackground: '#101521',
