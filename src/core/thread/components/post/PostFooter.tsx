@@ -541,10 +541,16 @@ export default function PostFooter({
 
   // Render existing reactions
   const renderExistingReactions = () => {
+    // Debug logging
+    // console.log('[PostFooter] renderExistingReactions - updatedPost.reactions:', updatedPost.reactions);
+    // console.log('[PostFooter] renderExistingReactions - typeof reactions:', typeof updatedPost.reactions);
+    // console.log('[PostFooter] renderExistingReactions - Object.keys length:', updatedPost.reactions ? Object.keys(updatedPost.reactions).length : 'null/undefined');
+
     if (
       !updatedPost.reactions ||
       Object.keys(updatedPost.reactions).length === 0
     ) {
+      // console.log('[PostFooter] renderExistingReactions - returning null (no reactions)');
       return null;
     }
 
@@ -553,7 +559,7 @@ export default function PostFooter({
       .sort((a, b) => {
         const aData = typeof a[1] === 'number' ? { count: a[1] } : a[1] as ReactionData;
         const bData = typeof b[1] === 'number' ? { count: b[1] } : b[1] as ReactionData;
-        
+
         // If timestamps exist, sort by them
         if (aData.timestamp && bData.timestamp) {
           return aData.timestamp - bData.timestamp;

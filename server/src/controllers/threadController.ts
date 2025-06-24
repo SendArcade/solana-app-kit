@@ -24,6 +24,36 @@ type DBUserRow = {
 };
 
 function mapPostRowToClientShape(postRow: DBPostRow & DBUserRow) {
+  // Handle sections parsing - it might be a string, already parsed JSON, or null/undefined
+  let sections = [];
+  try {
+    if (typeof postRow.sections === 'string') {
+      sections = JSON.parse(postRow.sections);
+    } else if (Array.isArray(postRow.sections)) {
+      sections = postRow.sections;
+    } else {
+      sections = [];
+    }
+  } catch (error) {
+    console.error('[mapPostRowToClientShape] Error parsing sections:', error);
+    sections = [];
+  }
+
+  // Handle reactions parsing - it might be a string, already parsed JSON, or null/undefined
+  let reactions = {};
+  try {
+    if (typeof postRow.reactions === 'string') {
+      reactions = JSON.parse(postRow.reactions);
+    } else if (typeof postRow.reactions === 'object' && postRow.reactions !== null) {
+      reactions = postRow.reactions;
+    } else {
+      reactions = {};
+    }
+  } catch (error) {
+    console.error('[mapPostRowToClientShape] Error parsing reactions:', error);
+    reactions = {};
+  }
+
   return {
     id: postRow.id,
     parentId: postRow.parent_id,
@@ -36,13 +66,13 @@ function mapPostRowToClientShape(postRow: DBPostRow & DBUserRow) {
         : null,
       verified: false,
     },
-    sections: postRow.sections || [],
+    sections: sections,
     createdAt: postRow.created_at,
     replies: [],
     reactionCount: postRow.reaction_count,
     retweetCount: postRow.retweet_count,
     quoteCount: postRow.quote_count,
-    reactions: postRow.reactions || {},
+    reactions: reactions,
     retweetOf: postRow.retweet_of,
     userReaction: null as string | null,
   };
@@ -61,6 +91,37 @@ async function fetchRetweetOf(postId: string): Promise<any | null> {
     .first();
 
   if (!row) return null;
+
+  // Handle sections parsing - it might be a string, already parsed JSON, or null/undefined
+  let sections = [];
+  try {
+    if (typeof row.sections === 'string') {
+      sections = JSON.parse(row.sections);
+    } else if (Array.isArray(row.sections)) {
+      sections = row.sections;
+    } else {
+      sections = [];
+    }
+  } catch (error) {
+    console.error('[fetchRetweetOf] Error parsing sections:', error);
+    sections = [];
+  }
+
+  // Handle reactions parsing - it might be a string, already parsed JSON, or null/undefined
+  let reactions = {};
+  try {
+    if (typeof row.reactions === 'string') {
+      reactions = JSON.parse(row.reactions);
+    } else if (typeof row.reactions === 'object' && row.reactions !== null) {
+      reactions = row.reactions;
+    } else {
+      reactions = {};
+    }
+  } catch (error) {
+    console.error('[fetchRetweetOf] Error parsing reactions:', error);
+    reactions = {};
+  }
+
   return {
     id: row.id,
     parentId: row.parent_id,
@@ -71,13 +132,13 @@ async function fetchRetweetOf(postId: string): Promise<any | null> {
       avatar: row.profile_picture_url ? {uri: row.profile_picture_url} : null,
       verified: false,
     },
-    sections: row.sections || [],
+    sections: sections,
     createdAt: row.created_at,
     replies: [],
     reactionCount: row.reaction_count,
     retweetCount: row.retweet_count,
     quoteCount: row.quote_count,
-    reactions: row.reactions || {},
+    reactions: reactions,
     retweetOf: null,
   };
 }
@@ -181,6 +242,8 @@ export async function createRootPost(req: Request, res: Response) {
     }
 
     const newId = uuidv4();
+    const now = new Date();
+    
     await knex('posts').insert({
       id: newId,
       parent_id: null,
@@ -189,6 +252,9 @@ export async function createRootPost(req: Request, res: Response) {
       reaction_count: 0,
       retweet_count: 0,
       quote_count: 0,
+      reactions: JSON.stringify({}),
+      retweet_of: null,
+      created_at: now,
     });
 
     const row = await knex<DBPostRow>('posts')
@@ -232,6 +298,8 @@ export async function createReply(req: Request, res: Response) {
     }
 
     const newId = uuidv4();
+    const now = new Date();
+    
     await knex('posts').insert({
       id: newId,
       parent_id: parentId,
@@ -240,6 +308,9 @@ export async function createReply(req: Request, res: Response) {
       reaction_count: 0,
       retweet_count: 0,
       quote_count: 0,
+      reactions: JSON.stringify({}),
+      retweet_of: null,
+      created_at: now,
     });
 
     // increment parent's quote_count
@@ -472,6 +543,8 @@ export async function createRetweet(req: Request, res: Response) {
     }
 
     const newId = uuidv4();
+    const now = new Date();
+    
     await knex('posts').insert({
       id: newId,
       parent_id: null,
@@ -480,7 +553,9 @@ export async function createRetweet(req: Request, res: Response) {
       reaction_count: 0,
       retweet_count: 0,
       quote_count: 0,
+      reactions: JSON.stringify({}),
       retweet_of: retweetOf,
+      created_at: now,
     });
 
     // increment original's retweet_count
