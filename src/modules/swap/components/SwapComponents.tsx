@@ -195,7 +195,7 @@ export const ProviderSelector = ({
           numberOfLines={1}
           ellipsizeMode="tail"
         >
-          {provider}{!isProviderAvailable(provider) ? ' (soon)' : ''}
+          {provider === 'JupiterUltra' ? 'Jupiter' : provider}{!isProviderAvailable(provider) ? ' (soon)' : ''}
         </Text>
       </TouchableOpacity>
     ))}
