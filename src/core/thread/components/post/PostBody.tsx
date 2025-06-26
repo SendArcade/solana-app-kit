@@ -103,9 +103,17 @@ function PostBody({
 
   // Memoize the sections rendering to prevent re-creation on every render
   const renderedSections = useMemo(() => {
-    return sections.map(section => (
+    // Additional safety check to ensure sections is always an array
+    const safeSections = Array.isArray(sections) ? sections : [];
+
+    // Debug logging
+    if (!Array.isArray(sections)) {
+      console.warn('[PostBody] sections is not an array:', typeof sections, sections);
+    }
+
+    return safeSections.map(section => (
       <View key={section.id} style={styles.extraContentContainer}>
-        <View style={{ width: '84%' }}>
+        <View style={{ width: '100%' }}>
           {renderSection(section, user, createdAt, externalRefreshTrigger)}
         </View>
       </View>

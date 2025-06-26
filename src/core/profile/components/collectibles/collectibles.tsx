@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Image,
@@ -10,7 +10,9 @@ import {
   Dimensions,
   ScrollView,
   RefreshControl,
-  ImageBackground
+  ImageBackground,
+  Modal,
+  TextInput
 } from 'react-native';
 import { styles, portfolioStyles } from './collectibles.style';
 
@@ -21,6 +23,10 @@ import TokenDetailsDrawer from '@/core/shared-ui/TokenDetailsDrawer/TokenDetails
 import { AssetItem } from '@/modules/data-module';
 import COLORS from '@/assets/colors';
 import { IPFSAwareImage, getValidImageSource, fixAllImageUrls } from '@/shared/utils/IPFSImage';
+import { useWallet } from '@/modules/wallet-providers/hooks/useWallet';
+import { VersionedTransaction, Connection } from '@solana/web3.js';
+import bs58 from 'bs58';
+import { HELIUS_STAKED_URL, SERVER_URL } from '@env';
 
 export interface PortfolioSectionProps {
   sectionTitle: string;
@@ -72,6 +78,8 @@ const SOL_DECIMAL = 1000000000; // 1 SOL = 10^9 lamports
 
 // NFT data cache to prevent redundant fetches
 const nftDataCache = new Map<string, any>();
+
+const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 
 // List renderer for token items
 const TokenListItem: React.FC<{
@@ -291,6 +299,11 @@ const PortfolioSection: React.FC<PortfolioSectionProps> = ({
   );
 };
 
+const connection = new Connection(
+  HELIUS_STAKED_URL || 'https://api.mainnet-beta.solana.com',
+  'confirmed'
+);
+
 /**
  * Renders a complete portfolio view with tokens, NFTs, and compressed NFTs
  */
@@ -304,11 +317,22 @@ const Collectibles: React.FC<CollectiblesProps> = ({
   refreshing,
   onItemPress,
 }) => {
-  const [activeTab, setActiveTab] = useState<'all' | 'tokens' | 'nfts' | 'cnfts'>('all');
+  const { publicKey, address, connected, sendBase64Transaction } = useWallet();
+  const [activeTab, setActiveTab] = useState<'all' | 'tokens' | 'nfts'>('all');
   const [selectedAsset, setSelectedAsset] = useState<AssetItem | null>(null);
   const [showDetailsDrawer, setShowDetailsDrawer] = useState(false);
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [detailedNftData, setDetailedNftData] = useState<any>(null);
+
+  const mountedRef = useRef(true);
+  const [isProcessingTransaction, setIsProcessingTransaction] = useState(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Handle asset item press
   const handleAssetPress = async (item: AssetItem) => {
@@ -431,12 +455,9 @@ const Collectibles: React.FC<CollectiblesProps> = ({
     item.assetType === 'token'
   );
 
-  const regularNfts = items.filter(item =>
-    item.assetType === 'nft'
-  );
-
-  const compressedNfts = items.filter(item =>
-    item.assetType === 'cnft'
+  // Merge regular and compressed NFTs into one array
+  const allNfts = items.filter(item =>
+    item.assetType === 'nft' || item.assetType === 'cnft'
   );
 
   const solBalance = nativeBalance ? (nativeBalance / SOL_DECIMAL).toFixed(4) : '0';
@@ -460,10 +481,10 @@ const Collectibles: React.FC<CollectiblesProps> = ({
         );
 
       case 'nfts':
-        return regularNfts.length > 0 ? (
+        return allNfts.length > 0 ? (
           <PortfolioSection
             sectionTitle="NFTs"
-            items={regularNfts}
+            items={allNfts}
             onItemPress={handleAssetPress}
             emptyMessage="No NFTs found"
             displayAsList={false}
@@ -471,21 +492,6 @@ const Collectibles: React.FC<CollectiblesProps> = ({
         ) : (
           <View style={portfolioStyles.emptyTabContent}>
             <Text style={portfolioStyles.emptyTabText}>No NFTs found in this wallet</Text>
-          </View>
-        );
-
-      case 'cnfts':
-        return compressedNfts.length > 0 ? (
-          <PortfolioSection
-            sectionTitle="Compressed NFTs"
-            items={compressedNfts}
-            onItemPress={handleAssetPress}
-            emptyMessage="No compressed NFTs found"
-            displayAsList={false}
-          />
-        ) : (
-          <View style={portfolioStyles.emptyTabContent}>
-            <Text style={portfolioStyles.emptyTabText}>No compressed NFTs found in this wallet</Text>
           </View>
         );
 
@@ -518,38 +524,26 @@ const Collectibles: React.FC<CollectiblesProps> = ({
               />
             )}
 
-            {/* NFTs Section */}
-            {regularNfts.length > 0 && (
+            {/* NFTs Section (merged) */}
+            {allNfts.length > 0 && (
               <PortfolioSection
                 sectionTitle="NFTs"
-                items={regularNfts.slice(0, 4)}
-                onItemPress={handleAssetPress}
-                displayAsList={false}
-              />
-            )}
-
-            {/* Compressed NFTs Section */}
-            {compressedNfts.length > 0 && (
-              <PortfolioSection
-                sectionTitle="Compressed NFTs"
-                items={compressedNfts.slice(0, 4)}
+                items={allNfts.slice(0, 8)}
                 onItemPress={handleAssetPress}
                 displayAsList={false}
               />
             )}
 
             {/* Show a view all button if there are more items than shown */}
-            {tokens.length > 6 || regularNfts.length > 4 || compressedNfts.length > 4 ? (
+            {tokens.length > 6 || allNfts.length > 8 ? (
               <TouchableOpacity
                 style={portfolioStyles.viewAllButton}
                 onPress={() => {
                   // Navigate to the category with the most items
-                  if (tokens.length >= regularNfts.length && tokens.length >= compressedNfts.length) {
+                  if (tokens.length >= allNfts.length) {
                     setActiveTab('tokens');
-                  } else if (regularNfts.length >= compressedNfts.length) {
-                    setActiveTab('nfts');
                   } else {
-                    setActiveTab('cnfts');
+                    setActiveTab('nfts');
                   }
                 }}
               >
@@ -690,31 +684,9 @@ const Collectibles: React.FC<CollectiblesProps> = ({
             >
               NFTs
             </Text>
-            {regularNfts.length > 0 && (
+            {allNfts.length > 0 && (
               <View style={portfolioStyles.badgeContainer}>
-                <Text style={portfolioStyles.badgeText}>{regularNfts.length}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              portfolioStyles.tab,
-              activeTab === 'cnfts' && portfolioStyles.activeTab,
-            ]}
-            onPress={() => setActiveTab('cnfts')}
-          >
-            <Text
-              style={[
-                portfolioStyles.tabText,
-                activeTab === 'cnfts' && portfolioStyles.activeTabText
-              ]}
-            >
-              cNFTs
-            </Text>
-            {compressedNfts.length > 0 && (
-              <View style={portfolioStyles.badgeContainer}>
-                <Text style={portfolioStyles.badgeText}>{compressedNfts.length}</Text>
+                <Text style={portfolioStyles.badgeText}>{allNfts.length}</Text>
               </View>
             )}
           </TouchableOpacity>

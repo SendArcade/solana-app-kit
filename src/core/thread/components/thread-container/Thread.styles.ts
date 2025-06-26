@@ -21,7 +21,7 @@ export function getThreadBaseStyles() {
     
     // Thread list container
     threadListContainer: {
-      paddingBottom: 20,
+      paddingBottom: 100, // Space for composer at bottom
     },
   });
   // Merging logic removed, will be handled by the utility function

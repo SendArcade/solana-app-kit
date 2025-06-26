@@ -215,6 +215,7 @@ export default function RetweetModal({
               multiline
               value={retweetText}
               onChangeText={setRetweetText}
+              keyboardAppearance="dark"
             />
             {loading ? (
               <ActivityIndicator style={{ marginTop: 10 }} />

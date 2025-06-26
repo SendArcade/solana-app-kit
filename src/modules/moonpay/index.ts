@@ -1,5 +1,6 @@
 /**
  * MoonPay module for adding funds to a wallet
+ * Comprehensive integration with all MoonPay parameters and features
  */
 
 // Components

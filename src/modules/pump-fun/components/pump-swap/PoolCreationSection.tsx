@@ -299,23 +299,25 @@ export function PoolCreationSection({
             {/* Base Amount */}
             <Text style={styles.inputLabel}>Base Token Amount ({baseToken.symbol})</Text>
             <TextInput
-                style={styles.input}
+                style={[styles.input, { keyboardAppearance: 'dark' }]}
                 value={baseAmount}
                 onChangeText={handleBaseAmountChange}
                 placeholder={`Enter ${baseToken.symbol} amount`}
                 keyboardType="numeric"
                 editable={!isLoading}
+                keyboardAppearance="dark"
             />
 
             {/* Quote Amount */}
             <Text style={styles.inputLabel}>Quote Token Amount ({quoteToken.symbol})</Text>
             <TextInput
-                style={styles.input}
+                style={[styles.input, { keyboardAppearance: 'dark' }]}
                 value={quoteAmount}
                 onChangeText={handleQuoteAmountChange}
                 placeholder={`Enter ${quoteToken.symbol} amount`}
                 keyboardType="numeric"
                 editable={!isLoading}
+                keyboardAppearance="dark"
             />
 
             {/* Show initial price if both amounts > 0 */}

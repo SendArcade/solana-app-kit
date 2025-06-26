@@ -11,28 +11,31 @@ export function createPostFooterStyles(
     footerContainer: {
       marginTop: 6,
       width: '100%',
-      alignItems: 'flex-end',
+      alignItems: 'flex-start',
       ...overrideStyles?.footerContainer,
     },
     itemIconsRow: {
-      width: '84%', // Consider making this customizable
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
       marginTop: 8,
-      gap: 16,
+      justifyContent: 'flex-end',
+      paddingRight: 12,
+      gap: 6,
       ...overrideStyles?.itemIconsRow,
     },
     itemLeftIcons: {
       flexDirection: 'row',
-      gap: 6,
+      gap: 4,
       alignItems: 'center',
+      flexWrap: 'wrap',
+      justifyContent: 'flex-start',
       ...overrideStyles?.itemLeftIcons,
     },
     itemRightIcons: {
       flexDirection: 'row',
       gap: 16,
       alignItems: 'center',
+      justifyContent: 'flex-end',
       ...overrideStyles?.itemRightIcons,
     },
     iconText: {

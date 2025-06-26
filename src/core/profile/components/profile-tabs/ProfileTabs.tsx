@@ -27,6 +27,8 @@ import { ThreadPost } from '../../../thread/types';
 import PostHeader from '../../../thread/components/post/PostHeader';
 import PostBody from '../../../thread/components/post/PostBody';
 import PostFooter from '../../../thread/components/post/PostFooter';
+import { ProfileAvatarView } from '../../../thread/components/post/PostHeader';
+import EditPostModal from '../../../thread/components/EditPostModal';
 import { AssetItem, PortfolioData } from '@/modules/data-module';
 
 import COLORS from '@/assets/colors'; // Import COLORS if not already
@@ -67,79 +69,102 @@ const PostItem = memo(({
   const isRetweet = !!post.retweetOf;
   const isQuoteRetweet = isRetweet && post.sections && post.sections.length > 0;
 
+  const handleUserPress = (user: any) => {
+    // Handle user press if needed
+    console.log('User pressed:', user);
+  };
+
   return (
     <View style={styles.postCard}>
-      {isReply ? (
-        <TouchableOpacity
-          onPress={() => onPressPost?.(post)}>
-          <Text style={styles.replyLabel}>Reply Post</Text>
-        </TouchableOpacity>
-      ) : null}
-
-      {/* Retweet indicator */}
-      {isRetweet && (
-        <View style={retweetStyles.retweetHeader}>
-          <Icons.RetweetIdle width={12} height={12} />
-          <Text style={retweetStyles.retweetHeaderText}>
-            {post.user.username} Retweeted
-          </Text>
+      {/* Twitter-like layout with avatar column + content column */}
+      <View style={styles.postItemContainer}>
+        {/* Avatar Column */}
+        <View style={styles.avatarColumn}>
+          <ProfileAvatarView
+            user={post.user}
+            style={styles.avatar}
+            size={40}
+          />
         </View>
-      )}
 
-      {/* Retweet content */}
-      {isRetweet ? (
-        <View style={retweetStyles.retweetedContent}>
-          {/* Quote retweet text */}
-          {isQuoteRetweet && (
-            <View style={retweetStyles.quoteContent}>
-              {post.sections.map(section => (
-                <Text key={section.id} style={retweetStyles.quoteText}>
-                  {section.text}
-                </Text>
-              ))}
+        {/* Content Column */}
+        <View style={styles.contentColumn}>
+          {isReply && (
+            <TouchableOpacity onPress={() => onPressPost?.(post)}>
+              <Text style={styles.replyLabel}>Reply Post</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Retweet indicator */}
+          {isRetweet && (
+            <View style={retweetStyles.retweetHeader}>
+              <Icons.RetweetIdle width={12} height={12} />
+              <Text style={retweetStyles.retweetHeaderText}>
+                {post.user.username} Reposted
+              </Text>
             </View>
           )}
 
-          {/* Original post content */}
-          {post.retweetOf && (
-            <TouchableOpacity
-              style={retweetStyles.originalPostContainer}
-              activeOpacity={0.8}
-              onPress={() => onPressPost?.(post.retweetOf!)}>
-              <PostHeader
-                post={post.retweetOf}
-                onDeletePost={onDeletePost}
-                onEditPost={onEditPost}
-              />
-              <PostBody
-                post={post.retweetOf}
-                externalRefreshTrigger={externalRefreshTrigger}
-                isRetweet={true}
-              />
-              <PostFooter
-                post={post.retweetOf}
-                onPressComment={() => onPressPost?.(post.retweetOf!)}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-      ) : (
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => onPressPost?.(post)}>
-          {/* Regular post */}
+          {/* Header without avatar (since avatar is in left column) */}
           <PostHeader
             post={post}
             onDeletePost={onDeletePost}
             onEditPost={onEditPost}
+            onPressUser={handleUserPress}
           />
-          <PostBody
-            post={post}
-            externalRefreshTrigger={externalRefreshTrigger}
-          />
-          <PostFooter post={post} />
-        </TouchableOpacity>
-      )}
+
+          {/* Retweet content */}
+          {isRetweet ? (
+            <View style={retweetStyles.retweetedContent}>
+              {/* Quote retweet text */}
+              {isQuoteRetweet && (
+                <View style={retweetStyles.quoteContent}>
+                  {post.sections.map(section => (
+                    <Text key={section.id} style={retweetStyles.quoteText}>
+                      {section.text}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Original post content */}
+              {post.retweetOf && (
+                <TouchableOpacity
+                  style={retweetStyles.originalPostContainer}
+                  activeOpacity={0.8}
+                  onPress={() => onPressPost?.(post.retweetOf!)}>
+                  <PostHeader
+                    post={post.retweetOf}
+                    onDeletePost={onDeletePost}
+                    onEditPost={onEditPost}
+                    onPressUser={handleUserPress}
+                  />
+                  <PostBody
+                    post={post.retweetOf}
+                    externalRefreshTrigger={externalRefreshTrigger}
+                    isRetweet={true}
+                  />
+                  <PostFooter
+                    post={post.retweetOf}
+                    onPressComment={() => onPressPost?.(post.retweetOf!)}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => onPressPost?.(post)}>
+              {/* Regular post content */}
+              <PostBody
+                post={post}
+                externalRefreshTrigger={externalRefreshTrigger}
+              />
+              <PostFooter post={post} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
     </View>
   );
 });
@@ -159,6 +184,10 @@ const PostsTab = memo(({
   const dispatch = useAppDispatch();
   const userWallet = useAppSelector(state => state.auth.address);
 
+  // Add edit modal state
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [postToEdit, setPostToEdit] = useState<ThreadPost | null>(null);
+
   const handleDeletePost = useCallback((post: ThreadPost) => {
     if (post.user.id !== userWallet) {
       alert('You are not the owner of this post.');
@@ -172,7 +201,8 @@ const PostsTab = memo(({
       alert('You are not the owner of this post.');
       return;
     }
-    // Editing logic would be here
+    setPostToEdit(post);
+    setEditModalVisible(true);
   }, [userWallet]);
 
   // Empty state check
@@ -194,16 +224,30 @@ const PostsTab = memo(({
   const keyExtractor = useCallback((post: ThreadPost) => post.id, []);
 
   return (
-    <FlatList
-      data={posts}
-      renderItem={renderPost}
-      keyExtractor={keyExtractor}
-      contentContainerStyle={styles.postList}
-      removeClippedSubviews={true} // Optimize memory usage
-      maxToRenderPerBatch={10}     // Optimize render performance
-      windowSize={5}               // Optimize render window
-      initialNumToRender={7}       // Initial render batch size
-    />
+    <>
+      <FlatList
+        data={posts}
+        renderItem={renderPost}
+        keyExtractor={keyExtractor}
+        contentContainerStyle={styles.postList}
+        removeClippedSubviews={true} // Optimize memory usage
+        maxToRenderPerBatch={10}     // Optimize render performance
+        windowSize={5}               // Optimize render window
+        initialNumToRender={7}       // Initial render batch size
+      />
+
+      {/* Edit Post Modal */}
+      {postToEdit && (
+        <EditPostModal
+          post={postToEdit}
+          isVisible={editModalVisible}
+          onClose={() => {
+            setEditModalVisible(false);
+            setPostToEdit(null);
+          }}
+        />
+      )}
+    </>
   );
 });
 

@@ -100,7 +100,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
 
   const isMounted = useRef(true);
   const pendingTokenOps = useRef<{ input: boolean, output: boolean }>({ input: false, output: false });
-  
+
   // Animation refs for smooth transitions
   const bottomActionAnimation = useRef(new Animated.Value(0)).current;
   const slideAnimation = useRef(new Animated.Value(0)).current;
@@ -149,7 +149,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
   useEffect(() => {
     if (swaps.length > 0) {
       const tokenAddresses: string[] = [];
-      
+
       swaps.forEach(swap => {
         if (swap.inputToken?.mint) {
           tokenAddresses.push(swap.inputToken.mint);
@@ -161,9 +161,12 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
 
       // Remove duplicates
       const uniqueAddresses = [...new Set(tokenAddresses)];
-      
+
       if (uniqueAddresses.length > 0) {
-        fetchMetadataForTokens(uniqueAddresses);
+        fetchMetadataForTokens(uniqueAddresses)
+          .catch((error) => {
+            console.error('[ShareTradeModal] Error fetching token metadata:', error);
+          });
       }
     }
   }, [swaps, fetchMetadataForTokens]);
@@ -254,45 +257,76 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
   }, [selectedPastSwap]);
 
   const createTradeDataFromSwap = useCallback(async (swap: EnhancedSwapTransaction): Promise<TradeData> => {
-    const inputQty = swap.inputToken.amount / Math.pow(10, swap.inputToken.decimals);
-    const outputQty = swap.outputToken.amount / Math.pow(10, swap.outputToken.decimals);
-    const timestampMs = swap.timestamp < 10000000000 ? swap.timestamp * 1000 : swap.timestamp;
-
-    let inputUsdValue: string;
-    let outputUsdValue: string;
-
-    if ('volumeUsd' in swap && swap.volumeUsd !== undefined && typeof swap.volumeUsd === 'number') {
-      inputUsdValue = `$${swap.volumeUsd.toFixed(2)}`;
-      outputUsdValue = `$${swap.volumeUsd.toFixed(2)}`;
-    } else {
-      inputUsdValue = await estimateTokenUsdValue(
-        swap.inputToken.amount,
-        swap.inputToken.decimals,
-        swap.inputToken.mint,
-        swap.inputToken.symbol
-      );
-      outputUsdValue = await estimateTokenUsdValue(
-        swap.outputToken.amount,
-        swap.outputToken.decimals,
-        swap.outputToken.mint,
-        swap.outputToken.symbol
-      );
+    // Validate swap data
+    if (!swap || !swap.inputToken || !swap.outputToken) {
+      throw new Error('Invalid swap data: missing token information');
     }
 
-    return {
-      inputMint: swap.inputToken.mint,
-      outputMint: swap.outputToken.mint,
-      aggregator: 'Jupiter',
-      inputSymbol: swap.inputToken.symbol || 'Unknown',
-      inputQuantity: inputQty.toFixed(4),
-      inputUsdValue,
-      outputSymbol: swap.outputToken.symbol || 'Unknown',
-      inputAmountLamports: String(swap.inputToken.amount),
-      outputAmountLamports: String(swap.outputToken.amount),
-      outputQuantity: outputQty.toFixed(4),
-      outputUsdValue,
-      executionTimestamp: timestampMs,
-    };
+    if (!swap.inputToken.mint || !swap.outputToken.mint) {
+      throw new Error('Invalid swap data: missing token mint addresses');
+    }
+
+    if (typeof swap.inputToken.amount !== 'number' || typeof swap.outputToken.amount !== 'number') {
+      throw new Error('Invalid swap data: token amounts must be numbers');
+    }
+
+    if (typeof swap.inputToken.decimals !== 'number' || typeof swap.outputToken.decimals !== 'number') {
+      throw new Error('Invalid swap data: token decimals must be numbers');
+    }
+
+    try {
+      const inputQty = swap.inputToken.amount / Math.pow(10, swap.inputToken.decimals);
+      const outputQty = swap.outputToken.amount / Math.pow(10, swap.outputToken.decimals);
+      const timestampMs = swap.timestamp < 10000000000 ? swap.timestamp * 1000 : swap.timestamp;
+
+      let inputUsdValue: string;
+      let outputUsdValue: string;
+
+      if ('volumeUsd' in swap && swap.volumeUsd !== undefined && typeof swap.volumeUsd === 'number' && swap.volumeUsd > 0) {
+        inputUsdValue = `$${swap.volumeUsd.toFixed(2)}`;
+        outputUsdValue = `$${swap.volumeUsd.toFixed(2)}`;
+      } else {
+        try {
+          inputUsdValue = await estimateTokenUsdValue(
+            swap.inputToken.amount,
+            swap.inputToken.decimals,
+            swap.inputToken.mint,
+            swap.inputToken.symbol
+          );
+          outputUsdValue = await estimateTokenUsdValue(
+            swap.outputToken.amount,
+            swap.outputToken.decimals,
+            swap.outputToken.mint,
+            swap.outputToken.symbol
+          );
+        } catch (error) {
+          console.warn('[ShareTradeModal] Failed to estimate USD values:', error);
+          inputUsdValue = '$0.00';
+          outputUsdValue = '$0.00';
+        }
+      }
+
+      const tradeData = {
+        inputMint: swap.inputToken.mint,
+        outputMint: swap.outputToken.mint,
+        aggregator: 'Jupiter',
+        inputSymbol: swap.inputToken.symbol || 'Unknown',
+        inputQuantity: inputQty.toFixed(4),
+        inputUsdValue,
+        outputSymbol: swap.outputToken.symbol || 'Unknown',
+        inputAmountLamports: String(swap.inputToken.amount),
+        outputAmountLamports: String(swap.outputToken.amount),
+        outputQuantity: outputQty.toFixed(4),
+        outputUsdValue,
+        executionTimestamp: timestampMs,
+      };
+
+      return tradeData;
+
+    } catch (error) {
+      console.error('[ShareTradeModal] Error creating trade data:', error);
+      throw new Error(`Failed to process swap data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }, []);
 
   const handlePastSwapSelected = useCallback((swap: EnhancedSwapTransaction) => {
@@ -367,7 +401,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
-    
+
     if (diffHours < 1) {
       return 'Just now';
     } else if (diffHours < 24) {
@@ -376,7 +410,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
       return `${Math.floor(diffHours / 24)}d ago`;
     }
   }, []);
-  
+
   const renderSwapsList = () => {
     // Show skeletons during initial loading
     if (initialLoading && swaps.length === 0) {
@@ -433,61 +467,87 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
           // Show actual content
           <FlatList
             data={swaps}
-            renderItem={({ item }) => {
-            const isSelected = selectedPastSwap?.uniqueId === item?.uniqueId;
+            renderItem={({ item, index }) => {
+              const isSelected = selectedPastSwap?.uniqueId === item?.uniqueId;
 
-            // Ensure we have valid item data
-            if (!item || !item.inputToken || !item.outputToken) {
-              return null;
-            }
+              // Ensure we have valid item data
+              if (!item || !item.inputToken || !item.outputToken) {
+                return null;
+              }
 
-            return (
-              <View style={styles.swapItemWrapper}>
-                <TouchableOpacity
-                  style={[
-                    isSelected ? styles.swapItemSelected : styles.swapItemUnselected,
-                    { position: 'relative' },
-                    refreshing && { opacity: 0.6 }
-                  ]}
-                  onPress={() => handlePastSwapSelected(item)}
-                  activeOpacity={0.7}
-                  disabled={refreshing}>
-                  
-                  {isSelected && (
-                    <View style={styles.swapItemCheckmark}>
-                      <FontAwesome5 name="check" size={12} color={COLORS.white} />
+              // Additional validation
+              if (!item.inputToken.mint || !item.outputToken.mint) {
+                return null;
+              }
+
+              return (
+                <View style={styles.swapItemWrapper}>
+                  <TouchableOpacity
+                    style={[
+                      isSelected ? styles.swapItemSelected : styles.swapItemUnselected,
+                      { position: 'relative' },
+                      refreshing && { opacity: 0.6 }
+                    ]}
+                    onPress={() => {
+                      handlePastSwapSelected(item);
+                    }}
+                    activeOpacity={0.7}
+                    disabled={refreshing}>
+
+                    {isSelected && (
+                      <View style={styles.swapItemCheckmark}>
+                        <FontAwesome5 name="check" size={12} color={COLORS.white} />
+                      </View>
+                    )}
+
+                    <View style={{ padding: 16 }}>
+                      <PastSwapItem
+                        swap={item}
+                        onSelect={() => { }}
+                        selected={isSelected}
+                        inputTokenLogoURI={getTokenLogoUrl(item.inputToken?.mint) || undefined}
+                        outputTokenLogoURI={getTokenLogoUrl(item.outputToken?.mint) || undefined}
+                        isMultiHop={item.isMultiHop}
+                        hopCount={item.hopCount}
+                      />
                     </View>
-                  )}
-                  
-                  <View style={{ padding: 16 }}>
-                    <PastSwapItem
-                      swap={item}
-                      onSelect={() => {}}
-                      selected={isSelected}
-                      inputTokenLogoURI={getTokenLogoUrl(item.inputToken?.mint) || undefined}
-                      outputTokenLogoURI={getTokenLogoUrl(item.outputToken?.mint) || undefined}
-                    />
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                </View>
+              );
+            }}
+            keyExtractor={(item, index) => {
+              // Improved key extraction with fallbacks
+              if (item?.uniqueId) return item.uniqueId;
+              if (item?.signature) return item.signature;
+              return `swap-${index}-${item?.timestamp || Date.now()}`;
+            }}
+            contentContainerStyle={styles.swapsList}
+            showsVerticalScrollIndicator={true}
+            initialNumToRender={5}
+            onRefresh={forceRefreshPastSwaps}
+            refreshing={false}
+            ListHeaderComponent={
+              <View style={styles.listHeaderContainer}>
+                <Text style={styles.swapsCountText}>
+                  {swaps.length > 0 ? `${swaps.length} ${swaps.length === 1 ? 'swap' : 'swaps'} found` : ''}
+                  {apiError && swaps.length > 0 ? ' (Error loading more)' : ''}
+                  {metadataLoading ? ' • Loading token info...' : ''}
+                </Text>
+                {swaps.length > 0 && <View style={styles.swapsListDivider} />}
               </View>
-            );
-          }}
-          keyExtractor={(item, index) => item?.uniqueId || item?.signature || `swap-${index}`}
-          contentContainerStyle={styles.swapsList}
-          showsVerticalScrollIndicator={true}
-          initialNumToRender={5}
-          onRefresh={forceRefreshPastSwaps}
-          refreshing={false}
-          ListHeaderComponent={
-            <View style={styles.listHeaderContainer}>
-              <Text style={styles.swapsCountText}>
-                {swaps.length > 0 ? `${swaps.length} ${swaps.length === 1 ? 'swap' : 'swaps'} found` : ''}
-                {apiError && swaps.length > 0 ? ' (Error loading more)' : ''} 
-              </Text>
-              {swaps.length > 0 && <View style={styles.swapsListDivider} />}
-            </View>
-          }
-        />
+            }
+            ListEmptyComponent={
+              !initialLoading && !refreshing ? (
+                <View style={styles.emptySwapsList}>
+                  <View style={styles.emptySwapsIcon}>
+                    <FontAwesome5 name="exchange-alt" size={24} color={COLORS.white} />
+                  </View>
+                  <Text style={styles.emptySwapsText}>No Swaps Available</Text>
+                  <Text style={styles.emptySwapsSubtext}>Unable to load swap data</Text>
+                </View>
+              ) : null
+            }
+          />
         )}
       </View>
     );
@@ -524,7 +584,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
                 {formatSwapTimestamp(selectedPastSwap.timestamp)}
               </Text>
             </View>
-            
+
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <TouchableOpacity
                 style={styles.quickShareButton}
@@ -533,7 +593,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
                 <FontAwesome5 name="share" size={12} color={COLORS.brandBlue} />
                 <Text style={styles.quickShareButtonText}>Share</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={styles.continueButton}
                 onPress={handleContinueToMessage}
@@ -556,7 +616,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
         <Text style={styles.selectedSwapHeader}>Selected Swap</Text>
         <PastSwapItem
           swap={selectedPastSwap}
-          onSelect={() => {}}
+          onSelect={() => { }}
           selected={true}
           inputTokenLogoURI={getTokenLogoUrl(selectedPastSwap.inputToken?.mint) || undefined}
           outputTokenLogoURI={getTokenLogoUrl(selectedPastSwap.outputToken?.mint) || undefined}
@@ -614,7 +674,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
   );
 
   const renderMessageInputScreen = () => (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.keyboardAvoidingContainer}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
@@ -634,7 +694,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
 
       <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
         {renderSelectedSwapPreview()}
-        
+
         <View style={styles.messageInputContainer}>
           <Text style={styles.messageInputLabel}>Message (Optional)</Text>
           <View style={{ position: 'relative', flex: 1 }}>
@@ -649,6 +709,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
               returnKeyType="done"
               textAlignVertical="top"
               autoFocus
+              keyboardAppearance="dark"
             />
             {messageText.length > 0 && (
               <Text style={styles.characterCount}>
@@ -683,7 +744,7 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
       </View>
     </KeyboardAvoidingView>
   );
-  
+
   return (
     <Modal
       visible={visible}
@@ -703,8 +764,8 @@ export const ShareTradeModal = forwardRef<ShareTradeModalRef, UpdatedTradeModalP
             <TouchableWithoutFeedback>
               <View style={{ flex: 1 }}>
                 <View style={styles.dragHandle} />
-                {currentScreen === 'SWAP_SELECTION' 
-                  ? renderSwapSelectionScreen() 
+                {currentScreen === 'SWAP_SELECTION'
+                  ? renderSwapSelectionScreen()
                   : renderMessageInputScreen()
                 }
                 {!!resultMsg && (

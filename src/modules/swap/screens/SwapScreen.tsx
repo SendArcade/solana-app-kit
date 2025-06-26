@@ -39,12 +39,17 @@ type SwapScreenRouteProp = RouteProp<RootStackParamList, 'SwapScreen'>;
 type SwapScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'SwapScreen'>;
 
 // Swap providers
-const swapProviders: SwapProvider[] = ['Jupiter', 'Raydium', 'PumpSwap'];
+const swapProviders: SwapProvider[] = ['JupiterUltra', 'Raydium'/* , 'PumpSwap' */];
 
 export default function SwapScreen() {
   const navigation = useNavigation<SwapScreenNavigationProp>();
   const route = useRoute<SwapScreenRouteProp>();
-  const { publicKey: userPublicKey, connected, sendTransaction } = useWallet();
+  const { 
+    publicKey: userPublicKey, 
+    connected, 
+    sendTransaction,
+    sendBase64Transaction
+  } = useWallet();
 
   // Get parameters from route if they exist
   const routeParams = route.params || {};
@@ -93,6 +98,8 @@ export default function SwapScreen() {
     // Action handlers
     handleTokenSelected,
     handleMaxButtonClick,
+    handlePercentageButtonClick,
+    handleClearButtonClick,
     handleKeyPress,
     handleSwap,
     viewTransaction,
@@ -101,7 +108,45 @@ export default function SwapScreen() {
     isSwapButtonEnabled,
     pendingTokenOps,
     handleSwapTokens,
-  } = useSwapLogic(routeParams as SwapRouteParams, userPublicKey, connected, sendTransaction, navigation);
+  } = useSwapLogic(routeParams as SwapRouteParams, userPublicKey, connected, { sendTransaction, sendBase64Transaction }, navigation);
+
+  // Helper function to determine swap button text with user feedback
+  const getSwapButtonText = () => {
+    if (!connected) {
+      return 'Connect Wallet to Swap';
+    }
+
+    if (!isProviderAvailable(activeProvider)) {
+      return `${activeProvider} Coming Soon`;
+    }
+
+    if (activeProvider === 'PumpSwap' && !poolAddress) {
+      return 'Enter Pool Address';
+    }
+
+    if (loading) {
+      return 'Swapping...';
+    }
+
+    // Check if amount exceeds balance
+    const inputAmount = parseFloat(inputValue || '0');
+    if (inputAmount > 0 && currentBalance !== null && inputAmount > currentBalance) {
+      return `Insufficient ${inputToken?.symbol || 'Token'} Balance`;
+    }
+
+    // Check if amount is invalid
+    if (inputAmount <= 0) {
+      return 'Enter Amount to Swap';
+    }
+
+    return `Swap via ${activeProvider}`;
+  };
+
+  // Helper function to determine if we're in insufficient balance state
+  const isInsufficientBalance = () => {
+    const inputAmount = parseFloat(inputValue || '0');
+    return inputAmount > 0 && currentBalance !== null && inputAmount > currentBalance;
+  };
 
   // Handle paste from clipboard for transaction signatures
   const handlePasteFromClipboard = async () => {
@@ -204,13 +249,36 @@ export default function SwapScreen() {
                   />
                 </View>
 
-                {/* Max Button */}
-                <TouchableOpacity
-                  style={styles.maxButtonContainer}
-                  onPress={handleMaxButtonClick}
-                >
-                  <Text style={styles.maxButtonText}>MAX</Text>
-                </TouchableOpacity>
+                {/* Percentage Buttons */}
+                <View style={styles.percentageButtonsContainer}>
+                  <TouchableOpacity
+                    style={styles.percentageButton}
+                    onPress={handleMaxButtonClick}
+                  >
+                    <Text style={styles.percentageButtonText}>MAX</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.percentageButton}
+                    onPress={() => handlePercentageButtonClick(25)}
+                  >
+                    <Text style={styles.percentageButtonText}>25%</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.percentageButton}
+                    onPress={() => handlePercentageButtonClick(50)}
+                  >
+                    <Text style={styles.percentageButtonText}>50%</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.clearButton}
+                    onPress={handleClearButtonClick}
+                  >
+                    <Text style={styles.clearButtonText}>CLEAR</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Status Messages */}
@@ -237,16 +305,21 @@ export default function SwapScreen() {
               style={[
                 styles.swapActionButton,
                 !isSwapButtonEnabled() && { opacity: 0.6 },
+                isInsufficientBalance() && {
+                  backgroundColor: '#FF6B6B', // Reddish color for insufficient balance
+                  borderWidth: 1,
+                  borderColor: '#FF4444'
+                },
                 Platform.OS === 'android' && androidStyles.swapActionButton
               ]}
               onPress={handleSwap}
               disabled={!isSwapButtonEnabled()}
             >
-              <Text style={styles.swapActionButtonText}>
-                {!connected ? 'Connect Wallet to Swap' :
-                  !isProviderAvailable(activeProvider) ? `${activeProvider} Coming Soon` :
-                    activeProvider === 'PumpSwap' && !poolAddress ? 'Enter Pool Address' :
-                      loading ? 'Swapping...' : `Swap via ${activeProvider}`}
+              <Text style={[
+                styles.swapActionButtonText,
+                isInsufficientBalance() && { color: '#FFFFFF' } // White text on red background
+              ]}>
+                {getSwapButtonText()}
               </Text>
             </TouchableOpacity>
           </View>

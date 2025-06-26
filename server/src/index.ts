@@ -11,6 +11,7 @@ import { launchRouter } from './routes/pumpfun/pumpfunLaunch';
 // import { buildCompressedNftListingTx } from './utils/compressedNftListing';
 import knex from './db/knex';
 import jupiterSwapRouter from './routes/swap/jupiterSwapRoutes';
+import jupiterUltraSwapRouter from './routes/swap/jupiterUltraSwapRoutes';
 import raydiumSwapRouter from './routes/swap/raydiumSwapRoutes';
 import { threadImageRouter } from './routes/feed/threadImageRoutes';
 import tokenMillRouter from './routes/tokenmill/tokenMillRoutes';
@@ -30,6 +31,7 @@ import { setupConnection } from './utils/connection';
 import raydiumLaunchpadRoutes from './routes/raydium/launchpad.routes';
 import nftRoutes from './routes/nft';
 import notificationRoutes from './routes/notifications/notificationRoutes';
+import luloRouter from './routes/lulo';
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
@@ -40,11 +42,11 @@ app.set('trust proxy', true);
 
 // Add CORS middleware with expanded options for WebSocket
 const corsOptions = {
-  origin: '*', // Or restrict to specific origins in production
+  origin: '*', // This should work for development
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Forwarded-Proto', 'X-Requested-With', 'Accept'],
   credentials: true,
-  maxAge: 86400 // 24 hours for preflight cache
+  maxAge: 86400
 };
 app.use(cors(corsOptions));
 
@@ -167,10 +169,36 @@ app.get('/api/websocket-status', (req, res) => {
   });
 });
 
+// Setup connection to Solana
+setupConnection();
+
+// Add App Runner specific health check endpoints
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    service: 'Solana App Kit API',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0'
+  });
+});
+
+// Add health check endpoint that App Runner expects
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    memory: process.memoryUsage(),
+    version: process.version
+  });
+});
+
 // Use the routes
 app.use('/api/pumpfun', launchRouter);
 app.use('/api', threadRouter);
 app.use('/api/jupiter', jupiterSwapRouter);
+app.use('/api/jupiter/ultra', jupiterUltraSwapRouter);
 app.use('/api/raydium/swap', raydiumSwapRouter);
 app.use('/api/raydium/launchpad', raydiumLaunchpadRoutes);
 app.use('/api/profile', profileImageRouter);
@@ -184,6 +212,7 @@ app.use('/api/chat', chatRouter); // Add the chat routes
 app.use('/api/meteora', meteoraDBCRouter);
 app.use('/api/nft', nftRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/lulo', luloRouter);
 
 // app.post('/api/build-compressed-nft-listing-tx', async (req: any, res: any) => {
 //   try {
@@ -195,23 +224,29 @@ app.use('/api/notifications', notificationRoutes);
 //   }
 // });
 
-// Setup connection to Solana
-setupConnection();
-
 // Start the Express server.
 // Note: We now try connecting to the database and running migrations,
 // but if these fail we log the error and continue to start the server.
-const PORT = process.env.PORT || 8080;
+const PORT = parseInt(process.env.PORT || '8080', 10);
+const HOST = '0.0.0.0'; // Critical for App Runner health checks
 
 (async function startServer() {
-  await testDbConnection();
-  await runMigrationsAndStartServer();
-  
-  // Use the HTTP server instead of app.listen
-  server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
+  // Start server immediately for health checks - critical for App Runner
+  server.listen(PORT, HOST, () => {
+    console.log(`Server listening on ${HOST}:${PORT}`);
     console.log(`WebSocket server initialized. Environment: ${process.env.NODE_ENV}`);
     console.log(`Server started at: ${new Date().toISOString()}`);
     console.log(`WebSocket enabled: ${process.env.WEBSOCKET_ENABLED || 'true'}`);
+    console.log(`Health checks available at: http://${HOST}:${PORT}/health`);
   });
+
+  // Run async operations after server starts to not block health checks
+  try {
+    await testDbConnection();
+    await runMigrationsAndStartServer();
+    console.log('✅ Database and migrations completed successfully');
+  } catch (error) {
+    console.error('⚠️ Database/migration setup failed, but server is running:', error);
+    // Server continues running even if DB fails - important for App Runner
+  }
 })();

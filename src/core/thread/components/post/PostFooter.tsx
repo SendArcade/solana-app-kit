@@ -26,6 +26,8 @@ import {
   undoRetweetLocally,
   addRetweetLocally,
   updatePostAsync,
+  setActiveReactionTray,
+  closeReactionTray,
 } from '@/shared/state/thread/reducer';
 import { nanoid } from '@reduxjs/toolkit';
 import { DEFAULT_IMAGES } from '@/shared/config/constants';
@@ -51,6 +53,12 @@ interface SimpleRetweetDrawerProps {
   hasAlreadyRetweeted: boolean;
   onDirectRepost: () => Promise<void>;
   onUndoRepost: () => Promise<void>;
+}
+
+// Add interface for reaction data
+interface ReactionData {
+  count: number;
+  timestamp?: number;
 }
 
 // Simplified inline RetweetDrawer component
@@ -239,6 +247,7 @@ function SimpleRetweetDrawer({
                 value={retweetText}
                 onChangeText={setRetweetText}
                 autoFocus
+                keyboardAppearance="dark"
               />
 
               <View style={drawerStyles.quoteButtons}>
@@ -291,13 +300,16 @@ export default function PostFooter({
   const [localReactionCount, setLocalReactionCount] = useState(post.reactionCount);
   const [localRetweetCount, setLocalRetweetCount] = useState(post.retweetCount);
   const [localQuoteCount, setLocalQuoteCount] = useState(post.quoteCount);
-  const [showReactions, setShowReactions] = useState(false);
   const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
   const [showRetweetDrawer, setShowRetweetDrawer] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const [commentPressed, setCommentPressed] = useState(false);
   const [isReactionProcessing, setIsReactionProcessing] = useState(false);
+
+  // Get global reaction tray state from Redux
+  const activeReactionTrayPostId = useAppSelector(state => state.thread.activeReactionTrayPostId);
+  const showReactions = activeReactionTrayPostId === post.id;
 
   // Animation refs for reactions
   const reactionButtonScale = useRef(new Animated.Value(1)).current;
@@ -385,14 +397,34 @@ export default function PostFooter({
     }
   }, [updatedPost.reactionCount, updatedPost.reactions, post.reactionCount, reactionPillsOpacity]);
 
+  // Handle animation when global reaction tray state changes
+  useEffect(() => {
+    if (showReactions) {
+      // Animate in when this tray becomes active
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      // Animate out when this tray becomes inactive
+      Animated.timing(scaleAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showReactions, scaleAnim]);
+
   const closeReactionBubble = () => {
-    Animated.timing(scaleAnim, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => {
-      setShowReactions(false);
-    });
+    dispatch(closeReactionTray(post.id));
   };
 
   useEffect(() => {
@@ -430,7 +462,7 @@ export default function PostFooter({
     setIsReactionProcessing(true);
 
     // Close reaction bubble immediately for better UX
-    setShowReactions(false);
+    dispatch(closeReactionTray(post.id));
     Animated.timing(scaleAnim, {
       toValue: 0,
       duration: 150,
@@ -493,20 +525,14 @@ export default function PostFooter({
   };
 
   const handleShowReactions = () => {
-    setShowReactions(true);
-    // Animate in with a bounce effect
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 1.1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    // If this post's tray is already open, close it
+    if (showReactions) {
+      dispatch(closeReactionTray(post.id));
+      return;
+    }
+
+    // Otherwise, open this post's tray (which will close any other open tray)
+    dispatch(setActiveReactionTray(post.id));
   };
 
   const handleOpenRetweetDrawer = () => {
@@ -515,16 +541,39 @@ export default function PostFooter({
 
   // Render existing reactions
   const renderExistingReactions = () => {
+    // Debug logging
+    // console.log('[PostFooter] renderExistingReactions - updatedPost.reactions:', updatedPost.reactions);
+    // console.log('[PostFooter] renderExistingReactions - typeof reactions:', typeof updatedPost.reactions);
+    // console.log('[PostFooter] renderExistingReactions - Object.keys length:', updatedPost.reactions ? Object.keys(updatedPost.reactions).length : 'null/undefined');
+
     if (
       !updatedPost.reactions ||
       Object.keys(updatedPost.reactions).length === 0
     ) {
+      // console.log('[PostFooter] renderExistingReactions - returning null (no reactions)');
       return null;
     }
 
-    const reactionEntries = Object.entries(updatedPost.reactions || {});
+    // Convert reactions to array and sort by timestamp (oldest first)
+    const reactionEntries = Object.entries(updatedPost.reactions || {})
+      .sort((a, b) => {
+        const aData = typeof a[1] === 'number' ? { count: a[1] } : a[1] as ReactionData;
+        const bData = typeof b[1] === 'number' ? { count: b[1] } : b[1] as ReactionData;
+
+        // If timestamps exist, sort by them
+        if (aData.timestamp && bData.timestamp) {
+          return aData.timestamp - bData.timestamp;
+        }
+        // If no timestamps, maintain original order
+        return 0;
+      })
+      .map(([emoji, data]): [string, number] => [String(emoji), typeof data === 'number' ? data : (data as ReactionData).count]);
+
     const userReaction = updatedPost.userReaction;
-    const totalReactions = Object.values(updatedPost.reactions || {}).reduce((a: number, b) => a + (typeof b === 'number' ? b : 0), 0);
+    const totalReactions = Object.values(updatedPost.reactions || {}).reduce((a: number, b) => {
+      const count = typeof b === 'number' ? b : (b as ReactionData).count;
+      return a + count;
+    }, 0);
 
     // If there are many reactions, show a compact summary
     if (reactionEntries.length > 3) {
@@ -694,8 +743,10 @@ export default function PostFooter({
         </TouchableWithoutFeedback>
       )}
 
-      <View style={styles.itemIconsRow}>
-        <View style={{ flexDirection: 'row', gap: 16 }}>
+      {/* New flex row: left icons and right reactions */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        {/* Left icons */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {/* Comment icon */}
           <TouchableOpacity
             style={[
@@ -752,17 +803,11 @@ export default function PostFooter({
                 ]}
                 disabled={isReactionProcessing}
               >
-                {updatedPost.userReaction ? (
-                  <Text style={reactionStyles.userReactionIcon}>
-                    {updatedPost.userReaction}
-                  </Text>
-                ) : (
-                  <Icons.ReactionIdle
-                    width={20}
-                    height={20}
-                    color={updatedPost.userReaction ? COLORS.brandBlue : undefined}
-                  />
-                )}
+                <Icons.ReactionIdle
+                  width={20}
+                  height={20}
+                  color={updatedPost.userReaction ? COLORS.brandBlue : undefined}
+                />
               </TouchableOpacity>
             </Animated.View>
             <Animated.Text style={[
@@ -784,7 +829,7 @@ export default function PostFooter({
                   },
                 ]}>
                 <View style={reactionStyles.emojiRow}>
-                  {['👍', '🚀', '❤️', '😂'].map((emoji, index) => {
+                  {['🚀', '❤️', '😂'].map((emoji, index) => {
                     const isSelected = updatedPost.userReaction === emoji;
                     return (
                       <TouchableOpacity
@@ -822,8 +867,10 @@ export default function PostFooter({
           </View>
         </View>
 
-        {/* Right side - Display existing reactions inline */}
-        {renderExistingReactions()}
+        {/* Right: Reacted emoji pill */}
+        <View style={{ flexShrink: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', minWidth: 0 }}>
+          {renderExistingReactions()}
+        </View>
       </View>
 
       {/* Use our inline SimpleRetweetDrawer component */}
@@ -890,13 +937,21 @@ const reactionStyles = StyleSheet.create({
     borderRadius: 12,
   },
   selectedEmojiButton: {
-    backgroundColor: COLORS.darkerBackground,
+    backgroundColor: COLORS.brandBlue,
+    borderWidth: 2,
+    borderColor: COLORS.white,
+    shadowColor: COLORS.brandBlue,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   emojiText: {
     fontSize: TYPOGRAPHY.size.lg,
   },
   selectedEmojiText: {
     transform: [{ scale: 1.1 }],
+    color: COLORS.white,
+    fontWeight: 'bold',
   },
   reactionButton: {
     padding: 4,

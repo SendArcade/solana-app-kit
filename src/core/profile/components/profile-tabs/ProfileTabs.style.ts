@@ -37,6 +37,31 @@ export const styles = StyleSheet.create({
     // Android elevation
     elevation: 2,
   },
+  
+  // Twitter-like post layout
+  postItemContainer: {
+    flexDirection: 'row',
+  },
+  
+  avatarColumn: {
+    width: 40,
+    alignItems: 'flex-start',
+    marginRight: 12,
+    paddingTop: 2,
+  },
+  
+  contentColumn: {
+    flex: 1,
+    minWidth: 0,
+  },
+  
+  // Avatar styling
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  
   replyLabel: {
     alignSelf: 'flex-start',
     paddingHorizontal: 8,

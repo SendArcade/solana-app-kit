@@ -30,6 +30,10 @@ const initialState: AuthState = {
 
 const SERVER_BASE_URL = SERVER_URL || 'http://localhost:3000';
 
+// Debug environment variable loading
+console.log('[Auth Reducer] SERVER_URL from @env:', SERVER_URL);
+console.log('[Auth Reducer] SERVER_BASE_URL resolved to:', SERVER_BASE_URL);
+
 /**
  * Fetch the user's profile from the server, including profile pic URL, username,
  * and attachment data.
@@ -287,6 +291,9 @@ const authSlice = createSlice({
       if (action.payload.description || !state.description) {
         state.description = action.payload.description || state.description;
       }
+
+      // If no profile picture is set after login, we'll let the fetchUserProfile handle avatar generation
+      // This way we don't duplicate avatar generation logic here
     },
     logoutSuccess(state) {
       console.log('[AuthReducer] logoutSuccess: Resetting state.');

@@ -12,6 +12,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  TouchableWithoutFeedback,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { styles, modalOverlayStyles } from './transferBalanceButton.style';
 import { useAppSelector, useAppDispatch } from '@/shared/hooks/useReduxHooks';
@@ -33,6 +37,9 @@ import SelectTokenModal from '@/modules/swap/components/SelectTokenModal';
 import COLORS from '@/assets/colors';
 import TYPOGRAPHY from '@/assets/typography';
 import { ENDPOINTS } from '@/shared/config/constants';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const { height: windowHeight } = Dimensions.get('window');
 
 export interface TransferBalanceButtonProps {
   amIFollowing?: boolean;
@@ -99,6 +106,49 @@ const TransferBalanceButton: React.FC<TransferBalanceButtonProps> = ({
   const transactionState = useAppSelector(state => state.transaction);
 
   const {wallet, address, isMWA} = useWallet();
+
+  const insets = useSafeAreaInsets();
+
+  // --- Drag-to-dismiss state ---
+  const drawerTranslateY = useRef(new Animated.Value(windowHeight)).current;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, { dy }) => {
+        if (dy > 0) {
+          drawerTranslateY.setValue(dy);
+        }
+      },
+      onPanResponderRelease: (_, { dy, vy }) => {
+        if (dy > 150 || vy > 0.5) {
+          // Animate out (close)
+          Animated.timing(drawerTranslateY, {
+            toValue: windowHeight,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            setSendModalVisible(false);
+            drawerTranslateY.setValue(windowHeight);
+          });
+        } else {
+          // Snap back to open
+          Animated.timing(drawerTranslateY, {
+            toValue: 0,
+            duration: 100,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  useEffect(() => {
+    if (sendModalVisible) {
+      drawerTranslateY.setValue(0);
+    } else {
+      drawerTranslateY.setValue(windowHeight);
+    }
+  }, [sendModalVisible, drawerTranslateY]);
 
   useEffect(() => {
     if (externalModalVisible !== undefined && externalModalVisible !== sendModalVisible) {
@@ -457,246 +507,261 @@ const TransferBalanceButton: React.FC<TransferBalanceButtonProps> = ({
         transparent={true}
         visible={sendModalVisible}
         onRequestClose={() => setSendModalVisible(false)}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={modalOverlayStyles.overlay}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-          ref={keyboardAvoidingRef}
-        >
-          <View style={modalOverlayStyles.drawerContainer} ref={modalRef}>
-            <View style={modalOverlayStyles.dragHandle} />
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={modalOverlayStyles.scrollContent}>
-              <Text style={modalOverlayStyles.title}>Send {selectedToken.symbol}</Text>
-
-              {/* Token Selection Row */}
-              <TouchableOpacity
-                style={modalOverlayStyles.tokenRow}
-                onPress={() => setShowSelectTokenModal(true)}
-              >
-                {selectedToken.logoURI ? (
-                  <Image source={{ uri: selectedToken.logoURI }} style={modalOverlayStyles.tokenIcon} />
-                ) : (
-                  <View style={[modalOverlayStyles.tokenIcon, { backgroundColor: COLORS.lighterBackground, justifyContent: 'center', alignItems: 'center' }]}>
-                    <Text style={{ color: COLORS.white, fontWeight: 'bold', fontSize: 10 }}>
-                      {selectedToken.symbol?.charAt(0) || '?'}
-                    </Text>
-                  </View>
-                )}
-                <View style={modalOverlayStyles.tokenInfo}>
-                  <Text style={modalOverlayStyles.tokenSymbol} numberOfLines={1} ellipsizeMode="tail">
-                    {selectedToken.symbol}
-                  </Text>
-                  {currentBalance !== null && (
-                    <Text style={modalOverlayStyles.tokenBalance} numberOfLines={1} ellipsizeMode="tail">
-                      Balance: {currentBalance.toFixed(6)} {selectedToken.symbol}
-                    </Text>
-                  )}
-                  {loadingTokenData && (
-                    <Text style={modalOverlayStyles.tokenBalance}>Loading balance...</Text>
-                  )}
-                </View>
-                <View style={modalOverlayStyles.changeTokenButton}>
-                  <Text style={modalOverlayStyles.changeTokenText}>Change</Text>
-                </View>
-              </TouchableOpacity>
-
-              {showCustomWalletInput && (
-                <View style={modalOverlayStyles.inputContainer}>
-                  <Text style={modalOverlayStyles.label}>Recipient Wallet Address</Text>
-                  <TextInput
-                    style={[modalOverlayStyles.input, walletAddressError ? modalOverlayStyles.inputError : null]}
-                    value={customWalletAddress}
-                    onChangeText={handleWalletAddressChange}
-                    placeholder="Enter Solana wallet address"
-                    placeholderTextColor={COLORS.textHint}
+        <TouchableWithoutFeedback onPress={() => setSendModalVisible(false)}>
+          <View style={modalOverlayStyles.overlay}>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+              ref={keyboardAvoidingRef}
+            >
+              <TouchableWithoutFeedback onPress={() => {}}>
+                <Animated.View
+                  style={[
+                    modalOverlayStyles.drawerContainer,
+                    { paddingBottom: insets.bottom, transform: [{ translateY: drawerTranslateY }] },
+                  ]}
+                  ref={modalRef}
+                >
+                  <View
+                    style={modalOverlayStyles.dragHandle}
+                    {...panResponder.panHandlers}
                   />
-                  {walletAddressError ? (
-                    <Text style={modalOverlayStyles.errorText}>{walletAddressError}</Text>
-                  ) : null}
-                </View>
-              )}
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={modalOverlayStyles.scrollContent}
+                  >
+                    <Text style={modalOverlayStyles.title}>Send {selectedToken.symbol}</Text>
 
-              <View style={modalOverlayStyles.modeContainer}>
-                <View style={modalOverlayStyles.buttonRow}>
-                  <TouchableOpacity
-                    style={[
-                      modalOverlayStyles.modeButton,
-                      selectedMode === 'priority' &&
-                        modalOverlayStyles.selectedBtn,
-                    ]}
-                    onPress={() => setSelectedMode('priority')}>
-                    <Text
-                      style={[
-                        modalOverlayStyles.modeButtonText,
-                        selectedMode === 'priority' &&
-                          modalOverlayStyles.selectedBtnText,
-                      ]}>
-                      Priority
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      modalOverlayStyles.modeButton,
-                      selectedMode === 'jito' && modalOverlayStyles.selectedBtn,
-                    ]}
-                    onPress={() => setSelectedMode('jito')}>
-                    <Text
-                      style={[
-                        modalOverlayStyles.modeButtonText,
-                        selectedMode === 'jito' &&
-                          modalOverlayStyles.selectedBtnText,
-                      ]}>
-                      Jito
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+                    {/* Token Selection Row */}
+                    <TouchableOpacity
+                      style={modalOverlayStyles.tokenRow}
+                      onPress={() => setShowSelectTokenModal(true)}
+                    >
+                      {selectedToken.logoURI ? (
+                        <Image source={{ uri: selectedToken.logoURI }} style={modalOverlayStyles.tokenIcon} />
+                      ) : (
+                        <View style={[modalOverlayStyles.tokenIcon, { backgroundColor: COLORS.lighterBackground, justifyContent: 'center', alignItems: 'center' }]}>
+                          <Text style={{ color: COLORS.white, fontWeight: 'bold', fontSize: 10 }}>
+                            {selectedToken.symbol?.charAt(0) || '?'}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={modalOverlayStyles.tokenInfo}>
+                        <Text style={modalOverlayStyles.tokenSymbol} numberOfLines={1} ellipsizeMode="tail">
+                          {selectedToken.symbol}
+                        </Text>
+                        {currentBalance !== null && (
+                          <Text style={modalOverlayStyles.tokenBalance} numberOfLines={1} ellipsizeMode="tail">
+                            Balance: {currentBalance.toFixed(6)} {selectedToken.symbol}
+                          </Text>
+                        )}
+                        {loadingTokenData && (
+                          <Text style={modalOverlayStyles.tokenBalance}>Loading balance...</Text>
+                        )}
+                      </View>
+                      <View style={modalOverlayStyles.changeTokenButton}>
+                        <Text style={modalOverlayStyles.changeTokenText}>Change</Text>
+                      </View>
+                    </TouchableOpacity>
 
-              {selectedMode === 'priority' && (
-                <View style={modalOverlayStyles.tierContainer}>
-                  <Text style={modalOverlayStyles.sectionTitle}>
-                    Priority Fee Tier:
-                  </Text>
-                  <View style={modalOverlayStyles.tierButtonRow}>
-                    {(['low', 'medium', 'high', 'very-high'] as const).map(
-                      tier => (
+                    {showCustomWalletInput && (
+                      <View style={modalOverlayStyles.inputContainer}>
+                        <Text style={modalOverlayStyles.label}>Recipient Wallet Address</Text>
+                        <TextInput
+                          style={[modalOverlayStyles.input, walletAddressError ? modalOverlayStyles.inputError : null]}
+                          value={customWalletAddress}
+                          onChangeText={handleWalletAddressChange}
+                          placeholder="Enter Solana wallet address"
+                          placeholderTextColor={COLORS.textHint}
+                        />
+                        {walletAddressError ? (
+                          <Text style={modalOverlayStyles.errorText}>{walletAddressError}</Text>
+                        ) : null}
+                      </View>
+                    )}
+
+                    <View style={modalOverlayStyles.modeContainer}>
+                      <View style={modalOverlayStyles.buttonRow}>
                         <TouchableOpacity
-                          key={tier}
                           style={[
-                            modalOverlayStyles.tierButton,
-                            selectedFeeTier === tier &&
+                            modalOverlayStyles.modeButton,
+                            selectedMode === 'priority' &&
                               modalOverlayStyles.selectedBtn,
                           ]}
-                          onPress={() => setSelectedFeeTier(tier)}>
+                          onPress={() => setSelectedMode('priority')}>
                           <Text
                             style={[
-                              modalOverlayStyles.tierButtonText,
-                              selectedFeeTier === tier &&
+                              modalOverlayStyles.modeButtonText,
+                              selectedMode === 'priority' &&
                                 modalOverlayStyles.selectedBtnText,
                             ]}>
-                            {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                            Priority
                           </Text>
                         </TouchableOpacity>
-                      ),
+                        <TouchableOpacity
+                          style={[
+                            modalOverlayStyles.modeButton,
+                            selectedMode === 'jito' && modalOverlayStyles.selectedBtn,
+                          ]}
+                          onPress={() => setSelectedMode('jito')}>
+                          <Text
+                            style={[
+                              modalOverlayStyles.modeButtonText,
+                              selectedMode === 'jito' &&
+                                modalOverlayStyles.selectedBtnText,
+                            ]}>
+                            Jito
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {selectedMode === 'priority' && (
+                      <View style={modalOverlayStyles.tierContainer}>
+                        <Text style={modalOverlayStyles.sectionTitle}>
+                          Priority Fee Tier:
+                        </Text>
+                        <View style={modalOverlayStyles.tierButtonRow}>
+                          {(['low', 'medium', 'high', 'very-high'] as const).map(
+                            tier => (
+                              <TouchableOpacity
+                                key={tier}
+                                style={[
+                                  modalOverlayStyles.tierButton,
+                                  selectedFeeTier === tier &&
+                                    modalOverlayStyles.selectedBtn,
+                                ]}
+                                onPress={() => setSelectedFeeTier(tier)}>
+                                <Text
+                                  style={[
+                                    modalOverlayStyles.tierButtonText,
+                                    selectedFeeTier === tier &&
+                                      modalOverlayStyles.selectedBtnText,
+                                  ]}>
+                                  {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                                </Text>
+                              </TouchableOpacity>
+                            ),
+                          )}
+                        </View>
+                      </View>
                     )}
-                  </View>
-                </View>
-              )}
 
-              <View style={modalOverlayStyles.inputContainer}>
-                <View style={modalOverlayStyles.amountLabelRow}>
-                  <Text style={modalOverlayStyles.label}>Amount ({selectedToken.symbol})</Text>
-                  <TouchableOpacity 
-                    style={modalOverlayStyles.maxButton}
-                    onPress={fetchMaxBalance}
-                    disabled={fetchingBalance}
-                  >
-                    {fetchingBalance ? (
-                      <ActivityIndicator size="small" color={COLORS.white} />
-                    ) : (
-                      <Text style={modalOverlayStyles.maxButtonText}>MAX</Text>
+                    <View style={modalOverlayStyles.inputContainer}>
+                      <View style={modalOverlayStyles.amountLabelRow}>
+                        <Text style={modalOverlayStyles.label}>Amount ({selectedToken.symbol})</Text>
+                        <TouchableOpacity 
+                          style={modalOverlayStyles.maxButton}
+                          onPress={fetchMaxBalance}
+                          disabled={fetchingBalance}
+                        >
+                          {fetchingBalance ? (
+                            <ActivityIndicator size="small" color={COLORS.white} />
+                          ) : (
+                            <Text style={modalOverlayStyles.maxButtonText}>MAX</Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+
+                      {selectedToken.symbol === 'SOL' && (
+                        <View style={modalOverlayStyles.presetButtonsRow}>
+                          <TouchableOpacity
+                            style={modalOverlayStyles.presetButton}
+                            onPress={() => setAmountSol('1')}>
+                            <Text style={modalOverlayStyles.presetButtonText}>
+                              1 SOL
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={modalOverlayStyles.presetButton}
+                            onPress={() => setAmountSol('5')}>
+                            <Text style={modalOverlayStyles.presetButtonText}>
+                              5 SOL
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={modalOverlayStyles.presetButton}
+                            onPress={() => setAmountSol('10')}>
+                            <Text style={modalOverlayStyles.presetButtonText}>
+                              10 SOL
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+
+                      <View style={modalOverlayStyles.amountControlContainer}>
+                        <TouchableOpacity
+                          style={modalOverlayStyles.controlButton}
+                          onPress={() => {
+                            const currentVal = parseFloat(amountSol) || 0;
+                            if (currentVal > 0) {
+                              setAmountSol((currentVal - 1).toString());
+                            }
+                          }}>
+                          <Text style={modalOverlayStyles.controlButtonText}>−</Text>
+                        </TouchableOpacity>
+
+                        <TextInput
+                          style={modalOverlayStyles.amountInput}
+                          value={amountSol}
+                          onChangeText={setAmountSol}
+                          keyboardType="numeric"
+                          placeholder="0"
+                          placeholderTextColor={COLORS.textHint}
+                          textAlign="center"
+                        />
+
+                        <TouchableOpacity
+                          style={modalOverlayStyles.controlButton}
+                          onPress={() => {
+                            const currentVal = parseFloat(amountSol) || 0;
+                            setAmountSol((currentVal + 1).toString());
+                          }}>
+                          <Text style={modalOverlayStyles.controlButtonText}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {transactionStatus && (
+                      <View style={modalOverlayStyles.statusContainer}>
+                        <Text style={modalOverlayStyles.statusText}>
+                          {transactionStatus}
+                        </Text>
+                      </View>
                     )}
-                  </TouchableOpacity>
-                </View>
 
-                {selectedToken.symbol === 'SOL' && (
-                  <View style={modalOverlayStyles.presetButtonsRow}>
-                    <TouchableOpacity
-                      style={modalOverlayStyles.presetButton}
-                      onPress={() => setAmountSol('1')}>
-                      <Text style={modalOverlayStyles.presetButtonText}>
-                        1 SOL
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={modalOverlayStyles.presetButton}
-                      onPress={() => setAmountSol('5')}>
-                      <Text style={modalOverlayStyles.presetButtonText}>
-                        5 SOL
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={modalOverlayStyles.presetButton}
-                      onPress={() => setAmountSol('10')}>
-                      <Text style={modalOverlayStyles.presetButtonText}>
-                        10 SOL
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                <View style={modalOverlayStyles.amountControlContainer}>
-                  <TouchableOpacity
-                    style={modalOverlayStyles.controlButton}
-                    onPress={() => {
-                      const currentVal = parseFloat(amountSol) || 0;
-                      if (currentVal > 0) {
-                        setAmountSol((currentVal - 1).toString());
-                      }
-                    }}>
-                    <Text style={modalOverlayStyles.controlButtonText}>−</Text>
-                  </TouchableOpacity>
-
-                  <TextInput
-                    style={modalOverlayStyles.amountInput}
-                    value={amountSol}
-                    onChangeText={setAmountSol}
-                    keyboardType="numeric"
-                    placeholder="0"
-                    placeholderTextColor={COLORS.textHint}
-                    textAlign="center"
-                  />
-
-                  <TouchableOpacity
-                    style={modalOverlayStyles.controlButton}
-                    onPress={() => {
-                      const currentVal = parseFloat(amountSol) || 0;
-                      setAmountSol((currentVal + 1).toString());
-                    }}>
-                    <Text style={modalOverlayStyles.controlButtonText}>+</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {transactionStatus && (
-                <View style={modalOverlayStyles.statusContainer}>
-                  <Text style={modalOverlayStyles.statusText}>
-                    {transactionStatus}
-                  </Text>
-                </View>
-              )}
-
-              <View style={modalOverlayStyles.buttonRow}>
-                <TouchableOpacity
-                  style={[
-                    modalOverlayStyles.modalButton,
-                    {backgroundColor: COLORS.lightBackground},
-                  ]}
-                  onPress={() => setSendModalVisible(false)}
-                  disabled={
-                    !!transactionStatus && !transactionStatus.includes('Error')
-                  }>
-                  <Text style={modalOverlayStyles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    modalOverlayStyles.modalButton,
-                    {backgroundColor: COLORS.brandBlue},
-                    !!transactionStatus && {opacity: 0.5},
-                  ]}
-                  onPress={handleSendTransaction}
-                  disabled={!!transactionStatus}>
-                  <Text style={modalOverlayStyles.modalButtonText}>Send</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
+                    {/* Action Buttons moved inside ScrollView */}
+                    <View style={[modalOverlayStyles.buttonRow, { marginTop: 24 }]}>
+                      <TouchableOpacity
+                        style={[
+                          modalOverlayStyles.modalButton,
+                          {backgroundColor: COLORS.lightBackground},
+                        ]}
+                        onPress={() => setSendModalVisible(false)}
+                        disabled={
+                          !!transactionStatus && !transactionStatus.includes('Error')
+                        }>
+                        <Text style={modalOverlayStyles.modalButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          modalOverlayStyles.modalButton,
+                          {backgroundColor: COLORS.brandBlue},
+                          !!transactionStatus && {opacity: 0.5},
+                        ]}
+                        onPress={handleSendTransaction}
+                        disabled={!!transactionStatus}>
+                        <Text style={modalOverlayStyles.modalButtonText}>Send</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </ScrollView>
+                </Animated.View>
+              </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
           </View>
-        </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Token Selection Modal */}

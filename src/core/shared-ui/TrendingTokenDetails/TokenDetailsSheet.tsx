@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,8 @@ import {
     Dimensions,
     ScrollView,
     ActivityIndicator,
+    Animated,
+    PanResponder,
 } from 'react-native';
 import { styles } from './TokenDetailsSheet.styles';
 import { TokenDetailsSheetProps } from '@/modules/data-module/types/tokenDetails.types';
@@ -24,7 +26,7 @@ import RiskAnalysisSection from './RiskAnalysisSection';
 import LineGraph from '@/core/shared-ui/TradeCard/LineGraph';
 import COLORS from '@/assets/colors';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const TokenDetailsSheet: React.FC<TokenDetailsSheetProps> = ({
     visible,
@@ -47,6 +49,39 @@ const TokenDetailsSheet: React.FC<TokenDetailsSheetProps> = ({
         visible
     });
 
+    const panY = useRef(new Animated.Value(0)).current;
+
+    const panResponder = useRef(
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onPanResponderMove: (_, { dy }) => {
+          panY.setValue(Math.max(0, dy));
+        },
+        onPanResponderRelease: (_, { dy, vy }) => {
+          if (dy > 150 || vy > 0.5) {
+            Animated.timing(panY, {
+              toValue: height,
+              duration: 200,
+              useNativeDriver: true,
+            }).start(() => {
+              onClose();
+            });
+          } else {
+            Animated.spring(panY, {
+              toValue: 0,
+              useNativeDriver: true,
+            }).start();
+          }
+        },
+      }),
+    ).current;
+  
+    useEffect(() => {
+      if (visible) {
+        panY.setValue(0);
+      }
+    }, [visible]);
+
     return (
         <Modal
             animationType="slide"
@@ -58,7 +93,10 @@ const TokenDetailsSheet: React.FC<TokenDetailsSheetProps> = ({
                 <View style={styles.overlay} />
             </TouchableWithoutFeedback>
 
-            <View style={styles.container}>
+            <Animated.View style={[styles.container, { transform: [{ translateY: panY }] }]}>
+                <View style={styles.handleContainer} {...panResponder.panHandlers}>
+                    <View style={styles.handle} />
+                </View>
                 <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                     <Text style={styles.closeButtonText}>×</Text>
                 </TouchableOpacity>
@@ -242,7 +280,7 @@ const TokenDetailsSheet: React.FC<TokenDetailsSheetProps> = ({
                         </View>
                     </View>
                 </ScrollView>
-            </View>
+            </Animated.View>
         </Modal>
     );
 };

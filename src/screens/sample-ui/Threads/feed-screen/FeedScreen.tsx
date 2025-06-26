@@ -19,6 +19,7 @@ import { DEFAULT_IMAGES } from '@/shared/config/constants';
 import HomeEnvErrorBanner from '@/core/shared-ui/EnvErrors/HomeEnvErrorBanner';
 import FeedItemSkeleton from '@/core/thread/components/FeedSkeleton';
 import notificationService from '@/shared/services/notificationService';
+import { useScrollUI } from '@/shared/navigation/MainTabs';
 
 /**
  * FeedScreen component that displays user's social feed
@@ -28,6 +29,15 @@ export default function FeedScreen() {
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
+
+  // Get scroll UI context for tab bar hiding (optional - may not be available in all contexts)
+  let scrollUI;
+  try {
+    scrollUI = useScrollUI();
+  } catch (error) {
+    // Context not available - this is fine, component will work without it
+    scrollUI = undefined;
+  }
 
   const allPosts = useAppSelector(state => state.thread.allPosts);
   const userWallet = useAppSelector(state => state.auth.address);
@@ -218,6 +228,8 @@ export default function FeedScreen() {
         disableReplies={false}
         refreshing={refreshing}
         onRefresh={onRefresh}
+        // Pass scroll UI context to Thread component
+        scrollUI={scrollUI}
         // onPressPost navigates to the PostThreadScreen with the post's ID.
         onPressPost={post => {
           // For retweets and quotes, handle navigation correctly:

@@ -523,6 +523,7 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsSectionProps> = ({
             keyboardType="numeric"
             placeholderTextColor={COLORS.greyMid}
             editable={!isLoading}
+            keyboardAppearance="dark"
           />
           <TouchableOpacity
             style={styles.dropdownButton}
@@ -586,6 +587,7 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsSectionProps> = ({
               keyboardType="numeric"
               placeholderTextColor={COLORS.greyMid}
               editable={!isLoading}
+              keyboardAppearance="dark"
             />
           </View>
           {solRaisedError && (
@@ -605,6 +607,7 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsSectionProps> = ({
               keyboardType="numeric"
               placeholderTextColor={COLORS.greyMid}
               editable={!isLoading}
+              keyboardAppearance="dark"
             />
             <RNText style={styles.percentSign}>%</RNText>
           </View>
@@ -630,6 +633,7 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsSectionProps> = ({
             keyboardType="numeric"
             placeholderTextColor={COLORS.greyMid}
             editable={!isLoading}
+            keyboardAppearance="dark"
           />
           <RNText style={styles.bpsText}>bps</RNText>
         </View>
@@ -680,6 +684,7 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsSectionProps> = ({
                   keyboardType="numeric"
                   placeholderTextColor={COLORS.greyMid}
                   editable={!isLoading}
+                  keyboardAppearance="dark"
                 />
                 <RNText style={styles.percentSign}>%</RNText>
               </View>
@@ -729,6 +734,7 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsSectionProps> = ({
                     keyboardType="numeric"
                     placeholderTextColor={COLORS.greyMid}
                     editable={!isLoading}
+                    keyboardAppearance="dark"
                   />
                 </View>
                 <RNText style={styles.helperText}>
@@ -746,6 +752,7 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsSectionProps> = ({
                     keyboardType="numeric"
                     placeholderTextColor={COLORS.greyMid}
                     editable={!isLoading}
+                    keyboardAppearance="dark"
                   />
                 </View>
                 <RNText style={styles.helperText}>

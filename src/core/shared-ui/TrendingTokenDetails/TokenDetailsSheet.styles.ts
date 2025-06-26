@@ -261,4 +261,15 @@ export const styles = StyleSheet.create({
     disabledText: {
         opacity: 0.5,
     },
+    handleContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingBottom: 8,
+    },
+    handle: {
+        width: 40,
+        height: 5,
+        borderRadius: 2.5,
+        backgroundColor: COLORS.borderDarkColor,
+    },
 }); 

@@ -22,14 +22,11 @@ const RiskAnalysisSection: React.FC<RiskAnalysisSectionProps> = ({ tokenAddress 
         setError(null);
 
         try {
-            console.log('[RiskAnalysis] Fetching report for', tokenAddress);
             const report = await getTokenRiskReport(tokenAddress, true);
 
             if (report) {
-                console.log('[RiskAnalysis] Successfully received report');
                 setRiskReport(report);
             } else {
-                console.log('[RiskAnalysis] No report data received');
                 setError('Unable to retrieve risk data for this token');
             }
         } catch (err) {
@@ -142,7 +139,7 @@ const RiskAnalysisSection: React.FC<RiskAnalysisSectionProps> = ({ tokenAddress 
                                 />
                             </View>
                             <Text style={styles.holderPercentage}>
-                                {(holder.pct * 100).toFixed(2)}%
+                                {holder.pct.toFixed(2)}%
                             </Text>
                             {holder.insider && (
                                 <View style={styles.insiderBadge}>

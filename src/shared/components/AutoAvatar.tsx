@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ViewStyle, TextStyle, ImageStyle, Animated, Easing, Platform } from 'react-native';
 import { IPFSAwareImage, getValidImageSource } from '../utils/IPFSImage';
-import { useAutoAvatar } from '../hooks/useAutoAvatar';
 import { DEFAULT_IMAGES } from '../config/constants';
 import COLORS from '@/assets/colors';
 
@@ -24,8 +23,6 @@ interface AutoAvatarProps {
     showLoading?: boolean;
     /** Custom loading component */
     loadingComponent?: React.ReactNode;
-    /** Whether to automatically generate DiceBear avatar */
-    autoGenerate?: boolean;
     /** Callback when avatar loads successfully */
     onLoad?: () => void;
     /** Callback when avatar fails to load */
@@ -146,7 +143,6 @@ export const AutoAvatar: React.FC<AutoAvatarProps> = React.memo(({
     username,
     showLoading = false,
     loadingComponent,
-    autoGenerate = true,
     onLoad,
     onError,
     showShimmer = true,
@@ -155,22 +151,8 @@ export const AutoAvatar: React.FC<AutoAvatarProps> = React.memo(({
     const [imageError, setImageError] = useState(false);
     const [imageAttempted, setImageAttempted] = useState(false);
 
-    // Memoize hook options to prevent unnecessary re-renders
-    const hookOptions = useMemo(() => ({
-        autoGenerate,
-        preload: true,
-        updateRedux: userId ? false : true, // Only update Redux for current user
-    }), [autoGenerate, userId]);
-
-    // Use the auto avatar hook
-    const { avatarUrl, isLoading, isDiceBearAvatar, error } = useAutoAvatar(
-        userId,
-        profilePicUrl,
-        hookOptions
-    );
-
-    // Determine which avatar URL to use - prioritize the hook's result
-    const finalAvatarUrl = avatarUrl || profilePicUrl;
+    // Use the provided profile picture URL directly
+    const finalAvatarUrl = profilePicUrl;
 
     // Generate initials and background color with memoization
     const initials = useMemo(() => getInitials(username), [username]);
@@ -232,29 +214,29 @@ export const AutoAvatar: React.FC<AutoAvatarProps> = React.memo(({
 
     // Determine what to show based on current state
     const shouldShowShimmer = useMemo(() => {
-        // Show shimmer if:
-        // 1. Shimmer is enabled AND
-        // 2. (Hook is loading OR we have a URL but haven't attempted to load it yet) AND
-        // 3. We don't have a custom loading component
+        // Show shimmer only when loading is requested and we have a URL but haven't attempted to load
         return showShimmer && 
-               (isLoading || (finalAvatarUrl && !imageAttempted)) && 
+               finalAvatarUrl && 
+               !imageAttempted && 
                !loadingComponent;
-    }, [showShimmer, isLoading, finalAvatarUrl, imageAttempted, loadingComponent]);
+    }, [showShimmer, finalAvatarUrl, imageAttempted, loadingComponent]);
 
     const shouldShowCustomLoading = useMemo(() => {
-        // Show custom loading if provided and we're in a loading state
+        // Show custom loading if provided and we have a URL but haven't attempted to load
         return showLoading && 
-               (isLoading || (finalAvatarUrl && !imageAttempted)) && 
+               finalAvatarUrl && 
+               !imageAttempted && 
                loadingComponent;
-    }, [showLoading, isLoading, finalAvatarUrl, imageAttempted, loadingComponent]);
+    }, [showLoading, finalAvatarUrl, imageAttempted, loadingComponent]);
 
     const shouldShowDefaultLoading = useMemo(() => {
         // Show default loading if requested and no custom component and shimmer is disabled
         return showLoading && 
-               (isLoading || (finalAvatarUrl && !imageAttempted)) && 
+               finalAvatarUrl && 
+               !imageAttempted && 
                !loadingComponent && 
                !showShimmer;
-    }, [showLoading, isLoading, finalAvatarUrl, imageAttempted, loadingComponent, showShimmer]);
+    }, [showLoading, finalAvatarUrl, imageAttempted, loadingComponent, showShimmer]);
 
     const shouldShowInitials = useMemo(() => {
         // Show initials if:
@@ -307,19 +289,6 @@ export const AutoAvatar: React.FC<AutoAvatarProps> = React.memo(({
                     key={`avatar-${userId}-${finalAvatarUrl}`}
                 />
             )}
-            
-            {/* Debug overlay for development - remove in production */}
-            {__DEV__ && error && (
-                <View style={{
-                    position: 'absolute',
-                    top: -5,
-                    right: -5,
-                    width: 10,
-                    height: 10,
-                    borderRadius: 5,
-                    backgroundColor: 'red',
-                }} />
-            )}
         </View>
     );
 });
@@ -345,7 +314,6 @@ export const SimpleAutoAvatar: React.FC<{
             size={size}
             style={style}
             showInitials={true}
-            autoGenerate={true}
             showShimmer={showShimmer}
         />
     );

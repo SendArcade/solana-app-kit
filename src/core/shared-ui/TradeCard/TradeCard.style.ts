@@ -97,6 +97,7 @@ export const styles = StyleSheet.create({
     height: 130,
     marginVertical: 6,
     marginTop: 30,
+    overflow: 'visible',
   },
   
   timeframeRow: {

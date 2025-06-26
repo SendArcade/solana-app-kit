@@ -84,6 +84,7 @@ export const PumpfunBuySection: React.FC<PumpfunBuySectionProps> = ({
         onChangeText={setTokenAddress}
         textAlignVertical="center"
         editable={!isLoading}
+        keyboardAppearance="dark"
       />
       <TouchableOpacity
         style={[PumpfunBuyStyles.pasteButton, isLoading && { opacity: 0.5 }]}
@@ -101,6 +102,7 @@ export const PumpfunBuySection: React.FC<PumpfunBuySectionProps> = ({
         keyboardType="decimal-pad"
         textAlignVertical="center"
         editable={!isLoading}
+        keyboardAppearance="dark"
       />
       <TouchableOpacity
         style={[PumpfunBuyStyles.pasteButton, isLoading && { opacity: 0.5 }]}

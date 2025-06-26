@@ -44,7 +44,7 @@ export const PumpfunSellSection: React.FC<PumpfunSellSectionProps> = ({
       // Use a fixed base fee instead of random values
       const baseFeeInLamports = 5000;
       // Small deterministic adjustment based on token amount (if needed)
-      const adjustedFee = baseFeeInLamports + (amount * 100); 
+      const adjustedFee = baseFeeInLamports + (amount * 100);
       const estimateSol = adjustedFee / 1e9;
       setEstimatedFee(estimateSol);
     }
@@ -107,6 +107,7 @@ export const PumpfunSellSection: React.FC<PumpfunSellSectionProps> = ({
             value={tokenAddress}
             onChangeText={setTokenAddress}
             editable={!isLoading}
+            keyboardAppearance="dark"
           />
         </>
       )}
@@ -119,6 +120,7 @@ export const PumpfunSellSection: React.FC<PumpfunSellSectionProps> = ({
         onChangeText={setTokenAmount}
         keyboardType="decimal-pad"
         editable={!isLoading}
+        keyboardAppearance="dark"
       />
       {selectedToken && (
         <TouchableOpacity

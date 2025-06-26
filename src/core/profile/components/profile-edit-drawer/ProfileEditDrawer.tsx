@@ -17,6 +17,8 @@ import {
     Platform,
     KeyboardAvoidingView,
     Animated,
+    PanResponder,
+    Dimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAppDispatch, useAppSelector } from '@/shared/hooks/useReduxHooks';
@@ -63,6 +65,8 @@ const LOG_TAG = "[ProfileEditDrawer]";
 const SUCCESS_GREEN = '#27AE60';
 const ERROR_RED = '#EB5757';
 
+const { height: windowHeight } = Dimensions.get('window');
+
 const ProfileEditDrawer = ({
     visible,
     onClose,
@@ -100,6 +104,45 @@ const ProfileEditDrawer = ({
     const [uploadProgress, setUploadProgress] = useState(0);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const progressAnim = useRef(new Animated.Value(0)).current;
+
+    // --- Drag-to-dismiss state ---
+    const drawerTranslateY = useRef(new Animated.Value(windowHeight)).current;
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => currentView === DrawerView.PROFILE_EDIT,
+            onPanResponderMove: (_, { dy }) => {
+                if (currentView === DrawerView.PROFILE_EDIT && dy > 0) {
+                    drawerTranslateY.setValue(dy);
+                }
+            },
+            onPanResponderRelease: (_, { dy, vy }) => {
+                if (currentView === DrawerView.PROFILE_EDIT && (dy > 150 || vy > 0.5)) {
+                    Animated.timing(drawerTranslateY, {
+                        toValue: windowHeight,
+                        duration: 200,
+                        useNativeDriver: true,
+                    }).start(() => {
+                        onClose();
+                        drawerTranslateY.setValue(windowHeight);
+                    });
+                } else {
+                    Animated.timing(drawerTranslateY, {
+                        toValue: 0,
+                        duration: 100,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            },
+        })
+    ).current;
+
+    useEffect(() => {
+        if (visible) {
+            drawerTranslateY.setValue(0);
+        } else {
+            drawerTranslateY.setValue(windowHeight);
+        }
+    }, [visible, drawerTranslateY]);
 
     // Memoize profileData to prevent unnecessary re-renders
     const memoizedProfileData = useMemo(() => profileData, [
@@ -900,7 +943,28 @@ const ProfileEditDrawer = ({
                 <View style={styles.overlay} />
             </TouchableWithoutFeedback>
 
-            <View style={styles.drawerContainer}>
+            <Animated.View
+                style={[
+                    styles.drawerContainer,
+                    currentView === DrawerView.PROFILE_EDIT && { transform: [{ translateY: drawerTranslateY }] },
+                ]}
+            >
+                {/* Drag handle only in PROFILE_EDIT view */}
+                {currentView === DrawerView.PROFILE_EDIT && (
+                    <View
+                        style={{
+                            width: 40,
+                            height: 5,
+                            borderRadius: 2.5,
+                            backgroundColor: COLORS.borderDarkColor,
+                            alignSelf: 'center',
+                            marginTop: 10,
+                            marginBottom: 10,
+                            opacity: 0.7,
+                        }}
+                        {...panResponder.panHandlers}
+                    />
+                )}
                 {currentView === DrawerView.PROFILE_EDIT && (
                     <View style={styles.headerContainer}>
                         <TouchableOpacity
@@ -931,9 +995,11 @@ const ProfileEditDrawer = ({
                         </TouchableOpacity>
                     </View>
                 )}
-
+                {currentView !== DrawerView.PROFILE_EDIT && (
+                    // NFT_LIST and NFT_CONFIRM keep their header as before
+                    null
+                )}
                 {renderContent()}
-
                 {showUploadProgress && (
                     <View style={styles.uploadProgressOverlay}>
                         <View style={styles.uploadProgressContainer}>
@@ -978,8 +1044,7 @@ const ProfileEditDrawer = ({
                         </View>
                     </View>
                 )}
-
-            </View>
+            </Animated.View>
         </Modal>
     );
 };

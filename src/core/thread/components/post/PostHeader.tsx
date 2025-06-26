@@ -15,7 +15,7 @@ import {
 import Icons from '../../../../assets/svgs';
 import { createPostHeaderStyles } from './PostHeader.styles';
 import { ThreadPost, ThreadUser } from '../thread.types';
-import { DEFAULT_IMAGES } from '../../../../config/constants';
+import { DEFAULT_IMAGES } from '@/shared/config/constants';
 import { useWallet } from '../../../../modules/wallet-providers/hooks/useWallet';
 import { IPFSAwareImage, getValidImageSource } from '@/shared/utils/IPFSImage';
 import { AutoAvatar } from '@/shared/components/AutoAvatar';
@@ -37,7 +37,7 @@ function getAvatarColor(username: string): string {
   return `hsl(${hue}, 60%, 80%)`;
 }
 
-// The ProfileAvatarView component - now using AutoAvatar for automatic DiceBear generation
+// The ProfileAvatarView component - displays existing profile pictures with initials fallback
 export function ProfileAvatarView({
   user,
   style,
@@ -50,7 +50,9 @@ export function ProfileAvatarView({
   // Extract avatar URL from user object
   const avatarUrl = typeof user?.avatar === 'string'
     ? user.avatar
-    : user?.avatar?.uri || null;
+    : typeof user?.avatar === 'object' && user?.avatar && 'uri' in user.avatar
+      ? user.avatar.uri
+      : null;
 
   return (
     <AutoAvatar
@@ -60,7 +62,6 @@ export function ProfileAvatarView({
       size={size}
       style={style}
       showInitials={true}
-      autoGenerate={true}
     />
   );
 }
@@ -178,30 +179,7 @@ export default React.memo(function PostHeader({
       )}
 
       <View style={styles.threadItemHeaderLeft}>
-        {/* Wrap the avatar in a Touchable to press user */}
-        <TouchableOpacity
-          onPress={handleUserPress}
-          style={{ position: 'relative' }}>
-          <ProfileAvatarView
-            user={user}
-            style={styles.threadItemAvatar}
-          />
-          {/* <Icons.addUserIcon
-            style={{
-              position: 'absolute',
-              bottom: -4,
-              zIndex: 10,
-              right: 4,
-              width: 16,
-              height: 16,
-              borderRadius: 8,
-              borderWidth: 2,
-              borderColor: 'white',
-            }}
-          /> */}
-        </TouchableOpacity>
-
-        <View style={{ marginLeft: 8 }}>
+        <View style={{ marginLeft: 0 }}>
           {/* Also wrap the username in a Touchable */}
           <TouchableOpacity
             onPress={handleUserPress}

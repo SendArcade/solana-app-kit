@@ -386,6 +386,7 @@ export default function SwapForm({
                         onChangeText={setInputTokenAddress}
                         placeholder="Enter token address..."
                         placeholderTextColor={COLORS.greyDark}
+                        keyboardAppearance="dark"
                     />
 
                     {/* Check Available Pools Button */}
@@ -431,6 +432,7 @@ export default function SwapForm({
                             placeholderTextColor={COLORS.greyDark}
                             keyboardType="numeric"
                             editable={!!selectedPool} // Only editable if pool is selected
+                            keyboardAppearance="dark"
                         />
                     </View>
                 </View>

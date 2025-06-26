@@ -68,15 +68,15 @@ export function validateBondingCurvePercentage(value: string): {
 
   // Per Raydium docs: min 51% and max 80%
   if (number < 51) {
-    return { 
-      valid: false, 
-      message: 'Bonding curve percentage must be at least 51%', 
+    return {
+      valid: false,
+      message: 'Bonding curve percentage must be at least 51%',
       value: '51'
     };
   } else if (number > 80) {
-    return { 
-      valid: false, 
-      message: 'Bonding curve percentage cannot exceed 80%', 
+    return {
+      valid: false,
+      message: 'Bonding curve percentage cannot exceed 80%',
       value: '80'
     };
   }
@@ -100,9 +100,9 @@ export function validateVestingPercentage(value: string, bondingCurvePercentage:
 
   // Maximum vesting is 30%
   if (vestingPercent > 30) {
-    return { 
-      valid: false, 
-      message: 'Vesting percentage cannot exceed 30%', 
+    return {
+      valid: false,
+      message: 'Vesting percentage cannot exceed 30%',
       value: '30'
     };
   }
@@ -110,9 +110,9 @@ export function validateVestingPercentage(value: string, bondingCurvePercentage:
   // Ensure vesting + bonding curve doesn't exceed 80%
   if (vestingPercent + bondingPercent > 80) {
     const maxPossible = Math.max(0, 80 - bondingPercent);
-    return { 
-      valid: false, 
-      message: `Total of tokens sold + tokens locked cannot exceed 80%. Max vesting possible: ${maxPossible}%`, 
+    return {
+      valid: false,
+      message: `Total of tokens sold + tokens locked cannot exceed 80%. Max vesting possible: ${maxPossible}%`,
       value: String(maxPossible)
     };
   }
@@ -123,10 +123,10 @@ export function validateVestingPercentage(value: string, bondingCurvePercentage:
 export function calculatePoolMigrationPercentage(bondingCurvePercentage: string, vestingPercentage: string): string {
   const bondingPercent = parseInt(bondingCurvePercentage, 10) || 0;
   const vestingPercent = parseInt(vestingPercentage, 10) || 0;
-  
+
   // Calculate remaining percentage for pool migration
   const migrationPercent = 100 - bondingPercent - vestingPercent;
-  
+
   return String(Math.max(0, migrationPercent));
 }
 
@@ -138,16 +138,16 @@ export function validateSolRaised(value: string): {
   // Allow only numbers and decimal point
   const filtered = value.replace(/[^0-9.]/g, '');
   const numVal = parseFloat(filtered || '0');
-  
+
   // Ensure it's at least 30 SOL per Raydium docs
   if (numVal < 30) {
-    return { 
-      valid: false, 
-      message: 'Minimum SOL raised must be at least 30 SOL', 
+    return {
+      valid: false,
+      message: 'Minimum SOL raised must be at least 30 SOL',
       value: filtered
     };
   }
-  
+
   return { valid: true, message: null, value: filtered };
 }
 
@@ -204,7 +204,7 @@ export function convertVestingPeriodToSeconds(
   const SECONDS_PER_WEEK = SECONDS_PER_DAY * 7;
   const SECONDS_PER_MONTH = SECONDS_PER_DAY * 30; // Approximation
   const SECONDS_PER_YEAR = SECONDS_PER_DAY * 365; // Approximation
-  
+
   switch (timeUnit) {
     case VestingTimeUnit.DAY:
       return duration * SECONDS_PER_DAY;
@@ -289,6 +289,7 @@ export const TokenSelectionModal: React.FC<TokenSelectionModalProps> = ({
               onChangeText={setSearchInput}
               autoCapitalize="none"
               returnKeyType="search"
+              keyboardAppearance="dark"
             />
           </View>
 
@@ -304,24 +305,24 @@ export const TokenSelectionModal: React.FC<TokenSelectionModalProps> = ({
               data={filteredTokens}
               keyExtractor={item => item.address}
               contentContainerStyle={modalStyles.listContentContainer}
-              renderItem={({item}) => (
+              renderItem={({ item }) => (
                 <TouchableOpacity
                   style={modalStyles.tokenItem}
                   onPress={() => onSelectToken(item)}>
                   <View style={modalStyles.tokenItemContent}>
                     {item.logoURI ? (
                       <Image
-                        source={{uri: item.logoURI}}
+                        source={{ uri: item.logoURI }}
                         style={modalStyles.tokenLogo}
                       />
                     ) : (
                       <View
                         style={[
                           modalStyles.tokenLogo,
-                          {justifyContent: 'center', alignItems: 'center'},
+                          { justifyContent: 'center', alignItems: 'center' },
                         ]}>
                         <RNText
-                          style={{color: COLORS.white, fontWeight: 'bold'}}>
+                          style={{ color: COLORS.white, fontWeight: 'bold' }}>
                           {item.symbol.charAt(0)}
                         </RNText>
                       </View>
@@ -368,7 +369,7 @@ export function calculateGraphData(tokenSupply: string, solRaised: string, bondi
   // Dimensions for the chart
   const width = 300;
   const height = 200;
-  const margin = {top: 30, right: 30, bottom: 40, left: 40}; 
+  const margin = { top: 30, right: 30, bottom: 40, left: 40 };
   const graphWidth = width - margin.left - margin.right;
   const graphHeight = height - margin.top - margin.bottom;
 
@@ -380,19 +381,19 @@ export function calculateGraphData(tokenSupply: string, solRaised: string, bondi
     return {
       linePath: `M${defaultX},${defaultY}L${defaultX + graphWidth},${defaultY}`, // Flat line at bottom
       areaPath: `M${defaultX},${defaultY}L${defaultX + graphWidth},${defaultY}Z`, // No area
-      xTicks: Array.from({length: 5}).map((_, i) => ({
+      xTicks: Array.from({ length: 5 }).map((_, i) => ({
         value: '0',
         x: defaultX + (i / 4) * graphWidth,
         y: defaultY + 12,
       })),
-      yTicks: Array.from({length: 5}).map((_, i) => ({
+      yTicks: Array.from({ length: 5 }).map((_, i) => ({
         value: '0',
         x: defaultX - 10,
         y: defaultY - (i / 4) * graphHeight,
         textAnchor: 'end',
       })),
-      startPoint: {cx: defaultX, cy: defaultY},
-      endPoint: {cx: defaultX + graphWidth, cy: defaultY},
+      startPoint: { cx: defaultX, cy: defaultY },
+      endPoint: { cx: defaultX + graphWidth, cy: defaultY },
       graphWidth,
       graphHeight,
       margin,
@@ -407,39 +408,39 @@ export function calculateGraphData(tokenSupply: string, solRaised: string, bondi
   // Scale factor to handle large numbers
   const scaleFactor = Math.pow(10, Math.max(0, Math.floor(Math.log10(maxSupplyOnCurve)) - 6));
   const scaledSupply = maxSupplyOnCurve / scaleFactor;
-  
+
   // We use a modified quadratic formula that better represents the Raydium curve behavior
   // This matches more closely with the curve visualization in create.tsx
   const C = (2 * solNum) / Math.pow(scaledSupply, 2);
   const maxPrice = C * Math.pow(scaledSupply, 2);
 
   // Generate points along the curve with more density near the beginning for better curvature
-  const points: {cx: number; cy: number}[] = [];
+  const points: { cx: number; cy: number }[] = [];
   const numPoints = 50;
-  
+
   for (let i = 0; i <= numPoints; i++) {
     // Use a square root scale for x to emphasize the beginning curve
     const supplyRatio = Math.pow(i / numPoints, 0.5);
     const s = supplyRatio * maxSupplyOnCurve;
     const scaledS = s / scaleFactor;
-    
+
     // Calculate price using quadratic formula
     const p = C * Math.pow(scaledS, 2);
-    
+
     // Map coordinates to SVG space
     const svgX = margin.left + supplyRatio * graphWidth;
     const svgY = height - margin.bottom - (p / maxPrice) * graphHeight;
-    
+
     // Ensure y is within bounds
     const boundedY = Math.max(margin.top, Math.min(height - margin.bottom, svgY));
-    points.push({cx: svgX, cy: boundedY});
+    points.push({ cx: svgX, cy: boundedY });
   }
-  
+
   // Ensure start point is exactly on the x-axis
   if (points.length > 0) {
     points[0].cy = height - margin.bottom;
   } else {
-    points.push({cx: margin.left, cy: height - margin.bottom});
+    points.push({ cx: margin.left, cy: height - margin.bottom });
   }
 
   // Create path data for the curve and area
@@ -450,7 +451,7 @@ export function calculateGraphData(tokenSupply: string, solRaised: string, bondi
   const areaPath = `${linePath} L${points[points.length - 1].cx.toFixed(1)},${height - margin.bottom} L${margin.left},${height - margin.bottom} Z`;
 
   // Generate X-axis tick labels (token supply values)
-  const xTicks = Array.from({length: 5}).map((_, i) => {
+  const xTicks = Array.from({ length: 5 }).map((_, i) => {
     const val = (i / 4) * maxSupplyOnCurve;
     return {
       value: formatNumber(val),
@@ -460,7 +461,7 @@ export function calculateGraphData(tokenSupply: string, solRaised: string, bondi
   });
 
   // Generate Y-axis tick labels (price values)
-  const yTicks = Array.from({length: 5}).map((_, i) => {
+  const yTicks = Array.from({ length: 5 }).map((_, i) => {
     const priceVal = i === 0 ? 0 : maxPrice * (i / 4);
     return {
       value: formatNumber(priceVal),

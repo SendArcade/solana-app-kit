@@ -1,13 +1,13 @@
 # AutoAvatar Component
 
-The `AutoAvatar` component automatically generates and manages DiceBear avatars for users who don't have profile images. This ensures that every user has a consistent, unique avatar even if they haven't uploaded their own profile picture.
+The `AutoAvatar` component displays user avatars with fallback to initials when no profile image is available. It supports IPFS images and provides loading states for better UX.
 
 ## Features
 
-- **Automatic Avatar Generation**: Uses DiceBear API to generate unique avatars based on user ID
-- **IPFS Support**: Fully compatible with existing IPFSAwareImage logic for cross-platform support
-- **Caching**: Caches generated avatars locally and in the database for consistency
-- **Fallback Support**: Shows initials as a fallback while avatars are loading
+- **Profile Picture Display**: Shows existing profile pictures from URLs
+- **IPFS Support**: Fully compatible with IPFS images for cross-platform support
+- **Fallback Support**: Shows initials as a fallback when no profile picture is available
+- **Loading States**: Shimmer animation and custom loading indicators
 - **Cross-Platform**: Works seamlessly on both iOS and Android
 
 ## Usage
@@ -22,7 +22,6 @@ import {AutoAvatar} from '@/shared/components/AutoAvatar';
   profilePicUrl={user.profilePicUrl}
   username={user.username}
   size={40}
-  autoGenerate={true}
 />;
 ```
 
@@ -36,7 +35,7 @@ import {AutoAvatar} from '@/shared/components/AutoAvatar';
   size={60}
   style={customStyles.avatar}
   showInitials={true}
-  autoGenerate={true}
+  showShimmer={true}
   onLoad={() => console.log('Avatar loaded')}
   onError={() => console.log('Avatar failed to load')}
 />
@@ -46,14 +45,14 @@ import {AutoAvatar} from '@/shared/components/AutoAvatar';
 
 | Prop            | Type             | Default | Description                                                 |
 | --------------- | ---------------- | ------- | ----------------------------------------------------------- |
-| `userId`        | `string`         | -       | User ID/wallet address (used as seed for avatar generation) |
+| `userId`        | `string`         | -       | User ID/wallet address for consistent styling |
 | `profilePicUrl` | `string \| null` | -       | Existing profile picture URL                                |
 | `username`      | `string`         | -       | Username for generating initials fallback                   |
 | `size`          | `number`         | `40`    | Avatar size in pixels                                       |
 | `style`         | `ViewStyle`      | -       | Custom style for the avatar container                       |
 | `imageStyle`    | `ViewStyle`      | -       | Custom style for the avatar image                           |
 | `showInitials`  | `boolean`        | `true`  | Whether to show initials as fallback                        |
-| `autoGenerate`  | `boolean`        | `true`  | Whether to automatically generate DiceBear avatar           |
+| `showShimmer`   | `boolean`        | `false` | Whether to show shimmer animation when loading                |
 | `onLoad`        | `() => void`     | -       | Callback when avatar loads successfully                     |
 | `onError`       | `() => void`     | -       | Callback when avatar fails to load                          |
 

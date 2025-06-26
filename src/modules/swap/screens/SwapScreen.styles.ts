@@ -38,7 +38,8 @@ export const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    width: (width - 60) / 3, // Equal width for 3 buttons with margins
+    flex: 1,
+    marginHorizontal: 8,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.borderDarkColor,
@@ -319,7 +320,7 @@ export const styles = StyleSheet.create({
   },
   fullWidthScroll: {
     width: '100%',
-    maxHeight : '60%'
+    flex: 1,
   },
   headerContainer: {
     flexDirection: 'row',
@@ -370,5 +371,43 @@ export const styles = StyleSheet.create({
     bottom: 0,
     height: 50,
     zIndex: -2,
+  },
+  percentageButtonsContainer: {
+    flexDirection: 'row',
+    alignSelf: 'flex-end',
+    marginTop: 4,
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  percentageButton: {
+    backgroundColor: COLORS.brandPrimary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  percentageButtonText: {
+    color: COLORS.background,
+    fontSize: TYPOGRAPHY.size.xs,
+    fontWeight: String(TYPOGRAPHY.bold) as any,
+  },
+  clearButton: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 6,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.errorRed,
+  },
+  clearButtonText: {
+    color: COLORS.errorRed,
+    fontSize: TYPOGRAPHY.size.xs,
+    fontWeight: String(TYPOGRAPHY.bold) as any,
   },
 }); 

@@ -684,6 +684,7 @@ export const ChatComposer = forwardRef<{ focus: () => void }, ChatComposerProps>
             value={currentTextValue}
             onChangeText={handleTextChange}
             multiline
+            keyboardAppearance="dark"
           />
 
           <View style={styles.iconsContainer}>

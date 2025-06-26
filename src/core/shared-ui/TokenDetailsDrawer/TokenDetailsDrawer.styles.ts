@@ -29,11 +29,21 @@ export const styles = StyleSheet.create({
     shadowRadius: 4.65,
     elevation: 6,
   },
+  dragHandleContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  dragHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: COLORS.borderDarkColor,
+  },
   drawerContent: {
     paddingBottom: 20,
   },
   drawerHeader: {
-    paddingTop: 12,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.borderDarkColor,
@@ -513,5 +523,80 @@ export const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.size.xs,
     color: COLORS.textLight,
     lineHeight: TYPOGRAPHY.lineHeight.xs,
+  },
+  // Button container for swap and explorer buttons
+  buttonsContainer: {
+    flexDirection: 'row',
+    marginTop: 16,
+    gap: 8,
+  },
+  // Swap action button
+  swapActionButton: {
+    backgroundColor: COLORS.brandPrimary,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: COLORS.brandPrimary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  swapActionButtonText: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.size.sm,
+    fontWeight: TYPOGRAPHY.weights.semiBold,
+    textAlign: 'center',
+  },
+  // Elegant swap button for top placement
+  elegantSwapButton: {
+    backgroundColor: COLORS.brandPrimary,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 12,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    shadowColor: COLORS.brandPrimary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  swapButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  swapIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  swapButtonTextContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
+  swapButtonTitle: {
+    color: COLORS.white,
+    fontSize: TYPOGRAPHY.size.md,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    marginBottom: 1,
+  },
+  swapButtonSubtitle: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: TYPOGRAPHY.size.xs,
+    fontWeight: TYPOGRAPHY.weights.medium,
+  },
+  swapButtonArrow: {
+    opacity: 0.8,
   },
 });

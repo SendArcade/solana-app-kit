@@ -8,7 +8,7 @@
     "ios": "expo run:ios",
     "lint": "eslint .",
     "start": "node scripts/start.js",
-    "dev": "npx expo start --dev",
+    "dev": "pnpm start --dev",
     "docs:generate": "typedoc --options typedoc.json",
     "docs:convert": "node scripts/convert-to-mintlify.js",
     "check-env": "node scripts/check-env.js"
@@ -27,6 +27,7 @@
     "@ethersproject/shims": "^5.7.0",
     "@expo/metro-runtime": "^4.0.1",
     "@expo/vector-icons": "^14.1.0",
+    "@metaplex-foundation/umi": "^1.2.0",
     "@moonpay/react-native-moonpay-sdk": "^1.0.7",
     "@privy-io/expo": "^0.45.0",
     "@privy-io/expo-native-extensions": "^0.0.3",
@@ -46,6 +47,7 @@
     "@solana-mobile/mobile-wallet-adapter-protocol": "^2.1.5",
     "@solana-mobile/mobile-wallet-adapter-protocol-web3js": "^2.1.5",
     "@solana/spl-token": "^0.4.13",
+    "@solana/wallet-adapter-react": "^0.15.38",
     "@solana/wallet-standard-util": "^1.1.2",
     "@solana/web3.js": "^1.98.0",
     "@turnkey/http": "^2.17.3",
@@ -101,6 +103,7 @@
     "react-native-pager-view": "6.5.1",
     "react-native-paper": "^5.13.1",
     "react-native-qrcode-styled": "^0.3.3",
+    "react-native-qrcode-svg": "^6.3.15",
     "react-native-reanimated": "^3.16.7",
     "react-native-safe-area-context": "4.12.0",
     "react-native-screens": "~4.4.0",
@@ -119,7 +122,8 @@
     "tailwind-merge": "^3.2.0",
     "text-encoding": "^0.7.0",
     "viem": "^2.22.23",
-    "web-streams-polyfill": "^4.1.0"
+    "web-streams-polyfill": "^4.1.0",
+    "zod": "^3.25.57"
   },
   "resolutions": {
     "@dynamic-labs/utils": "4.0.0-alpha.52",
@@ -137,7 +141,7 @@
     "@types/react": "^18.2.6",
     "@types/redux": "^3.6.0",
     "babel-plugin-transform-remove-console": "^6.9.4",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.5.0",
     "eslint": "^8.19.0",
     "jest": "^29.6.3",
     "prettier": "2.8.8",

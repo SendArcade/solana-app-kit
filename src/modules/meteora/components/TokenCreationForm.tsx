@@ -93,7 +93,7 @@ export default function TokenCreationForm({
     const wallet = useWallet();
     // Create a connection to the Solana network with better configuration
     const connection = new Connection(
-        HELIUS_STAKED_URL, 
+        HELIUS_STAKED_URL,
         {
             commitment: 'confirmed',
             confirmTransactionInitialTimeout: 120000, // 2 minutes 
@@ -406,6 +406,7 @@ export default function TokenCreationForm({
                         onChangeText={setTokenName}
                         placeholder="e.g. My Awesome Token"
                         placeholderTextColor={COLORS.greyDark}
+                        keyboardAppearance="dark"
                     />
                 </View>
 
@@ -418,6 +419,7 @@ export default function TokenCreationForm({
                         placeholder="e.g. MAT"
                         placeholderTextColor={COLORS.greyDark}
                         maxLength={10}
+                        keyboardAppearance="dark"
                     />
                 </View>
 
@@ -430,6 +432,7 @@ export default function TokenCreationForm({
                         placeholder="Describe your token's purpose"
                         placeholderTextColor={COLORS.greyDark}
                         multiline
+                        keyboardAppearance="dark"
                     />
                 </View>
 
@@ -441,6 +444,7 @@ export default function TokenCreationForm({
                         onChangeText={setTokenWebsite}
                         placeholder="e.g. https://example.com"
                         placeholderTextColor={COLORS.greyDark}
+                        keyboardAppearance="dark"
                     />
                     <Text style={styles.helperText}>Project website for token metadata</Text>
                 </View>
@@ -478,6 +482,7 @@ export default function TokenCreationForm({
                             </View>
                         ) : (
                             <View style={styles.uploadContent}>
+                                <View style={{ paddingTop: 10 }} />
                                 <TouchableOpacity
                                     onPress={pickImage}
                                     style={styles.uploadImageButton}
@@ -502,6 +507,7 @@ export default function TokenCreationForm({
                                         value={tokenLogo}
                                         onChangeText={setTokenLogo}
                                         editable={!isCreating}
+                                        keyboardAppearance="dark"
                                     />
                                     <TouchableOpacity
                                         onPress={setImageFromUrl}
@@ -539,6 +545,7 @@ export default function TokenCreationForm({
                                 placeholder="@username"
                                 placeholderTextColor={COLORS.greyDark}
                                 editable={!isCreating}
+                                keyboardAppearance="dark"
                             />
                         </View>
 
@@ -551,6 +558,7 @@ export default function TokenCreationForm({
                                 placeholder="t.me/community"
                                 placeholderTextColor={COLORS.greyDark}
                                 editable={!isCreating}
+                                keyboardAppearance="dark"
                             />
                         </View>
                     </View>
@@ -565,6 +573,7 @@ export default function TokenCreationForm({
                         placeholder="e.g. 1000000000"
                         placeholderTextColor={COLORS.greyDark}
                         keyboardType="numeric"
+                        keyboardAppearance="dark"
                     />
                 </View>
 
@@ -578,6 +587,7 @@ export default function TokenCreationForm({
                         placeholderTextColor={COLORS.greyDark}
                         keyboardType="numeric"
                         maxLength={1}
+                        keyboardAppearance="dark"
                     />
                 </View>
 
@@ -621,6 +631,7 @@ export default function TokenCreationForm({
                         placeholder="e.g. 100"
                         placeholderTextColor={COLORS.greyDark}
                         keyboardType="numeric"
+                        keyboardAppearance="dark"
                     />
                     <Text style={styles.helperText}>Starting market cap for your token.</Text>
                 </View>
@@ -634,6 +645,7 @@ export default function TokenCreationForm({
                         placeholder="e.g. 3000"
                         placeholderTextColor={COLORS.greyDark}
                         keyboardType="numeric"
+                        keyboardAppearance="dark"
                     />
                     <Text style={styles.helperText}>When reached, token graduates to DAMM V1.</Text>
                 </View>
@@ -660,6 +672,7 @@ export default function TokenCreationForm({
                             placeholder="e.g. 1"
                             placeholderTextColor={COLORS.greyDark}
                             keyboardType="numeric"
+                            keyboardAppearance="dark"
                         />
                         <Text style={styles.helperText}>Amount of SOL to spend buying your token after creation.</Text>
                     </View>
@@ -697,6 +710,7 @@ export default function TokenCreationForm({
                                 placeholderTextColor={COLORS.greyDark}
                                 keyboardType="numeric"
                                 maxLength={4}
+                                keyboardAppearance="dark"
                             />
                             <Text style={styles.helperText}>100 BPS = 1% trading fee</Text>
                         </View>
@@ -762,6 +776,7 @@ export default function TokenCreationForm({
                                     onChangeText={setPartnerLpPercentage}
                                     keyboardType="numeric"
                                     maxLength={3}
+                                    keyboardAppearance="dark"
                                 />
                                 <Text style={styles.lpPercent}>%</Text>
                             </View>
@@ -774,6 +789,7 @@ export default function TokenCreationForm({
                                     onChangeText={setCreatorLpPercentage}
                                     keyboardType="numeric"
                                     maxLength={3}
+                                    keyboardAppearance="dark"
                                 />
                                 <Text style={styles.lpPercent}>%</Text>
                             </View>
@@ -786,6 +802,7 @@ export default function TokenCreationForm({
                                     onChangeText={setPartnerLockedLpPercentage}
                                     keyboardType="numeric"
                                     maxLength={3}
+                                    keyboardAppearance="dark"
                                 />
                                 <Text style={styles.lpPercent}>%</Text>
                             </View>
@@ -798,6 +815,7 @@ export default function TokenCreationForm({
                                     onChangeText={setCreatorLockedLpPercentage}
                                     keyboardType="numeric"
                                     maxLength={3}
+                                    keyboardAppearance="dark"
                                 />
                                 <Text style={styles.lpPercent}>%</Text>
                             </View>
@@ -817,7 +835,7 @@ export default function TokenCreationForm({
                     <TouchableOpacity style={styles.backButton} onPress={handleBack}>
                         <Text style={styles.backButtonText}>Back</Text>
                     </TouchableOpacity>
-
+                    <View style={{ width: 12 }} />
                     <TouchableOpacity
                         style={[styles.actionButton, styles.createButton]}
                         onPress={handleCreateToken}
@@ -976,13 +994,13 @@ const styles = StyleSheet.create({
         fontSize: TYPOGRAPHY.size.sm,
     },
     actionButton: {
-        marginTop: 16,
         overflow: 'hidden',
         borderRadius: 12,
     },
     actionButtonGradient: {
         paddingVertical: 14,
         alignItems: 'center',
+        borderRadius: 12,
     },
     actionButtonText: {
         color: COLORS.white,
@@ -1063,18 +1081,21 @@ const styles = StyleSheet.create({
     },
     buttonRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         alignItems: 'center',
         marginTop: 16,
+        paddingHorizontal: 16,
     },
     backButton: {
-        padding: 14,
+        padding: 0,
         borderRadius: 12,
         borderWidth: 1,
         borderColor: COLORS.borderDarkColor,
-        width: '30%',
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
+        height: 50,
+        backgroundColor: 'transparent',
     },
     backButtonText: {
         color: COLORS.white,
@@ -1082,7 +1103,10 @@ const styles = StyleSheet.create({
         fontWeight: TYPOGRAPHY.weights.medium,
     },
     createButton: {
-        width: '65%',
+        flex: 1,
+        height: 50,
+        borderRadius: 12,
+        overflow: 'hidden',
     },
     imageUploadContainer: {
         backgroundColor: COLORS.lighterBackground,
@@ -1090,7 +1114,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: COLORS.borderDarkColor,
         borderStyle: 'dashed',
-        height: 200,
+        height: 230,
         overflow: 'hidden',
         justifyContent: 'center',
         alignItems: 'center',

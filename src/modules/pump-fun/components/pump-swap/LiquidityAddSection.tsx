@@ -504,6 +504,7 @@ export function LiquidityAddSection({
         onChangeText={handlePoolAddressChange}
         placeholder="Enter pool address"
         editable={!isLoading && !isPoolLoading}
+        keyboardAppearance="dark"
       />
 
       {isPoolLoading && (
@@ -538,23 +539,25 @@ export function LiquidityAddSection({
           {/* Base Input */}
           <Text style={styles.inputLabel}>{baseToken.symbol} Amount</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, inputStyle]}
             value={baseAmount}
             onChangeText={handleBaseAmountChange}
             placeholder={`Enter ${baseToken.symbol} amount`}
             keyboardType="numeric"
-            editable={!isLoading && quoteAmount === ''}
+            editable={!isLoading}
+            keyboardAppearance="dark"
           />
 
           {/* Quote Input */}
           <Text style={styles.inputLabel}>{quoteToken.symbol} Amount</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, inputStyle]}
             value={quoteAmount}
             onChangeText={handleQuoteAmountChange}
             placeholder={`Enter ${quoteToken.symbol} amount`}
             keyboardType="numeric"
-            editable={!isLoading && baseAmount === ''}
+            editable={!isLoading}
+            keyboardAppearance="dark"
           />
 
           {/* LP tokens to receive (read-only) */}

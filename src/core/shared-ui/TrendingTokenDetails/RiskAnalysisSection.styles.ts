@@ -167,10 +167,11 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.brandPurple,
     },
     holderPercentage: {
-        width: 50,
+        width: 60,
         fontSize: TYPOGRAPHY.size.xs,
         color: COLORS.white,
         textAlign: 'right',
+        flexShrink: 0,
     },
     insiderBadge: {
         backgroundColor: COLORS.brandPurple,

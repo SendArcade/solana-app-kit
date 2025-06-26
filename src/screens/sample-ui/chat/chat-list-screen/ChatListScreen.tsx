@@ -439,7 +439,7 @@ const ChatListScreen: React.FC = () => {
           id: otherParticipant.id,
           username: otherParticipant.username,
           handle: otherParticipant.username,
-          // Don't provide fallback avatar - let AutoAvatar generate DiceBear avatar if needed
+          // Don't provide fallback avatar - let AutoAvatar show initials if no profile picture
           avatar: otherParticipant.profile_picture_url || null,
           verified: false,
         };
@@ -495,7 +495,6 @@ const ChatListScreen: React.FC = () => {
               size={50}
               style={styles.avatar}
               showInitials={true}
-              autoGenerate={true}
             />
           )}
           {!isDirect && !isAI ? (
@@ -570,6 +569,7 @@ const ChatListScreen: React.FC = () => {
                 placeholderTextColor={COLORS.lightGrey}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
+                keyboardAppearance="dark"
               />
               {searchQuery ? (
                 <TouchableOpacity

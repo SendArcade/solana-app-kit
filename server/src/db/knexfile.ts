@@ -14,12 +14,7 @@ const config: { [key: string]: Knex.Config } = {
   },
   production: {
     client: 'pg',
-    connection: {
-      host: `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASS,
-      database: process.env.DB_NAME,
-    },
+    connection: process.env.DATABASE_URL,
     migrations: {
       directory: path.resolve(__dirname, 'migrations'),
     },

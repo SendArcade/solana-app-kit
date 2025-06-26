@@ -27,11 +27,14 @@ export function useSwapLogic(
   routeParams: SwapRouteParams = {},
   userPublicKey: PublicKey | null,
   connected: boolean,
-  sendTransaction: any,
+  transactionSender: { 
+    sendTransaction: (transaction: any, connection: any, options?: any) => Promise<string>,
+    sendBase64Transaction: (base64Tx: string, connection: any, options?: any) => Promise<string> 
+  },
   navigation: any
 ) {
   // UI States
-  const [activeProvider, setActiveProvider] = useState<SwapProvider>('Jupiter');
+  const [activeProvider, setActiveProvider] = useState<SwapProvider>('JupiterUltra');
   const [inputValue, setInputValue] = useState(routeParams.inputAmount || '0');
   const [showSelectTokenModal, setShowSelectTokenModal] = useState(false);
   const [selectingWhichSide, setSelectingWhichSide] = useState<'input' | 'output'>('input');
@@ -582,6 +585,78 @@ export function useSwapLogic(
     }
   }, [currentBalance, fetchBalance, inputToken, userPublicKey, connected]);
 
+  // Handle percentage button clicks (25%, 50%)
+  const handlePercentageButtonClick = useCallback(async (percentage: number) => {
+    console.log(`[SwapScreen] ${percentage}% button clicked, current balance:`, currentBalance);
+
+    if (isMounted.current) {
+      setErrorMsg(''); // Clear any existing error messages
+    }
+
+    // Validate wallet connection
+    if (!connected || !userPublicKey || !inputToken) {
+      if (isMounted.current) {
+        Alert.alert(
+          "Wallet Not Connected",
+          "Please connect your wallet to view your balance."
+        );
+      }
+      return;
+    }
+
+    // If we already have a balance, use it
+    if (currentBalance !== null && currentBalance > 0) {
+      const percentageAmount = (currentBalance * percentage) / 100;
+      setInputValue(String(percentageAmount));
+      return;
+    }
+
+    // Otherwise, fetch fresh balance
+    if (isMounted.current) {
+      setLoading(true);
+      setResultMsg("Fetching your balance...");
+    }
+
+    try {
+      const balance = await fetchBalance(inputToken);
+
+      if (isMounted.current) {
+        setLoading(false);
+        setResultMsg("");
+      }
+
+      // Check if we have a balance after fetching
+      if (balance !== null && balance > 0 && isMounted.current) {
+        console.log(`[SwapScreen] Setting ${percentage}% amount from fetched balance:`, balance);
+        const percentageAmount = (balance * percentage) / 100;
+        setInputValue(String(percentageAmount));
+      } else if (isMounted.current) {
+        console.log("[SwapScreen] Balance fetch returned:", balance);
+        Alert.alert(
+          "Balance Unavailable",
+          `Could not get your ${inputToken.symbol} balance. Please check your wallet connection.`
+        );
+      }
+    } catch (error) {
+      console.error(`[SwapScreen] Error in ${percentage}% button handler:`, error);
+      if (isMounted.current) {
+        setLoading(false);
+        setResultMsg("");
+        setErrorMsg(`Failed to fetch your ${inputToken?.symbol || 'token'} balance`);
+        setTimeout(() => isMounted.current && setErrorMsg(''), 3000);
+      }
+    }
+  }, [currentBalance, fetchBalance, inputToken, userPublicKey, connected]);
+
+  // Handle clear button click
+  const handleClearButtonClick = useCallback(() => {
+    console.log("[SwapScreen] Clear button clicked");
+    setInputValue('0');
+    if (isMounted.current) {
+      setErrorMsg(''); // Clear any existing error messages
+    }
+  }, []);
+
   // Calculate conversion rate
   const getConversionRate = useCallback(() => {
     if (!inputToken || !outputToken || !estimatedOutputAmount || parseFloat(inputValue || '0') <= 0) {
@@ -601,7 +676,7 @@ export function useSwapLogic(
   // Check if a provider is available for selection
   const isProviderAvailable = useCallback((provider: SwapProvider) => {
     // Now Jupiter, Raydium, and PumpSwap are fully implemented
-    return provider === 'Jupiter' || provider === 'Raydium' || provider === 'PumpSwap';
+    return provider === 'JupiterUltra' || provider === 'Raydium' || provider === 'PumpSwap';
   }, []);
 
   // Check if the swap button should be enabled
@@ -614,8 +689,17 @@ export function useSwapLogic(
     // For PumpSwap, we need a pool address
     if (activeProvider === 'PumpSwap' && !poolAddress) return false;
 
+    // Check if input amount is valid and not greater than balance
+    const inputAmount = parseFloat(inputValue || '0');
+    if (inputAmount <= 0) return false;
+
+    // If we have a current balance, check if input amount exceeds it
+    if (currentBalance !== null && inputAmount > currentBalance) {
+      return false;
+    }
+
     return true;
-  }, [connected, loading, activeProvider, isProviderAvailable, poolAddress]);
+  }, [connected, loading, activeProvider, isProviderAvailable, poolAddress, inputValue, currentBalance]);
 
   // Function to handle keypad input
   const handleKeyPress = (key: string) => {
@@ -729,7 +813,7 @@ export function useSwapLogic(
         outputToken,
         inputValue,
         userPublicKey,
-        sendTransaction,
+        transactionSender,
         {
           statusCallback: (status) => {
             console.log('[SwapScreen] Status update:', status);
@@ -770,7 +854,11 @@ export function useSwapLogic(
         }
       } else {
         console.log('[SwapScreen] Swap response not successful:', response);
-
+        const errorString = response.error?.toString() || '';
+        if (errorString.includes('Component unmounted')) {
+          console.log('[SwapScreen] Component unmounted during swap, ignoring error.');
+          return; // Exit silently
+        }
         // For PumpSwap, check if we might have had a transaction timeout but it could have succeeded
         if (activeProvider === 'PumpSwap' && response.error) {
           const errorMsg = response.error.toString();
@@ -944,7 +1032,7 @@ export function useSwapLogic(
     inputValue,
     inputToken,
     outputToken,
-    sendTransaction,
+    transactionSender,
     fetchBalance,
     estimatedOutputAmount,
     activeProvider,
@@ -1201,6 +1289,8 @@ export function useSwapLogic(
     // Action handlers
     handleTokenSelected,
     handleMaxButtonClick,
+    handlePercentageButtonClick,
+    handleClearButtonClick,
     handleKeyPress,
     handleSwap,
     viewTransaction,
